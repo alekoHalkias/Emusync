@@ -184,23 +184,46 @@ To re-cut a failed release: delete the tag remotely and locally, fix the issue, 
 
 ## Development workflow — before touching code
 
-**Always do this before starting any new task:**
+**This applies to both human developers and Claude Code agents. Claude: do not start writing or editing code until these steps are complete.**
 
-1. **Check open issues:** https://github.com/alekoHalkias/Emusync/issues
-   Look for an existing issue that covers the work. If none exists, create one — it becomes the paper trail for why the change was made.
+### Step 1 — find or create an issue
 
-2. **Check open branches:** `git fetch --prune && git branch -r`
-   Look for a branch already working on the same area. If one exists, coordinate before duplicating effort. Branches to watch: any `feature/*` or `copilot/*` branch touching the same files you intend to change.
+```bash
+curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues?state=open&per_page=50"
+```
 
-3. **Name branches after the issue:** `feature/<issue-number>-short-description`
-   Example: `feature/10-event-log`. This makes it trivial to trace a branch back to its rationale.
+Read the list. If an existing issue covers the requested work, use it. If not, create one via the GitHub UI or API before proceeding. The issue is the paper trail for why a change was made.
 
-4. **Reference the issue in your PR/commit:** Use `Closes #N` in the PR body so GitHub auto-closes the issue on merge.
+**Claude agents:** if the user gives you a task without mentioning an issue, check the list yourself. If no issue matches, tell the user what issue you'd create and ask them to confirm before you create it (issue creation is visible to the whole team). If they confirm, create it via the API and note the issue number.
 
-**Warning signs you should stop and check:**
-- Another open branch modifies the same key file (e.g., two branches both touching `api.py` or `store.py`)
-- An open issue already describes the problem you're about to solve
-- An issue is assigned to someone else or has recent activity
+### Step 2 — check for conflicting branches
+
+```bash
+git fetch --prune && git branch -r
+```
+
+Look for any `feature/*` or `copilot/*` branch that is likely to touch the same files. If one exists, stop and flag it to the user before writing any code — two branches editing `api.py` or `store.py` simultaneously will produce a painful merge.
+
+### Step 3 — create a linked branch
+
+Name the branch after the issue: `feature/<issue-number>-short-description`
+
+```bash
+git checkout main && git pull && git checkout -b feature/10-event-log
+```
+
+**Claude agents:** if the user is already on a correctly-named branch, skip this. If they're on `main` or an unlinked branch, create the right branch before making any edits.
+
+### Step 4 — reference the issue in the PR
+
+Use `Closes #N` in the PR body so GitHub auto-closes the issue on merge.
+
+---
+
+**Stop and warn the user if:**
+- Another open branch is already modifying the same key files
+- An open issue is assigned to someone else or has recent activity suggesting active work
+- The current branch name has no issue number and `--no-verify` would be needed to commit
 
 ---
 
