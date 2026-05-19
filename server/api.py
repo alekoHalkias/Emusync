@@ -60,7 +60,7 @@ class PairRequest(BaseModel):
 
 @app.post("/pair")
 def pair(req: PairRequest) -> dict:
-    if req.master_token != _master_token:
+    if _master_token and req.master_token != _master_token:
         raise HTTPException(status_code=403, detail="Invalid master token")
     token = str(uuid.uuid4())
     device = _get_store().register_device(req.device_id, req.device_name, token)

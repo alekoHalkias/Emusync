@@ -28,6 +28,10 @@ else
     echo "           Install Node.js, then run: cd gui && npm install"
 fi
 
+echo "==> Installing git hooks..."
+git -C "$SCRIPT_DIR" config core.hooksPath .githooks
+echo "    Git hooks installed (pre-commit will warn on CLAUDE.md drift)."
+
 echo ""
 echo "Done! To use the CLI:"
 echo "  $SCRIPT_DIR/emusync --help"

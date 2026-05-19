@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Pre-commit checks:
+#   1. Warn when architecture-defining files change without CLAUDE.md being updated.
+#   2. Warn when committing on a branch that isn't linked to a GitHub issue.
+
+# ── Issue-linked branch check ─────────────────────────────────────────────────
+
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+EXEMPT_BRANCHES="main master develop"
+
+branch_is_exempt=false
+for b in $EXEMPT_BRANCHES; do
+  [ "$BRANCH" = "$b" ] && branch_is_exempt=true && break
+done
+
+if ! $branch_is_exempt; then
+  # Accept: feature/10-foo, fix/10-foo, copilot/10-foo, etc.
+  if ! echo "$BRANCH" | grep -qE '^[a-z][a-z0-9_/-]*/[0-9]+-'; then
+    echo ""
+    echo "⚠  Branch '$BRANCH' is not linked to a GitHub issue."
+    echo "   Convention: feature/<issue-number>-short-description"
+    echo "   Example:    feature/10-event-log"
+    echo ""
+    echo "   Steps:"
+    echo "     1. Check or create an issue: https://github.com/alekoHalkias/Emusync/issues"
+    echo "     2. Rename this branch:  git branch -m feature/<number>-description"
+    echo "     3. Or commit anyway:    git commit --no-verify"
+    echo ""
+    exit 1
+  fi
+fi
+
+ARCH_FILES=(
+  emusync.py
+  server/api.py
+  server/config.py
+  server/store.py
+  server/mdns.py
+  server/sync_client.py
+  gui/electron/main.ts
+  gui/electron/preload.ts
+  requirements.txt
+  gui/package.json
+)
+
+changed_arch=()
+for f in "${ARCH_FILES[@]}"; do
+  if git diff --cached --name-only | grep -qx "$f"; then
+    changed_arch+=("$f")
+  fi
+done
+
+if [ ${#changed_arch[@]} -eq 0 ]; then
+  exit 0
+fi
+
+if git diff --cached --name-only | grep -qx "CLAUDE.md"; then
+  exit 0
+fi
+
+echo ""
+echo "⚠  CLAUDE.md not updated"
+echo "   These architecture files changed in this commit:"
+for f in "${changed_arch[@]}"; do
+  echo "     $f"
+done
+echo ""
+echo "   CLAUDE.md documents IPC surface, config fields, CLI commands, key files,"
+echo "   and gotchas. Update it if your changes affect any of those."
+echo ""
+echo "   To commit anyway:  git commit --no-verify"
+echo ""
+exit 1

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { pair } from "../api";
 import { configure } from "../api";
 
@@ -23,6 +23,9 @@ declare global {
       server: {
         start: () => Promise<{ ok: boolean; token: string | null }>;
         stop: () => Promise<boolean>;
+        token: () => Promise<string | null>;
+        changePin: (pin: string | null) => Promise<{ ok: boolean; token: string | null }>;
+        discover: () => Promise<Array<{ name: string; host: string; port: number }>>;
       };
       dialog: {
         openFile: (opts?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
@@ -35,41 +38,41 @@ type Props = { onDone: () => void };
 
 export default function Setup({ onDone }: Props): React.ReactElement {
   const [step, setStep] = useState<Step>("choose");
-  const [masterToken, setMasterToken] = useState("");
   const [servers, setServers] = useState<DiscoveredServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<DiscoveredServer | null>(null);
   const [inputToken, setInputToken] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deviceName, setDeviceName] = useState("");
+
+  useEffect(() => {
+    window.emusync.config.load().then((cfg) => {
+      if (cfg?.device_name) setDeviceName(cfg.device_name as string);
+    });
+  }, []);
 
   async function startServer(): Promise<void> {
     setStep("server-starting");
+    const existing = (await window.emusync.config.load()) ?? {};
+    await window.emusync.config.save({ ...existing, is_server: true, device_name: deviceName || (existing.device_name as string) || "Server" });
     const result = await window.emusync.server.start();
     if (!result.ok) {
       setError("Failed to start server. Make sure Python and emusync.py are available.");
       setStep("choose");
       return;
     }
-    const token = result.token ?? "(check terminal output)";
-    setMasterToken(token);
-
-    // Save config as server
-    const existing = (await window.emusync.config.load()) ?? {};
-    await window.emusync.config.save({ ...existing, is_server: true });
     setStep("server-ready");
   }
 
   async function scanServers(): Promise<void> {
     setStep("join-scanning");
-    // Scanning is done by the CLI; we simulate by calling mdns discover via the Python server
-    // For the GUI we just let the user enter host/token manually if scan fails
     setServers([]);
     setStep("join-select");
   }
 
   async function doPair(): Promise<void> {
-    if (!selectedServer || !inputToken.trim()) {
-      setError("Enter the pairing token shown on the server machine.");
+    if (!selectedServer) {
+      setError("Enter the server details.");
       return;
     }
     setBusy(true);
@@ -78,20 +81,20 @@ export default function Setup({ onDone }: Props): React.ReactElement {
       configure(selectedServer.host, selectedServer.port, "");
       const cfg = (await window.emusync.config.load()) ?? {};
       const deviceId = (cfg.device_id as string) ?? crypto.randomUUID();
-      const deviceName = (cfg.device_name as string) ?? "unknown";
-      const token = await pair(inputToken.trim(), deviceId, deviceName);
+      const devName = deviceName || (cfg.device_name as string) || "unknown";
+      const token = await pair(inputToken.trim(), deviceId, devName);
       await window.emusync.config.save({
         ...cfg,
         server_host: selectedServer.host,
         server_port: selectedServer.port,
         device_id: deviceId,
-        device_name: deviceName,
+        device_name: devName,
         token,
         is_server: false,
       });
       onDone();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Pairing failed. Check the token and try again.");
+      setError(e instanceof Error ? e.message : "Pairing failed. Check the PIN and server address.");
     } finally {
       setBusy(false);
     }
@@ -104,6 +107,18 @@ export default function Setup({ onDone }: Props): React.ReactElement {
           <>
             <h1>Welcome to EmuSync</h1>
             <p>Keep game saves in sync across your devices on your home network.</p>
+
+            <div className="input-group" style={{ margin: "20px 0" }}>
+              <label>What should we call this device?</label>
+              <input
+                type="text"
+                value={deviceName}
+                onChange={(e) => setDeviceName(e.target.value)}
+                placeholder="My Gaming PC"
+                autoFocus
+              />
+            </div>
+
             {error && <p className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
             <div className="setup-choices">
               <div className="setup-choice" onClick={startServer}>
@@ -133,22 +148,13 @@ export default function Setup({ onDone }: Props): React.ReactElement {
 
         {step === "server-ready" && (
           <>
-            <h1>Server running!</h1>
+            <h1>Server is running!</h1>
             <p style={{ marginBottom: 16 }}>
-              Share this pairing token with your other device when it prompts you:
+              Your EmuSync server is ready. Other devices on your network can now connect.
             </p>
-            <div className="token-display">
-              <span>{masterToken}</span>
-              <button
-                className="btn btn-ghost"
-                style={{ padding: "4px 10px", fontSize: 12 }}
-                onClick={() => navigator.clipboard.writeText(masterToken)}
-              >
-                Copy
-              </button>
-            </div>
-            <p style={{ marginTop: 16, marginBottom: 24, fontSize: 12 }}>
-              You can pair additional devices anytime from their own EmuSync app.
+            <p style={{ marginBottom: 24, fontSize: 13, color: "var(--text-muted, #888)" }}>
+              To require a PIN, open the server settings from the top-right button after continuing.
+              If no PIN is set, any device on your LAN can connect.
             </p>
             <button className="btn btn-primary" onClick={onDone} style={{ width: "100%" }}>
               Continue to game list
@@ -227,15 +233,17 @@ export default function Setup({ onDone }: Props): React.ReactElement {
 
         {step === "join-token" && (
           <>
-            <h1>Enter pairing token</h1>
-            <p>Open EmuSync on your gaming PC and copy the pairing token shown there.</p>
+            <h1>Enter PIN</h1>
+            <p>If the server has a PIN set, enter it below. Otherwise leave it blank.</p>
             <div className="input-group" style={{ margin: "16px 0" }}>
-              <label>Pairing token</label>
+              <label>PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
               <input
                 type="text"
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="1234"
                 value={inputToken}
-                onChange={(e) => setInputToken(e.target.value)}
+                onChange={(e) => setInputToken(e.target.value.replace(/\D/g, ""))}
                 className={error ? "error" : ""}
                 autoFocus
               />
@@ -245,8 +253,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               <button className="btn btn-ghost" onClick={() => setStep("join-select")} disabled={busy}>
                 Back
               </button>
-              <button className="btn btn-primary" onClick={doPair} disabled={busy || !inputToken.trim()} style={{ flex: 1 }}>
-                {busy ? <><span className="spinner" /> Pairing…</> : "Pair device"}
+              <button className="btn btn-primary" onClick={doPair} disabled={busy} style={{ flex: 1 }}>
+                {busy ? <><span className="spinner" /> Pairing…</> : "Connect"}
               </button>
             </div>
           </>

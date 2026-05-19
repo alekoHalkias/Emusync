@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, ChildProcess } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
@@ -13,6 +13,7 @@ const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
 })();
 
 let serverProcess: ChildProcess | null = null;
+let serverToken: string | null = null;
 let gameProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 
@@ -62,13 +63,14 @@ ipcMain.handle("config:save", (_event, data: Record<string, unknown>) => {
 
 ipcMain.handle("config:exists", () => existsSync(CONFIG_PATH));
 
-ipcMain.handle("server:start", () => {
-  if (serverProcess) return { ok: true, token: null };
+function startServerProcess(): Promise<{ ok: boolean; token: string | null }> {
+  if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
 
   return new Promise<{ ok: boolean; token: string | null }>((resolve) => {
     let token: string | null = null;
     const proc = spawn(PYTHON, [SCRIPT, "server", "start"], {
       stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, PYTHONUNBUFFERED: "1" },
     });
     serverProcess = proc;
 
@@ -77,6 +79,7 @@ ipcMain.handle("server:start", () => {
       const match = line.match(/Pairing token: (\S+)/);
       if (match) {
         token = match[1];
+        serverToken = token;
         resolve({ ok: true, token });
       }
     });
@@ -89,19 +92,99 @@ ipcMain.handle("server:start", () => {
 
     proc.on("exit", () => {
       serverProcess = null;
+      serverToken = null;
     });
 
-    // Timeout in case the server starts but doesn't print the token
     setTimeout(() => {
       if (token === null) resolve({ ok: true, token: null });
     }, 5000);
   });
+}
+
+ipcMain.handle("server:start", () => startServerProcess());
+
+function killServerByPid(): void {
+  const pidFile = join(homedir(), ".emusync", ".server_pid");
+  try {
+    if (existsSync(pidFile)) {
+      const pid = parseInt(readFileSync(pidFile, "utf-8").trim(), 10);
+      if (pid) try { process.kill(pid, "SIGKILL"); } catch {}
+      unlinkSync(pidFile);
+    }
+  } catch {}
+  try { unlinkSync(join(homedir(), ".emusync", ".server_token")); } catch {}
+}
+
+function killOrphanServers(): Promise<void> {
+  return new Promise((resolve) => {
+    // Kill any emusync server process not tracked by serverProcess (orphans from previous sessions)
+    const proc = spawn("pkill", ["-9", "-f", "emusync.py server start"], { stdio: "ignore" });
+    proc.on("exit", resolve);
+    proc.on("error", resolve);
+    setTimeout(resolve, 1000);
+  });
+}
+
+ipcMain.handle("server:stop", async () => {
+  if (serverProcess) {
+    serverProcess.kill("SIGKILL");
+    serverProcess = null;
+  }
+  serverToken = null;
+  killServerByPid();
+  await killOrphanServers();
+  return true;
 });
 
-ipcMain.handle("server:stop", () => {
-  serverProcess?.kill("SIGTERM");
-  serverProcess = null;
-  return true;
+ipcMain.handle("server:token", () => {
+  if (serverToken) return serverToken;
+  const tokenFile = join(homedir(), ".emusync", ".server_token");
+  try {
+    if (existsSync(tokenFile)) return readFileSync(tokenFile, "utf-8").trim();
+  } catch {}
+  return null;
+});
+
+ipcMain.handle("server:discover", () => {
+  return new Promise<Array<{ name: string; host: string; port: number }>>((resolve) => {
+    const proc = spawn(PYTHON, [SCRIPT, "server", "discover-json"], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, PYTHONUNBUFFERED: "1" },
+    });
+    let output = "";
+    proc.stdout?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+    proc.on("exit", () => { try { resolve(JSON.parse(output)); } catch { resolve([]); } });
+    proc.on("error", () => resolve([]));
+  });
+});
+
+ipcMain.handle("server:change-pin", async (_event, pin: string | null) => {
+  // Stop running server
+  if (serverProcess) {
+    serverProcess.kill("SIGKILL");
+    serverProcess = null;
+  }
+  serverToken = null;
+  killServerByPid();
+  await killOrphanServers();
+
+  // Save PIN to config
+  const raw = existsSync(CONFIG_PATH) ? parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, unknown> : {};
+  if (pin) {
+    raw.server_pin = pin;
+  } else {
+    delete raw.server_pin;
+  }
+  writeFileSync(CONFIG_PATH, stringifyTOML(raw as any));
+
+  // Clear all paired devices so they must re-pair
+  await new Promise<void>((resolve) => {
+    const proc = spawn(PYTHON, [SCRIPT, "server", "clear-devices"], { stdio: "ignore" });
+    proc.on("exit", () => resolve());
+    proc.on("error", () => resolve());
+  });
+
+  return startServerProcess();
 });
 
 ipcMain.handle("dialog:openFile", async (_event, options: Electron.OpenDialogOptions) => {
@@ -147,6 +230,11 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  serverProcess?.kill("SIGTERM");
+  if (serverProcess) {
+    serverProcess.kill("SIGKILL");
+    serverProcess = null;
+  }
+  killServerByPid();
+  spawn("pkill", ["-9", "-f", "emusync.py server start"], { stdio: "ignore" });
   if (process.platform !== "darwin") app.quit();
 });

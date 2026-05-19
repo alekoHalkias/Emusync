@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import signal
 import subprocess
 import sys
+import random
 import uuid
 from pathlib import Path
 
@@ -62,10 +64,15 @@ def server_start() -> None:
     cfg_module.save(cfg)
 
     store = Store(cfg.data_dir)
-    master_token = str(uuid.uuid4())
+    master_token = cfg.server_pin
+    token_file = Path(cfg.data_dir) / ".server_token"
+    pid_file = Path(cfg.data_dir) / ".server_pid"
+    token_file.write_text(master_token)
+    pid_file.write_text(str(os.getpid()))
     api_module.init(store, master_token)
 
     click.echo(f"Pairing token: {master_token}")
+    sys.stdout.flush()
     click.echo(f"EmuSync server running on :{cfg.server_port}")
 
     zc, info = mdns_module.advertise(cfg.device_name, cfg.server_port)
@@ -74,6 +81,27 @@ def server_start() -> None:
     finally:
         zc.unregister_service(info)
         zc.close()
+        token_file.unlink(missing_ok=True)
+        pid_file.unlink(missing_ok=True)
+
+
+@server.command("clear-devices")
+def server_clear_devices() -> None:
+    """Remove all paired devices so they must re-pair with the new PIN."""
+    from server.store import Store
+    cfg = cfg_module.load()
+    store = Store(cfg.data_dir)
+    store.clear_devices()
+    click.echo("All paired devices removed.")
+
+
+@server.command("discover-json")
+def server_discover_json() -> None:
+    """Discover EmuSync servers on the LAN and output as JSON."""
+    import json
+    from server import mdns as mdns_module
+    results = mdns_module.discover(timeout=2.0)
+    click.echo(json.dumps([{"name": r.name, "host": r.host, "port": r.port} for r in results]))
 
 
 # ── device ────────────────────────────────────────────────────────────────────
