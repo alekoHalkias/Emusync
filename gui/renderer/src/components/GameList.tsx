@@ -1,0 +1,140 @@
+import React, { useCallback, useEffect, useState } from "react";
+import { listGames, removeGame, getSaveMeta, getLock, type Game } from "../api";
+
+type Props = {
+  onAdd: () => void;
+  onEdit: (game: Game) => void;
+  onPlay: (slug: string) => void;
+};
+
+type GameRow = Game & {
+  lastPush?: string;
+  locked?: boolean;
+};
+
+type ConfirmRemove = { slug: string; name: string } | null;
+
+export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactElement {
+  const [games, setGames] = useState<GameRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
+  const [removing, setRemoving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const raw = await listGames();
+      const enriched = await Promise.all(
+        raw.map(async (g): Promise<GameRow> => {
+          const [meta, lock] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug)]);
+          return {
+            ...g,
+            lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
+            locked: lock.status === "fulfilled" ? lock.value.locked : false,
+          };
+        })
+      );
+      setGames(enriched);
+    } catch {
+      // Server offline — show empty list, StatusBadge shows the offline indicator
+      setGames([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleRemove(): Promise<void> {
+    if (!confirmRemove) return;
+    setRemoving(true);
+    try {
+      await removeGame(confirmRemove.slug);
+      setConfirmRemove(null);
+      await load();
+    } catch {
+      /* ignore — game might not exist */
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="section-header">
+        <h2>Games</h2>
+        <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <span className="spinner" style={{ width: 24, height: 24 }} />
+        </div>
+      ) : games.length === 0 ? (
+        <div className="empty-state">
+          <h3>No games yet</h3>
+          <p style={{ marginBottom: 20 }}>Add your first game to start syncing saves.</p>
+          <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
+        </div>
+      ) : (
+        <div className="game-list">
+          {games.map((g) => (
+            <div key={g.slug} className="game-row">
+              <div style={{ flex: 1 }}>
+                <div className="game-row-name">{g.name}</div>
+                <div className="game-row-meta">
+                  {g.locked && <span style={{ color: "var(--red)", marginRight: 10 }}>🔒 In use</span>}
+                  {g.lastPush ? `Last sync: ${g.lastPush}` : "Never synced"}
+                </div>
+              </div>
+              <div className="game-row-actions">
+                <button
+                  className="btn btn-icon"
+                  title="Play"
+                  disabled={g.locked}
+                  onClick={() => onPlay(g.slug)}
+                >
+                  ▶
+                </button>
+                <button
+                  className="btn btn-icon"
+                  title="Settings"
+                  onClick={() => onEdit(g)}
+                >
+                  ⚙
+                </button>
+                <button
+                  className="btn btn-icon"
+                  title="Remove from EmuSync"
+                  onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
+                >
+                  🗑
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {confirmRemove && (
+        <div className="modal-overlay" onClick={() => setConfirmRemove(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Remove {confirmRemove.name}?</h3>
+            <p>
+              This removes the game from EmuSync management. The save file on your
+              device will <strong>not</strong> be deleted.
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmRemove(null)} disabled={removing}>
+                Cancel
+              </button>
+              <button className="btn btn-danger" onClick={handleRemove} disabled={removing}>
+                {removing ? <><span className="spinner" /> Removing…</> : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
