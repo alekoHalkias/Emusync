@@ -1,4 +1,4 @@
-.PHONY: install dev-server dev-gui build-gui lint test
+.PHONY: install dev-server dev-gui build-gui lint test release
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -21,3 +21,8 @@ lint:
 
 test:
 	$(PYTHON) -m pytest tests/ -v
+
+release:
+	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=v1.0.0" && exit 1)
+	git tag $(VERSION)
+	git push origin $(VERSION)

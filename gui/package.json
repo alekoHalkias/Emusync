@@ -27,6 +27,7 @@
   "build": {
     "appId": "com.emusync.app",
     "productName": "EmuSync",
+    "publish": null,
     "linux": {
       "target": "AppImage",
       "category": "Utility"
