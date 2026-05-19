@@ -231,7 +231,7 @@ Use `Closes #N` in the PR body so GitHub auto-closes the issue on merge.
 
 - `main` — stable, release-ready
 - Feature branches cut from `main`, merged via PR — named `feature/<issue-number>-description`
-- The branch `feature/server-control-panel` contains the server modal UI and PIN system (not yet merged as of last update)
+- The branch `feature/server-control-panel` contains the server modal UI and PIN system (merged into main)
 - No `--no-verify` or `--amend` on published commits
 
 ---

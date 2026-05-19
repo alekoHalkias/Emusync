@@ -17,23 +17,35 @@ jobs:
 
       - name: Mark merged branches in CLAUDE.md
         id: update
+        env:
+          REPO: ${{ github.repository }}
         run: |
           python3 - <<'EOF'
-          import re, subprocess, sys
+          import re, sys, json, os
+          from urllib.request import urlopen, Request
+
+          repo = os.environ["REPO"]
 
           with open("CLAUDE.md", "r") as f:
               content = f.read()
 
-          # Get all branches merged into HEAD (we're on main after the merge)
-          result = subprocess.run(
-              ["git", "branch", "-r", "--merged", "HEAD"],
-              capture_output=True, text=True, check=True,
-          )
-          merged = {
-              b.strip().removeprefix("origin/")
-              for b in result.stdout.splitlines()
-              if b.strip() and not b.strip().endswith("/HEAD")
-          }
+          branches = re.findall(r"`([^`]+)`[^\n]*\(not yet merged[^)]*\)", content)
+          if not branches:
+              print("No branches annotated as 'not yet merged'.")
+              sys.exit(0)
+
+          # Use merged PRs from GitHub API — works for squash, rebase, and merge commits
+          page, merged = 1, set()
+          while True:
+              url = f"https://api.github.com/repos/{repo}/pulls?state=closed&per_page=100&page={page}"
+              req = Request(url, headers={"Accept": "application/vnd.github+json"})
+              prs = json.loads(urlopen(req).read())
+              if not prs:
+                  break
+              for pr in prs:
+                  if pr.get("merged_at"):
+                      merged.add(pr["head"]["ref"])
+              page += 1
 
           pattern = r"(`([^`]+)`)([^\n]*)\(not yet merged[^)]*\)"
 
