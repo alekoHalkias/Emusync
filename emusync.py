@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import re
+import signal
 import subprocess
 import sys
 import uuid
 from pathlib import Path
+
+# Make SIGTERM run finally blocks (default handler calls _exit, skipping them)
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
 import click
 

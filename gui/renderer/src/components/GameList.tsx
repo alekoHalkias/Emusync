@@ -4,7 +4,7 @@ import { listGames, removeGame, getSaveMeta, getLock, type Game } from "../api";
 type Props = {
   onAdd: () => void;
   onEdit: (game: Game) => void;
-  onPlay: (slug: string) => void;
+  onPlay: (slug: string, name: string) => void;
 };
 
 type GameRow = Game & {
@@ -92,7 +92,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   className="btn btn-icon"
                   title="Play"
                   disabled={g.locked}
-                  onClick={() => onPlay(g.slug)}
+                  onClick={() => onPlay(g.slug, g.name)}
                 >
                   ▶
                 </button>

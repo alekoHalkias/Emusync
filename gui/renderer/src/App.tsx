@@ -1,45 +1,93 @@
 import React, { useEffect, useState } from "react";
-import { configure } from "./api";
+import { configure, getGameDevice } from "./api";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
 import StatusBadge from "./components/StatusBadge";
 
-function PlayModal({ slug, onClose }: { slug: string; onClose: () => void }): React.ReactElement {
+function CopyBox({ text }: { text: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
-  const command = `emusync run --game ${slug} -- %command%`;
-
   function copy(): void {
-    navigator.clipboard.writeText(command).then(() => {
+    navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   }
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 16 }}>
+      <div style={{
+        flex: 1,
+        background: "var(--surface-2, #0f1923)",
+        borderRadius: 6,
+        padding: "10px 14px",
+        fontFamily: "monospace",
+        fontSize: 13,
+        userSelect: "text",
+        WebkitUserSelect: "text",
+        wordBreak: "break-all",
+        border: "1px solid var(--border, rgba(255,255,255,0.1))",
+      }}>
+        {text}
+      </div>
+      <button className="btn btn-ghost" onClick={copy} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+        {copied ? "✓ Copied!" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
+function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
+  slug: string;
+  launchCommand: string | null;
+  onClose: () => void;
+  onLaunched: () => void;
+}): React.ReactElement {
+  const [launching, setLaunching] = useState(false);
+  const [launched, setLaunched] = useState(false);
+  const steamCommand = `emusync run --game ${slug} -- %command%`;
+
+  async function launchDirect(): Promise<void> {
+    if (!launchCommand) return;
+    setLaunching(true);
+    await window.emusync.game.launch(slug, launchCommand);
+    setLaunching(false);
+    setLaunched(true);
+    onLaunched();
+    setTimeout(() => { setLaunched(false); onClose(); }, 1500);
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Launch {slug}</h3>
-        <p style={{ marginBottom: 8 }}>Add this to your Steam launch options:</p>
-        <div style={{
-          background: "var(--surface-2, #0f1923)",
-          borderRadius: 6,
-          padding: "10px 14px",
-          fontFamily: "monospace",
-          fontSize: 13,
-          userSelect: "text",
-          WebkitUserSelect: "text",
-          wordBreak: "break-all",
-          marginBottom: 12,
-          border: "1px solid var(--border, rgba(255,255,255,0.1))",
-        }}>
-          {command}
-        </div>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <h3 style={{ marginBottom: 20 }}>Play {slug}</h3>
+
+        <p style={{ marginBottom: 8, fontWeight: 500 }}>Launch directly</p>
+        {launchCommand ? (
+          <>
+            <CopyBox text={launchCommand} />
+            <button
+              className="btn btn-primary"
+              style={{ width: "100%", marginBottom: 20 }}
+              onClick={launchDirect}
+              disabled={launching || launched}
+            >
+              {launched ? "✓ Launched!" : launching ? "Launching…" : "▶ Launch now"}
+            </button>
+          </>
+        ) : (
+          <p style={{ color: "var(--muted, #888)", fontSize: 13, marginBottom: 20 }}>
+            No launch command configured. Edit this game and set a launch command first.
+          </p>
+        )}
+
+        <p style={{ marginBottom: 8, fontWeight: 500 }}>Add to Steam</p>
+        <p style={{ fontSize: 13, color: "var(--muted, #888)", marginBottom: 8 }}>
+          Paste this into Steam → game properties → launch options:
+        </p>
+        <CopyBox text={steamCommand} />
+
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
-          <button className="btn btn-primary" onClick={copy}>
-            {copied ? "✓ Copied!" : "Copy"}
-          </button>
         </div>
       </div>
     </div>
@@ -56,6 +104,16 @@ type Screen =
 export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
   const [playSlug, setPlaySlug] = useState<string | null>(null);
+  const [playLaunchCommand, setPlayLaunchCommand] = useState<string | null>(null);
+  const [gameRunning, setGameRunning] = useState(false);
+  const [runningGameName, setRunningGameName] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.emusync.game.isRunning().then(setGameRunning);
+    const onExited = (): void => { setGameRunning(false); setRunningGameName(null); };
+    window.emusync.game.onExited(onExited);
+    return () => window.emusync.game.offExited(onExited);
+  }, []);
 
   useEffect(() => {
     async function init(): Promise<void> {
@@ -91,8 +149,19 @@ export default function App(): React.ReactElement {
     });
   }
 
-  function handlePlay(slug: string): void {
+  function handlePlay(slug: string, name?: string): void {
+    setPlayLaunchCommand(null);
     setPlaySlug(slug);
+    if (name) setRunningGameName(name);
+    getGameDevice(slug)
+      .then((gd) => setPlayLaunchCommand(gd.launch_command || null))
+      .catch(() => {});
+  }
+
+  async function handleStop(): Promise<void> {
+    await window.emusync.game.stop();
+    setGameRunning(false);
+    setRunningGameName(null);
   }
 
   if (screen.name === "loading") {
@@ -111,6 +180,16 @@ export default function App(): React.ReactElement {
     <div className="layout">
       <header className="topbar">
         <span className="topbar-title">EmuSync</span>
+        {gameRunning && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 8 }}>
+            <span style={{ color: "#4ade80", fontWeight: 600, fontSize: 13 }}>
+              ● {runningGameName ?? "Game"} running
+            </span>
+            <button className="btn btn-danger" onClick={handleStop}>
+              ■ Stop
+            </button>
+          </div>
+        )}
         <StatusBadge />
       </header>
 
@@ -142,7 +221,14 @@ export default function App(): React.ReactElement {
         )}
       </main>
 
-      {playSlug && <PlayModal slug={playSlug} onClose={() => setPlaySlug(null)} />}
+      {playSlug && (
+        <PlayModal
+          slug={playSlug}
+          launchCommand={playLaunchCommand}
+          onClose={() => { setPlaySlug(null); setPlayLaunchCommand(null); }}
+          onLaunched={() => setGameRunning(true)}
+        />
+      )}
     </div>
   );
 }

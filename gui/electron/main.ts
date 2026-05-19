@@ -6,11 +6,16 @@ import { homedir } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
 
 const CONFIG_PATH = join(homedir(), ".emusync", "emusync.toml");
-const PYTHON = process.env.EMUSYNC_PYTHON ?? "python3";
-const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../../emusync.py");
+const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../../../emusync.py");
+const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
+  const venv = join(dirname(SCRIPT), ".venv", "bin", "python");
+  return require("fs").existsSync(venv) ? venv : "python3";
+})();
 
 let serverProcess: ChildProcess | null = null;
+let gameProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
+
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -28,7 +33,6 @@ function createWindow(): void {
 
   if (process.env.NODE_ENV === "development") {
     mainWindow.loadURL("http://localhost:5173");
-    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
@@ -104,6 +108,34 @@ ipcMain.handle("dialog:openFile", async (_event, options: Electron.OpenDialogOpt
   const result = await dialog.showOpenDialog(mainWindow!, options);
   return result.canceled ? null : result.filePaths[0];
 });
+
+ipcMain.handle("game:launch", (_event, slug: string, command: string) => {
+  if (gameProcess) return { ok: false };
+  const args = (command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [])
+    .map(a => /^["']/.test(a) ? a.slice(1, -1) : a);
+  const proc = spawn(PYTHON, [SCRIPT, "run", "--game", slug, "--", ...args], {
+    stdio: "ignore",
+    detached: true,
+    env: { ...process.env, DISPLAY: process.env.DISPLAY || ":0", WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY || "wayland-0" },
+  });
+  gameProcess = proc;
+  proc.on("exit", () => {
+    gameProcess = null;
+    mainWindow?.webContents.send("game:exited");
+  });
+  proc.unref();
+  return { ok: true };
+});
+
+ipcMain.handle("game:stop", () => {
+  if (gameProcess?.pid) {
+    try { process.kill(-gameProcess.pid, "SIGTERM"); } catch { gameProcess.kill("SIGTERM"); }
+  }
+  gameProcess = null;
+  return { ok: true };
+});
+
+ipcMain.handle("game:isRunning", () => gameProcess !== null);
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 

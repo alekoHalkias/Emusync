@@ -28,4 +28,12 @@ contextBridge.exposeInMainWorld("emusync", {
         ...options,
       }),
   },
+  game: {
+    launch: (slug: string, command: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke("game:launch", slug, command),
+    stop: (): Promise<{ ok: boolean }> => ipcRenderer.invoke("game:stop"),
+    isRunning: (): Promise<boolean> => ipcRenderer.invoke("game:isRunning"),
+    onExited: (cb: () => void): void => { ipcRenderer.on("game:exited", cb); },
+    offExited: (cb: () => void): void => { ipcRenderer.removeListener("game:exited", cb); },
+  },
 });

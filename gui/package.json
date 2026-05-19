@@ -4,7 +4,7 @@
   "description": "EmuSync — save-file sync for emulators",
   "main": "out/main/main.js",
   "scripts": {
-    "dev": "ELECTRON_EXEC_PATH=/usr/lib/electron/electron electron-vite dev",
+    "dev": "electron-vite dev -- --no-sandbox",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "dist": "npm run build && electron-builder"
