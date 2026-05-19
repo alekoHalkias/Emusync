@@ -1,0 +1,68 @@
+name: Update CLAUDE.md branch status
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-branch-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Mark merged branches in CLAUDE.md
+        id: update
+        run: |
+          python3 - <<'EOF'
+          import re, subprocess, sys
+
+          with open("CLAUDE.md", "r") as f:
+              content = f.read()
+
+          # Get all branches merged into HEAD (we're on main after the merge)
+          result = subprocess.run(
+              ["git", "branch", "-r", "--merged", "HEAD"],
+              capture_output=True, text=True, check=True,
+          )
+          merged = {
+              b.strip().removeprefix("origin/")
+              for b in result.stdout.splitlines()
+              if b.strip() and not b.strip().endswith("/HEAD")
+          }
+
+          pattern = r"(`([^`]+)`)([^\n]*)\(not yet merged[^)]*\)"
+
+          def replace(m):
+              branch = m.group(2)
+              if branch in merged:
+                  return f"{m.group(1)}{m.group(3)}(merged into main)"
+              return m.group(0)
+
+          new_content = re.sub(pattern, replace, content)
+
+          if new_content == content:
+              print("No branch status changes.")
+              sys.exit(0)
+
+          with open("CLAUDE.md", "w") as f:
+              f.write(new_content)
+
+          print("Updated CLAUDE.md — marked merged branches.")
+          EOF
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet CLAUDE.md; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CLAUDE.md
+          git commit -m "ci: mark merged branches in CLAUDE.md"
+          git push

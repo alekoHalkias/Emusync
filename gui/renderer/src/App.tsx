@@ -3,7 +3,7 @@ import { configure, getGameDevice } from "./api";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
-import StatusBadge from "./components/StatusBadge";
+import ServerStatusButton from "./components/ServerStatusButton";
 
 function CopyBox({ text }: { text: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
@@ -104,6 +104,8 @@ type Screen =
 export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
   const [loadingMessage, setLoadingMessage] = useState("Loading…");
+  const [isServer, setIsServer] = useState(false);
+  const [gameListKey, setGameListKey] = useState(0);
   const [playSlug, setPlaySlug] = useState<string | null>(null);
   const [playLaunchCommand, setPlayLaunchCommand] = useState<string | null>(null);
   const [gameRunning, setGameRunning] = useState(false);
@@ -133,6 +135,7 @@ export default function App(): React.ReactElement {
         (cfg.server_port as number) || 8765,
         (cfg.token as string) || "",
       );
+      setIsServer(!!(cfg.is_server as boolean));
       if (cfg.is_server) {
         setLoadingMessage("Starting server…");
         await window.emusync.server.start();
@@ -150,7 +153,20 @@ export default function App(): React.ReactElement {
         (cfg.server_port as number) || 8765,
         (cfg.token as string) || "",
       );
+      setIsServer(!!(cfg.is_server as boolean));
       setScreen({ name: "games" });
+    });
+  }
+
+  function handleRepaired(): void {
+    window.emusync.config.load().then((cfg) => {
+      if (!cfg) return;
+      configure(
+        (cfg.server_host as string) || "localhost",
+        (cfg.server_port as number) || 8765,
+        (cfg.token as string) || "",
+      );
+      setGameListKey((k) => k + 1);
     });
   }
 
@@ -196,12 +212,13 @@ export default function App(): React.ReactElement {
             </button>
           </div>
         )}
-        <StatusBadge />
+        <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
       </header>
 
       <main className="content">
         {screen.name === "games" && (
           <GameList
+            key={gameListKey}
             onAdd={() => setScreen({ name: "config-new" })}
             onEdit={(g) => setScreen({ name: "config-edit", slug: g.slug, gameName: g.name })}
             onPlay={handlePlay}

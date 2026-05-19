@@ -102,6 +102,10 @@ class Store:
         self._conn.commit()
         return Device(id=id, name=name, token=token)
 
+    def clear_devices(self) -> None:
+        self._conn.execute("DELETE FROM devices")
+        self._conn.commit()
+
     def device_by_token(self, token: str) -> Optional[Device]:
         row = self._conn.execute(
             "SELECT id, name, token FROM devices WHERE token = ?", (token,)

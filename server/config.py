@@ -19,6 +19,7 @@ class Config:
     device_name: str = field(default_factory=lambda: os.uname().nodename)
     token: str = ""
     is_server: bool = False
+    server_pin: str = ""
 
 
 def load() -> Config:
@@ -34,6 +35,7 @@ def load() -> Config:
         device_name=str(data.get("device_name", os.uname().nodename)),
         token=str(data.get("token", "")),
         is_server=bool(data.get("is_server", False)),
+        server_pin=str(data.get("server_pin", "")),
     )
 
 
@@ -47,5 +49,7 @@ def save(cfg: Config) -> None:
     doc.add("device_name", cfg.device_name)
     doc.add("token", cfg.token)
     doc.add("is_server", cfg.is_server)
+    if cfg.server_pin:
+        doc.add("server_pin", cfg.server_pin)
     with open(CONFIG_PATH, "w") as f:
         tomlkit.dump(doc, f)
