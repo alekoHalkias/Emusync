@@ -465,3 +465,134 @@ async def test_two_device_save_sync(client):
     r = await client.get("/games/pokemon-emerald/save", headers=auth_a)
     assert r.content == save_v2
     assert r.headers["x-save-hash"] == hash_v2
+
+
+# ── blank PIN (open access) ───────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_pair_with_blank_pin_succeeds():
+    """When server_pin is blank any device can pair without a code."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, "")  # blank master token = open access
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app),
+            base_url="http://test",
+        ) as c:
+            r = await c.post("/pair", json={
+                "master_token": "",
+                "device_id": "open-device",
+                "device_name": "Open Device",
+            })
+            assert r.status_code == 200
+            assert r.json()["token"]
+
+
+@pytest.mark.asyncio
+async def test_pair_with_blank_pin_ignores_wrong_code():
+    """Blank server PIN means even a wrong code is accepted."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, "")
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app),
+            base_url="http://test",
+        ) as c:
+            r = await c.post("/pair", json={
+                "master_token": "some-random-garbage",
+                "device_id": "open-device",
+                "device_name": "Open Device",
+            })
+            assert r.status_code == 200
+
+
+# ── devices endpoint ──────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_list_devices(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    r = await client.get("/devices", headers=auth)
+    assert r.status_code == 200
+    devices = r.json()
+    assert any(d["id"] == DEVICE_ID for d in devices)
+    assert any(d["name"] == DEVICE_NAME for d in devices)
+
+
+@pytest.mark.asyncio
+async def test_list_devices_shows_all_paired(client):
+    r1 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d1", "device_name": "PC"})
+    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d2", "device_name": "Deck"})
+    auth = {"Authorization": f"Bearer {r1.json()['token']}"}
+
+    r = await client.get("/devices", headers=auth)
+    ids = [d["id"] for d in r.json()]
+    assert "d1" in ids
+    assert "d2" in ids
+
+
+# ── game rename ───────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_update_game_name(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+
+    r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald v2"}, headers=auth)
+    assert r.status_code == 200
+    assert r.json()["name"] == "Pokemon Emerald v2"
+    assert r.json()["slug"] == "pokemon-emerald"
+
+
+@pytest.mark.asyncio
+async def test_update_nonexistent_game_returns_404(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    r = await client.put("/games/ghost-game", json={"name": "Ghost"}, headers=auth)
+    assert r.status_code == 404
+
+
+# ── clear_devices ─────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_clear_devices_removes_all(client):
+    await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d1", "device_name": "PC"})
+    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d2", "device_name": "Deck"})
+    auth = {"Authorization": f"Bearer {r2.json()['token']}"}
+
+    r = await client.get("/devices", headers=auth)
+    assert len(r.json()) == 2
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.register_device("d1", "PC", "tok1")
+        store.register_device("d2", "Deck", "tok2")
+        assert len(store.list_devices()) == 2
+        store.clear_devices()
+        assert store.list_devices() == []
+
+
+# ── pair idempotency ──────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_pair_same_device_id_updates_token(client):
+    """Pairing the same device_id twice issues a new token, not a duplicate row."""
+    r1 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": DEVICE_ID, "device_name": DEVICE_NAME})
+    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": DEVICE_ID, "device_name": DEVICE_NAME})
+    token1 = r1.json()["token"]
+    token2 = r2.json()["token"]
+
+    # New token issued each time
+    assert token1 != token2
+
+    # Old token should no longer be valid
+    r = await client.get("/games", headers={"Authorization": f"Bearer {token1}"})
+    assert r.status_code == 401
+
+    # New token works
+    r = await client.get("/games", headers={"Authorization": f"Bearer {token2}"})
+    assert r.status_code == 200
