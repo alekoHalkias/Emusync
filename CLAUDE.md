@@ -153,12 +153,47 @@ Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_na
 ## Testing
 
 ```bash
-make test   # runs tests/test_integration.py with pytest
+make test                          # run all tests
+.venv/bin/python -m pytest tests/test_integration.py::test_name -v  # single test
 ```
 
-Integration tests use a real SQLite DB (no mocks). They spin up the full store and API. Set `EMUSYNC_CONFIG_DIR` env var to isolate config between test runs.
+Integration tests use a real SQLite DB (no mocks). They spin up the full store and API via `httpx.AsyncClient` + `ASGITransport`. Set `EMUSYNC_CONFIG_DIR` env var to isolate config between test runs.
 
 **Do not mock the database.** The project had a past incident where mock/prod divergence masked a broken migration.
+
+### Claude agents — testing requirements
+
+**Before marking any task complete, run `make test` and confirm it passes.**
+
+When adding or changing code, write tests if any of the following are true:
+
+- You added a new API route (`server/api.py`) → add an integration test for the happy path and the main error case (404, 403, 409, etc.)
+- You added a new `Store` method (`server/store.py`) → test it directly via `Store(tmpdir)` or through the API
+- You added a CLI subcommand (`emusync.py`) → note it in the PR; CLI-level tests are optional but preferred for logic-heavy commands
+- You fixed a bug → add a regression test that would have caught it
+
+**How to write a test** — follow the pattern in `tests/test_integration.py`:
+
+```python
+@pytest.mark.asyncio
+async def test_your_scenario(client):          # client fixture = fresh DB + app
+    token = await _pair(client)               # pair a device to get a bearer token
+    auth = {"Authorization": f"Bearer {token}"}
+    r = await client.post("/your-route", json={...}, headers=auth)
+    assert r.status_code == 200
+```
+
+For tests that need blank-PIN (open access) or direct store access, spin up your own fixture:
+
+```python
+with tempfile.TemporaryDirectory() as tmpdir:
+    store = Store(tmpdir)
+    api_module.init(store, "")   # blank = open access
+    async with AsyncClient(transport=ASGITransport(app=api_module.app), base_url="http://test") as c:
+        ...
+```
+
+**Never use mocks.** Real SQLite only.
 
 ---
 
