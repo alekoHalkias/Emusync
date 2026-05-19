@@ -30,7 +30,16 @@
     "publish": null,
     "linux": {
       "target": "AppImage",
-      "category": "Utility"
+      "category": "Utility",
+      "artifactName": "${productName}-${version}-linux-x86_64.${ext}"
+    },
+    "win": {
+      "target": [{"target": "nsis", "arch": ["x64"]}],
+      "artifactName": "${productName}-${version}-windows-x64-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
     }
   }
 }

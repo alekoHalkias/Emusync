@@ -27,8 +27,8 @@ jobs:
       - name: Run tests
         run: make test
 
-  build:
-    name: Build AppImage
+  build-linux:
+    name: Build Linux AppImage
     needs: test
     runs-on: ubuntu-latest
 
@@ -54,6 +54,9 @@ jobs:
       - name: Install Node deps
         run: npm ci --prefix gui
 
+      - name: Set version from tag
+        run: npm version --no-git-tag-version ${GITHUB_REF_NAME#v} --prefix gui
+
       - name: Install AppImage dependencies
         run: sudo apt-get install -y libfuse2 libgbm1 libnss3 libasound2t64
 
@@ -62,15 +65,48 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload AppImage artifact
+      - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EmuSync-AppImage
+          name: EmuSync-linux
           path: gui/dist/*.AppImage
+
+  build-windows:
+    name: Build Windows Installer
+    needs: test
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Node
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Install Node deps
+        run: npm ci --prefix gui
+
+      - name: Set version from tag
+        run: npm version --no-git-tag-version ${GITHUB_REF_NAME#v} --prefix gui
+        shell: bash
+
+      - name: Build Windows installer
+        run: npm run dist --prefix gui
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EmuSync-windows
+          path: gui/dist/*.exe
 
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -78,14 +114,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
-      - name: Download AppImage
+      - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
-          name: EmuSync-AppImage
+          name: EmuSync-linux
+          path: dist/
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: EmuSync-windows
           path: dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.AppImage
+          files: dist/*
           generate_release_notes: true
