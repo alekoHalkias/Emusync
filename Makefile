@@ -1,4 +1,4 @@
-.PHONY: install dev-server dev-gui build-gui lint
+.PHONY: install dev-server dev-gui build-gui lint test
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -18,3 +18,6 @@ build-gui:
 lint:
 	$(VENV)/bin/python -m py_compile server/config.py server/store.py server/mdns.py server/api.py server/sync_client.py emusync.py
 	@echo "Python syntax OK"
+
+test:
+	$(PYTHON) -m pytest tests/ -v
