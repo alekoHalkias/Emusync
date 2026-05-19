@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.spec
+backend/build/
+backend/dist/
+backend/emusync-backend.spec
+
+# Node / Electron
+gui/node_modules/
+gui/dist/
+
+# Test artifacts
+*.sav
+*.bak
+*.rom
+
+# Config / secrets
+.emusync/
