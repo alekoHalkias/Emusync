@@ -22,6 +22,13 @@ Makefile                ← dev shortcuts
 requirements.txt        ← Python deps
 pyproject.toml          ← package metadata
 
+tests/
+└── test_integration.py ← integration tests (real SQLite, no mocks)
+
+.github/workflows/
+├── ci.yml              ← runs tests on push/PR to Aleko-andrewVersion and main
+└── release.yml         ← builds AppImage + publishes GitHub Release on version tags
+
 server/
 ├── api.py              ← FastAPI REST API (all endpoints)
 ├── config.py           ← TOML config (~/.emusync/emusync.toml)
@@ -178,14 +185,34 @@ Set `EMUSYNC_CONFIG_DIR` to override the config directory — used to simulate t
 
 ---
 
+## CI/CD
+
+**On every push to `Aleko-andrewVersion` or `main`, and on PRs into `main`:**
+GitHub Actions runs the full test suite. The commit gets a green check or red X.
+
+**To publish a release:**
+```bash
+make release VERSION=v1.0.0
+```
+This tags the commit and pushes the tag. GitHub Actions then:
+1. Runs all tests — fails fast if anything is broken
+2. Builds the AppImage on Ubuntu
+3. Creates a GitHub Release at `github.com/alekoHalkias/Emusync/releases` with the AppImage attached and auto-generated release notes from commit messages
+
+AppImages are only built on version tags — not on every push to main. You control exactly when a release goes out.
+
+---
+
 ## Makefile shortcuts
 
 ```bash
-make install      # run install.sh
-make dev-server   # start Python backend via venv
-make dev-gui      # cd gui && npm run dev
-make build-gui    # cd gui && npm run build
-make lint         # syntax-check Python files
+make install                  # run install.sh
+make dev-server               # start Python backend via venv
+make dev-gui                  # cd gui && npm run dev
+make build-gui                # cd gui && npm run build
+make lint                     # syntax-check Python files
+make test                     # run integration tests
+make release VERSION=v1.0.0   # tag + push to trigger a release build
 ```
 
 ---
