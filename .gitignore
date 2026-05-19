@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.spec
+.venv/
+backend/build/
+backend/dist/
+
+# Node / Electron
+gui/node_modules/
+gui/dist/
+gui/out/
+
+# Local test ROMs and saves (never commit)
+roms/
+
+# Config
+.emusync/
