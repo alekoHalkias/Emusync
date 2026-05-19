@@ -44,7 +44,9 @@ function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
 }): React.ReactElement {
   const [launching, setLaunching] = useState(false);
   const [launched, setLaunched] = useState(false);
-  const steamCommand = `emusync run --game ${slug} -- %command%`;
+  const [launcherPath, setLauncherPath] = useState("emusync");
+  useEffect(() => { window.emusync.launcher.path().then(setLauncherPath); }, []);
+  const steamCommand = `"${launcherPath}" run --game ${slug} -- %command%`;
 
   async function launchDirect(): Promise<void> {
     if (!launchCommand) return;

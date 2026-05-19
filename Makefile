@@ -10,7 +10,7 @@ dev-server:
 	$(PYTHON) emusync.py server start
 
 dev-gui:
-	cd gui && npm run dev
+	cd gui && npm run dev || (test -x /usr/lib/electron/electron && ELECTRON_EXEC_PATH=/usr/lib/electron/electron npm run dev)
 
 build-gui:
 	cd gui && npm run build

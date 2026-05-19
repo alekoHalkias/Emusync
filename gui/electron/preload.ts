@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld("emusync", {
     discover: (): Promise<Array<{ name: string; host: string; port: number }>> =>
       ipcRenderer.invoke("server:discover"),
   },
+  launcher: {
+    path: (): Promise<string> => ipcRenderer.invoke("launcher:path"),
+  },
   dialog: {
     openFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }): Promise<string | null> =>
       ipcRenderer.invoke("dialog:openFile", {
