@@ -103,6 +103,7 @@ type Screen =
 
 export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
+  const [loadingMessage, setLoadingMessage] = useState("Loading…");
   const [playSlug, setPlaySlug] = useState<string | null>(null);
   const [playLaunchCommand, setPlayLaunchCommand] = useState<string | null>(null);
   const [gameRunning, setGameRunning] = useState(false);
@@ -132,6 +133,10 @@ export default function App(): React.ReactElement {
         (cfg.server_port as number) || 8765,
         (cfg.token as string) || "",
       );
+      if (cfg.is_server) {
+        setLoadingMessage("Starting server…");
+        await window.emusync.server.start();
+      }
       setScreen({ name: "games" });
     }
     init();
@@ -166,8 +171,9 @@ export default function App(): React.ReactElement {
 
   if (screen.name === "loading") {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 16 }}>
         <span className="spinner" style={{ width: 32, height: 32 }} />
+        <span style={{ color: "var(--muted, #888)", fontSize: 13 }}>{loadingMessage}</span>
       </div>
     );
   }
