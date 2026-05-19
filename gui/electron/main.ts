@@ -187,6 +187,8 @@ ipcMain.handle("server:change-pin", async (_event, pin: string | null) => {
   return startServerProcess();
 });
 
+ipcMain.handle("launcher:path", () => join(dirname(SCRIPT), "emusync"));
+
 ipcMain.handle("dialog:openFile", async (_event, options: Electron.OpenDialogOptions) => {
   const result = await dialog.showOpenDialog(mainWindow!, options);
   return result.canceled ? null : result.filePaths[0];

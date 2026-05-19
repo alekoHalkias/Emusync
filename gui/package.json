@@ -18,7 +18,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "electron": "^31.0.0",
+    "electron": "^31.7.7",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "typescript": "^5.5.2",
@@ -34,7 +34,14 @@
       "artifactName": "${productName}-${version}-linux-x86_64.${ext}"
     },
     "win": {
-      "target": [{"target": "nsis", "arch": ["x64"]}],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "artifactName": "${productName}-${version}-windows-x64-setup.${ext}"
     },
     "nsis": {
