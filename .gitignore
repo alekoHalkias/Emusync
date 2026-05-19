@@ -16,3 +16,7 @@ roms/
 
 # Config
 .emusync/
+
+# Release artifacts
+*.zip
+*.AppImage
