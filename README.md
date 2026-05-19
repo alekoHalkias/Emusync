@@ -187,7 +187,7 @@ Set `EMUSYNC_CONFIG_DIR` to override the config directory — used to simulate t
 
 ## CI/CD
 
-**On every push to `Aleko-andrewVersion` or `main`, and on PRs into `main`:**
+**On every push to any branch, and on PRs into `main`:**
 GitHub Actions runs the full test suite. The commit gets a green check or red X.
 
 **To publish a release:**
