@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+from datetime import datetime, timezone, timedelta
 
 import pytest
 import pytest_asyncio
@@ -17,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from server import api as api_module
-from server.store import Store
+from server.store import Store, LOCK_TTL_HOURS
 
 MASTER_TOKEN = "test-master-token"
 DEVICE_ID = "device-abc"
@@ -301,3 +302,166 @@ async def test_full_flow(client):
     await client.delete("/games/metroid-fusion/lock", headers=auth)
     r = await client.get("/games/metroid-fusion/lock", headers=auth)
     assert r.json()["locked"] is False
+
+
+# ── store direct tests ────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_cascade_delete_removes_saves_and_locks(client):
+    """Deleting a game must remove its saves and locks from the DB."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=auth)
+    await client.post("/games/pokemon-emerald/lock", headers=auth)
+
+    await client.delete("/games/pokemon-emerald", headers=auth)
+
+    # Game is gone
+    r = await client.get("/games/pokemon-emerald", headers=auth)
+    assert r.status_code == 404
+
+    # Re-add the game — save and lock should not reappear
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    r = await client.get("/games/pokemon-emerald/save", headers=auth)
+    assert r.status_code == 204
+    r = await client.get("/games/pokemon-emerald/lock", headers=auth)
+    assert r.json()["locked"] is False
+
+
+@pytest.mark.asyncio
+async def test_stale_lock_can_be_taken_after_ttl(client):
+    """A lock older than LOCK_TTL_HOURS should be claimable by another device."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, MASTER_TOKEN)
+
+        # Pair two devices directly against the store
+        store.register_device("device-1", "PC", "token-1")
+        store.register_device("device-2", "Deck", "token-2")
+        store.add_game("test-game", "Test Game")
+
+        # Device 1 acquires lock, then backdate it past the TTL
+        store.acquire_lock("test-game", "device-1")
+        expired_time = (datetime.now(timezone.utc) - timedelta(hours=LOCK_TTL_HOURS + 1)).isoformat()
+        store._conn.execute(
+            "UPDATE locks SET acquired_at = ? WHERE game_slug = ?",
+            (expired_time, "test-game"),
+        )
+        store._conn.commit()
+
+        # Device 2 should now be able to take it
+        store.acquire_lock("test-game", "device-2")
+        lock = store.get_lock("test-game")
+        assert lock is not None
+        assert lock.device_id == "device-2"
+
+
+@pytest.mark.asyncio
+async def test_push_save_twice_keeps_only_latest(client):
+    """Pushing a save twice must replace the first — only one row in the DB."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+
+    await client.post("/games/pokemon-emerald/save", content=b"version one", headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"version two", headers=auth)
+
+    r = await client.get("/games/pokemon-emerald/save", headers=auth)
+    assert r.content == b"version two"
+
+
+# ── API edge cases ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_delete_game_clears_lock_and_save(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"save", headers=auth)
+    await client.post("/games/pokemon-emerald/lock", headers=auth)
+
+    r = await client.delete("/games/pokemon-emerald", headers=auth)
+    assert r.status_code == 200
+
+    # Neither save nor lock endpoint should find anything
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    assert (await client.get("/games/pokemon-emerald/save", headers=auth)).status_code == 204
+    assert (await client.get("/games/pokemon-emerald/lock", headers=auth)).json()["locked"] is False
+
+
+@pytest.mark.asyncio
+async def test_set_device_config_nonexistent_game(client):
+    """PUT /games/:slug/device on a slug that doesn't exist should 404 or fail gracefully."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    r = await client.put("/games/ghost-game/device", json={
+        "rom_path": "/roms/ghost.gba",
+        "save_path": "/roms/ghost.srm",
+        "launch_command": "retroarch ghost.gba",
+    }, headers=auth)
+    # Should not silently succeed — foreign key constraint on game_slug
+    assert r.status_code in (404, 422, 500)
+
+
+@pytest.mark.asyncio
+async def test_save_meta_returns_204_when_no_save(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+
+    r = await client.get("/games/pokemon-emerald/save/meta", headers=auth)
+    assert r.status_code == 204
+
+
+# ── two-device save sync ──────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_two_device_save_sync(client):
+    """Device A pushes v1, device B pulls and verifies, B pushes v2, A pulls and gets v2."""
+    # Pair device A
+    r = await client.post("/pair", json={
+        "master_token": MASTER_TOKEN,
+        "device_id": "device-a",
+        "device_name": "Gaming PC",
+    })
+    token_a = r.json()["token"]
+    auth_a = {"Authorization": f"Bearer {token_a}"}
+
+    # Pair device B
+    r = await client.post("/pair", json={
+        "master_token": MASTER_TOKEN,
+        "device_id": "device-b",
+        "device_name": "Steam Deck",
+    })
+    token_b = r.json()["token"]
+    auth_b = {"Authorization": f"Bearer {token_b}"}
+
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth_a)
+
+    # Device A pushes v1
+    save_v1 = b"save file version 1 - just started game"
+    r = await client.post("/games/pokemon-emerald/save", content=save_v1, headers=auth_a)
+    hash_v1 = r.json()["hash"]
+    assert hash_v1 == hashlib.sha256(save_v1).hexdigest()
+
+    # Device B pulls and verifies hash matches
+    r = await client.get("/games/pokemon-emerald/save", headers=auth_b)
+    assert r.status_code == 200
+    assert r.content == save_v1
+    assert r.headers["x-save-hash"] == hash_v1
+
+    # Device B pushes v2
+    save_v2 = b"save file version 2 - beat first gym"
+    r = await client.post("/games/pokemon-emerald/save", content=save_v2, headers=auth_b)
+    hash_v2 = r.json()["hash"]
+    assert hash_v2 == hashlib.sha256(save_v2).hexdigest()
+    assert hash_v2 != hash_v1
+
+    # Device A pulls and gets v2
+    r = await client.get("/games/pokemon-emerald/save", headers=auth_a)
+    assert r.content == save_v2
+    assert r.headers["x-save-hash"] == hash_v2

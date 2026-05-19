@@ -135,6 +135,8 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
 
 @app.put("/games/{slug}/device")
 def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(_auth)) -> dict:
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")
     _get_store().set_game_device(
         GameDevice(
             game_slug=slug,
