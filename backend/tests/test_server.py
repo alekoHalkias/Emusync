@@ -289,33 +289,23 @@ class TestLockEndpoints:
         r = client.get("/games/zelda/lock", headers=auth_headers)
         assert r.json()["locked"] is False
 
-    def test_lock_conflict_returns_409(self, client, master_token, db):
-        # Pair a second device
-        r = client.post(
+    def test_lock_conflict_returns_409(self, client, master_token):
+        # Pair two devices
+        r1 = client.post(
+            "/pair",
+            json={"master_token": master_token, "device_id": "dev-1", "device_name": "Dev1"},
+        )
+        headers1 = {"Authorization": f"Bearer {r1.json()['token']}"}
+
+        r2 = client.post(
             "/pair",
             json={"master_token": master_token, "device_id": "dev-2", "device_name": "Dev2"},
         )
-        token2 = r.json()["token"]
-        headers2 = {"Authorization": f"Bearer {token2}"}
+        headers2 = {"Authorization": f"Bearer {r2.json()['token']}"}
 
-        # First device acquires lock
-        client.post("/games/zelda/lock", headers={"Authorization": f"Bearer {client.headers.get('Authorization', '')}"})
-        # Use db directly to acquire the lock for dev-1
-        db.acquire_lock("zelda", "dev-1-direct")
-
-        # Second device tries to acquire
-        # First acquire with auth_headers fixture device
-        token1, dev_id1 = (
-            client.post(
-                "/pair",
-                json={"master_token": master_token, "device_id": "dev-1-direct", "device_name": "Dev1"},
-            ).json()["token"],
-            "dev-1-direct",
-        )
-        headers1 = {"Authorization": f"Bearer {token1}"}
-        # Acquire lock with dev-1
+        # dev-1 acquires the lock first
         client.post("/games/zelda/lock", headers=headers1)
-        # dev-2 tries — should get 409
+        # dev-2 tries to acquire the same lock — should get 409
         r = client.post("/games/zelda/lock", headers=headers2)
         assert r.status_code == 409
 
