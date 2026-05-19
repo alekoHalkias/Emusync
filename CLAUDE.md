@@ -194,7 +194,35 @@ curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues?state=open&per
 
 Read the list. If an existing issue covers the requested work, use it. If not, create one via the GitHub UI or API before proceeding. The issue is the paper trail for why a change was made.
 
-**Claude agents:** if the user gives you a task without mentioning an issue, check the list yourself. If no issue matches, tell the user what issue you'd create and ask them to confirm before you create it (issue creation is visible to the whole team). If they confirm, create it via the API and note the issue number.
+**Claude agents:** if the user gives you a task without mentioning an issue, check the list yourself. If no issue matches, tell the user what issue you'd create and ask them to confirm before you create it (issue creation is visible to the whole team). If they confirm, create it using the method below and note the issue number.
+
+#### How Claude agents create issues
+
+Check for tools in this order:
+
+```bash
+# 1. Preferred — gh CLI (handles auth transparently)
+which gh && gh issue create --repo alekoHalkias/Emusync --title "..." --body "..."
+
+# 2. Fallback — curl with GITHUB_TOKEN env var
+curl -s -X POST https://api.github.com/repos/alekoHalkias/Emusync/issues \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -d '{"title":"...","body":"..."}'
+```
+
+If neither works (no `gh`, no `GITHUB_TOKEN`), tell the user:
+> "I need GitHub access to create the issue. Run `gh auth login` or set `GITHUB_TOKEN=<your PAT>` in your shell, then ask again."
+
+To set up `gh` on this machine (WSL2/Linux):
+```bash
+curl -sL https://github.com/cli/cli/releases/download/v2.71.0/gh_2.71.0_linux_amd64.tar.gz \
+  | tar xz -C /tmp && mkdir -p ~/.local/bin && mv /tmp/gh_2.71.0_linux_amd64/bin/gh ~/.local/bin/gh
+export PATH="$HOME/.local/bin:$PATH"   # add to ~/.bashrc to persist
+gh auth login
+```
+
+**Always prefix gh commands with `export PATH="$HOME/.local/bin:$PATH"` in this project** until it's on the system PATH.
 
 ### Step 2 — check for conflicting branches
 
