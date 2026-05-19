@@ -5,6 +5,47 @@ import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
 import StatusBadge from "./components/StatusBadge";
 
+function PlayModal({ slug, onClose }: { slug: string; onClose: () => void }): React.ReactElement {
+  const [copied, setCopied] = useState(false);
+  const command = `emusync run --game ${slug} -- %command%`;
+
+  function copy(): void {
+    navigator.clipboard.writeText(command).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Launch {slug}</h3>
+        <p style={{ marginBottom: 8 }}>Add this to your Steam launch options:</p>
+        <div style={{
+          background: "var(--surface-2, #0f1923)",
+          borderRadius: 6,
+          padding: "10px 14px",
+          fontFamily: "monospace",
+          fontSize: 13,
+          userSelect: "text",
+          WebkitUserSelect: "text",
+          wordBreak: "break-all",
+          marginBottom: 12,
+          border: "1px solid var(--border, rgba(255,255,255,0.1))",
+        }}>
+          {command}
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn btn-primary" onClick={copy}>
+            {copied ? "✓ Copied!" : "Copy"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type Screen =
   | { name: "loading" }
   | { name: "setup" }
@@ -14,6 +55,7 @@ type Screen =
 
 export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
+  const [playSlug, setPlaySlug] = useState<string | null>(null);
 
   useEffect(() => {
     async function init(): Promise<void> {
@@ -49,13 +91,8 @@ export default function App(): React.ReactElement {
     });
   }
 
-  // Stub: launching via GUI just shows a toast — real play happens through the CLI wrapper
   function handlePlay(slug: string): void {
-    alert(
-      `To launch ${slug}, add this to your Steam launch options:\n\n` +
-        `emusync run --game ${slug} -- %command%\n\n` +
-        `Or run it manually in a terminal.`,
-    );
+    setPlaySlug(slug);
   }
 
   if (screen.name === "loading") {
@@ -104,6 +141,8 @@ export default function App(): React.ReactElement {
           />
         )}
       </main>
+
+      {playSlug && <PlayModal slug={playSlug} onClose={() => setPlaySlug(null)} />}
     </div>
   );
 }
