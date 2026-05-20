@@ -216,8 +216,10 @@ ipcMain.handle("game:launch", (_event, slug: string, command: string) => {
 ipcMain.handle("game:stop", () => {
   if (gameProcess?.pid) {
     try { process.kill(-gameProcess.pid, "SIGTERM"); } catch { gameProcess.kill("SIGTERM"); }
+    // Do NOT null gameProcess here — let the exit event do it so game:isRunning()
+    // stays true while the Python wrapper is still in its finally block (releasing
+    // the lock), preventing the lock-polling race that shows "Playing on Steam".
   }
-  gameProcess = null;
   return { ok: true };
 });
 
@@ -235,6 +237,21 @@ ipcMain.handle("game:stop-external", () => {
     }
   } catch {}
   return { ok: true };
+});
+
+ipcMain.handle("game:hasPidFile", () => {
+  const gamePidFile = join(homedir(), ".emusync", ".game_pid");
+  if (!existsSync(gamePidFile)) return false;
+  try {
+    const pid = parseInt(readFileSync(gamePidFile, "utf-8").trim().split("\n")[0], 10);
+    if (!pid) return false;
+    try { process.kill(pid, 0); } catch { return false; }
+    // Verify the process is actually emusync, not a recycled PID
+    try {
+      const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf-8");
+      return cmdline.includes("emusync") || cmdline.includes("python");
+    } catch { return true; } // non-Linux: trust the signal check
+  } catch { return false; }
 });
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────

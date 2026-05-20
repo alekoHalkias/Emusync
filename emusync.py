@@ -45,6 +45,69 @@ def _slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
+def _show_already_running_popup(game_slug: str, game_name: str, client: SyncClient) -> bool:
+    """Show a tkinter dialog when a duplicate launch is detected.
+
+    Returns True if the game closed during the countdown (proceed with launch).
+    Returns False if the user cancelled or the 5s window expired.
+    """
+    try:
+        import tkinter as tk
+    except ImportError:
+        return False
+
+    try:
+        result = {"proceed": False}
+        countdown = [5]
+
+        root = tk.Tk()
+        root.title("EmuSync")
+        root.resizable(False, False)
+        root.attributes("-topmost", True)
+        root.geometry("420x160")
+
+        frame = tk.Frame(root, padx=20, pady=16)
+        frame.pack(fill="both", expand=True)
+
+        tk.Label(frame, text="Already running", font=("TkDefaultFont", 13, "bold")).pack(anchor="w")
+        tk.Label(
+            frame,
+            text=f"{game_name} is already running.\nClose it to launch it here, or cancel.",
+            justify="left",
+            wraplength=380,
+        ).pack(anchor="w", pady=(6, 0))
+
+        timer_var = tk.StringVar(value=f"Closing in {countdown[0]}s…")
+        tk.Label(frame, textvariable=timer_var, fg="#888888", justify="left").pack(anchor="w", pady=(4, 10))
+
+        def dismiss() -> None:
+            root.destroy()
+
+        tk.Button(frame, text="Cancel", command=dismiss).pack(anchor="e")
+        root.protocol("WM_DELETE_WINDOW", dismiss)
+
+        def poll() -> None:
+            try:
+                if not client.get_lock(game_slug).get("locked"):
+                    result["proceed"] = True
+                    root.destroy()
+                    return
+            except Exception:
+                pass
+            countdown[0] -= 1
+            if countdown[0] <= 0:
+                root.destroy()
+                return
+            timer_var.set(f"Closing in {countdown[0]}s…")
+            root.after(1000, poll)
+
+        root.after(1000, poll)
+        root.mainloop()
+        return result["proceed"]
+    except Exception:
+        return False
+
+
 # ── root ──────────────────────────────────────────────────────────────────────
 
 @click.group()
@@ -331,6 +394,17 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
     save_path = gd.save_path
     game_pid_file = Path(cfg.data_dir) / ".game_pid"
+
+    # Block duplicate launches: if this device already holds the lock, show a popup and wait
+    try:
+        lock_info = client.get_lock(game_slug)
+        if lock_info.get("locked") and lock_info.get("device_id") == cfg.device_id:
+            game_data = client.get_game(game_slug)
+            name = game_data["name"] if game_data else game_slug
+            if not _show_already_running_popup(game_slug, name, client):
+                sys.exit(0)
+    except Exception:
+        pass  # can't reach server yet; let acquire_lock report the real error
 
     try:
         client.acquire_lock(game_slug)

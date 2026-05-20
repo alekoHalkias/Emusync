@@ -114,6 +114,7 @@ window.emusync.launcher.path()             // absolute path to emusync launcher 
 window.emusync.game.launch(slug, command)  // spawns emusync run
 window.emusync.game.stop()                 // SIGKILL game process group (in-app launches)
 window.emusync.game.stopExternal()         // kill emulator + emusync via .game_pid file (Steam launches)
+window.emusync.game.hasPidFile()           // true if .game_pid exists, process is alive, and cmdline contains emusync/python
 window.emusync.game.isRunning()            // boolean
 window.emusync.game.onExited(cb)           // subscribe to game:exited event
 window.emusync.game.offExited(cb)          // unsubscribe
@@ -314,6 +315,8 @@ Use `Closes #N` in the PR body so GitHub auto-closes the issue on merge.
 **Stale DB schema** — If you see `sqlite3.OperationalError: no such column`, delete `~/.emusync/emusync.db` and restart the server.
 
 **TypeScript on `window.emusync`** — Typed as `any`; the global interface declaration is in `Setup.tsx`. If you add new IPC channels, add them there too or type errors won't surface at compile time.
+
+**Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks whether this device already holds it (game is already running). If so it shows a native `tkinter` popup with a 5 s countdown. If the lock clears the popup closes and launch proceeds; if the countdown expires or the user cancels, the wrapper exits cleanly. This covers both in-app and Steam-launched games without any app-side modal. Requires `python3-tk` (included in the `.venv` setup).
 
 ---
 

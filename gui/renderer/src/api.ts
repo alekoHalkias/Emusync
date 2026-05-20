@@ -66,6 +66,7 @@ export const setGameDevice = (slug: string, cfg: GameDeviceConfig): Promise<void
   _fetch("PUT", `/games/${slug}/device`, cfg);
 
 export const getLock = (slug: string): Promise<LockInfo> => _fetch("GET", `/games/${slug}/lock`);
+export const releaseLock = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}/lock`);
 export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
   const res = await fetch(`${_base}/games/${slug}/save/meta`, {
     headers: { Authorization: `Bearer ${_token}` },
