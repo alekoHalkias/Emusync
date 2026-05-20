@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { configure, getGameDevice, health, listGames, getLock } from "./api";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
@@ -96,50 +96,6 @@ function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
   );
 }
 
-function AlreadyRunningModal({ attemptName, runningName, gameRunning, onProceed, onClose }: {
-  attemptName: string | null;
-  runningName: string | null;
-  gameRunning: boolean;
-  onProceed: () => void;
-  onClose: () => void;
-}): React.ReactElement {
-  const [countdown, setCountdown] = useState(5);
-  const doneRef = useRef(false);
-
-  useEffect(() => {
-    if (!gameRunning && !doneRef.current) {
-      doneRef.current = true;
-      onProceed();
-    }
-  }, [gameRunning]);
-
-  useEffect(() => {
-    if (countdown <= 0) {
-      if (!doneRef.current) { doneRef.current = true; onClose(); }
-      return;
-    }
-    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown]);
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
-        <h3 style={{ marginBottom: 16 }}>Already running</h3>
-        <p style={{ marginBottom: 12 }}>
-          <strong>{runningName ?? "A game"}</strong> is already running. Close it to launch{" "}
-          <strong>{attemptName ?? "this game"}</strong> here.
-        </p>
-        <p style={{ color: "var(--muted, #888)", fontSize: 13, marginBottom: 20 }}>
-          Waiting for it to close… {countdown}s
-        </p>
-        <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 type Screen =
   | { name: "loading" }
@@ -160,9 +116,6 @@ export default function App(): React.ReactElement {
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
   const [runningGameSlug, setRunningGameSlug] = useState<string | null>(null);
   const [myDeviceId, setMyDeviceId] = useState<string | null>(null);
-  const [alreadyRunningSlug, setAlreadyRunningSlug] = useState<string | null>(null);
-  const [alreadyRunningName, setAlreadyRunningName] = useState<string | null>(null);
-  const [alreadyRunningLaunchCommand, setAlreadyRunningLaunchCommand] = useState<string | null>(null);
 
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
@@ -262,41 +215,12 @@ export default function App(): React.ReactElement {
   }
 
   function handlePlay(slug: string, name?: string): void {
-    if (gameRunning) {
-      setAlreadyRunningSlug(slug);
-      setAlreadyRunningName(name ?? null);
-      setAlreadyRunningLaunchCommand(null);
-      getGameDevice(slug)
-        .then((gd) => setAlreadyRunningLaunchCommand(gd.launch_command || null))
-        .catch(() => {});
-      return;
-    }
     setPlayLaunchCommand(null);
     setPlaySlug(slug);
     if (name) setRunningGameName(name);
     getGameDevice(slug)
       .then((gd) => setPlayLaunchCommand(gd.launch_command || null))
       .catch(() => {});
-  }
-
-  async function handleAlreadyRunningProceed(): Promise<void> {
-    const slug = alreadyRunningSlug;
-    const name = alreadyRunningName;
-    const launchCmd = alreadyRunningLaunchCommand;
-    setAlreadyRunningSlug(null);
-    setAlreadyRunningName(null);
-    setAlreadyRunningLaunchCommand(null);
-    if (!slug) return;
-    if (launchCmd) {
-      await window.emusync.game.launch(slug, launchCmd);
-      setGameRunning(true);
-      setGameIsExternal(false);
-      setRunningGameName(name);
-    } else {
-      setPlaySlug(slug);
-      setPlayLaunchCommand(null);
-      if (name) setRunningGameName(name);
-    }
   }
 
   async function handleStop(): Promise<void> {
@@ -379,16 +303,6 @@ export default function App(): React.ReactElement {
           launchCommand={playLaunchCommand}
           onClose={() => { setPlaySlug(null); setPlayLaunchCommand(null); }}
           onLaunched={() => { setGameRunning(true); setGameIsExternal(false); }}
-        />
-      )}
-
-      {alreadyRunningSlug && (
-        <AlreadyRunningModal
-          attemptName={alreadyRunningName}
-          runningName={runningGameName}
-          gameRunning={gameRunning}
-          onProceed={handleAlreadyRunningProceed}
-          onClose={() => { setAlreadyRunningSlug(null); setAlreadyRunningName(null); setAlreadyRunningLaunchCommand(null); }}
         />
       )}
 
