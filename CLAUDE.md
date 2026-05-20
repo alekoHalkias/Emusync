@@ -316,7 +316,7 @@ Use `Closes #N` in the PR body so GitHub auto-closes the issue on merge.
 
 **TypeScript on `window.emusync`** — Typed as `any`; the global interface declaration is in `Setup.tsx`. If you add new IPC channels, add them there too or type errors won't surface at compile time.
 
-**Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks whether this device already holds it (game is already running). If so it shows a native `tkinter` popup with a 5 s countdown. If the lock clears the popup closes and launch proceeds; if the countdown expires or the user cancels, the wrapper exits cleanly. This covers both in-app and Steam-launched games without any app-side modal. Requires `python3-tk` (included in the `.venv` setup).
+**Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks the lock state. Two cases: (1) **This device** already holds the lock — shows a native `tkinter` countdown popup; if the lock clears within 5 s the launch proceeds, otherwise the wrapper exits cleanly. (2) **Another device** holds the lock — shows a `tkinter` messagebox: "\<game\> is already running. Please close it on \<device\>." with an OK button, then exits. Both paths also cover a race-condition fallback after `acquire_lock` returns 409. Works from any caller (Steam, terminal, in-app). Requires `python3-tk` (included in the `.venv` setup).
 
 ---
 

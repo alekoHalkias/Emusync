@@ -45,6 +45,40 @@ def _slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
+def _get_device_name(client: SyncClient, device_id: str) -> str:
+    """Return the display name for a device ID, or the ID itself as fallback."""
+    try:
+        devices = client.list_devices()
+        for d in devices:
+            if d.get("id") == device_id:
+                return d.get("name", device_id)
+    except Exception:
+        pass
+    return device_id
+
+
+def _show_locked_by_other_popup(game_name: str, device_name: str) -> None:
+    """Show a blocking popup when the game is locked by a different device."""
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+    except ImportError:
+        return
+
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        messagebox.showinfo(
+            "EmuSync",
+            f"{game_name} is already running.\nPlease close it on {device_name}.",
+            parent=root,
+        )
+        root.destroy()
+    except Exception:
+        pass
+
+
 def _show_already_running_popup(game_slug: str, game_name: str, client: SyncClient) -> bool:
     """Show a tkinter dialog when a duplicate launch is detected.
 
@@ -395,21 +429,36 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     save_path = gd.save_path
     game_pid_file = Path(cfg.data_dir) / ".game_pid"
 
-    # Block duplicate launches: if this device already holds the lock, show a popup and wait
+    # Block duplicate launches before attempting to acquire the lock
     try:
         lock_info = client.get_lock(game_slug)
-        if lock_info.get("locked") and lock_info.get("device_id") == cfg.device_id:
+        if lock_info.get("locked"):
             game_data = client.get_game(game_slug)
             name = game_data["name"] if game_data else game_slug
-            if not _show_already_running_popup(game_slug, name, client):
+            if lock_info.get("device_id") == cfg.device_id:
+                # This device already holds the lock — countdown popup, proceed if it clears
+                if not _show_already_running_popup(game_slug, name, client):
+                    sys.exit(0)
+            else:
+                # A different device holds the lock — inform and exit
+                device_name = _get_device_name(client, lock_info["device_id"])
+                _show_locked_by_other_popup(name, device_name)
                 sys.exit(0)
     except Exception:
         pass  # can't reach server yet; let acquire_lock report the real error
 
     try:
         client.acquire_lock(game_slug)
-    except ValueError as exc:
-        click.echo(f"This game is currently being played on another device: {exc}", err=True)
+    except ValueError:
+        # Lock was acquired by another device between our check and the acquire attempt
+        try:
+            lock_info = client.get_lock(game_slug)
+            game_data = client.get_game(game_slug)
+            name = game_data["name"] if game_data else game_slug
+            device_name = _get_device_name(client, lock_info.get("device_id", ""))
+            _show_locked_by_other_popup(name, device_name)
+        except Exception:
+            pass
         sys.exit(1)
 
     lock_released = False
