@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, getGameDevice } from "./api";
+import { configure, getGameDevice, health } from "./api";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
@@ -141,6 +141,11 @@ export default function App(): React.ReactElement {
       if (cfg.is_server) {
         setLoadingMessage("Starting server…");
         await window.emusync.server.start();
+        setLoadingMessage("Waiting for server…");
+        for (let i = 0; i < 20; i++) {
+          if (await health()) break;
+          await new Promise<void>((r) => setTimeout(r, 500));
+        }
       }
       setScreen({ name: "games" });
     }
