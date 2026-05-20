@@ -70,6 +70,7 @@ def server_start() -> None:
     token_file.write_text(master_token)
     pid_file.write_text(str(os.getpid()))
     api_module.init(store, master_token)
+    store.log_event("server_started")
 
     click.echo(f"Pairing token: {master_token}")
     sys.stdout.flush()
