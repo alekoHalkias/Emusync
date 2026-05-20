@@ -171,6 +171,7 @@ def pull_save(slug: str, device_id: str = Depends(_auth)) -> Response:
 async def push_save(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
     data = await request.body()
     meta = _get_store().push_save(slug, device_id, data)
+    _get_store().log_event("save_synced", slug, device_id)
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
 
@@ -193,13 +194,20 @@ def acquire_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
         _get_store().acquire_lock(slug, device_id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    _get_store().log_event("game_started", slug, device_id)
     return {"ok": True}
 
 
 @app.delete("/games/{slug}/lock")
 def release_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
     _get_store().release_lock(slug, device_id)
+    _get_store().log_event("game_stopped", slug, device_id)
     return {"ok": True}
+
+
+@app.get("/events")
+def list_events(device_id: str = Depends(_auth)) -> list:
+    return _get_store().list_events()
 
 
 @app.get("/games/{slug}/lock")

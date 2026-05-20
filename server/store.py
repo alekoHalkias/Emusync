@@ -41,6 +41,14 @@ CREATE TABLE IF NOT EXISTS locks (
     device_id   TEXT NOT NULL REFERENCES devices(id),
     acquired_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    type        TEXT NOT NULL,
+    game_slug   TEXT,
+    device_id   TEXT,
+    device_name TEXT,
+    occurred_at TEXT NOT NULL
+);
 """
 
 
@@ -227,6 +235,27 @@ class Store:
             (game_slug, device_id),
         )
         self._conn.commit()
+
+    # ── events ────────────────────────────────────────────────────────────────
+
+    def log_event(self, event_type: str, game_slug: Optional[str] = None, device_id: Optional[str] = None) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        device_name: Optional[str] = None
+        if device_id:
+            row = self._conn.execute("SELECT name FROM devices WHERE id = ?", (device_id,)).fetchone()
+            device_name = row["name"] if row else device_id
+        self._conn.execute(
+            "INSERT INTO events (type, game_slug, device_id, device_name, occurred_at) VALUES (?, ?, ?, ?, ?)",
+            (event_type, game_slug, device_id, device_name, now),
+        )
+        self._conn.commit()
+
+    def list_events(self, limit: int = 100) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT type, game_slug, device_id, device_name, occurred_at FROM events ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_lock(self, game_slug: str) -> Optional[Lock]:
         row = self._conn.execute(

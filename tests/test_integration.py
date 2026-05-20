@@ -593,6 +593,83 @@ async def test_pair_same_device_id_updates_token(client):
     r = await client.get("/games", headers={"Authorization": f"Bearer {token1}"})
     assert r.status_code == 401
 
-    # New token works
-    r = await client.get("/games", headers={"Authorization": f"Bearer {token2}"})
+
+# ── activity events ───────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_events_empty_on_fresh_store(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    r = await client.get("/events", headers=auth)
     assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_save_synced_event_logged(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=auth)
+
+    r = await client.get("/events", headers=auth)
+    events = r.json()
+    assert any(e["type"] == "save_synced" and e["game_slug"] == "pokemon-emerald" for e in events)
+
+
+@pytest.mark.asyncio
+async def test_game_started_and_stopped_events_logged(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games/pokemon-emerald/lock", headers=auth)
+    await client.delete("/games/pokemon-emerald/lock", headers=auth)
+
+    r = await client.get("/events", headers=auth)
+    types = [e["type"] for e in r.json()]
+    assert "game_started" in types
+    assert "game_stopped" in types
+
+
+@pytest.mark.asyncio
+async def test_events_include_device_name(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=auth)
+
+    r = await client.get("/events", headers=auth)
+    save_event = next(e for e in r.json() if e["type"] == "save_synced")
+    assert save_event["device_name"] == DEVICE_NAME
+
+
+@pytest.mark.asyncio
+async def test_events_ordered_newest_first(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games/pokemon-emerald/lock", headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"save", headers=auth)
+
+    r = await client.get("/events", headers=auth)
+    events = r.json()
+    assert events[0]["type"] == "save_synced"
+    assert events[1]["type"] == "game_started"
+
+
+@pytest.mark.asyncio
+async def test_events_requires_auth(client):
+    r = await client.get("/events")
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_log_event_server_started_direct():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.log_event("server_started")
+        events = store.list_events()
+        assert len(events) == 1
+        assert events[0]["type"] == "server_started"
+        assert events[0]["game_slug"] is None
+        assert events[0]["device_id"] is None

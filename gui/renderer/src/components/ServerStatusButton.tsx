@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { configure, health, pair } from "../api";
+import { configure, health, pair, listEvents, type ActivityEvent } from "../api";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
@@ -18,6 +18,11 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   // Device name
   const [deviceName, setDeviceName] = useState("");
   const [deviceNameSaved, setDeviceNameSaved] = useState(false);
+
+  // Activity log
+  const [showActivity, setShowActivity] = useState(false);
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   // LAN discovery warning
   const [existingServers, setExistingServers] = useState<Array<{ name: string; host: string; port: number }>>([]);
@@ -42,6 +47,12 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
     const id = setInterval(poll, 5000);
     return () => clearInterval(id);
   }, [poll]);
+
+  useEffect(() => {
+    if (!open || !showActivity) return;
+    setEventsLoading(true);
+    listEvents().then(setEvents).catch(() => setEvents([])).finally(() => setEventsLoading(false));
+  }, [open, showActivity]);
 
   useEffect(() => {
     if (!open) return;
@@ -197,19 +208,28 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       {open && (
         <div className="modal-overlay" onClick={() => setOpen(false)}>
           <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3>Server connection</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setOpen(false)}>✕</button>
             </div>
 
-            {/* Status row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "var(--bg)", borderRadius: "var(--radius)", marginBottom: 20 }}>
+            {/* Status row — click to open activity popup */}
+            <button
+              onClick={() => setShowActivity(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                width: "100%", padding: "12px 14px", marginBottom: 20,
+                background: "var(--bg)", borderRadius: "var(--radius)",
+                border: "1px solid var(--border)", cursor: "pointer", textAlign: "left",
+              }}
+            >
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: dot, display: "inline-block", flexShrink: 0 }} />
-              <div>
-                <div style={{ fontWeight: 500 }}>{label}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 500, color: "var(--text)" }}>{label}</div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Port {pairPort || 8765} · {pairHost || "localhost"}</div>
               </div>
-            </div>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>click to see server activity →</span>
+            </button>
 
             {/* Server machine controls */}
             {isServer && (
@@ -353,6 +373,48 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activity popup */}
+      {showActivity && (
+        <div className="modal-overlay" onClick={() => setShowActivity(false)}>
+          <div className="modal" style={{ width: 480 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3>Server activity</h3>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowActivity(false)}>✕</button>
+            </div>
+            {eventsLoading ? (
+              <div style={{ textAlign: "center", padding: 40 }}><span className="spinner" style={{ width: 22, height: 22 }} /></div>
+            ) : events.length === 0 ? (
+              <p style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", padding: 40, margin: 0 }}>No activity yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", maxHeight: 400, overflowY: "auto" }}>
+                {events.map((e, i) => {
+                  const icons: Record<string, string> = {
+                    server_started: "🟢",
+                    game_started: "▶",
+                    game_stopped: "■",
+                    save_synced: "↑",
+                  };
+                  const descriptions: Record<string, (ev: ActivityEvent) => string> = {
+                    server_started: () => "Server started",
+                    game_started: (ev) => `${ev.game_slug} started${ev.device_name ? ` on ${ev.device_name}` : ""}`,
+                    game_stopped: (ev) => `${ev.game_slug} stopped${ev.device_name ? ` on ${ev.device_name}` : ""}`,
+                    save_synced: (ev) => `${ev.game_slug} synced${ev.device_name ? ` from ${ev.device_name}` : ""}`,
+                  };
+                  const time = e.occurred_at ? e.occurred_at.slice(0, 19).replace("T", " ") : "";
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "8px 4px", borderBottom: i < events.length - 1 ? "1px solid var(--border)" : "none" }}>
+                      <span style={{ fontSize: 13, minWidth: 18, textAlign: "center" }}>{icons[e.type] ?? "•"}</span>
+                      <span style={{ flex: 1, fontSize: 13 }}>{(descriptions[e.type] ?? (() => e.type))(e)}</span>
+                      <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{time}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

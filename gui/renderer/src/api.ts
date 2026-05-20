@@ -75,3 +75,13 @@ export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
 };
 
 export const listDevices = (): Promise<Device[]> => _fetch("GET", "/devices");
+
+export type ActivityEvent = {
+  type: string;
+  game_slug: string | null;
+  device_id: string | null;
+  device_name: string | null;
+  occurred_at: string;
+};
+
+export const listEvents = (): Promise<ActivityEvent[]> => _fetch("GET", "/events");
