@@ -223,6 +223,20 @@ ipcMain.handle("game:stop", () => {
 
 ipcMain.handle("game:isRunning", () => gameProcess !== null);
 
+ipcMain.handle("game:stop-external", () => {
+  const gamePidFile = join(homedir(), ".emusync", ".game_pid");
+  try {
+    if (existsSync(gamePidFile)) {
+      const lines = readFileSync(gamePidFile, "utf-8").trim().split("\n");
+      const emusyncPid = parseInt(lines[0], 10);
+      const childPid = lines[1] ? parseInt(lines[1], 10) : NaN;
+      if (childPid) try { process.kill(childPid, "SIGKILL"); } catch {}
+      if (emusyncPid) try { process.kill(emusyncPid, "SIGTERM"); } catch {}
+    }
+  } catch {}
+  return { ok: true };
+});
+
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {

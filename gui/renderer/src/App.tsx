@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, getGameDevice, health } from "./api";
+import { configure, getGameDevice, health, listGames, getLock } from "./api";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
@@ -111,11 +111,47 @@ export default function App(): React.ReactElement {
   const [playSlug, setPlaySlug] = useState<string | null>(null);
   const [playLaunchCommand, setPlayLaunchCommand] = useState<string | null>(null);
   const [gameRunning, setGameRunning] = useState(false);
+  const [gameIsExternal, setGameIsExternal] = useState(false);
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
+  const [runningGameSlug, setRunningGameSlug] = useState<string | null>(null);
+  const [myDeviceId, setMyDeviceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.emusync.config.load().then((cfg) => {
+      if (cfg?.device_id) setMyDeviceId(cfg.device_id as string);
+    });
+  }, []);
+
+  // Poll for locks held by this device to detect games launched outside the app (e.g. Steam)
+  useEffect(() => {
+    if (screen.name !== "games" || !myDeviceId) return;
+    async function checkLocks(): Promise<void> {
+      if (await window.emusync.game.isRunning()) return; // already tracked via gameProcess
+      try {
+        const games = await listGames();
+        for (const game of games) {
+          const lock = await getLock(game.slug);
+          if (lock.locked && lock.device_id === myDeviceId) {
+            setGameRunning(true);
+            setGameIsExternal(true);
+            setRunningGameName(game.name);
+            setRunningGameSlug(game.slug);
+            return;
+          }
+        }
+        setGameRunning(false);
+        setGameIsExternal(false);
+        setRunningGameName(null);
+        setRunningGameSlug(null);
+      } catch { /* server offline */ }
+    }
+    const id = setInterval(checkLocks, 3000);
+    return () => clearInterval(id);
+  }, [screen.name, myDeviceId]);
 
   useEffect(() => {
     window.emusync.game.isRunning().then(setGameRunning);
-    const onExited = (): void => { setGameRunning(false); setRunningGameName(null); };
+    const onExited = (): void => { setGameRunning(false); setGameIsExternal(false); setRunningGameName(null); };
     window.emusync.game.onExited(onExited);
     return () => window.emusync.game.offExited(onExited);
   }, []);
@@ -187,9 +223,14 @@ export default function App(): React.ReactElement {
   }
 
   async function handleStop(): Promise<void> {
-    await window.emusync.game.stop();
+    if (await window.emusync.game.isRunning()) {
+      await window.emusync.game.stop();
+    } else if (runningGameSlug) {
+      await window.emusync.game.stopExternal();
+    }
     setGameRunning(false);
     setRunningGameName(null);
+    setRunningGameSlug(null);
   }
 
   if (screen.name === "loading") {
@@ -212,11 +253,15 @@ export default function App(): React.ReactElement {
         {gameRunning && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 8 }}>
             <span style={{ color: "#4ade80", fontWeight: 600, fontSize: 13 }}>
-              ● {runningGameName ?? "Game"} running
+              {gameIsExternal
+                ? `● Playing ${runningGameName ?? "game"} on Steam`
+                : `● ${runningGameName ?? "Game"} running`}
             </span>
-            <button className="btn btn-danger" onClick={handleStop}>
-              ■ Stop
-            </button>
+            {!gameIsExternal && (
+              <button className="btn btn-danger" onClick={handleStop}>
+                ■ Stop
+              </button>
+            )}
           </div>
         )}
         <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
@@ -256,7 +301,7 @@ export default function App(): React.ReactElement {
           slug={playSlug}
           launchCommand={playLaunchCommand}
           onClose={() => { setPlaySlug(null); setPlayLaunchCommand(null); }}
-          onLaunched={() => setGameRunning(true)}
+          onLaunched={() => { setGameRunning(true); setGameIsExternal(false); }}
         />
       )}
     </div>

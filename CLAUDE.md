@@ -109,8 +109,11 @@ window.emusync.server.discover()  // runs emusync.py server discover-json → se
 
 window.emusync.dialog.openFile()  // native file picker
 
+window.emusync.launcher.path()             // absolute path to emusync launcher binary
+
 window.emusync.game.launch(slug, command)  // spawns emusync run
-window.emusync.game.stop()                 // SIGKILL game process group
+window.emusync.game.stop()                 // SIGKILL game process group (in-app launches)
+window.emusync.game.stopExternal()         // kill emulator + emusync via .game_pid file (Steam launches)
 window.emusync.game.isRunning()            // boolean
 window.emusync.game.onExited(cb)           // subscribe to game:exited event
 window.emusync.game.offExited(cb)          // unsubscribe
@@ -128,6 +131,7 @@ When adding a new IPC channel, add the handler to `main.ts` AND the bridge entry
 | `~/.emusync/emusync.db` | SQLite database (devices, games, saves, locks) |
 | `~/.emusync/.server_pid` | PID of the running server process (written on start, deleted on clean exit) |
 | `~/.emusync/.server_token` | Current pairing PIN (written on start, deleted on clean exit) |
+| `~/.emusync/.game_pid` | Two-line file: line 1 = emusync run PID, line 2 = emulator child PID (written by `emusync run`, deleted on exit) |
 
 Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_name`, `token`, `is_server`, `server_pin` (optional).
 
