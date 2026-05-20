@@ -128,6 +128,14 @@ export default function App(): React.ReactElement {
     if (screen.name !== "games" || !myDeviceId) return;
     async function checkLocks(): Promise<void> {
       if (await window.emusync.game.isRunning()) return; // already tracked via gameProcess
+      // If no .game_pid file with a live process, any lock in the DB is stale — clear and skip
+      if (!await window.emusync.game.hasPidFile()) {
+        setGameRunning(false);
+        setGameIsExternal(false);
+        setRunningGameName(null);
+        setRunningGameSlug(null);
+        return;
+      }
       try {
         const games = await listGames();
         for (const game of games) {

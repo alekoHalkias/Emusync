@@ -114,6 +114,7 @@ window.emusync.launcher.path()             // absolute path to emusync launcher 
 window.emusync.game.launch(slug, command)  // spawns emusync run
 window.emusync.game.stop()                 // SIGKILL game process group (in-app launches)
 window.emusync.game.stopExternal()         // kill emulator + emusync via .game_pid file (Steam launches)
+window.emusync.game.hasPidFile()           // true if .game_pid exists and the process in it is still alive
 window.emusync.game.isRunning()            // boolean
 window.emusync.game.onExited(cb)           // subscribe to game:exited event
 window.emusync.game.offExited(cb)          // unsubscribe
