@@ -57,89 +57,39 @@ def _get_device_name(client: SyncClient, device_id: str) -> str:
     return device_id
 
 
-def _show_locked_by_other_popup(game_name: str, device_name: str) -> None:
-    """Show a blocking popup when the game is locked by a different device."""
+def _show_game_running_popup(game_name: str, device_name: str) -> None:
+    """Show a blocking 'game already running' dialog using the best available method.
+
+    Tries zenity → kdialog → xmessage (all Wayland-safe) before falling back to
+    tkinter, so it works even when libtk is missing or X11 is unavailable.
+    """
+    msg = f"{game_name} is already running.\nPlease close it on {device_name}."
+
+    cmds = [
+        ["zenity", "--info", "--title=EmuSync", f"--text={msg}", "--width=360", "--no-wrap"],
+        ["kdialog", "--msgbox", msg, "--title", "EmuSync"],
+        ["xmessage", "-center", "-buttons", "OK:0", msg],
+    ]
+    for cmd in cmds:
+        try:
+            subprocess.run(cmd, timeout=300)
+            return
+        except (FileNotFoundError, PermissionError):
+            continue
+        except subprocess.TimeoutExpired:
+            return
+
+    # Last-resort tkinter (may fail on systems without libtk)
     try:
         import tkinter as tk
         from tkinter import messagebox
-    except ImportError:
-        return
-
-    try:
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
-        messagebox.showinfo(
-            "EmuSync",
-            f"{game_name} is already running.\nPlease close it on {device_name}.",
-            parent=root,
-        )
+        messagebox.showinfo("EmuSync", msg, parent=root)
         root.destroy()
     except Exception:
         pass
-
-
-def _show_already_running_popup(game_slug: str, game_name: str, client: SyncClient) -> bool:
-    """Show a tkinter dialog when a duplicate launch is detected.
-
-    Returns True if the game closed during the countdown (proceed with launch).
-    Returns False if the user cancelled or the 5s window expired.
-    """
-    try:
-        import tkinter as tk
-    except ImportError:
-        return False
-
-    try:
-        result = {"proceed": False}
-        countdown = [5]
-
-        root = tk.Tk()
-        root.title("EmuSync")
-        root.resizable(False, False)
-        root.attributes("-topmost", True)
-        root.geometry("420x160")
-
-        frame = tk.Frame(root, padx=20, pady=16)
-        frame.pack(fill="both", expand=True)
-
-        tk.Label(frame, text="Already running", font=("TkDefaultFont", 13, "bold")).pack(anchor="w")
-        tk.Label(
-            frame,
-            text=f"{game_name} is already running.\nClose it to launch it here, or cancel.",
-            justify="left",
-            wraplength=380,
-        ).pack(anchor="w", pady=(6, 0))
-
-        timer_var = tk.StringVar(value=f"Closing in {countdown[0]}s…")
-        tk.Label(frame, textvariable=timer_var, fg="#888888", justify="left").pack(anchor="w", pady=(4, 10))
-
-        def dismiss() -> None:
-            root.destroy()
-
-        tk.Button(frame, text="Cancel", command=dismiss).pack(anchor="e")
-        root.protocol("WM_DELETE_WINDOW", dismiss)
-
-        def poll() -> None:
-            try:
-                if not client.get_lock(game_slug).get("locked"):
-                    result["proceed"] = True
-                    root.destroy()
-                    return
-            except Exception:
-                pass
-            countdown[0] -= 1
-            if countdown[0] <= 0:
-                root.destroy()
-                return
-            timer_var.set(f"Closing in {countdown[0]}s…")
-            root.after(1000, poll)
-
-        root.after(1000, poll)
-        root.mainloop()
-        return result["proceed"]
-    except Exception:
-        return False
 
 
 # ── root ──────────────────────────────────────────────────────────────────────
@@ -435,15 +385,13 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         if lock_info.get("locked"):
             game_data = client.get_game(game_slug)
             name = game_data["name"] if game_data else game_slug
-            if lock_info.get("device_id") == cfg.device_id:
-                # This device already holds the lock — countdown popup, proceed if it clears
-                if not _show_already_running_popup(game_slug, name, client):
-                    sys.exit(0)
+            locking_device = lock_info.get("device_id", "")
+            if locking_device == cfg.device_id:
+                device_name = cfg.device_name
             else:
-                # A different device holds the lock — inform and exit
-                device_name = _get_device_name(client, lock_info["device_id"])
-                _show_locked_by_other_popup(name, device_name)
-                sys.exit(0)
+                device_name = _get_device_name(client, locking_device)
+            _show_game_running_popup(name, device_name)
+            sys.exit(0)
     except Exception:
         pass  # can't reach server yet; let acquire_lock report the real error
 
@@ -455,8 +403,9 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             lock_info = client.get_lock(game_slug)
             game_data = client.get_game(game_slug)
             name = game_data["name"] if game_data else game_slug
-            device_name = _get_device_name(client, lock_info.get("device_id", ""))
-            _show_locked_by_other_popup(name, device_name)
+            locking_device = lock_info.get("device_id", "")
+            device_name = cfg.device_name if locking_device == cfg.device_id else _get_device_name(client, locking_device)
+            _show_game_running_popup(name, device_name)
         except Exception:
             pass
         sys.exit(1)
