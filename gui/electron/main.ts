@@ -245,7 +245,12 @@ ipcMain.handle("game:hasPidFile", () => {
   try {
     const pid = parseInt(readFileSync(gamePidFile, "utf-8").trim().split("\n")[0], 10);
     if (!pid) return false;
-    try { process.kill(pid, 0); return true; } catch { return false; }
+    try { process.kill(pid, 0); } catch { return false; }
+    // Verify the process is actually emusync, not a recycled PID
+    try {
+      const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf-8");
+      return cmdline.includes("emusync") || cmdline.includes("python");
+    } catch { return true; } // non-Linux: trust the signal check
   } catch { return false; }
 });
 

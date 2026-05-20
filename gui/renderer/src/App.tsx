@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, getGameDevice, health, listGames, getLock } from "./api";
+import { configure, getGameDevice, health, listGames, getLock, releaseLock } from "./api";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
@@ -123,28 +123,37 @@ export default function App(): React.ReactElement {
     });
   }, []);
 
+  async function releaseStaleLocks(deviceId: string): Promise<void> {
+    try {
+      const games = await listGames();
+      for (const game of games) {
+        const lock = await getLock(game.slug);
+        if (lock.locked && lock.device_id === deviceId) {
+          await releaseLock(game.slug);
+        }
+      }
+    } catch { /* server offline */ }
+  }
+
   // Poll for locks held by this device to detect games launched outside the app (e.g. Steam)
   useEffect(() => {
     if (screen.name !== "games" || !myDeviceId) return;
     async function checkLocks(): Promise<void> {
       if (await window.emusync.game.isRunning()) return; // already tracked via gameProcess
-      // If no .game_pid file with a live process, any lock in the DB is stale — clear and skip
-      if (!await window.emusync.game.hasPidFile()) {
-        setGameRunning(false);
-        setGameIsExternal(false);
-        setRunningGameName(null);
-        setRunningGameSlug(null);
-        return;
-      }
+      const pidFileActive = await window.emusync.game.hasPidFile();
       try {
         const games = await listGames();
         for (const game of games) {
           const lock = await getLock(game.slug);
           if (lock.locked && lock.device_id === myDeviceId) {
-            setGameRunning(true);
-            setGameIsExternal(true);
-            setRunningGameName(game.name);
-            setRunningGameSlug(game.slug);
+            if (pidFileActive) {
+              setGameRunning(true);
+              setGameIsExternal(true);
+              setRunningGameName(game.name);
+              setRunningGameSlug(game.slug);
+            } else {
+              await releaseLock(game.slug);
+            }
             return;
           }
         }
@@ -192,6 +201,8 @@ export default function App(): React.ReactElement {
           await new Promise<void>((r) => setTimeout(r, 500));
         }
       }
+      // Release any stale locks this device left from a previous crash
+      if (cfg.device_id) await releaseStaleLocks(cfg.device_id as string);
       setScreen({ name: "games" });
     }
     init();
