@@ -12,8 +12,17 @@ import random
 import uuid
 from pathlib import Path
 
-# Make SIGTERM run finally blocks (default handler calls _exit, skipping them)
-signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+# Track the emulator child process so SIGTERM can kill it before exiting
+_child_proc: subprocess.Popen | None = None  # type: ignore[type-arg]
+
+
+def _sigterm_handler(*_) -> None:
+    if _child_proc is not None and _child_proc.poll() is None:
+        _child_proc.kill()
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, _sigterm_handler)
 
 import click
 
@@ -321,6 +330,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         sys.exit(1)
 
     save_path = gd.save_path
+    game_pid_file = Path(cfg.data_dir) / ".game_pid"
 
     try:
         client.acquire_lock(game_slug)
@@ -340,14 +350,18 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             click.echo(f"Warning: failed to release lock: {exc}", err=True)
         lock_released = True
 
+    game_pid_file.write_text(str(os.getpid()))
     try:
         pulled, server_hash = client.pull_save(game_slug, save_path)
         if pulled:
             click.echo(f"Pulled save for {game_slug}.")
 
         try:
-            proc = subprocess.run(list(command))
-            exit_code = proc.returncode
+            global _child_proc
+            _child_proc = subprocess.Popen(list(command))
+            game_pid_file.write_text(f"{os.getpid()}\n{_child_proc.pid}")
+            exit_code = _child_proc.wait()
+            _child_proc = None
         except Exception as exc:
             click.echo(f"Emulator error: {exc}", err=True)
             _release()
@@ -363,6 +377,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     click.echo(f"Warning: failed to push save: {exc}", err=True)
     finally:
         _release()
+        game_pid_file.unlink(missing_ok=True)
 
     sys.exit(exit_code if "exit_code" in dir() else 0)
 
