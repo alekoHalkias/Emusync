@@ -25,6 +25,7 @@ function createWindow(): void {
     minWidth: 700,
     minHeight: 500,
     title: "EmuSync",
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/preload.js"),
       contextIsolation: true,
