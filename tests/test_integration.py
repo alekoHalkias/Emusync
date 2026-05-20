@@ -273,6 +273,21 @@ async def test_same_device_can_reacquire_own_lock(client):
     assert r.status_code == 200
 
 
+@pytest.mark.asyncio
+async def test_get_lock_reflects_owning_device(client):
+    """get_lock returns the device_id so emusync run can detect its own duplicate launch."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+
+    await client.post("/games/pokemon-emerald/lock", headers=auth)
+    r = await client.get("/games/pokemon-emerald/lock", headers=auth)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["locked"] is True
+    assert data["device_id"] == DEVICE_ID
+
+
 # ── schema smoke test ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import random
+import time
 import uuid
 from pathlib import Path
 
@@ -331,6 +332,22 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
     save_path = gd.save_path
     game_pid_file = Path(cfg.data_dir) / ".game_pid"
+
+    # Block duplicate launches: if this device already holds the lock, wait up to 5s for it to clear
+    try:
+        lock_info = client.get_lock(game_slug)
+        if lock_info.get("locked") and lock_info.get("device_id") == cfg.device_id:
+            click.echo(f"'{game_slug}' is already running on this device. Waiting for it to close...", err=True)
+            for _ in range(10):
+                time.sleep(0.5)
+                lock_info = client.get_lock(game_slug)
+                if not lock_info.get("locked"):
+                    break
+            else:
+                click.echo(f"'{game_slug}' is still running. Close it before launching again.", err=True)
+                sys.exit(1)
+    except Exception:
+        pass  # can't reach server yet; let acquire_lock report the real error
 
     try:
         client.acquire_lock(game_slug)
