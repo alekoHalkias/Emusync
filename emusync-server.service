@@ -1,0 +1,14 @@
+[Unit]
+Description=EmuSync save-file sync server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=EMUSYNC_EXEC server start
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
