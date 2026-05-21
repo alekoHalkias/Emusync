@@ -66,18 +66,28 @@ def _show_game_running_popup(game_name: str, device_name: str) -> None:
     msg = f"{game_name} is already running.\nPlease close it on {device_name}."
 
     cmds = [
+        # notify-send is non-blocking but works inside gamescope (Steam Deck Gaming Mode)
+        # where zenity/kdialog cannot create windows; run it and also continue to a
+        # blocking dialog so the user sees a modal on desktop environments too.
+        ["notify-send", "--app-name=EmuSync", "--urgency=normal", "EmuSync", msg],
         ["zenity", "--info", "--title=EmuSync", f"--text={msg}", "--width=360", "--no-wrap"],
         ["kdialog", "--msgbox", msg, "--title", "EmuSync"],
         ["xmessage", "-center", "-buttons", "OK:0", msg],
     ]
+    notify_sent = False
     for cmd in cmds:
+        is_notify = cmd[0] == "notify-send"
         try:
             subprocess.run(cmd, timeout=300)
+            if is_notify:
+                notify_sent = True
+                continue  # always try a blocking dialog after notifying
             return
         except (FileNotFoundError, PermissionError):
             continue
         except subprocess.TimeoutExpired:
-            return
+            if not is_notify:
+                return
 
     # Last-resort tkinter (may fail on systems without libtk)
     try:
