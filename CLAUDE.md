@@ -69,6 +69,10 @@ make build-gui                   # electron-vite build
 
 # Cut a release (tags + pushes, triggers GitHub Actions)
 make release VERSION=v1.2.3
+
+# Install / remove the systemd user service (Steam Deck / headless server)
+make install-service             # generates service file, enables + starts it
+make uninstall-service           # disables + removes it
 ```
 
 ---
@@ -331,5 +335,6 @@ Update this file when any of the following change:
 - New data files written to `~/.emusync/`
 - Python or Node dependency changes (`requirements.txt`, `package.json`)
 - Release or CI/CD process changes
+- Changes to `install.sh`, `Makefile`, or `emusync-server.service`
 
 A pre-commit hook (`.git/hooks/pre-commit`) warns when architecture files change without this file being updated. Run `bash install.sh` to install it.

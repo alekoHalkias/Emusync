@@ -1,4 +1,4 @@
-.PHONY: install dev-server dev-gui build-gui lint test release
+.PHONY: install dev-server dev-gui build-gui lint test release install-service uninstall-service
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -26,3 +26,20 @@ release:
 	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=v1.0.0" && exit 1)
 	git tag $(VERSION)
 	git push origin $(VERSION)
+
+install-service:
+	@EXEC="$(CURDIR)/emusync"; \
+	test -x "$$EXEC" || (echo "Run 'bash install.sh' first to create the launcher." && exit 1); \
+	SERVICE_DIR="$$HOME/.config/systemd/user"; \
+	mkdir -p "$$SERVICE_DIR"; \
+	sed "s|EMUSYNC_EXEC|$$EXEC|g" "$(CURDIR)/emusync-server.service" > "$$SERVICE_DIR/emusync-server.service"; \
+	systemctl --user daemon-reload; \
+	systemctl --user enable --now emusync-server; \
+	echo "emusync-server service installed and started."; \
+	echo "It will start automatically on login (including Steam Deck Gaming Mode)."
+
+uninstall-service:
+	-systemctl --user disable --now emusync-server 2>/dev/null; \
+	rm -f "$$HOME/.config/systemd/user/emusync-server.service"; \
+	systemctl --user daemon-reload; \
+	echo "emusync-server service removed."
