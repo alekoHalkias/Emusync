@@ -514,12 +514,14 @@ export interface EmulatorScanResult {
   roms: RomEntry[];
 }
 
-function parseRetroArchCfg(cfgPath: string): Record<string, string> {
+function parseRetroArchCfg(cfgPath: string, home: string): Record<string, string> {
   const out: Record<string, string> = {};
   if (!existsSync(cfgPath)) return out;
+  // Node.js doesn't expand ~ — do it here so all path fields are absolute
+  const expandHome = (v: string) => v.startsWith("~/") ? join(home, v.slice(2)) : v === "~" ? home : v;
   for (const line of readFileSync(cfgPath, "utf-8").split("\n")) {
     const m = line.match(/^\s*(\w+)\s*=\s*"?([^"#\r\n]*)"?\s*$/);
-    if (m) out[m[1].trim()] = m[2].trim();
+    if (m) out[m[1].trim()] = expandHome(m[2].trim());
   }
   return out;
 }
@@ -532,14 +534,17 @@ function detectRetroArch(home: string): EmulatorInfo[] {
   const nativeCfg  = join(home, ".config/retroarch/retroarch.cfg");
   for (const bin of nativeBins) {
     if (existsSync(bin)) {
-      const cfg = parseRetroArchCfg(nativeCfg);
+      const cfg = parseRetroArchCfg(nativeCfg, home);
+      // Filter out RetroArch's "default" placeholder (means "not configured")
+      const romDir = cfg.rgui_browser_directory && cfg.rgui_browser_directory !== "default"
+        ? cfg.rgui_browser_directory : "";
       infos.push({
         type:     "native",
         label:    "RetroArch",
         execPath:  bin,
         saveDir:   cfg.savefile_directory || join(home, ".config/retroarch/saves"),
         coresDir:  cfg.libretro_directory  || join(home, ".config/retroarch/cores"),
-        romDirs:  [cfg.rgui_browser_directory].filter(Boolean) as string[],
+        romDirs:  [romDir].filter(Boolean) as string[],
       });
       break;
     }
@@ -550,14 +555,16 @@ function detectRetroArch(home: string): EmulatorInfo[] {
     const list = execSync("flatpak list --app --columns=application 2>/dev/null", { timeout: 5000 }).toString();
     if (list.includes("org.libretro.RetroArch")) {
       const flatCfg = join(home, ".var/app/org.libretro.RetroArch/config/retroarch/retroarch.cfg");
-      const cfg = parseRetroArchCfg(flatCfg);
+      const cfg = parseRetroArchCfg(flatCfg, home);
+      const flatRomDir = cfg.rgui_browser_directory && cfg.rgui_browser_directory !== "default"
+        ? cfg.rgui_browser_directory : "";
       infos.push({
         type:     "flatpak",
         label:    "RetroArch (Flatpak)",
         execPath: "flatpak run org.libretro.RetroArch",
         saveDir:  cfg.savefile_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
         coresDir: cfg.libretro_directory  || join(home, ".var/app/org.libretro.RetroArch/data/retroarch/cores"),
-        romDirs:  [cfg.rgui_browser_directory].filter(Boolean) as string[],
+        romDirs:  [flatRomDir].filter(Boolean) as string[],
       });
     }
   } catch { /* flatpak not available */ }
@@ -745,7 +752,7 @@ function detectEmulatorsForConsole(home: string, consoleKey: string): DetectedEm
       const core = findInstalledCore(ra.coresDir, sys);
       if (!core || seenCores.has(core.lib)) continue;
       seenCores.add(core.lib);
-      const saveDir = resolveCoreSaveDir(ra.saveDir, core.folderName);
+      const saveDir = join(ra.saveDir, core.folderName);
       options.push({
         id: `${ra.type}-${core.folderName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
         label: `${ra.label} · ${core.folderName}`,
@@ -828,7 +835,14 @@ ipcMain.handle("emulator:scan", (_event, params: {
         const base   = basename(romPath, extname(romPath));
         const system = SYSTEMS[romExt];
         const saveExts = system?.saveExts ?? defaultSaveExts;
-        const m = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+        let m = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+        // If the per-core subfolder has no save yet, also check the root saves dir
+        // for saves written before per-core organization (e.g. saves/game.sav vs saves/mGBA/game.sav)
+        if (!m.exists && emulatorOption.coreFolderName) {
+          const rootSaveDir = dirname(emulatorOption.saveDir);
+          const mRoot = matchSaveFile(rootSaveDir, base, saveExts);
+          if (mRoot.exists) m = mRoot;
+        }
         const launchCommand = emulatorOption.corePath
           ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
           : `${emulatorOption.execPath} "${romPath}"`;
