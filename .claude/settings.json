@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make test *)",
+      "Bash(bash install.sh)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(export PATH=\"$HOME/.local/bin:$PATH\")",
+      "Bash(gh issue create --repo alekoHalkias/Emusync --title 'Popup may not appear in Steam Deck Gaming Mode — add notify-send fallback' --body 'In Steam Deck Gaming Mode, games run inside a `gamescope` Wayland compositor. External GUI tools like `zenity`/`kdialog`/`xmessage` may not be able to create windows in that session, causing the '\\\\''already running'\\\\'' popup to silently fail. *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

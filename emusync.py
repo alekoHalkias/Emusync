@@ -438,6 +438,14 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         if pulled:
             click.echo(f"Pulled save for {game_slug}.")
 
+        # Pull state if configured
+        state_path = gd.state_path
+        server_state_hash = None
+        if state_path:
+            pulled, server_state_hash = client.pull_state(game_slug, state_path)
+            if pulled:
+                click.echo(f"Pulled state for {game_slug}.")
+
         try:
             global _child_proc
             _child_proc = subprocess.Popen(list(command))
@@ -457,6 +465,16 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     click.echo(f"Pushed save for {game_slug}.")
                 except Exception as exc:
                     click.echo(f"Warning: failed to push save: {exc}", err=True)
+
+        # Push state if configured
+        if state_path and Path(state_path).exists():
+            local_state_hash = hashlib.sha256(Path(state_path).read_bytes()).hexdigest()
+            if local_state_hash != server_state_hash:
+                try:
+                    client.push_state(game_slug, state_path)
+                    click.echo(f"Pushed state for {game_slug}.")
+                except Exception as exc:
+                    click.echo(f"Warning: failed to push state: {exc}", err=True)
     finally:
         _release()
         game_pid_file.unlink(missing_ok=True)
