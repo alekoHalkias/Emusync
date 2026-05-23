@@ -688,3 +688,69 @@ async def test_log_event_server_started_direct():
         assert events[0]["type"] == "server_started"
         assert events[0]["game_slug"] is None
         assert events[0]["device_id"] is None
+
+
+# ── update_game regression: cascade delete bug ────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_update_game_name_preserves_save_and_device_config(client):
+    """Renaming a game must not cascade-delete its saves or device config.
+
+    Regression: update_game previously called store.add_game() which uses
+    INSERT OR REPLACE, deleting the existing row (and cascading to saves,
+    game_devices, locks) before re-inserting it.  The fix uses UPDATE instead.
+    """
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    # Create game + push a save + set device config
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"save-data-v1", headers=auth)
+    await client.put("/games/pokemon-emerald/device", json={
+        "rom_path": "/roms/emerald.gba",
+        "save_path": "/saves/emerald.sav",
+        "launch_command": "retroarch emerald.gba",
+    }, headers=auth)
+
+    # Rename the game
+    r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald GBA"}, headers=auth)
+    assert r.status_code == 200
+    assert r.json()["name"] == "Pokemon Emerald GBA"
+
+    # Save must still be present
+    save_meta = await client.get("/games/pokemon-emerald/save/meta", headers=auth)
+    assert save_meta.status_code == 200, "save was cascade-deleted by rename (regression)"
+
+    # Device config must still be present
+    device_cfg = await client.get("/games/pokemon-emerald/device", headers=auth)
+    assert device_cfg.status_code == 200, "device config was cascade-deleted by rename (regression)"
+    assert device_cfg.json()["rom_path"] == "/roms/emerald.gba"
+
+    # The game itself and the other games in list must still be accessible
+    games = await client.get("/games", headers=auth)
+    assert games.status_code == 200
+    assert any(g["slug"] == "pokemon-emerald" for g in games.json())
+
+
+@pytest.mark.asyncio
+async def test_update_game_name_does_not_wipe_other_games(client):
+    """Renaming one game must not affect other games' data."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Game One"}, headers=auth)
+    await client.post("/games", json={"name": "Game Two"}, headers=auth)
+    await client.post("/games/game-two/save", content=b"save-two", headers=auth)
+
+    # Rename Game One
+    await client.put("/games/game-one", json={"name": "Game One Renamed"}, headers=auth)
+
+    # Game Two's save must be intact
+    meta = await client.get("/games/game-two/save/meta", headers=auth)
+    assert meta.status_code == 200, "other game's save was wiped when a different game was renamed"
+
+    # Both games should appear in the list
+    games = await client.get("/games", headers=auth)
+    slugs = {g["slug"] for g in games.json()}
+    assert "game-one" in slugs
+    assert "game-two" in slugs
