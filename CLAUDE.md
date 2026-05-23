@@ -115,7 +115,7 @@ window.emusync.server.discover()  // runs emusync.py server discover-json → se
 window.emusync.dialog.openFile()  // native file picker
 window.emusync.dialog.openFolder() // native folder picker
 
-window.emusync.emulator.scan(extraPaths[])  // detect RetroArch + scan ROM/save dirs (recurses up to 3 levels for per-game folders); returns { emulators, romDirs, roms[] }
+window.emusync.emulator.scan(extraPaths[])  // detect RetroArch + scan ROM/save dirs (recurses up to 3 levels for per-game folders); save extension matched per system (.sav for GBA/GB/GBC/NDS, .srm for SNES/Genesis/N64/NES); returns { emulators, romDirs, roms[] }
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 

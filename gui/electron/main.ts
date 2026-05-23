@@ -274,7 +274,20 @@ const ROM_EXTENSIONS = new Set([
   "iso", "cue", "bin", "chd", "pbp",   // Disc-based (PSX, Dreamcast…)
 ]);
 
-const SAVE_EXTENSIONS = ["srm", "sav", "save"];
+// Save extensions checked per ROM system, most-likely first.
+// GBA/GB/GBC/NDS use .sav (mGBA, VBA-M, DeSmuME).
+// SNES/Genesis/N64/NES use .srm (Snes9x, Genesis Plus GX, Mupen64).
+const SAVE_EXTENSIONS_BY_ROM: Record<string, string[]> = {
+  gba:  ["sav", "srm"],
+  gb:   ["sav", "srm"],
+  gbc:  ["sav", "srm"],
+  nds:  ["sav", "dsv", "srm"],
+};
+const DEFAULT_SAVE_EXTENSIONS = ["srm", "sav", "save"];
+
+function saveExtensionsFor(romExt: string): string[] {
+  return SAVE_EXTENSIONS_BY_ROM[romExt.toLowerCase()] ?? DEFAULT_SAVE_EXTENSIONS;
+}
 
 interface EmulatorInfo {
   type: "native" | "flatpak";
@@ -363,12 +376,14 @@ function scanRomDir(dir: string, depth = 0): string[] {
   } catch { return []; }
 }
 
-function matchSave(saveDir: string, baseName: string): { path: string; exists: boolean } {
-  for (const ext of SAVE_EXTENSIONS) {
+function matchSave(saveDir: string, baseName: string, romExt: string): { path: string; exists: boolean } {
+  const exts = saveExtensionsFor(romExt);
+  for (const ext of exts) {
     const p = join(saveDir, `${baseName}.${ext}`);
     if (existsSync(p)) return { path: p, exists: true };
   }
-  return { path: join(saveDir, `${baseName}.srm`), exists: false };
+  // Predict using the most likely extension for this system
+  return { path: join(saveDir, `${baseName}.${exts[0]}`), exists: false };
 }
 
 ipcMain.handle("emulator:scan", (_event, extraPaths: string[]): EmulatorScanResult => {
@@ -383,18 +398,23 @@ ipcMain.handle("emulator:scan", (_event, extraPaths: string[]): EmulatorScanResu
 
   const roms: RomEntry[] = romDirs.flatMap(dir => {
     return scanRomDir(dir).map(romPath => {
-      const base = basename(romPath, extname(romPath));
+      const romExt  = extname(romPath).slice(1).toLowerCase();
+      const base    = basename(romPath, extname(romPath));
 
       // Match save against every detected emulator's save dir, prefer existing
       let savePath = "";
       let saveExists = false;
       for (const emu of emus) {
-        const m = matchSave(emu.saveDir, base);
+        const m = matchSave(emu.saveDir, base, romExt);
         if (m.exists) { savePath = m.path; saveExists = true; break; }
         if (!savePath) savePath = m.path; // take first predicted path as fallback
       }
-      // If no emulator detected at all, predict alongside the ROM
-      if (!savePath) savePath = join(dirname(romPath), `${base}.srm`);
+      // If no emulator detected at all, predict alongside the ROM using the
+      // correct extension for this system
+      if (!savePath) {
+        const fallbackExt = saveExtensionsFor(romExt)[0];
+        savePath = join(dirname(romPath), `${base}.${fallbackExt}`);
+      }
 
       // Build launch command from whichever emulator was found first
       const launchCommand = emus.length
