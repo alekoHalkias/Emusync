@@ -128,10 +128,17 @@ class Store:
 
     def add_game(self, slug: str, name: str) -> Game:
         self._conn.execute(
-            "INSERT OR REPLACE INTO games (slug, name) VALUES (?, ?)", (slug, name)
+            "INSERT OR IGNORE INTO games (slug, name) VALUES (?, ?)", (slug, name)
         )
         self._conn.commit()
         return Game(slug=slug, name=name)
+
+    def update_game_name(self, slug: str, name: str) -> None:
+        """Rename a game without touching its saves, locks, or device config."""
+        self._conn.execute(
+            "UPDATE games SET name = ? WHERE slug = ?", (name, slug)
+        )
+        self._conn.commit()
 
     def remove_game(self, slug: str) -> None:
         self._conn.execute("DELETE FROM games WHERE slug = ?", (slug,))

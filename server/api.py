@@ -105,7 +105,7 @@ def get_game(slug: str, device_id: str = Depends(_auth)) -> dict:
 def update_game(slug: str, req: GameRequest, device_id: str = Depends(_auth)) -> dict:
     if not _get_store().get_game(slug):
         raise HTTPException(status_code=404, detail="Game not found")
-    _get_store().add_game(slug, req.name)
+    _get_store().update_game_name(slug, req.name)
     return {"slug": slug, "name": req.name}
 
 

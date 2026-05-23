@@ -71,7 +71,7 @@ export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
   const res = await fetch(`${_base}/games/${slug}/save/meta`, {
     headers: { Authorization: `Bearer ${_token}` },
   });
-  if (res.status === 204) return null;
+  if (res.status === 204 || !res.ok) return null;
   return res.json();
 };
 

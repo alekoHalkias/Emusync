@@ -43,6 +43,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | `gui/renderer/src/components/ServerStatusButton.tsx` | Server control panel modal (start/stop, PIN, LAN discovery, re-pair) |
 | `gui/renderer/src/components/GameList.tsx` | Main game list; play/edit/remove actions |
 | `gui/renderer/src/components/GameConfig.tsx` | Add/edit game form with file pickers |
+| `gui/renderer/src/components/ConsoleImport.tsx` | "Add Console" wizard modal — console dropdown → emulator detection → ROM scan → import |
 
 ---
 
@@ -112,6 +113,12 @@ window.emusync.server.changePin() // stops server, saves PIN, clears devices, re
 window.emusync.server.discover()  // runs emusync.py server discover-json → server list
 
 window.emusync.dialog.openFile()  // native file picker
+window.emusync.dialog.openFolder() // native folder picker
+
+window.emusync.emulator.consoles()          // returns ordered console list { key, label }[] for the dropdown
+window.emusync.emulator.detect(consoleKey)  // scans for installed emulators for that console; checks RetroArch (native+flatpak) cores + standalone emulators (mGBA etc.); resolves per-core save subfolder; returns { options: DetectedEmulatorOption[], suggestions[] }
+window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; uses emulatorOption.saveDir (already resolved to core subfolder); returns { emulators, romDirs, roms[] } with consoleName+coreName on each entry
+window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 
@@ -319,6 +326,12 @@ Use `Closes #N` in the PR body so GitHub auto-closes the issue on merge.
 **Stale DB schema** — If you see `sqlite3.OperationalError: no such column`, delete `~/.emusync/emusync.db` and restart the server.
 
 **TypeScript on `window.emusync`** — Typed as `any`; the global interface declaration is in `Setup.tsx`. If you add new IPC channels, add them there too or type errors won't surface at compile time.
+
+**RetroArch config paths use `~` which Node.js does not expand** — `retroarch.cfg` commonly stores paths like `savefile_directory = "~/.config/retroarch/saves"`. `parseRetroArchCfg` in `main.ts` expands leading `~/` to the real home directory so that `existsSync`, `mkdirSync`, and `join` work correctly. Do not call `parseRetroArchCfg` without passing `home` and do not use raw config values as filesystem paths without checking for tilde. Also, `rgui_browser_directory = "default"` is RetroArch's placeholder for "not configured" — it is filtered out and never passed as a ROM directory.
+
+**RetroArch per-core save directory is always `saves/<CoreName>/`** — `detectEmulatorsForConsole` uses `join(ra.saveDir, core.folderName)` unconditionally. The old `resolveCoreSaveDir` fell back to the root saves dir if the subfolder did not exist yet, causing saves to land in the wrong place on fresh installs. The scan handler additionally checks the root saves dir as a fallback when looking for *existing* saves written before per-core organisation was set up.
+
+**`store.add_game` is INSERT OR IGNORE, not INSERT OR REPLACE** — `add_game` only inserts new rows; it never overwrites. Use `update_game_name(slug, name)` to rename an existing game. The original `INSERT OR REPLACE` bug cascade-deleted `game_devices`, `saves`, and `locks` every time a game was renamed, causing the game list to appear empty after a config save.
 
 **Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks the lock state. If the lock is already held (by this device or another), it calls `_show_game_running_popup` which displays "\<game\> is already running. Please close it on \<device\>." and then exits. The popup uses a subprocess fallback chain — `notify-send` → `zenity` → `kdialog` → `xmessage` → tkinter — so it works on Wayland, X11, Steam Deck Gaming Mode (gamescope), and environments where `libtk` may not be installed. `notify-send` fires first and is non-blocking (auto-dismisses); the chain then continues to the first available blocking dialog so desktop users still get a modal. The race-condition path (409 from `acquire_lock`) follows the same flow.
 
