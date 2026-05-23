@@ -271,43 +271,246 @@ const ROM_EXTENSIONS = new Set([
   "ngp", "ngc",                        // Neo Geo Pocket
   "a26", "a52", "a78",                 // Atari
   "lnx",                               // Atari Lynx
-  "iso", "cue", "bin", "chd", "pbp",   // Disc-based (PSX, Dreamcast…)
+  "iso", "cue", "bin", "chd", "pbp",   // Disc-based (PSX, Dreamcast, PSP…)
 ]);
 
-// Save extensions checked per ROM system, most-likely first.
-// GBA/GB/GBC/NDS use .sav (mGBA, VBA-M, DeSmuME).
-// SNES/Genesis/N64/NES use .srm (Snes9x, Genesis Plus GX, Mupen64).
-const SAVE_EXTENSIONS_BY_ROM: Record<string, string[]> = {
-  gba:  ["sav", "srm"],
-  gb:   ["sav", "srm"],
-  gbc:  ["sav", "srm"],
-  nds:  ["sav", "dsv", "srm"],
-};
-const DEFAULT_SAVE_EXTENSIONS = ["srm", "sav", "save"];
-
-function saveExtensionsFor(romExt: string): string[] {
-  return SAVE_EXTENSIONS_BY_ROM[romExt.toLowerCase()] ?? DEFAULT_SAVE_EXTENSIONS;
+// Per-core info: library filename (without .so) and the folder name RetroArch
+// uses under saves/ when "Sort Saves by Core" is enabled.
+interface CoreInfo {
+  libName: string;      // e.g. "mgba_libretro"
+  folderName: string;   // e.g. "mGBA"
 }
+
+interface SystemInfo {
+  name: string;         // display name shown in the import UI
+  saveExts: string[];   // save file extensions, most-likely first
+  cores: CoreInfo[];    // preferred RetroArch cores, in order
+}
+
+const DEFAULT_SAVE_EXTS = ["srm", "sav", "save"];
+
+// Map ROM extension → system + preferred cores.  Cores are tried in order;
+// the first one whose .so exists in the RetroArch cores directory wins.
+const SYSTEMS: Record<string, SystemInfo> = {
+  // ── Game Boy family ────────────────────────────────────────────────────────
+  gba: {
+    name: "Game Boy Advance",
+    saveExts: ["sav", "srm"],
+    cores: [
+      { libName: "mgba_libretro",     folderName: "mGBA" },
+      { libName: "vba_next_libretro", folderName: "VBA Next" },
+      { libName: "vbam_libretro",     folderName: "VBA-M" },
+    ],
+  },
+  gb: {
+    name: "Game Boy",
+    saveExts: ["sav", "srm"],
+    cores: [
+      { libName: "gambatte_libretro", folderName: "Gambatte" },
+      { libName: "mgba_libretro",     folderName: "mGBA" },
+      { libName: "gearboy_libretro",  folderName: "Gearboy" },
+    ],
+  },
+  gbc: {
+    name: "Game Boy Color",
+    saveExts: ["sav", "srm"],
+    cores: [
+      { libName: "gambatte_libretro", folderName: "Gambatte" },
+      { libName: "mgba_libretro",     folderName: "mGBA" },
+      { libName: "gearboy_libretro",  folderName: "Gearboy" },
+    ],
+  },
+  // ── SNES ──────────────────────────────────────────────────────────────────
+  sfc: {
+    name: "SNES",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "snes9x_libretro",     folderName: "Snes9x" },
+      { libName: "bsnes_libretro",      folderName: "bsnes" },
+      { libName: "snes9x2010_libretro", folderName: "Snes9x 2010" },
+    ],
+  },
+  smc: {
+    name: "SNES",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "snes9x_libretro",     folderName: "Snes9x" },
+      { libName: "bsnes_libretro",      folderName: "bsnes" },
+      { libName: "snes9x2010_libretro", folderName: "Snes9x 2010" },
+    ],
+  },
+  // ── NES ───────────────────────────────────────────────────────────────────
+  nes: {
+    name: "NES",
+    saveExts: ["sav", "srm"],
+    cores: [
+      { libName: "nestopia_libretro", folderName: "Nestopia UE" },
+      { libName: "fceumm_libretro",   folderName: "FCEUmm" },
+      { libName: "mesen_libretro",    folderName: "Mesen" },
+    ],
+  },
+  fds: {
+    name: "Famicom Disk System",
+    saveExts: ["sav", "srm"],
+    cores: [
+      { libName: "nestopia_libretro", folderName: "Nestopia UE" },
+      { libName: "fceumm_libretro",   folderName: "FCEUmm" },
+    ],
+  },
+  // ── Nintendo 64 ───────────────────────────────────────────────────────────
+  n64: {
+    name: "Nintendo 64",
+    saveExts: ["srm", "sav", "eep", "mpk"],
+    cores: [
+      { libName: "mupen64plus_next_libretro", folderName: "Mupen64Plus-Next" },
+      { libName: "parallel_n64_libretro",     folderName: "ParaLLEl N64" },
+    ],
+  },
+  z64: {
+    name: "Nintendo 64",
+    saveExts: ["srm", "sav", "eep", "mpk"],
+    cores: [
+      { libName: "mupen64plus_next_libretro", folderName: "Mupen64Plus-Next" },
+      { libName: "parallel_n64_libretro",     folderName: "ParaLLEl N64" },
+    ],
+  },
+  v64: {
+    name: "Nintendo 64",
+    saveExts: ["srm", "sav", "eep", "mpk"],
+    cores: [
+      { libName: "mupen64plus_next_libretro", folderName: "Mupen64Plus-Next" },
+      { libName: "parallel_n64_libretro",     folderName: "ParaLLEl N64" },
+    ],
+  },
+  // ── Nintendo DS ───────────────────────────────────────────────────────────
+  nds: {
+    name: "Nintendo DS",
+    saveExts: ["sav", "dsv", "srm"],
+    cores: [
+      { libName: "melonds_libretro",     folderName: "melonDS" },
+      { libName: "desmume_libretro",     folderName: "DeSmuME" },
+      { libName: "desmume2015_libretro", folderName: "DeSmuME 2015" },
+    ],
+  },
+  // ── Sega Genesis / Mega Drive ─────────────────────────────────────────────
+  md:  {
+    name: "Sega Genesis",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "genesis_plus_gx_libretro", folderName: "Genesis Plus GX" },
+      { libName: "picodrive_libretro",       folderName: "PicoDrive" },
+    ],
+  },
+  smd: {
+    name: "Sega Genesis",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "genesis_plus_gx_libretro", folderName: "Genesis Plus GX" },
+      { libName: "picodrive_libretro",       folderName: "PicoDrive" },
+    ],
+  },
+  gen: {
+    name: "Sega Genesis",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "genesis_plus_gx_libretro", folderName: "Genesis Plus GX" },
+      { libName: "picodrive_libretro",       folderName: "PicoDrive" },
+    ],
+  },
+  // ── Sega Master System / Game Gear ────────────────────────────────────────
+  sms: {
+    name: "Sega Master System",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "genesis_plus_gx_libretro", folderName: "Genesis Plus GX" },
+      { libName: "picodrive_libretro",       folderName: "PicoDrive" },
+    ],
+  },
+  gg: {
+    name: "Game Gear",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "genesis_plus_gx_libretro", folderName: "Genesis Plus GX" },
+    ],
+  },
+  // ── PC Engine ─────────────────────────────────────────────────────────────
+  pce: {
+    name: "PC Engine",
+    saveExts: ["srm", "sav"],
+    cores: [
+      { libName: "mednafen_pce_libretro",      folderName: "Beetle PCE" },
+      { libName: "mednafen_pce_fast_libretro", folderName: "Beetle PCE Fast" },
+    ],
+  },
+  // ── Disc-based (PSX / Dreamcast / PSP) ───────────────────────────────────
+  iso: {
+    name: "Disc",
+    saveExts: ["mcr", "srm", "sav"],
+    cores: [
+      { libName: "pcsx_rearmed_libretro",    folderName: "PCSX-ReARMed" },
+      { libName: "mednafen_psx_libretro",    folderName: "Beetle PSX" },
+      { libName: "mednafen_psx_hw_libretro", folderName: "Beetle PSX HW" },
+      { libName: "flycast_libretro",         folderName: "Flycast" },
+      { libName: "ppsspp_libretro",          folderName: "PPSSPP" },
+    ],
+  },
+  bin: {
+    name: "Disc",
+    saveExts: ["mcr", "srm", "sav"],
+    cores: [
+      { libName: "pcsx_rearmed_libretro",    folderName: "PCSX-ReARMed" },
+      { libName: "mednafen_psx_libretro",    folderName: "Beetle PSX" },
+    ],
+  },
+  cue: {
+    name: "Disc",
+    saveExts: ["mcr", "srm", "sav"],
+    cores: [
+      { libName: "pcsx_rearmed_libretro",    folderName: "PCSX-ReARMed" },
+      { libName: "mednafen_psx_libretro",    folderName: "Beetle PSX" },
+    ],
+  },
+  chd: {
+    name: "Disc (CHD)",
+    saveExts: ["mcr", "srm", "sav"],
+    cores: [
+      { libName: "pcsx_rearmed_libretro",    folderName: "PCSX-ReARMed" },
+      { libName: "mednafen_psx_libretro",    folderName: "Beetle PSX" },
+      { libName: "flycast_libretro",         folderName: "Flycast" },
+    ],
+  },
+  pbp: {
+    name: "PSP / PS1",
+    saveExts: ["srm", "sav", "mcr"],
+    cores: [
+      { libName: "ppsspp_libretro",       folderName: "PPSSPP" },
+      { libName: "pcsx_rearmed_libretro", folderName: "PCSX-ReARMed" },
+    ],
+  },
+};
 
 interface EmulatorInfo {
   type: "native" | "flatpak";
   label: string;      // display name, e.g. "RetroArch (Flatpak)"
-  execPath: string;   // binary or "flatpak run ..."
-  saveDir: string;
+  execPath: string;   // binary path or "flatpak run ..."
+  saveDir: string;    // root saves directory
+  coresDir: string;   // where core .so files live
   romDirs: string[];
 }
 
 export interface RomEntry {
   name: string;
   romPath: string;
-  savePath: string;       // predicted path, may not exist yet
+  savePath: string;       // resolved path (may not exist yet)
   saveExists: boolean;
   launchCommand: string;
+  consoleName?: string;   // e.g. "Game Boy Advance"
+  coreName?: string;      // e.g. "mGBA" — the core that will be used
 }
 
 export interface EmulatorScanResult {
   emulators: EmulatorInfo[];
-  romDirs: string[];      // dirs that were actually scanned
+  romDirs: string[];
   roms: RomEntry[];
 }
 
@@ -331,11 +534,12 @@ function detectRetroArch(home: string): EmulatorInfo[] {
     if (existsSync(bin)) {
       const cfg = parseRetroArchCfg(nativeCfg);
       infos.push({
-        type:    "native",
-        label:   "RetroArch",
-        execPath: bin,
-        saveDir: cfg.savefile_directory || join(home, ".config/retroarch/saves"),
-        romDirs: [cfg.rgui_browser_directory].filter(Boolean) as string[],
+        type:     "native",
+        label:    "RetroArch",
+        execPath:  bin,
+        saveDir:   cfg.savefile_directory || join(home, ".config/retroarch/saves"),
+        coresDir:  cfg.libretro_directory  || join(home, ".config/retroarch/cores"),
+        romDirs:  [cfg.rgui_browser_directory].filter(Boolean) as string[],
       });
       break;
     }
@@ -345,19 +549,45 @@ function detectRetroArch(home: string): EmulatorInfo[] {
   try {
     const list = execSync("flatpak list --app --columns=application 2>/dev/null", { timeout: 5000 }).toString();
     if (list.includes("org.libretro.RetroArch")) {
-      const flatCfg  = join(home, ".var/app/org.libretro.RetroArch/config/retroarch/retroarch.cfg");
+      const flatCfg = join(home, ".var/app/org.libretro.RetroArch/config/retroarch/retroarch.cfg");
       const cfg = parseRetroArchCfg(flatCfg);
       infos.push({
-        type:    "flatpak",
-        label:   "RetroArch (Flatpak)",
+        type:     "flatpak",
+        label:    "RetroArch (Flatpak)",
         execPath: "flatpak run org.libretro.RetroArch",
-        saveDir: cfg.savefile_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
-        romDirs: [cfg.rgui_browser_directory].filter(Boolean) as string[],
+        saveDir:  cfg.savefile_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
+        coresDir: cfg.libretro_directory  || join(home, ".var/app/org.libretro.RetroArch/data/retroarch/cores"),
+        romDirs:  [cfg.rgui_browser_directory].filter(Boolean) as string[],
       });
     }
   } catch { /* flatpak not available */ }
 
   return infos;
+}
+
+/** Find the first installed core for a system in the given coresDir. */
+function findInstalledCore(coresDir: string, system: SystemInfo): { lib: string; folderName: string } | null {
+  for (const core of system.cores) {
+    const soPath = join(coresDir, `${core.libName}.so`);
+    if (existsSync(soPath)) return { lib: soPath, folderName: core.folderName };
+  }
+  return null;
+}
+
+/**
+ * If a per-core subfolder exists inside saveDir (case-insensitive match on
+ * folderName), return that subfolder path.  Otherwise return saveDir itself.
+ */
+function resolveCoreSaveDir(saveDir: string, coreFolderName: string): string {
+  if (!existsSync(saveDir)) return saveDir;
+  try {
+    const entries = readdirSync(saveDir, { withFileTypes: true });
+    const match = entries.find(
+      e => e.isDirectory() && e.name.toLowerCase() === coreFolderName.toLowerCase()
+    );
+    if (match) return join(saveDir, match.name);
+  } catch {}
+  return saveDir;
 }
 
 function scanRomDir(dir: string, depth = 0): string[] {
@@ -376,19 +606,18 @@ function scanRomDir(dir: string, depth = 0): string[] {
   } catch { return []; }
 }
 
-function matchSave(saveDir: string, baseName: string, romExt: string): { path: string; exists: boolean } {
-  const exts = saveExtensionsFor(romExt);
+/** Search saveDir for a file matching baseName + any of the given extensions. */
+function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { path: string; exists: boolean } {
   for (const ext of exts) {
     const p = join(saveDir, `${baseName}.${ext}`);
     if (existsSync(p)) return { path: p, exists: true };
   }
-  // Predict using the most likely extension for this system
   return { path: join(saveDir, `${baseName}.${exts[0]}`), exists: false };
 }
 
 ipcMain.handle("emulator:scan", (_event, extraPaths: string[]): EmulatorScanResult => {
-  const home    = homedir();
-  const emus    = detectRetroArch(home);
+  const home = homedir();
+  const emus = detectRetroArch(home);
 
   // Collect unique ROM dirs from all detected emulators + user-supplied extras
   const romDirs = [...new Set([
@@ -396,34 +625,54 @@ ipcMain.handle("emulator:scan", (_event, extraPaths: string[]): EmulatorScanResu
     ...(extraPaths ?? []),
   ].filter(Boolean))];
 
-  const roms: RomEntry[] = romDirs.flatMap(dir => {
-    return scanRomDir(dir).map(romPath => {
-      const romExt  = extname(romPath).slice(1).toLowerCase();
-      const base    = basename(romPath, extname(romPath));
+  const roms: RomEntry[] = romDirs.flatMap(dir =>
+    scanRomDir(dir).map(romPath => {
+      const romExt = extname(romPath).slice(1).toLowerCase();
+      const base   = basename(romPath, extname(romPath));
+      const system = SYSTEMS[romExt];
+      const saveExts = system?.saveExts ?? DEFAULT_SAVE_EXTS;
 
-      // Match save against every detected emulator's save dir, prefer existing
-      let savePath = "";
-      let saveExists = false;
+      let savePath    = "";
+      let saveExists  = false;
+      let consoleName = system?.name;
+      let coreName: string | undefined;
+      let launchCommand = "";
+
       for (const emu of emus) {
-        const m = matchSave(emu.saveDir, base, romExt);
-        if (m.exists) { savePath = m.path; saveExists = true; break; }
-        if (!savePath) savePath = m.path; // take first predicted path as fallback
+        const installedCore = system ? findInstalledCore(emu.coresDir, system) : null;
+
+        if (installedCore) {
+          // ── Core found: check per-core save subfolder first ────────────────
+          const coreDir = resolveCoreSaveDir(emu.saveDir, installedCore.folderName);
+          const m = matchSaveFile(coreDir, base, saveExts);
+
+          if (m.exists || !savePath) {
+            savePath      = m.path;
+            saveExists    = m.exists;
+            coreName      = installedCore.folderName;
+            launchCommand = `${emu.execPath} -L "${installedCore.lib}" "${romPath}"`;
+          }
+          if (m.exists) break;
+        } else {
+          // ── No core: fall back to root save dir ───────────────────────────
+          const m = matchSaveFile(emu.saveDir, base, saveExts);
+          if (m.exists || !savePath) {
+            savePath      = m.path;
+            saveExists    = m.exists;
+            launchCommand = `${emu.execPath} "${romPath}"`;
+          }
+          if (m.exists) break;
+        }
       }
-      // If no emulator detected at all, predict alongside the ROM using the
-      // correct extension for this system
+
+      // No emulator detected at all: predict save alongside the ROM
       if (!savePath) {
-        const fallbackExt = saveExtensionsFor(romExt)[0];
-        savePath = join(dirname(romPath), `${base}.${fallbackExt}`);
+        savePath = join(dirname(romPath), `${base}.${saveExts[0]}`);
       }
 
-      // Build launch command from whichever emulator was found first
-      const launchCommand = emus.length
-        ? `${emus[0].execPath} "${romPath}"`
-        : "";
-
-      return { name: base, romPath, savePath, saveExists, launchCommand };
-    });
-  });
+      return { name: base, romPath, savePath, saveExists, launchCommand, consoleName, coreName };
+    })
+  );
 
   return { emulators: emus, romDirs, roms };
 });

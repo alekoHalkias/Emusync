@@ -7,6 +7,8 @@ type RomEntry = {
   savePath: string;
   saveExists: boolean;
   launchCommand: string;
+  consoleName?: string;   // e.g. "Game Boy Advance"
+  coreName?: string;      // e.g. "mGBA"
 };
 
 type ScanResult = {
@@ -225,11 +227,16 @@ export default function EmulatorImport({ onClose, onImported }: Props): React.Re
                             <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {rom.name}
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
                               {rom.saveExists
                                 ? <span style={{ color: "var(--green, #4caf50)" }}>✓ Save matched</span>
                                 : <span>Save: {rom.savePath.replace(/.*\//, "")}</span>
                               }
+                              {(rom.consoleName || rom.coreName) && (
+                                <span style={{ opacity: 0.7 }}>
+                                  {[rom.consoleName, rom.coreName].filter(Boolean).join(" · ")}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
