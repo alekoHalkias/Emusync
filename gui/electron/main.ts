@@ -347,11 +347,19 @@ function detectRetroArch(home: string): EmulatorInfo[] {
   return infos;
 }
 
-function scanRomDir(dir: string): string[] {
+function scanRomDir(dir: string, depth = 0): string[] {
+  if (depth > 3) return [];
   try {
-    return readdirSync(dir, { withFileTypes: true })
-      .filter(e => e.isFile() && ROM_EXTENSIONS.has(extname(e.name).slice(1).toLowerCase()))
-      .map(e => join(dir, e.name));
+    const entries = readdirSync(dir, { withFileTypes: true });
+    const roms: string[] = [];
+    for (const e of entries) {
+      if (e.isFile() && ROM_EXTENSIONS.has(extname(e.name).slice(1).toLowerCase())) {
+        roms.push(join(dir, e.name));
+      } else if (e.isDirectory()) {
+        roms.push(...scanRomDir(join(dir, e.name), depth + 1));
+      }
+    }
+    return roms;
   } catch { return []; }
 }
 
