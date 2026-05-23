@@ -321,11 +321,13 @@ In addition to save files (SRAM), EmuSync now syncs **save states** (snapshots).
 
 - **DB schema**: new `states` table; `state_path` column added to `game_devices` via migration
 - **API**: new `/games/{slug}/state` routes (GET/POST) and `/games/{slug}/state/meta`
-- **CLI (`emusync run`)**: pulls state before launch, pushes after exit (opt-in if `state_path` is configured)
+- **CLI (`emusync run`)**: pulls state before launch, pushes after exit (opt-in if `state_path` is configured); auto-detects actual save/state file extensions and updates config if needed
 - **Electron**: detects `savestate_directory` from `retroarch.cfg`, scans for `.state` / `.state.auto` files per ROM
-- **GUI**: wizard shows `✓ State found` / `⊕ State will be created` badges; creates empty state files on import
+- **GUI**: wizard shows `✓ State found` / `⊕ State will be created` badges; does not pre-create files, only tracks paths
 
 State sync is **opt-in** — if a game's `state_path` is empty, it is skipped silently. The scan handler checks both the per-core subfolder and the root `states/` dir for backwards compatibility with pre-existing states.
+
+**Auto-detection of save/state file extensions** — During import, games are registered with a default save/state path (e.g., `saves/SNES/game.sav`), but the actual extension emulator writes may differ (e.g., `.srm`). After the emulator exits in `emusync run`, the wrapper scans the save/state directory for files with the same base name but different extensions. If found, the game config is automatically updated with the correct path, and subsequent plays will sync the correct file. No manual path editing needed.
 
 ---
 
