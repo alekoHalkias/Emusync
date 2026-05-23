@@ -53,6 +53,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [romDirs, setRomDirs]     = useState<string[]>([]);
   const [roms, setRoms]           = useState<RomEntry[]>([]);
   const [selected, setSelected]   = useState<Set<string>>(new Set());
+  const [names, setNames]         = useState<Record<string, string>>({});
   const [error, setError]         = useState("");
   const [progress, setProgress]   = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -132,16 +133,15 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
       try {
-        if (!rom.saveExists) {
-          await (window as any).emusync.files.ensureSave(rom.savePath);
-        }
-        const game = await addGame(rom.name);
+        const displayName = names[rom.romPath] ?? rom.name;
+        const game = await addGame(displayName);
         await setGameDevice(game.slug, {
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
+          state_path: rom.stateExists ? (rom.statePath ?? "") : "",
         });
-      } catch { errs.push(rom.name); }
+      } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
     }
     setImportErrors(errs);
@@ -389,16 +389,23 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                           onClick={e => e.stopPropagation()}
                         />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500,
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {rom.name}
-                          </div>
+                          <input
+                            type="text"
+                            value={names[rom.romPath] ?? rom.name}
+                            onChange={(e) => setNames({ ...names, [rom.romPath]: e.target.value })}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ fontSize: 13, fontWeight: 500, width: "100%", marginBottom: 4 }}
+                          />
                           <div style={{ fontSize: 11, color: "var(--text-muted)",
                             marginTop: 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {rom.saveExists
                               ? <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
                               : <span style={{ color: "var(--yellow, #f0a500)" }}>⊕ Save will be created</span>
                             }
+                            {rom.statePath && (rom.stateExists
+                              ? <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
+                              : <span style={{ color: "var(--yellow, #f0a500)" }}>⊕ State will be created</span>
+                            )}
                             {(rom.consoleName || rom.coreName) && (
                               <span style={{ opacity: 0.7 }}>
                                 {[rom.consoleName, rom.coreName].filter(Boolean).join(" · ")}
