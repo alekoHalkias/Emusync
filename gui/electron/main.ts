@@ -615,66 +615,250 @@ function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { pat
   return { path: join(saveDir, `${baseName}.${exts[0]}`), exists: false };
 }
 
-ipcMain.handle("emulator:scan", (_event, extraPaths: string[]): EmulatorScanResult => {
-  const home = homedir();
-  const emus = detectRetroArch(home);
+// ── console / emulator detection ──────────────────────────────────────────────
 
-  // Collect unique ROM dirs from all detected emulators + user-supplied extras
-  const romDirs = [...new Set([
-    ...emus.flatMap(e => e.romDirs),
-    ...(extraPaths ?? []),
-  ].filter(Boolean))];
+interface StandaloneDef {
+  id: string;
+  label: string;
+  nativeBins: string[];
+  flatpakId?: string;
+  flatpakExec?: string;
+  getDefaultSaveDir: (home: string) => string;
+}
+
+interface ConsoleDef {
+  key: string;
+  label: string;
+  systemKeys: string[];       // ROM extensions covered by this console
+  standalones: StandaloneDef[];
+  suggestions: string[];      // shown when no emulators are detected
+}
+
+export interface DetectedEmulatorOption {
+  id: string;
+  label: string;
+  execPath: string;
+  saveDir: string;
+  corePath?: string;
+  coreFolderName?: string;
+  romDirs: string[];
+}
+
+const CONSOLES: ConsoleDef[] = [
+  {
+    key: "gba",
+    label: "Game Boy Advance",
+    systemKeys: ["gba"],
+    standalones: [
+      {
+        id: "mgba", label: "mGBA",
+        nativeBins: ["/usr/bin/mgba-qt", "/usr/bin/mgba", join(homedir(), ".local/bin/mgba-qt")],
+        flatpakId: "io.mgba.mGBA", flatpakExec: "flatpak run io.mgba.mGBA",
+        getDefaultSaveDir: (h) => join(h, ".local/share/mGBA/saves"),
+      },
+    ],
+    suggestions: ["RetroArch with mGBA core", "mGBA standalone"],
+  },
+  {
+    key: "gb",
+    label: "Game Boy / Game Boy Color",
+    systemKeys: ["gb", "gbc"],
+    standalones: [
+      {
+        id: "mgba", label: "mGBA",
+        nativeBins: ["/usr/bin/mgba-qt", "/usr/bin/mgba"],
+        flatpakId: "io.mgba.mGBA", flatpakExec: "flatpak run io.mgba.mGBA",
+        getDefaultSaveDir: (h) => join(h, ".local/share/mGBA/saves"),
+      },
+    ],
+    suggestions: ["RetroArch with Gambatte or mGBA core", "mGBA standalone"],
+  },
+  {
+    key: "snes",
+    label: "Super Nintendo (SNES)",
+    systemKeys: ["sfc", "smc"],
+    standalones: [],
+    suggestions: ["RetroArch with Snes9x core"],
+  },
+  {
+    key: "nes",
+    label: "NES / Famicom",
+    systemKeys: ["nes", "fds"],
+    standalones: [],
+    suggestions: ["RetroArch with Nestopia UE or FCEUmm core"],
+  },
+  {
+    key: "n64",
+    label: "Nintendo 64",
+    systemKeys: ["n64", "z64", "v64"],
+    standalones: [],
+    suggestions: ["RetroArch with Mupen64Plus-Next core"],
+  },
+  {
+    key: "nds",
+    label: "Nintendo DS",
+    systemKeys: ["nds"],
+    standalones: [],
+    suggestions: ["RetroArch with melonDS or DeSmuME core"],
+  },
+  {
+    key: "genesis",
+    label: "Sega Genesis / Mega Drive",
+    systemKeys: ["md", "smd", "gen"],
+    standalones: [],
+    suggestions: ["RetroArch with Genesis Plus GX core"],
+  },
+  {
+    key: "sms",
+    label: "Master System / Game Gear",
+    systemKeys: ["sms", "gg"],
+    standalones: [],
+    suggestions: ["RetroArch with Genesis Plus GX core"],
+  },
+  {
+    key: "pce",
+    label: "PC Engine",
+    systemKeys: ["pce"],
+    standalones: [],
+    suggestions: ["RetroArch with Beetle PCE core"],
+  },
+  {
+    key: "psx",
+    label: "PlayStation",
+    systemKeys: ["iso", "bin", "cue", "chd", "pbp"],
+    standalones: [],
+    suggestions: ["RetroArch with PCSX-ReARMed or Beetle PSX core"],
+  },
+];
+
+function detectEmulatorsForConsole(home: string, consoleKey: string): DetectedEmulatorOption[] {
+  const consoleDef = CONSOLES.find(c => c.key === consoleKey);
+  if (!consoleDef) return [];
+  const options: DetectedEmulatorOption[] = [];
+
+  // ── RetroArch (native + flatpak) ──────────────────────────────────────────
+  for (const ra of detectRetroArch(home)) {
+    const seenCores = new Set<string>();
+    for (const sysKey of consoleDef.systemKeys) {
+      const sys = SYSTEMS[sysKey];
+      if (!sys) continue;
+      const core = findInstalledCore(ra.coresDir, sys);
+      if (!core || seenCores.has(core.lib)) continue;
+      seenCores.add(core.lib);
+      const saveDir = resolveCoreSaveDir(ra.saveDir, core.folderName);
+      options.push({
+        id: `${ra.type}-${core.folderName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+        label: `${ra.label} · ${core.folderName}`,
+        execPath: ra.execPath,
+        saveDir,
+        corePath: core.lib,
+        coreFolderName: core.folderName,
+        romDirs: ra.romDirs,
+      });
+    }
+  }
+
+  // ── Standalone emulators ──────────────────────────────────────────────────
+  let flatpakList: string | null = null;
+  const getFlatpakList = () => {
+    if (flatpakList !== null) return flatpakList;
+    try { flatpakList = execSync("flatpak list --app --columns=application 2>/dev/null", { timeout: 5000 }).toString(); }
+    catch { flatpakList = ""; }
+    return flatpakList;
+  };
+
+  for (const s of consoleDef.standalones) {
+    let found = false;
+    for (const bin of s.nativeBins) {
+      if (existsSync(bin)) {
+        options.push({ id: `${s.id}-native`, label: s.label, execPath: bin,
+          saveDir: s.getDefaultSaveDir(home), romDirs: [] });
+        found = true; break;
+      }
+    }
+    if (!found && s.flatpakId && s.flatpakExec && getFlatpakList().includes(s.flatpakId)) {
+      options.push({
+        id: `${s.id}-flatpak`, label: `${s.label} (Flatpak)`,
+        execPath: s.flatpakExec,
+        saveDir: join(home, `.var/app/${s.flatpakId}/data/${s.id}/saves`),
+        romDirs: [],
+      });
+    }
+  }
+
+  return options;
+}
+
+// ── IPC: console-based emulator import ────────────────────────────────────────
+
+ipcMain.handle("emulator:consoles", () =>
+  CONSOLES.map(c => ({ key: c.key, label: c.label }))
+);
+
+ipcMain.handle("emulator:detect", (_event, consoleKey: string): {
+  options: DetectedEmulatorOption[];
+  suggestions: string[];
+} => {
+  const consoleDef = CONSOLES.find(c => c.key === consoleKey);
+  return {
+    options: detectEmulatorsForConsole(homedir(), consoleKey),
+    suggestions: consoleDef?.suggestions ?? [],
+  };
+});
+
+ipcMain.handle("emulator:scan", (_event, params: {
+  consoleKey: string;
+  emulatorOption: DetectedEmulatorOption;
+  extraPaths: string[];
+}): EmulatorScanResult => {
+  const { consoleKey, emulatorOption, extraPaths } = params;
+  const consoleDef = CONSOLES.find(c => c.key === consoleKey);
+  if (!consoleDef) return { emulators: [], romDirs: [], roms: [] };
+
+  const romExtSet = new Set(consoleDef.systemKeys);
+  const romDirs = [...new Set([...emulatorOption.romDirs, ...(extraPaths ?? [])].filter(Boolean))];
+  const firstSys = SYSTEMS[consoleDef.systemKeys[0]];
+  const defaultSaveExts = firstSys?.saveExts ?? DEFAULT_SAVE_EXTS;
 
   const roms: RomEntry[] = romDirs.flatMap(dir =>
-    scanRomDir(dir).map(romPath => {
-      const romExt = extname(romPath).slice(1).toLowerCase();
-      const base   = basename(romPath, extname(romPath));
-      const system = SYSTEMS[romExt];
-      const saveExts = system?.saveExts ?? DEFAULT_SAVE_EXTS;
-
-      let savePath    = "";
-      let saveExists  = false;
-      let consoleName = system?.name;
-      let coreName: string | undefined;
-      let launchCommand = "";
-
-      for (const emu of emus) {
-        const installedCore = system ? findInstalledCore(emu.coresDir, system) : null;
-
-        if (installedCore) {
-          // ── Core found: check per-core save subfolder first ────────────────
-          const coreDir = resolveCoreSaveDir(emu.saveDir, installedCore.folderName);
-          const m = matchSaveFile(coreDir, base, saveExts);
-
-          if (m.exists || !savePath) {
-            savePath      = m.path;
-            saveExists    = m.exists;
-            coreName      = installedCore.folderName;
-            launchCommand = `${emu.execPath} -L "${installedCore.lib}" "${romPath}"`;
-          }
-          if (m.exists) break;
-        } else {
-          // ── No core: fall back to root save dir ───────────────────────────
-          const m = matchSaveFile(emu.saveDir, base, saveExts);
-          if (m.exists || !savePath) {
-            savePath      = m.path;
-            saveExists    = m.exists;
-            launchCommand = `${emu.execPath} "${romPath}"`;
-          }
-          if (m.exists) break;
-        }
-      }
-
-      // No emulator detected at all: predict save alongside the ROM
-      if (!savePath) {
-        savePath = join(dirname(romPath), `${base}.${saveExts[0]}`);
-      }
-
-      return { name: base, romPath, savePath, saveExists, launchCommand, consoleName, coreName };
-    })
+    scanRomDir(dir)
+      .filter(p => romExtSet.has(extname(p).slice(1).toLowerCase()))
+      .map(romPath => {
+        const romExt = extname(romPath).slice(1).toLowerCase();
+        const base   = basename(romPath, extname(romPath));
+        const system = SYSTEMS[romExt];
+        const saveExts = system?.saveExts ?? defaultSaveExts;
+        const m = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+        const launchCommand = emulatorOption.corePath
+          ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
+          : `${emulatorOption.execPath} "${romPath}"`;
+        return {
+          name: base, romPath,
+          savePath: m.path, saveExists: m.exists,
+          launchCommand,
+          consoleName: system?.name ?? consoleDef.label,
+          coreName: emulatorOption.coreFolderName,
+        };
+      })
   );
 
-  return { emulators: emus, romDirs, roms };
+  return {
+    emulators: [{ type: "native" as const, label: emulatorOption.label,
+      execPath: emulatorOption.execPath, saveDir: emulatorOption.saveDir,
+      coresDir: "", romDirs: emulatorOption.romDirs }],
+    romDirs,
+    roms,
+  };
+});
+
+// Create an empty save file (+ parent dirs) if it doesn't already exist
+ipcMain.handle("files:ensure-save", (_event, savePath: string): { created: boolean } => {
+  try {
+    if (existsSync(savePath)) return { created: false };
+    mkdirSync(dirname(savePath), { recursive: true });
+    writeFileSync(savePath, Buffer.alloc(0));
+    return { created: true };
+  } catch { return { created: false }; }
 });
 
 ipcMain.handle("dialog:openFolder", async () => {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { listGames, removeGame, getSaveMeta, getLock, type Game } from "../api";
-import EmulatorImport from "./EmulatorImport";
+import ConsoleImport from "./ConsoleImport";
 
 type Props = {
   onAdd: () => void;
@@ -66,7 +66,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       <div className="section-header">
         <h2>Games</h2>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🎮 Add emulator</button>
+          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
           <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       )}
 
       {showEmulatorImport && (
-        <EmulatorImport
+        <ConsoleImport
           onClose={() => setShowEmulatorImport(false)}
           onImported={load}
         />

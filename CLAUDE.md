@@ -43,7 +43,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | `gui/renderer/src/components/ServerStatusButton.tsx` | Server control panel modal (start/stop, PIN, LAN discovery, re-pair) |
 | `gui/renderer/src/components/GameList.tsx` | Main game list; play/edit/remove actions |
 | `gui/renderer/src/components/GameConfig.tsx` | Add/edit game form with file pickers |
-| `gui/renderer/src/components/EmulatorImport.tsx` | Wizard modal for bulk-importing games from an emulator (RetroArch) |
+| `gui/renderer/src/components/ConsoleImport.tsx` | "Add Console" wizard modal — console dropdown → emulator detection → ROM scan → import |
 
 ---
 
@@ -115,7 +115,10 @@ window.emusync.server.discover()  // runs emusync.py server discover-json → se
 window.emusync.dialog.openFile()  // native file picker
 window.emusync.dialog.openFolder() // native folder picker
 
-window.emusync.emulator.scan(extraPaths[])  // detect RetroArch + scan ROM/save dirs; ROM extension → console system → preferred RetroArch core (first .so found in coresDir wins); per-core save subfolder checked first (e.g. saves/mGBA/), falls back to root saves dir; recurses up to 3 levels for per-game folders; RomEntry includes consoleName + coreName; returns { emulators, romDirs, roms[] }
+window.emusync.emulator.consoles()          // returns ordered console list { key, label }[] for the dropdown
+window.emusync.emulator.detect(consoleKey)  // scans for installed emulators for that console; checks RetroArch (native+flatpak) cores + standalone emulators (mGBA etc.); resolves per-core save subfolder; returns { options: DetectedEmulatorOption[], suggestions[] }
+window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; uses emulatorOption.saveDir (already resolved to core subfolder); returns { emulators, romDirs, roms[] } with consoleName+coreName on each entry
+window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 

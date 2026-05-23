@@ -38,8 +38,22 @@ contextBridge.exposeInMainWorld("emusync", {
     openFolder: (): Promise<string | null> => ipcRenderer.invoke("dialog:openFolder"),
   },
   emulator: {
-    scan: (extraPaths: string[]): Promise<import("../../../electron/main").EmulatorScanResult> =>
-      ipcRenderer.invoke("emulator:scan", extraPaths),
+    consoles: (): Promise<{ key: string; label: string }[]> =>
+      ipcRenderer.invoke("emulator:consoles"),
+    detect: (consoleKey: string): Promise<{
+      options: import("../../../electron/main").DetectedEmulatorOption[];
+      suggestions: string[];
+    }> => ipcRenderer.invoke("emulator:detect", consoleKey),
+    scan: (
+      consoleKey: string,
+      emulatorOption: import("../../../electron/main").DetectedEmulatorOption,
+      extraPaths: string[],
+    ): Promise<import("../../../electron/main").EmulatorScanResult> =>
+      ipcRenderer.invoke("emulator:scan", { consoleKey, emulatorOption, extraPaths }),
+  },
+  files: {
+    ensureSave: (savePath: string): Promise<{ created: boolean }> =>
+      ipcRenderer.invoke("files:ensure-save", savePath),
   },
   game: {
     launch: (slug: string, command: string): Promise<{ ok: boolean }> =>
