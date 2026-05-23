@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { listGames, removeGame, getSaveMeta, getLock, type Game } from "../api";
+import EmulatorImport from "./EmulatorImport";
 
 type Props = {
   onAdd: () => void;
@@ -19,6 +20,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [loading, setLoading] = useState(true);
   const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
   const [removing, setRemoving] = useState(false);
+  const [showEmulatorImport, setShowEmulatorImport] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,7 +65,10 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     <>
       <div className="section-header">
         <h2>Games</h2>
-        <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🎮 Add emulator</button>
+          <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
+        </div>
       </div>
 
       {loading ? (
@@ -114,6 +119,13 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             </div>
           ))}
         </div>
+      )}
+
+      {showEmulatorImport && (
+        <EmulatorImport
+          onClose={() => setShowEmulatorImport(false)}
+          onImported={load}
+        />
       )}
 
       {confirmRemove && (

@@ -43,6 +43,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | `gui/renderer/src/components/ServerStatusButton.tsx` | Server control panel modal (start/stop, PIN, LAN discovery, re-pair) |
 | `gui/renderer/src/components/GameList.tsx` | Main game list; play/edit/remove actions |
 | `gui/renderer/src/components/GameConfig.tsx` | Add/edit game form with file pickers |
+| `gui/renderer/src/components/EmulatorImport.tsx` | Wizard modal for bulk-importing games from an emulator (RetroArch) |
 
 ---
 
@@ -112,6 +113,9 @@ window.emusync.server.changePin() // stops server, saves PIN, clears devices, re
 window.emusync.server.discover()  // runs emusync.py server discover-json → server list
 
 window.emusync.dialog.openFile()  // native file picker
+window.emusync.dialog.openFolder() // native folder picker
+
+window.emusync.emulator.scan(extraPaths[])  // detect RetroArch + scan ROM/save dirs; returns { emulators, romDirs, roms[] }
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 

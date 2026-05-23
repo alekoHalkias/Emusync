@@ -35,6 +35,11 @@ contextBridge.exposeInMainWorld("emusync", {
         properties: ["openFile"],
         ...options,
       }),
+    openFolder: (): Promise<string | null> => ipcRenderer.invoke("dialog:openFolder"),
+  },
+  emulator: {
+    scan: (extraPaths: string[]): Promise<import("../../../electron/main").EmulatorScanResult> =>
+      ipcRenderer.invoke("emulator:scan", extraPaths),
   },
   game: {
     launch: (slug: string, command: string): Promise<{ ok: boolean }> =>

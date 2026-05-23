@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import { spawn, ChildProcess } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
+import { spawn, execSync, ChildProcess } from "child_process";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync } from "fs";
+import { join, dirname, basename, extname } from "path";
 import { homedir } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
 
@@ -252,6 +252,157 @@ ipcMain.handle("game:hasPidFile", () => {
       return cmdline.includes("emusync") || cmdline.includes("python");
     } catch { return true; } // non-Linux: trust the signal check
   } catch { return false; }
+});
+
+// ── emulator scanning ─────────────────────────────────────────────────────────
+
+const ROM_EXTENSIONS = new Set([
+  "sfc", "smc",                        // SNES
+  "gb", "gbc",                         // Game Boy / Color
+  "gba",                               // Game Boy Advance
+  "nes", "fds",                        // NES
+  "n64", "z64", "v64",                 // Nintendo 64
+  "nds",                               // Nintendo DS
+  "md", "smd", "gen",                  // Sega Genesis / Mega Drive
+  "sms", "gg",                         // Sega Master System / Game Gear
+  "32x",                               // Sega 32X
+  "pce",                               // PC Engine
+  "ws", "wsc",                         // WonderSwan
+  "ngp", "ngc",                        // Neo Geo Pocket
+  "a26", "a52", "a78",                 // Atari
+  "lnx",                               // Atari Lynx
+  "iso", "cue", "bin", "chd", "pbp",   // Disc-based (PSX, Dreamcast…)
+]);
+
+const SAVE_EXTENSIONS = ["srm", "sav", "save"];
+
+interface EmulatorInfo {
+  type: "native" | "flatpak";
+  label: string;      // display name, e.g. "RetroArch (Flatpak)"
+  execPath: string;   // binary or "flatpak run ..."
+  saveDir: string;
+  romDirs: string[];
+}
+
+export interface RomEntry {
+  name: string;
+  romPath: string;
+  savePath: string;       // predicted path, may not exist yet
+  saveExists: boolean;
+  launchCommand: string;
+}
+
+export interface EmulatorScanResult {
+  emulators: EmulatorInfo[];
+  romDirs: string[];      // dirs that were actually scanned
+  roms: RomEntry[];
+}
+
+function parseRetroArchCfg(cfgPath: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!existsSync(cfgPath)) return out;
+  for (const line of readFileSync(cfgPath, "utf-8").split("\n")) {
+    const m = line.match(/^\s*(\w+)\s*=\s*"?([^"#\r\n]*)"?\s*$/);
+    if (m) out[m[1].trim()] = m[2].trim();
+  }
+  return out;
+}
+
+function detectRetroArch(home: string): EmulatorInfo[] {
+  const infos: EmulatorInfo[] = [];
+
+  // ── native ──────────────────────────────────────────────────────────────────
+  const nativeBins = ["/usr/bin/retroarch", "/usr/local/bin/retroarch", join(home, ".local/bin/retroarch")];
+  const nativeCfg  = join(home, ".config/retroarch/retroarch.cfg");
+  for (const bin of nativeBins) {
+    if (existsSync(bin)) {
+      const cfg = parseRetroArchCfg(nativeCfg);
+      infos.push({
+        type:    "native",
+        label:   "RetroArch",
+        execPath: bin,
+        saveDir: cfg.savefile_directory || join(home, ".config/retroarch/saves"),
+        romDirs: [cfg.rgui_browser_directory].filter(Boolean) as string[],
+      });
+      break;
+    }
+  }
+
+  // ── flatpak ─────────────────────────────────────────────────────────────────
+  try {
+    const list = execSync("flatpak list --app --columns=application 2>/dev/null", { timeout: 5000 }).toString();
+    if (list.includes("org.libretro.RetroArch")) {
+      const flatCfg  = join(home, ".var/app/org.libretro.RetroArch/config/retroarch/retroarch.cfg");
+      const cfg = parseRetroArchCfg(flatCfg);
+      infos.push({
+        type:    "flatpak",
+        label:   "RetroArch (Flatpak)",
+        execPath: "flatpak run org.libretro.RetroArch",
+        saveDir: cfg.savefile_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
+        romDirs: [cfg.rgui_browser_directory].filter(Boolean) as string[],
+      });
+    }
+  } catch { /* flatpak not available */ }
+
+  return infos;
+}
+
+function scanRomDir(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter(e => e.isFile() && ROM_EXTENSIONS.has(extname(e.name).slice(1).toLowerCase()))
+      .map(e => join(dir, e.name));
+  } catch { return []; }
+}
+
+function matchSave(saveDir: string, baseName: string): { path: string; exists: boolean } {
+  for (const ext of SAVE_EXTENSIONS) {
+    const p = join(saveDir, `${baseName}.${ext}`);
+    if (existsSync(p)) return { path: p, exists: true };
+  }
+  return { path: join(saveDir, `${baseName}.srm`), exists: false };
+}
+
+ipcMain.handle("emulator:scan", (_event, extraPaths: string[]): EmulatorScanResult => {
+  const home    = homedir();
+  const emus    = detectRetroArch(home);
+
+  // Collect unique ROM dirs from all detected emulators + user-supplied extras
+  const romDirs = [...new Set([
+    ...emus.flatMap(e => e.romDirs),
+    ...(extraPaths ?? []),
+  ].filter(Boolean))];
+
+  const roms: RomEntry[] = romDirs.flatMap(dir => {
+    return scanRomDir(dir).map(romPath => {
+      const base = basename(romPath, extname(romPath));
+
+      // Match save against every detected emulator's save dir, prefer existing
+      let savePath = "";
+      let saveExists = false;
+      for (const emu of emus) {
+        const m = matchSave(emu.saveDir, base);
+        if (m.exists) { savePath = m.path; saveExists = true; break; }
+        if (!savePath) savePath = m.path; // take first predicted path as fallback
+      }
+      // If no emulator detected at all, predict alongside the ROM
+      if (!savePath) savePath = join(dirname(romPath), `${base}.srm`);
+
+      // Build launch command from whichever emulator was found first
+      const launchCommand = emus.length
+        ? `${emus[0].execPath} "${romPath}"`
+        : "";
+
+      return { name: base, romPath, savePath, saveExists, launchCommand };
+    });
+  });
+
+  return { emulators: emus, romDirs, roms };
+});
+
+ipcMain.handle("dialog:openFolder", async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, { properties: ["openDirectory"] });
+  return result.canceled ? null : result.filePaths[0];
 });
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
