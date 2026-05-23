@@ -288,6 +288,7 @@ interface SystemInfo {
 }
 
 const DEFAULT_SAVE_EXTS = ["srm", "sav", "save"];
+const DEFAULT_STATE_EXTS = ["state", "state.auto"];
 
 // Map ROM extension → system + preferred cores.  Cores are tried in order;
 // the first one whose .so exists in the RetroArch cores directory wins.
@@ -494,6 +495,7 @@ interface EmulatorInfo {
   label: string;      // display name, e.g. "RetroArch (Flatpak)"
   execPath: string;   // binary path or "flatpak run ..."
   saveDir: string;    // root saves directory
+  statesDir: string;  // root states directory
   coresDir: string;   // where core .so files live
   romDirs: string[];
 }
@@ -503,6 +505,8 @@ export interface RomEntry {
   romPath: string;
   savePath: string;       // resolved path (may not exist yet)
   saveExists: boolean;
+  statePath?: string;     // resolved state path (may not exist yet)
+  stateExists?: boolean;
   launchCommand: string;
   consoleName?: string;   // e.g. "Game Boy Advance"
   coreName?: string;      // e.g. "mGBA" — the core that will be used
@@ -543,6 +547,7 @@ function detectRetroArch(home: string): EmulatorInfo[] {
         label:    "RetroArch",
         execPath:  bin,
         saveDir:   cfg.savefile_directory || join(home, ".config/retroarch/saves"),
+        statesDir: cfg.savestate_directory || join(home, ".config/retroarch/states"),
         coresDir:  cfg.libretro_directory  || join(home, ".config/retroarch/cores"),
         romDirs:  [romDir].filter(Boolean) as string[],
       });
@@ -563,6 +568,7 @@ function detectRetroArch(home: string): EmulatorInfo[] {
         label:    "RetroArch (Flatpak)",
         execPath: "flatpak run org.libretro.RetroArch",
         saveDir:  cfg.savefile_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
+        statesDir: cfg.savestate_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/states"),
         coresDir: cfg.libretro_directory  || join(home, ".var/app/org.libretro.RetroArch/data/retroarch/cores"),
         romDirs:  [flatRomDir].filter(Boolean) as string[],
       });
@@ -646,6 +652,7 @@ export interface DetectedEmulatorOption {
   label: string;
   execPath: string;
   saveDir: string;
+  stateDir?: string;
   corePath?: string;
   coreFolderName?: string;
   romDirs: string[];
@@ -753,11 +760,13 @@ function detectEmulatorsForConsole(home: string, consoleKey: string): DetectedEm
       if (!core || seenCores.has(core.lib)) continue;
       seenCores.add(core.lib);
       const saveDir = join(ra.saveDir, core.folderName);
+      const stateDir = join(ra.statesDir, core.folderName);
       options.push({
         id: `${ra.type}-${core.folderName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
         label: `${ra.label} · ${core.folderName}`,
         execPath: ra.execPath,
         saveDir,
+        stateDir,
         corePath: core.lib,
         coreFolderName: core.folderName,
         romDirs: ra.romDirs,
@@ -843,12 +852,24 @@ ipcMain.handle("emulator:scan", (_event, params: {
           const mRoot = matchSaveFile(rootSaveDir, base, saveExts);
           if (mRoot.exists) m = mRoot;
         }
+        // Detect state files if stateDir is available
+        let sm: { path: string; exists: boolean } | undefined;
+        if (emulatorOption.stateDir) {
+          sm = matchSaveFile(emulatorOption.stateDir, base, DEFAULT_STATE_EXTS);
+          // Fallback: check root states dir for states written before per-core organization
+          if (!sm.exists && emulatorOption.coreFolderName) {
+            const rootStateDir = dirname(emulatorOption.stateDir);
+            const smRoot = matchSaveFile(rootStateDir, base, DEFAULT_STATE_EXTS);
+            if (smRoot.exists) sm = smRoot;
+          }
+        }
         const launchCommand = emulatorOption.corePath
           ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
           : `${emulatorOption.execPath} "${romPath}"`;
         return {
           name: base, romPath,
           savePath: m.path, saveExists: m.exists,
+          statePath: sm?.path, stateExists: sm?.exists,
           launchCommand,
           consoleName: system?.name ?? consoleDef.label,
           coreName: emulatorOption.coreFolderName,

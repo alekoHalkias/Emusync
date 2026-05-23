@@ -36,6 +36,14 @@ CREATE TABLE IF NOT EXISTS saves (
     hash       TEXT NOT NULL,
     pushed_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS states (
+    id         TEXT PRIMARY KEY,
+    game_slug  TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id  TEXT NOT NULL REFERENCES devices(id),
+    data       BLOB NOT NULL,
+    hash       TEXT NOT NULL,
+    pushed_at  TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS locks (
     game_slug   TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE,
     device_id   TEXT NOT NULL REFERENCES devices(id),
@@ -72,6 +80,7 @@ class GameDevice:
     rom_path: str
     save_path: str
     launch_command: str
+    state_path: str = ""
 
 
 @dataclass
@@ -98,6 +107,13 @@ class Store:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
+        # Migration: add state_path column to game_devices (safe to run multiple times)
+        try:
+            self._conn.execute(
+                "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
         self._conn.commit()
 
     # ── devices ──────────────────────────────────────────────────────────────
@@ -159,15 +175,15 @@ class Store:
     def set_game_device(self, gd: GameDevice) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO game_devices
-               (game_slug, device_id, rom_path, save_path, launch_command)
-               VALUES (?, ?, ?, ?, ?)""",
-            (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command),
+               (game_slug, device_id, rom_path, save_path, launch_command, state_path)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command, gd.state_path),
         )
         self._conn.commit()
 
     def get_game_device(self, game_slug: str, device_id: str) -> Optional[GameDevice]:
         row = self._conn.execute(
-            """SELECT game_slug, device_id, rom_path, save_path, launch_command
+            """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path
                FROM game_devices WHERE game_slug = ? AND device_id = ?""",
             (game_slug, device_id),
         ).fetchone()
@@ -204,6 +220,41 @@ class Store:
     def get_save_meta(self, game_slug: str) -> Optional[SaveMeta]:
         row = self._conn.execute(
             "SELECT game_slug, device_id, hash, pushed_at FROM saves WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
+        ).fetchone()
+        return SaveMeta(**dict(row)) if row else None
+
+    # ── states ─────────────────────────────────────────────────────────────────
+
+    def push_state(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
+        h = hashlib.sha256(data).hexdigest()
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute("DELETE FROM states WHERE game_slug = ?", (game_slug,))
+        self._conn.execute(
+            "INSERT INTO states (id, game_slug, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), game_slug, device_id, data, h, now),
+        )
+        self._conn.commit()
+        return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now)
+
+    def pull_state(self, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
+        row = self._conn.execute(
+            "SELECT data, game_slug, device_id, hash, pushed_at FROM states WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
+        ).fetchone()
+        if not row:
+            return None, None
+        meta = SaveMeta(
+            game_slug=row["game_slug"],
+            device_id=row["device_id"],
+            hash=row["hash"],
+            pushed_at=row["pushed_at"],
+        )
+        return bytes(row["data"]), meta
+
+    def get_state_meta(self, game_slug: str) -> Optional[SaveMeta]:
+        row = self._conn.execute(
+            "SELECT game_slug, device_id, hash, pushed_at FROM states WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
             (game_slug,),
         ).fetchone()
         return SaveMeta(**dict(row)) if row else None

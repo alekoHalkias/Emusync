@@ -13,6 +13,7 @@ class GameDeviceConfig:
     rom_path: str = ""
     save_path: str = ""
     launch_command: str = ""
+    state_path: str = ""
 
 
 class SyncClient:
@@ -107,6 +108,30 @@ class SyncClient:
         data = Path(save_path).read_bytes()
         r = httpx.post(
             self._url(f"/games/{slug}/save"),
+            content=data,
+            headers={**self._headers, "Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
+    def pull_state(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
+        """Write server state to disk. Returns (pulled, server_hash). pulled=False if no state exists."""
+        r = httpx.get(self._url(f"/games/{slug}/state"), headers=self._headers, timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        state = Path(state_path)
+        if state.exists():
+            shutil.copy2(state, state.with_suffix(state.suffix + ".bak"))
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_bytes(r.content)
+        return True, r.headers.get("X-State-Hash")
+
+    def push_state(self, slug: str, state_path: str) -> str:
+        data = Path(state_path).read_bytes()
+        r = httpx.post(
+            self._url(f"/games/{slug}/state"),
             content=data,
             headers={**self._headers, "Content-Type": "application/octet-stream"},
             timeout=30,

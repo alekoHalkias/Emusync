@@ -123,6 +123,7 @@ class GameDeviceRequest(BaseModel):
     rom_path: str = ""
     save_path: str = ""
     launch_command: str = ""
+    state_path: str = ""
 
 
 @app.get("/games/{slug}/device")
@@ -130,7 +131,7 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     gd = _get_store().get_game_device(slug, device_id)
     if not gd:
         raise HTTPException(status_code=404, detail="No device config for this game")
-    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command}
+    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command, "state_path": gd.state_path}
 
 
 @app.put("/games/{slug}/device")
@@ -144,6 +145,7 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
             rom_path=req.rom_path,
             save_path=req.save_path,
             launch_command=req.launch_command,
+            state_path=req.state_path,
         )
     )
     return {"ok": True}
@@ -178,6 +180,43 @@ async def push_save(slug: str, request: Request, device_id: str = Depends(_auth)
 @app.get("/games/{slug}/save/meta")
 def get_save_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     meta = _get_store().get_save_meta(slug)
+    if not meta:
+        return Response(status_code=204)
+    return Response(
+        content=f'{{"hash":"{meta.hash}","pushed_at":"{meta.pushed_at}","device_id":"{meta.device_id}"}}',
+        media_type="application/json",
+    )
+
+
+# ── states ────────────────────────────────────────────────────────────────────
+
+@app.get("/games/{slug}/state")
+def pull_state(slug: str, device_id: str = Depends(_auth)) -> Response:
+    data, meta = _get_store().pull_state(slug)
+    if data is None:
+        return Response(status_code=204)
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={
+            "X-State-Hash": meta.hash,
+            "X-Pushed-At": meta.pushed_at,
+            "X-Device-Id": meta.device_id,
+        },
+    )
+
+
+@app.post("/games/{slug}/state")
+async def push_state(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
+    data = await request.body()
+    meta = _get_store().push_state(slug, device_id, data)
+    _get_store().log_event("state_synced", slug, device_id)
+    return {"hash": meta.hash, "pushed_at": meta.pushed_at}
+
+
+@app.get("/games/{slug}/state/meta")
+def get_state_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
+    meta = _get_store().get_state_meta(slug)
     if not meta:
         return Response(status_code=204)
     return Response(

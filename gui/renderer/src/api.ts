@@ -4,6 +4,7 @@ export type GameDeviceConfig = {
   rom_path: string;
   save_path: string;
   launch_command: string;
+  state_path?: string;
 };
 
 export type Game = { slug: string; name: string };

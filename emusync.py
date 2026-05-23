@@ -354,6 +354,23 @@ def sync_status() -> None:
 
 # ── run ───────────────────────────────────────────────────────────────────────
 
+def _find_save_or_state_file(configured_path: str) -> str | None:
+  """Look for save/state files with different extensions. Return path if found, None if not."""
+  if not configured_path:
+    return None
+  p = Path(configured_path)
+  if p.exists():
+    return configured_path
+  # Look for files with same name but different extension in the same directory
+  dir_path = p.parent
+  base_name = p.stem  # filename without extension
+  if dir_path.exists():
+    for f in dir_path.iterdir():
+      if f.is_file() and f.stem == base_name:
+        return str(f)
+  return None
+
+
 @cli.command("run")
 @click.option("--game", "game_slug", required=True, help="Game slug (from 'emusync game list')")
 @click.argument("command", nargs=-1, required=True)
@@ -438,6 +455,14 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         if pulled:
             click.echo(f"Pulled save for {game_slug}.")
 
+        # Pull state if configured
+        state_path = gd.state_path
+        server_state_hash = None
+        if state_path:
+            pulled, server_state_hash = client.pull_state(game_slug, state_path)
+            if pulled:
+                click.echo(f"Pulled state for {game_slug}.")
+
         try:
             global _child_proc
             _child_proc = subprocess.Popen(list(command))
@@ -449,6 +474,28 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             _release()
             sys.exit(1)
 
+        # Check if save/state files were created with different extensions and update config
+        actual_save_path = _find_save_or_state_file(save_path)
+        actual_state_path = _find_save_or_state_file(state_path) if state_path else None
+
+        if (actual_save_path and actual_save_path != save_path) or (actual_state_path and actual_state_path != state_path):
+          try:
+            updated_gd = GameDeviceConfig(
+              rom_path=gd.rom_path,
+              save_path=actual_save_path or save_path,
+              launch_command=gd.launch_command,
+              state_path=actual_state_path or state_path,
+            )
+            client.set_game_device(game_slug, updated_gd)
+            if actual_save_path and actual_save_path != save_path:
+              save_path = actual_save_path
+              click.echo(f"Updated save path to {save_path}")
+            if actual_state_path and actual_state_path != state_path:
+              state_path = actual_state_path
+              click.echo(f"Updated state path to {state_path}")
+          except Exception as exc:
+            click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
+
         if Path(save_path).exists():
             local_hash = hashlib.sha256(Path(save_path).read_bytes()).hexdigest()
             if local_hash != server_hash:
@@ -457,6 +504,16 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     click.echo(f"Pushed save for {game_slug}.")
                 except Exception as exc:
                     click.echo(f"Warning: failed to push save: {exc}", err=True)
+
+        # Push state if configured
+        if state_path and Path(state_path).exists():
+            local_state_hash = hashlib.sha256(Path(state_path).read_bytes()).hexdigest()
+            if local_state_hash != server_state_hash:
+                try:
+                    client.push_state(game_slug, state_path)
+                    click.echo(f"Pushed state for {game_slug}.")
+                except Exception as exc:
+                    click.echo(f"Warning: failed to push state: {exc}", err=True)
     finally:
         _release()
         game_pid_file.unlink(missing_ok=True)
