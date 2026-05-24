@@ -17,8 +17,9 @@ CREATE TABLE IF NOT EXISTS devices (
     token TEXT NOT NULL UNIQUE
 );
 CREATE TABLE IF NOT EXISTS games (
-    slug TEXT PRIMARY KEY,
-    name TEXT NOT NULL
+    slug    TEXT PRIMARY KEY,
+    name    TEXT NOT NULL,
+    console TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS game_devices (
     game_slug      TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
@@ -71,6 +72,7 @@ class Device:
 class Game:
     slug: str
     name: str
+    console: str = ""
 
 
 @dataclass
@@ -122,6 +124,13 @@ class Store:
             )
         except sqlite3.OperationalError:
             pass  # column already exists
+        # Migration: add console column to games (safe to run multiple times)
+        try:
+            self._conn.execute(
+                "ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
         self._conn.commit()
 
     # ── devices ──────────────────────────────────────────────────────────────
@@ -154,12 +163,12 @@ class Store:
 
     # ── games ─────────────────────────────────────────────────────────────────
 
-    def add_game(self, slug: str, name: str) -> Game:
+    def add_game(self, slug: str, name: str, console: str = "") -> Game:
         self._conn.execute(
-            "INSERT OR IGNORE INTO games (slug, name) VALUES (?, ?)", (slug, name)
+            "INSERT OR IGNORE INTO games (slug, name, console) VALUES (?, ?, ?)", (slug, name, console)
         )
         self._conn.commit()
-        return Game(slug=slug, name=name)
+        return Game(slug=slug, name=name, console=console)
 
     def update_game_name(self, slug: str, name: str) -> None:
         """Rename a game without touching its saves, locks, or device config."""
@@ -168,17 +177,24 @@ class Store:
         )
         self._conn.commit()
 
+    def update_game_console(self, slug: str, console: str) -> None:
+        """Update the console type for a game."""
+        self._conn.execute(
+            "UPDATE games SET console = ? WHERE slug = ?", (console, slug)
+        )
+        self._conn.commit()
+
     def remove_game(self, slug: str) -> None:
         self._conn.execute("DELETE FROM games WHERE slug = ?", (slug,))
         self._conn.commit()
 
     def list_games(self) -> list[Game]:
-        rows = self._conn.execute("SELECT slug, name FROM games").fetchall()
+        rows = self._conn.execute("SELECT slug, name, console FROM games").fetchall()
         return [Game(**dict(r)) for r in rows]
 
     def get_game(self, slug: str) -> Optional[Game]:
         row = self._conn.execute(
-            "SELECT slug, name FROM games WHERE slug = ?", (slug,)
+            "SELECT slug, name, console FROM games WHERE slug = ?", (slug,)
         ).fetchone()
         return Game(**dict(row)) if row else None
 

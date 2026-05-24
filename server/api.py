@@ -89,19 +89,20 @@ def remove_device(remove_device_id: str, device_id: str = Depends(_auth)) -> dic
 
 class GameRequest(BaseModel):
     name: str
+    console: str = ""
 
 
 @app.get("/games")
 def list_games(device_id: str = Depends(_auth)) -> list[dict]:
-    return [{"slug": g.slug, "name": g.name} for g in _get_store().list_games()]
+    return [{"slug": g.slug, "name": g.name, "console": g.console} for g in _get_store().list_games()]
 
 
 @app.post("/games")
 def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
     import re
     slug = re.sub(r"[^a-z0-9]+", "-", req.name.lower()).strip("-")
-    game = _get_store().add_game(slug, req.name)
-    return {"slug": game.slug, "name": game.name}
+    game = _get_store().add_game(slug, req.name, req.console)
+    return {"slug": game.slug, "name": game.name, "console": game.console}
 
 
 @app.get("/games/{slug}")
@@ -109,7 +110,7 @@ def get_game(slug: str, device_id: str = Depends(_auth)) -> dict:
     game = _get_store().get_game(slug)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    return {"slug": game.slug, "name": game.name}
+    return {"slug": game.slug, "name": game.name, "console": game.console}
 
 
 @app.put("/games/{slug}")
@@ -117,7 +118,10 @@ def update_game(slug: str, req: GameRequest, device_id: str = Depends(_auth)) ->
     if not _get_store().get_game(slug):
         raise HTTPException(status_code=404, detail="Game not found")
     _get_store().update_game_name(slug, req.name)
-    return {"slug": slug, "name": req.name}
+    if req.console:
+        _get_store().update_game_console(slug, req.console)
+    game = _get_store().get_game(slug)
+    return {"slug": slug, "name": game.name, "console": game.console}
 
 
 @app.delete("/games/{slug}")

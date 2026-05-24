@@ -119,6 +119,54 @@ async def test_get_nonexistent_game(client):
     assert r.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_add_game_with_console(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    r = await client.post("/games", json={"name": "Pokemon Emerald", "console": "GBA"}, headers=auth)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["slug"] == "pokemon-emerald"
+    assert body["console"] == "GBA"
+
+    r = await client.get("/games/pokemon-emerald", headers=auth)
+    assert r.status_code == 200
+    assert r.json()["console"] == "GBA"
+
+
+@pytest.mark.asyncio
+async def test_list_games_includes_console(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Game 1", "console": "GBA"}, headers=auth)
+    await client.post("/games", json={"name": "Game 2", "console": "SNES"}, headers=auth)
+
+    r = await client.get("/games", headers=auth)
+    assert r.status_code == 200
+    games = r.json()
+    assert len(games) == 2
+    assert any(g["slug"] == "game-1" and g["console"] == "GBA" for g in games)
+    assert any(g["slug"] == "game-2" and g["console"] == "SNES" for g in games)
+
+
+@pytest.mark.asyncio
+async def test_update_game_console(client):
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Test Game"}, headers=auth)
+
+    r = await client.put("/games/test-game", json={"name": "Test Game", "console": "GB"}, headers=auth)
+    assert r.status_code == 200
+    assert r.json()["console"] == "GB"
+
+    r = await client.get("/games/test-game", headers=auth)
+    assert r.status_code == 200
+    assert r.json()["console"] == "GB"
+
+
 # ── game device config ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
