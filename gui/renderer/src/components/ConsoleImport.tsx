@@ -346,52 +346,6 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                     </label>
                   ))}
                 </div>
-                <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
-                    ROM folders to scan:
-                  </p>
-                  {extraPaths.length === 0 ? (
-                    <p style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
-                      No folders added yet. Click "Add ROM folder" to add folders to scan.
-                    </p>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-                      {extraPaths.map(folder => (
-                        <div
-                          key={folder}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "8px 10px",
-                            background: "var(--surface2)",
-                            borderRadius: 4,
-                            fontSize: 12,
-                          }}
-                        >
-                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={folder}>
-                            📁 {folder}
-                          </div>
-                          <button
-                            className="btn btn-icon"
-                            onClick={() => removeExtraPath(folder)}
-                            style={{ fontSize: 10, padding: "4px 6px", marginLeft: 8 }}
-                            title="Remove folder"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    className="btn btn-ghost"
-                    onClick={addExtraPath}
-                    style={{ fontSize: 12, width: "100%" }}
-                  >
-                    + Add ROM folder
-                  </button>
-                </div>
               </>
             )}
             <div className="modal-actions">
