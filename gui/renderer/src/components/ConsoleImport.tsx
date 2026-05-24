@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { addGame, setGameDevice } from "../api";
+import { addGame, setGameDevice, listGames, getGameDevice, type Game } from "../api";
 
 type ConsoleOption = { key: string; label: string };
 
@@ -16,11 +16,15 @@ type EmulatorOption = {
 type RomEntry = {
   name: string;
   romPath: string;
+  romFileName: string;
   savePath: string;
   saveExists: boolean;
   launchCommand: string;
   consoleName?: string;
   coreName?: string;
+  statePath?: string;
+  stateExists?: boolean;
+  existingGameSlug?: string;
 };
 
 type Phase =
@@ -83,9 +87,49 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setError("");
     try {
       const result = await (window as any).emusync.emulator.scan(consoleSel, emuSel, paths);
-      setRoms(result.roms);
+      const existingGames = await listGames();
+
+      // Extract ROM filename from path (without extension)
+      const getRomFileName = (path: string): string => {
+        const filename = path.split("/").pop() || "";
+        return filename.replace(/\.[^.]+$/, "").toLowerCase();
+      };
+
+      // Get device config for each game to check their original ROM filenames
+      const gameConfigs = await Promise.all(
+        existingGames.map(async (g: Game) => {
+          try {
+            const config = await getGameDevice(g.slug);
+            return { slug: g.slug, name: g.name, romPath: config.rom_path };
+          } catch {
+            return { slug: g.slug, name: g.name, romPath: null };
+          }
+        })
+      );
+
+      const romsWithMatches = result.roms
+        .map((rom: RomEntry) => {
+          const romFileName = getRomFileName(rom.romPath);
+
+          // Match by comparing ROM filenames
+          const match = gameConfigs.find(config => {
+            if (!config.romPath) return false;
+            const existingRomFileName = getRomFileName(config.romPath);
+            return existingRomFileName === romFileName;
+          });
+
+          return {
+            ...rom,
+            romFileName,
+            existingGameSlug: match?.slug,
+          };
+        })
+        // Filter out games that are already imported (have a match)
+        .filter((rom: RomEntry) => !rom.existingGameSlug);
+
+      setRoms(romsWithMatches);
       setRomDirs(result.romDirs ?? []);
-      setSelected(new Set(result.roms.map((r: RomEntry) => r.romPath)));
+      setSelected(new Set(romsWithMatches.map((r: RomEntry) => r.romPath)));
       setPhase("results");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Scan failed.");
@@ -398,13 +442,11 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                           />
                           <div style={{ fontSize: 11, color: "var(--text-muted)",
                             marginTop: 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {rom.saveExists
-                              ? <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
-                              : <span style={{ color: "var(--yellow, #f0a500)" }}>⊕ Save will be created</span>
-                            }
-                            {rom.statePath && (rom.stateExists
-                              ? <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
-                              : <span style={{ color: "var(--yellow, #f0a500)" }}>⊕ State will be created</span>
+                            {rom.saveExists && (
+                              <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
+                            )}
+                            {rom.statePath && rom.stateExists && (
+                              <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
                             )}
                             {(rom.consoleName || rom.coreName) && (
                               <span style={{ opacity: 0.7 }}>
