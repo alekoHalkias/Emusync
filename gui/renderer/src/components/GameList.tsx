@@ -23,6 +23,9 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [removing, setRemoving] = useState(false);
   const [showEmulatorImport, setShowEmulatorImport] = useState(false);
   const [syncingSlug, setSyncingSlug] = useState<string | null>(null);
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,11 +78,38 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     }
   }
 
+  function toggleSelection(slug: string): void {
+    setSelectedSlugs(prev => {
+      const next = new Set(prev);
+      next.has(slug) ? next.delete(slug) : next.add(slug);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete(): Promise<void> {
+    setBulkDeleting(true);
+    try {
+      await Promise.all(Array.from(selectedSlugs).map(slug => removeGame(slug)));
+      setSelectedSlugs(new Set());
+      setConfirmBulkDelete(false);
+      await load();
+    } catch {
+      /* ignore — games might not exist */
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   return (
     <>
       <div className="section-header">
         <h2>Games</h2>
         <div style={{ display: "flex", gap: 8 }}>
+          {selectedSlugs.size > 0 && (
+            <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
+              🗑 Delete {selectedSlugs.size}
+            </button>
+          )}
           <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
           <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
         </div>
@@ -99,6 +129,12 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         <div className="game-list">
           {games.map((g) => (
             <div key={g.slug} className="game-row">
+              <input
+                type="checkbox"
+                checked={selectedSlugs.has(g.slug)}
+                onChange={() => toggleSelection(g.slug)}
+                style={{ marginRight: 8, cursor: "pointer" }}
+              />
               <div className="game-row-header">
                 <div className="game-row-name">{g.name}</div>
                 <div className="game-row-divider">|</div>
@@ -165,6 +201,26 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               </button>
               <button className="btn btn-danger" onClick={handleRemove} disabled={removing}>
                 {removing ? <><span className="spinner" /> Removing…</> : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmBulkDelete && (
+        <div className="modal-overlay" onClick={() => setConfirmBulkDelete(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete {selectedSlugs.size} game{selectedSlugs.size !== 1 ? "s" : ""}?</h3>
+            <p>
+              This removes the selected games from EmuSync management. The save files on your
+              devices will <strong>not</strong> be deleted.
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmBulkDelete(false)} disabled={bulkDeleting}>
+                Cancel
+              </button>
+              <button className="btn btn-danger" onClick={handleBulkDelete} disabled={bulkDeleting}>
+                {bulkDeleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
               </button>
             </div>
           </div>
