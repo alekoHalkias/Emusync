@@ -124,25 +124,26 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       }));
 
       // Dedup: try to filter out already-imported ROMs.
-      // If the API is unavailable (e.g. not yet paired), skip dedup and show all.
       let newRoms = annotated;
       try {
         const existingGames = await listGames();
-        const gameConfigs = await Promise.all(
-          existingGames.map(async (g: Game) => {
-            try {
-              const config = await getGameDevice(g.slug);
-              return { slug: g.slug, romPath: config.rom_path };
-            } catch {
-              return { slug: g.slug, romPath: null };
+        const gameConfigs: Array<{ slug: string; romPath: string }> = [];
+
+        for (const g of existingGames) {
+          try {
+            const config = await getGameDevice(g.slug);
+            if (config.rom_path) {
+              gameConfigs.push({ slug: g.slug, romPath: config.rom_path });
             }
-          })
-        );
+          } catch {
+            // Skip games we can't load config for
+          }
+        }
 
         const withMatches = annotated.map((rom: RomEntry) => {
           const match = gameConfigs.find(cfg => {
-            if (!cfg.romPath) return false;
-            return getRomFileName(cfg.romPath) === rom.romFileName;
+            // Match by exact path or by filename
+            return cfg.romPath === rom.romPath || getRomFileName(cfg.romPath) === rom.romFileName;
           });
           return { ...rom, existingGameSlug: match?.slug };
         });
@@ -442,28 +443,14 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                 <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
                   No ROMs found. Try adding a folder above.
                 </div>
-              ) : Object.entries(grouped).map(([dir, dirRoms]) => {
-                const allPaths = dirRoms.map(r => r.romPath);
-                const allSel   = allPaths.every(p => selected.has(p));
-                return (
-                  <div key={dir}>
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      padding: "6px 12px", background: "var(--bg-secondary)",
-                      borderBottom: "1px solid var(--border)",
-                      fontSize: 11, color: "var(--text-muted)", position: "sticky", top: 0,
-                    }}>
-                      <input type="checkbox" checked={allSel} onChange={() => toggleAll(allPaths)} />
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {dir}
-                      </span>
-                    </div>
+              ) : Object.entries(grouped).map(([dir, dirRoms]) => (
+                    <React.Fragment key={dir}>
                     {dirRoms.map(rom => (
                       <div
                         key={rom.romPath}
                         style={{
-                          display: "flex", alignItems: "center", gap: 10,
-                          padding: "7px 12px", borderBottom: "1px solid var(--border)",
+                          display: "flex", alignItems: "flex-start", gap: 10,
+                          padding: "10px 12px", borderBottom: "1px solid var(--border)",
                           cursor: "pointer",
                         }}
                         onClick={() => toggleRom(rom.romPath)}
@@ -473,35 +460,32 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                           checked={selected.has(rom.romPath)}
                           onChange={() => toggleRom(rom.romPath)}
                           onClick={e => e.stopPropagation()}
+                          style={{ marginTop: 3, flexShrink: 0 }}
                         />
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
                           <input
                             type="text"
                             value={names[rom.romPath] ?? rom.name}
                             onChange={(e) => setNames({ ...names, [rom.romPath]: e.target.value })}
                             onClick={(e) => e.stopPropagation()}
-                            style={{ fontSize: 13, fontWeight: 500, width: "100%", marginBottom: 4 }}
+                            style={{ fontSize: 13, fontWeight: 500, width: "100%" }}
                           />
-                          <div style={{ fontSize: 11, color: "var(--text-muted)",
-                            marginTop: 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {rom.romPath}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 8, alignItems: "center" }}>
                             {rom.saveExists && (
                               <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
                             )}
                             {rom.statePath && rom.stateExists && (
                               <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
                             )}
-                            {(rom.consoleName || rom.coreName) && (
-                              <span style={{ opacity: 0.7 }}>
-                                {[rom.consoleName, rom.coreName].filter(Boolean).join(" · ")}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
                     ))}
-                  </div>
-                );
-              })}
+                    </React.Fragment>
+              ))}
             </div>
 
             <div className="modal-actions" style={{ marginTop: 16 }}>
