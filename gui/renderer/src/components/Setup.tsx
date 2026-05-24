@@ -53,14 +53,25 @@ export default function Setup({ onDone }: Props): React.ReactElement {
 
   async function startServer(): Promise<void> {
     setStep("server-starting");
-    const existing = (await window.emusync.config.load()) ?? {};
-    await window.emusync.config.save({ ...existing, is_server: true, device_name: deviceName || (existing.device_name as string) || "Server" });
+    const existing   = (await window.emusync.config.load()) ?? {};
+    const devName    = deviceName || (existing.device_name as string) || "Server";
+    const deviceId   = (existing.device_id as string) ?? crypto.randomUUID();
+    await window.emusync.config.save({ ...existing, is_server: true, device_name: devName, device_id: deviceId });
     const result = await window.emusync.server.start();
     if (!result.ok) {
       setError("Failed to start server. Make sure Python and emusync.py are available.");
       setStep("choose");
       return;
     }
+    // Self-pair so this machine can use its own API (add/import games, etc.)
+    try {
+      configure("localhost", (existing.server_port as number) || 8765, "");
+      const token = await pair(result.token || "", deviceId, devName);
+      await window.emusync.config.save({
+        ...existing, is_server: true, device_name: devName, device_id: deviceId, token,
+      });
+      configure("localhost", (existing.server_port as number) || 8765, token);
+    } catch { /* non-fatal; user can still continue */ }
     setStep("server-ready");
   }
 
