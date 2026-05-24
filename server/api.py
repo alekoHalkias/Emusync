@@ -255,3 +255,39 @@ def get_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
     if not lock:
         return {"locked": False}
     return {"locked": True, "device_id": lock.device_id, "acquired_at": lock.acquired_at}
+
+
+@app.post("/games/{slug}/push-saves")
+def push_saves(slug: str, device_id: str = Depends(_auth)) -> dict:
+  """Manually trigger a push of the game's save and state files to the server."""
+  from pathlib import Path
+
+  game = _get_store().get_game(slug)
+  if not game:
+    raise HTTPException(status_code=404, detail="Game not found")
+
+  gd = _get_store().get_game_device(slug, device_id)
+  if not gd:
+    raise HTTPException(status_code=404, detail="Game device config not found")
+
+  pushed = {"save": False, "state": False}
+
+  # Push save if it exists
+  if gd.save_path:
+    save_path = Path(gd.save_path)
+    if save_path.exists():
+      data = save_path.read_bytes()
+      meta = _get_store().push_save(slug, device_id, data)
+      _get_store().log_event("save_synced", slug, device_id)
+      pushed["save"] = True
+
+  # Push state if configured and exists
+  if gd.state_path:
+    state_path = Path(gd.state_path)
+    if state_path.exists():
+      data = state_path.read_bytes()
+      meta = _get_store().push_state(slug, device_id, data)
+      _get_store().log_event("state_synced", slug, device_id)
+      pushed["state"] = True
+
+  return {"ok": True, "pushed": pushed}

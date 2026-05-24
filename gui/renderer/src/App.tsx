@@ -4,6 +4,7 @@ import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
 import ServerStatusButton from "./components/ServerStatusButton";
+import DevicesButton from "./components/DevicesButton";
 
 function CopyBox({ text }: { text: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
@@ -284,7 +285,10 @@ export default function App(): React.ReactElement {
             )}
           </div>
         )}
-        <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <DevicesButton />
+          <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
+        </div>
       </header>
 
       <main className="content">
