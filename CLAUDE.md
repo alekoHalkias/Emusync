@@ -332,6 +332,17 @@ State sync is **opt-in** — if a game's `state_path` is empty, it is skipped si
 
 ---
 
+## ROM Folder Tracking
+
+During console import, the `rom_folder_path` is extracted from each ROM file path and saved with the game config. This allows:
+- Future features to re-scan specific folders for game updates
+- Tracking which folder contained each game's ROM file
+- Managing multiple games from the same directory
+
+The path is extracted from the full ROM file path during import and returned by `GET /games/{slug}/device` endpoint alongside `rom_path`, `save_path`, `state_path`, and `launch_command`.
+
+---
+
 ## Common gotchas
 
 **Orphaned server processes** — If Electron exits abnormally, the uvicorn server can keep running. The stop handler uses three kill strategies (see Server process lifecycle above). If you see "port already in use", run: `pkill -9 -f "emusync.py server start"`.
