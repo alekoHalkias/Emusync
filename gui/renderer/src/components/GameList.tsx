@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, type Game } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
@@ -26,6 +26,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +52,12 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedSlugs.size > 0 && selectedSlugs.size < games.length;
+    }
+  }, [selectedSlugs, games.length]);
 
   async function handleRemove(): Promise<void> {
     if (!confirmRemove) return;
@@ -84,6 +91,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       next.has(slug) ? next.delete(slug) : next.add(slug);
       return next;
     });
+  }
+
+  function toggleSelectAll(): void {
+    const allSlugs = games.map(g => g.slug);
+    if (selectedSlugs.size === games.length) {
+      setSelectedSlugs(new Set());
+    } else {
+      setSelectedSlugs(new Set(allSlugs));
+    }
   }
 
   async function handleBulkDelete(): Promise<void> {
@@ -129,6 +145,18 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         </div>
       ) : (
         <div className="game-list">
+          {games.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={selectedSlugs.size === games.length}
+                onChange={toggleSelectAll}
+                style={{ marginRight: 0, cursor: "pointer" }}
+                title="Select all games"
+              />
+            </div>
+          )}
           {games.map((g) => (
             <div key={g.slug} className="game-row">
               <input
