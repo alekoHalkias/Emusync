@@ -24,6 +24,9 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
+  // Pairing modal
+  const [showPairingModal, setShowPairingModal] = useState(false);
+
   // LAN discovery warning
   const [existingServers, setExistingServers] = useState<Array<{ name: string; host: string; port: number }>>([]);
   const [startWarningConfirmed, setStartWarningConfirmed] = useState(false);
@@ -326,54 +329,15 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
               </div>
             )}
 
-            {/* Pair / connect section */}
+            {/* Pair / connect button */}
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>
-                {isServer ? "Re-pair this device" : "Connect to server"}
-              </div>
-
-              {pairServerWarning && (
-                <div style={{ marginBottom: 12, padding: "10px 12px", background: "var(--bg)", border: "1px solid var(--red, #f87171)", borderRadius: "var(--radius)", fontSize: 12 }}>
-                  <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}>⚠ This machine is currently running as a server</p>
-                  <p style={{ color: "var(--text-muted)" }}>Pairing to an external host will stop this server and disconnect all clients. Continue?</p>
-                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                    <button className="btn btn-danger" onClick={doPair}>Stop server & pair</button>
-                    <button className="btn btn-ghost" onClick={() => setPairServerWarning(false)}>Cancel</button>
-                  </div>
-                </div>
-              )}
-
-              {!pairServerWarning && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <div className="input-group" style={{ flex: 2 }}>
-                      <label>Server host</label>
-                      <input type="text" value={pairHost} onChange={(e) => setPairHost(e.target.value)} placeholder="192.168.1.50" />
-                    </div>
-                    <div className="input-group" style={{ flex: 1 }}>
-                      <label>Port</label>
-                      <input type="number" value={pairPort} onChange={(e) => setPairPort(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="input-group">
-                    <label>PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={4}
-                      value={pairToken}
-                      onChange={(e) => setPairToken(e.target.value.replace(/\D/g, ""))}
-                      placeholder="1234"
-                      className={pairError ? "error" : ""}
-                    />
-                    {pairError && <span className="error-msg">{pairError}</span>}
-                    {pairSuccess && <span style={{ fontSize: 12, color: "var(--green)" }}>Paired successfully.</span>}
-                  </div>
-                  <button className="btn btn-primary" onClick={doPair} disabled={pairBusy || !pairHost.trim()}>
-                    {pairBusy ? <><span className="spinner" /> Pairing…</> : "Pair device"}
-                  </button>
-                </div>
-              )}
+              <button
+                className="btn btn-ghost"
+                style={{ width: "100%", justifyContent: "center" }}
+                onClick={() => setShowPairingModal(true)}
+              >
+                {isServer ? "Re-pair this device" : "Connect to server"} →
+              </button>
             </div>
           </div>
         </div>
@@ -415,6 +379,61 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Pairing modal */}
+      {showPairingModal && (
+        <div className="modal-overlay" onClick={() => setShowPairingModal(false)}>
+          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3>{isServer ? "Re-pair this device" : "Connect to server"}</h3>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowPairingModal(false)}>✕</button>
+            </div>
+
+            {pairServerWarning && (
+              <div style={{ marginBottom: 16, padding: "10px 12px", background: "var(--bg)", border: "1px solid var(--red, #f87171)", borderRadius: "var(--radius)", fontSize: 12 }}>
+                <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}>⚠ This machine is currently running as a server</p>
+                <p style={{ color: "var(--text-muted)" }}>Pairing to an external host will stop this server and disconnect all clients. Continue?</p>
+                <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                  <button className="btn btn-danger" onClick={doPair}>Stop server & pair</button>
+                  <button className="btn btn-ghost" onClick={() => setPairServerWarning(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {!pairServerWarning && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div className="input-group" style={{ flex: 2 }}>
+                    <label>Server host</label>
+                    <input type="text" value={pairHost} onChange={(e) => setPairHost(e.target.value)} placeholder="192.168.1.50" />
+                  </div>
+                  <div className="input-group" style={{ flex: 1 }}>
+                    <label>Port</label>
+                    <input type="number" value={pairPort} onChange={(e) => setPairPort(e.target.value)} />
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={pairToken}
+                    onChange={(e) => setPairToken(e.target.value.replace(/\D/g, ""))}
+                    placeholder="1234"
+                    className={pairError ? "error" : ""}
+                  />
+                  {pairError && <span className="error-msg">{pairError}</span>}
+                  {pairSuccess && <span style={{ fontSize: 12, color: "var(--green)" }}>Paired successfully.</span>}
+                </div>
+                <button className="btn btn-primary" onClick={doPair} disabled={pairBusy || !pairHost.trim()}>
+                  {pairBusy ? <><span className="spinner" /> Pairing…</> : "Pair device"}
+                </button>
               </div>
             )}
           </div>
