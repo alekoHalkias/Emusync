@@ -448,15 +448,25 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                 return (
                   <div key={dir}>
                     <div style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      padding: "6px 12px", background: "var(--bg-secondary)",
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                      padding: "8px 12px", background: "var(--bg-secondary)",
                       borderBottom: "1px solid var(--border)",
                       fontSize: 11, color: "var(--text-muted)", position: "sticky", top: 0,
                     }}>
-                      <input type="checkbox" checked={allSel} onChange={() => toggleAll(allPaths)} />
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                         {dir}
                       </span>
+                      <button
+                        onClick={() => toggleAll(allPaths)}
+                        style={{
+                          fontSize: 11, padding: "4px 8px", background: "transparent",
+                          border: "1px solid var(--text-muted)", borderRadius: 3,
+                          color: "var(--text-muted)", cursor: "pointer",
+                          whiteSpace: "nowrap", flexShrink: 0,
+                        }}
+                      >
+                        {allSel ? "Deselect all" : "Select all"}
+                      </button>
                     </div>
                     {dirRoms.map(rom => (
                       <div
