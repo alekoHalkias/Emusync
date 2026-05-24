@@ -113,6 +113,16 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
 
         <div className="input-group">
+          <label>Console <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+          <input
+            type="text"
+            value={console}
+            onChange={(e) => setConsole(e.target.value)}
+            placeholder="GBA, PSX, NDS, SNES, etc."
+          />
+        </div>
+
+        <div className="input-group">
           <label>Save file location</label>
           <div className="input-row">
             <input
