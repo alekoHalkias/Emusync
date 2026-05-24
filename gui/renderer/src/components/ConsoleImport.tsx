@@ -462,8 +462,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                       <div
                         key={rom.romPath}
                         style={{
-                          display: "flex", alignItems: "center", gap: 10,
-                          padding: "7px 12px", borderBottom: "1px solid var(--border)",
+                          display: "flex", alignItems: "flex-start", gap: 10,
+                          padding: "10px 12px", borderBottom: "1px solid var(--border)",
                           cursor: "pointer",
                         }}
                         onClick={() => toggleRom(rom.romPath)}
@@ -473,27 +473,25 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                           checked={selected.has(rom.romPath)}
                           onChange={() => toggleRom(rom.romPath)}
                           onClick={e => e.stopPropagation()}
+                          style={{ marginTop: 3, flexShrink: 0 }}
                         />
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
                           <input
                             type="text"
                             value={names[rom.romPath] ?? rom.name}
                             onChange={(e) => setNames({ ...names, [rom.romPath]: e.target.value })}
                             onClick={(e) => e.stopPropagation()}
-                            style={{ fontSize: 13, fontWeight: 500, width: "100%", marginBottom: 4 }}
+                            style={{ fontSize: 13, fontWeight: 500, width: "100%" }}
                           />
-                          <div style={{ fontSize: 11, color: "var(--text-muted)",
-                            marginTop: 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {rom.romPath}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 8, alignItems: "center" }}>
                             {rom.saveExists && (
                               <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
                             )}
                             {rom.statePath && rom.stateExists && (
                               <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
-                            )}
-                            {(rom.consoleName || rom.coreName) && (
-                              <span style={{ opacity: 0.7 }}>
-                                {[rom.consoleName, rom.coreName].filter(Boolean).join(" · ")}
-                              </span>
                             )}
                           </div>
                         </div>
