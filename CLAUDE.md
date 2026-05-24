@@ -103,9 +103,11 @@ make uninstall-service           # disables + removes it
 **Current surface:**
 
 ```typescript
-window.emusync.config.load()      // reads ~/.emusync/emusync.toml
-window.emusync.config.save(data)  // writes config
-window.emusync.config.exists()    // boolean
+window.emusync.config.load()                          // reads ~/.emusync/emusync.toml
+window.emusync.config.save(data)                      // writes config
+window.emusync.config.exists()                        // boolean
+window.emusync.config.getRecentFolders(consoleKey)   // returns string[] of recent ROM folders for console
+window.emusync.config.addRecentFolder(consoleKey, path) // adds folder to recent list (keeps max 10)
 
 window.emusync.server.start()     // spawns emusync.py server start → { ok, token }
 window.emusync.server.stop()      // SIGKILL server + pkill orphans + clean pid/token files
@@ -146,7 +148,7 @@ When adding a new IPC channel, add the handler to `main.ts` AND the bridge entry
 | `~/.emusync/.server_token` | Current pairing PIN (written on start, deleted on clean exit) |
 | `~/.emusync/.game_pid` | Two-line file: line 1 = emusync run PID, line 2 = emulator child PID (written by `emusync run`, deleted on exit) |
 
-Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_name`, `token`, `is_server`, `server_pin` (optional).
+Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_name`, `token`, `is_server`, `server_pin` (optional), `recent_import_folders` (dict mapping console keys to lists of recent folder paths).
 
 ---
 

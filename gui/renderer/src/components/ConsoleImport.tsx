@@ -62,6 +62,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [error, setError]         = useState("");
   const [progress, setProgress]   = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [recentFolders, setRecentFolders] = useState<string[]>([]);
 
   useEffect(() => {
     (window as any).emusync.emulator.consoles().then(setConsoles);
@@ -70,10 +71,13 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");
     try {
-      const { options, suggestions: sugg } =
-        await (window as any).emusync.emulator.detect(consoleSel);
+      const [{ options, suggestions: sugg }, recent] = await Promise.all([
+        (window as any).emusync.emulator.detect(consoleSel),
+        (window as any).emusync.config.getRecentFolders(consoleSel),
+      ]);
       setEmulators(options);
       setSuggestions(sugg);
+      setRecentFolders(recent);
       if (options.length === 1) setEmuSel(options[0]);
       setPhase("emulator");
     } catch {
@@ -143,6 +147,14 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   async function addExtraPath(): Promise<void> {
     const folder = await (window as any).emusync.dialog.openFolder();
     if (!folder) return;
+    await (window as any).emusync.config.addRecentFolder(consoleSel, folder);
+    const updated = [...extraPaths, folder];
+    setExtraPaths(updated);
+    scanRoms(updated);
+  }
+
+  async function useRecentFolder(folder: string): Promise<void> {
+    if (extraPaths.includes(folder)) return;
     const updated = [...extraPaths, folder];
     setExtraPaths(updated);
     scanRoms(updated);
@@ -330,6 +342,34 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                     </label>
                   ))}
                 </div>
+                {recentFolders.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+                      Recent folders:
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {recentFolders.map(folder => (
+                        <button
+                          key={folder}
+                          className="btn btn-ghost"
+                          onClick={() => useRecentFolder(folder)}
+                          disabled={extraPaths.includes(folder)}
+                          style={{
+                            fontSize: 12,
+                            textAlign: "left",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            opacity: extraPaths.includes(folder) ? 0.5 : 1,
+                          }}
+                          title={folder}
+                        >
+                          📁 {folder}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
             <div className="modal-actions">
