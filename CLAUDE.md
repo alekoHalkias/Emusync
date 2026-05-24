@@ -345,6 +345,21 @@ The path is extracted from the full ROM file path during import and returned by 
 
 ---
 
+## Debug tools
+
+```bash
+# Scan a folder for ROMs from the CLI (no Electron needed)
+node scripts/scan-roms.mjs <folder> [--ext gba,sfc] [--depth 3] [--verbose]
+
+# Example: find all GBA ROMs up to 3 dirs deep
+node scripts/scan-roms.mjs ~/Games/GBA --ext gba --verbose
+```
+
+The `emulator:scan` IPC handler emits `[scan]` lines to stderr when running in
+dev mode — visible in the `make dev-gui` terminal.
+
+---
+
 ## Common gotchas
 
 **Orphaned server processes** — If Electron exits abnormally, the uvicorn server can keep running. The stop handler uses three kill strategies (see Server process lifecycle above). If you see "port already in use", run: `pkill -9 -f "emusync.py server start"`.

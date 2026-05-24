@@ -93,7 +93,6 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setError("");
     try {
       const result = await (window as any).emusync.emulator.scan(consoleSel, emuSel, paths);
-      const existingGames = await listGames();
 
       // Extract ROM filename from path (without extension)
       const getRomFileName = (path: string): string => {
@@ -101,43 +100,49 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
         return filename.replace(/\.[^.]+$/, "").toLowerCase();
       };
 
-      // Get device config for each game to check their original ROM filenames
-      const gameConfigs = await Promise.all(
-        existingGames.map(async (g: Game) => {
-          try {
-            const config = await getGameDevice(g.slug);
-            return { slug: g.slug, name: g.name, romPath: config.rom_path };
-          } catch {
-            return { slug: g.slug, name: g.name, romPath: null };
-          }
-        })
-      );
+      // Annotate each ROM with folder path (always)
+      const annotated: RomEntry[] = result.roms.map((rom: RomEntry) => ({
+        ...rom,
+        romFileName: getRomFileName(rom.romPath),
+        romFolderPath: rom.romPath.replace(/[^/]+$/, "").replace(/\/$/, "") || "/",
+      }));
 
-      const romsWithMatches = result.roms
-        .map((rom: RomEntry) => {
-          const romFileName = getRomFileName(rom.romPath);
-          const romFolderPath = rom.romPath.replace(/[^/]+$/, "").replace(/\/$/, "") || "/";
+      // Dedup: try to filter out already-imported ROMs.
+      // If the API is unavailable (e.g. not yet paired), skip dedup and show all.
+      let newRoms = annotated;
+      try {
+        const existingGames = await listGames();
+        const gameConfigs = await Promise.all(
+          existingGames.map(async (g: Game) => {
+            try {
+              const config = await getGameDevice(g.slug);
+              return { slug: g.slug, romPath: config.rom_path };
+            } catch {
+              return { slug: g.slug, romPath: null };
+            }
+          })
+        );
 
-          // Match by comparing ROM filenames
-          const match = gameConfigs.find(config => {
-            if (!config.romPath) return false;
-            const existingRomFileName = getRomFileName(config.romPath);
-            return existingRomFileName === romFileName;
+        const withMatches = annotated.map((rom: RomEntry) => {
+          const match = gameConfigs.find(cfg => {
+            if (!cfg.romPath) return false;
+            return getRomFileName(cfg.romPath) === rom.romFileName;
           });
+          return { ...rom, existingGameSlug: match?.slug };
+        });
 
-          return {
-            ...rom,
-            romFileName,
-            romFolderPath,
-            existingGameSlug: match?.slug,
-          };
-        })
-        // Filter out games that are already imported (have a match)
-        .filter((rom: RomEntry) => !rom.existingGameSlug);
+        newRoms = withMatches.filter((rom: RomEntry) => !rom.existingGameSlug);
+        const skipCount = withMatches.length - newRoms.length;
+        if (skipCount > 0 && newRoms.length === 0) {
+          setError(`${skipCount} ROM${skipCount !== 1 ? "s" : ""} found — all already imported on this device.`);
+        }
+      } catch {
+        // Dedup unavailable (server not reachable / not paired yet) — show all ROMs
+      }
 
-      setRoms(romsWithMatches);
+      setRoms(newRoms);
       setRomDirs(result.romDirs ?? []);
-      setSelected(new Set(romsWithMatches.map((r: RomEntry) => r.romPath)));
+      setSelected(new Set(newRoms.map((r: RomEntry) => r.romPath)));
       setPhase("results");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Scan failed.");
