@@ -122,6 +122,7 @@ window.emusync.emulator.consoles()          // returns ordered console list { ke
 window.emusync.emulator.detect(consoleKey)  // scans for installed emulators for that console; checks RetroArch (native+flatpak) cores + standalone emulators (mGBA etc.); resolves per-core save subfolder; returns { options: DetectedEmulatorOption[], suggestions[] }
 window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; uses emulatorOption.saveDir (already resolved to core subfolder); returns { emulators, romDirs, roms[] } with consoleName+coreName on each entry
 window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
+window.emusync.files.getSaveInfo(path)      // returns { exists: boolean, mtime?: string } — checks if save file exists and gets last modified time
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 

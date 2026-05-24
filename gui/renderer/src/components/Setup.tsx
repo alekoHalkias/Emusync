@@ -30,6 +30,10 @@ declare global {
       dialog: {
         openFile: (opts?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
       };
+      files: {
+        ensureSave: (savePath: string) => Promise<{ created: boolean }>;
+        getSaveInfo: (savePath: string) => Promise<{ exists: boolean; mtime?: string }>;
+      };
     };
   }
 }

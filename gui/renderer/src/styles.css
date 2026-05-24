@@ -164,6 +164,10 @@ input.error { border-color: var(--red); }
 }
 .game-row-name { font-weight: 500; flex-shrink: 0; }
 .game-row-divider { color: var(--text-muted); flex-shrink: 0; }
+.game-row-console { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+.game-row-last-saved {
+  font-size: 12px; color: var(--text-muted); flex-shrink: 0;
+}
 .game-row-sync {
   display: flex; align-items: center; gap: 6px; font-size: 12px;
   color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

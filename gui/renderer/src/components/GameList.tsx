@@ -13,6 +13,7 @@ type GameRow = Game & {
   locked?: boolean;
   syncing?: boolean;
   console?: string;
+  lastSaved?: string;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -39,11 +40,19 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             getLock(g.slug),
             getGameDevice(g.slug),
           ]);
+
+          let lastSaved: string | undefined;
+          if (config.status === "fulfilled" && config.value?.save_path) {
+            const saveInfo = await window.emusync.files.getSaveInfo(config.value.save_path);
+            lastSaved = saveInfo.exists ? (saveInfo.mtime || "Unknown") : undefined;
+          }
+
           return {
             ...g,
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
             console: config.status === "fulfilled" && config.value?.console ? config.value.console : undefined,
+            lastSaved,
           };
         })
       );
@@ -144,10 +153,14 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                 style={{ marginRight: 8, cursor: "pointer" }}
               />
               <div className="game-row-header">
-                <div className="game-row-name">{g.name.length > 20 ? g.name.slice(0, 20) + "..." : g.name}</div>
+                <div className="game-row-name">{g.name.length > 25 ? g.name.slice(0, 25) + "..." : g.name}</div>
                 <div className="game-row-divider">|</div>
-                <div className="game-row-console" style={{ minWidth: "80px" }}>
+                <div className="game-row-console">
                   {g.console || "Unknown"}
+                </div>
+                <div className="game-row-divider">|</div>
+                <div className="game-row-last-saved">
+                  <span>{g.lastSaved ? g.lastSaved : "No save locally"}</span>
                 </div>
                 <div className="game-row-divider">|</div>
                 <div className="game-row-sync">
