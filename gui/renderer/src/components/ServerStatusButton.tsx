@@ -231,26 +231,28 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
               <span style={{ fontSize: 11, color: "var(--text-muted)" }}>click to see server activity →</span>
             </button>
 
+            {/* Device name editor */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                  <label>Device name</label>
+                  <input
+                    type="text"
+                    value={deviceName}
+                    onChange={(e) => { setDeviceName(e.target.value); setDeviceNameSaved(false); }}
+                    placeholder="My Gaming PC"
+                  />
+                </div>
+                <button className="btn btn-ghost" onClick={saveDeviceName} style={{ flexShrink: 0 }}>
+                  {deviceNameSaved ? "Saved" : "Save"}
+                </button>
+              </div>
+            </div>
+
             {/* Server machine controls */}
             {isServer && (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>This machine is the server</div>
-
-                {/* Device name */}
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 14 }}>
-                  <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
-                    <label>Server name</label>
-                    <input
-                      type="text"
-                      value={deviceName}
-                      onChange={(e) => { setDeviceName(e.target.value); setDeviceNameSaved(false); }}
-                      placeholder="My Gaming PC"
-                    />
-                  </div>
-                  <button className="btn btn-ghost" onClick={saveDeviceName} style={{ flexShrink: 0 }}>
-                    {deviceNameSaved ? "Saved" : "Save"}
-                  </button>
-                </div>
 
                 {/* Start/stop */}
                 {startState === "idle" && serverState === "offline" && (
