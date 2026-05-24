@@ -88,16 +88,18 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
 
   async function handleBulkDelete(): Promise<void> {
     setBulkDeleting(true);
+    const slugsToDelete = Array.from(selectedSlugs);
     try {
-      await Promise.all(Array.from(selectedSlugs).map(slug => removeGame(slug)));
-      setSelectedSlugs(new Set());
-      setConfirmBulkDelete(false);
-      await load();
+      await Promise.all(slugsToDelete.map(slug => removeGame(slug)));
     } catch {
       /* ignore — games might not exist */
-    } finally {
-      setBulkDeleting(false);
     }
+    // Close modal and clear state immediately
+    setConfirmBulkDelete(false);
+    setSelectedSlugs(new Set());
+    setBulkDeleting(false);
+    // Reload games after modal is closed
+    await load();
   }
 
   return (
