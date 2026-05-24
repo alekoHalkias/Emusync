@@ -124,25 +124,26 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       }));
 
       // Dedup: try to filter out already-imported ROMs.
-      // If the API is unavailable (e.g. not yet paired), skip dedup and show all.
       let newRoms = annotated;
       try {
         const existingGames = await listGames();
-        const gameConfigs = await Promise.all(
-          existingGames.map(async (g: Game) => {
-            try {
-              const config = await getGameDevice(g.slug);
-              return { slug: g.slug, romPath: config.rom_path };
-            } catch {
-              return { slug: g.slug, romPath: null };
+        const gameConfigs: Array<{ slug: string; romPath: string }> = [];
+
+        for (const g of existingGames) {
+          try {
+            const config = await getGameDevice(g.slug);
+            if (config.rom_path) {
+              gameConfigs.push({ slug: g.slug, romPath: config.rom_path });
             }
-          })
-        );
+          } catch {
+            // Skip games we can't load config for
+          }
+        }
 
         const withMatches = annotated.map((rom: RomEntry) => {
           const match = gameConfigs.find(cfg => {
-            if (!cfg.romPath) return false;
-            return getRomFileName(cfg.romPath) === rom.romFileName;
+            // Match by exact path or by filename
+            return cfg.romPath === rom.romPath || getRomFileName(cfg.romPath) === rom.romFileName;
           });
           return { ...rom, existingGameSlug: match?.slug };
         });
