@@ -442,32 +442,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                 <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
                   No ROMs found. Try adding a folder above.
                 </div>
-              ) : Object.entries(grouped).map(([dir, dirRoms]) => {
-                const allPaths = dirRoms.map(r => r.romPath);
-                const allSel   = allPaths.every(p => selected.has(p));
-                return (
-                  <div key={dir}>
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                      padding: "8px 12px", background: "var(--bg-secondary)",
-                      borderBottom: "1px solid var(--border)",
-                      fontSize: 11, color: "var(--text-muted)", position: "sticky", top: 0,
-                    }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                        {dir}
-                      </span>
-                      <button
-                        onClick={() => toggleAll(allPaths)}
-                        style={{
-                          fontSize: 11, padding: "4px 8px", background: "transparent",
-                          border: "1px solid var(--text-muted)", borderRadius: 3,
-                          color: "var(--text-muted)", cursor: "pointer",
-                          whiteSpace: "nowrap", flexShrink: 0,
-                        }}
-                      >
-                        {allSel ? "Deselect all" : "Select all"}
-                      </button>
-                    </div>
+              ) : Object.entries(grouped).map(([dir, dirRoms]) => (
+                    <React.Fragment key={dir}>
                     {dirRoms.map(rom => (
                       <div
                         key={rom.romPath}
@@ -507,9 +483,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                         </div>
                       </div>
                     ))}
-                  </div>
-                );
-              })}
+                    </React.Fragment>
+              ))}
             </div>
 
             <div className="modal-actions" style={{ marginTop: 16 }}>
