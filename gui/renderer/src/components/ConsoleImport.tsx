@@ -396,7 +396,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
             )}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => {
-                setEmulators([]); setEmuSel(null); setSuggestions([]); setPhase("console");
+                setEmulators([]); setEmuSel(null); setSuggestions([]);  setPhase("console");
               }}>← Back</button>
               {emulators.length === 0 ? (
                 <button className="btn btn-ghost" onClick={onClose}>Close</button>
@@ -530,7 +530,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
 
             <div className="modal-actions" style={{ marginTop: 16 }}>
               <button className="btn btn-ghost" onClick={() => {
-                setRoms([]); setExtraPaths([]); setRomDirs([]); setPhase("emulator");
+                setRoms([]); setExtraPaths(savedFolders); setRomDirs([]); setPhase("emulator");
               }}>← Back</button>
               <button
                 className="btn btn-primary"
