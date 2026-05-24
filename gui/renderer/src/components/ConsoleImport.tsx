@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { addGame, setGameDevice, listGames } from "../api";
+import { addGame, setGameDevice, listGames, getGameDevice, type Game } from "../api";
 
 type ConsoleOption = { key: string; label: string };
 
@@ -95,14 +95,27 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
         return filename.replace(/\.[^.]+$/, "").toLowerCase();
       };
 
+      // Get device config for each game to check their original ROM filenames
+      const gameConfigs = await Promise.all(
+        existingGames.map(async (g: Game) => {
+          try {
+            const config = await getGameDevice(g.slug);
+            return { slug: g.slug, name: g.name, romPath: config.rom_path };
+          } catch {
+            return { slug: g.slug, name: g.name, romPath: null };
+          }
+        })
+      );
+
       const romsWithMatches = result.roms
         .map((rom: RomEntry) => {
           const romFileName = getRomFileName(rom.romPath);
 
-          // Match only by ROM filename (stable identifier)
-          const match = existingGames.find((g: any) => {
-            const existingName = g.name.toLowerCase();
-            return existingName === romFileName;
+          // Match by comparing ROM filenames
+          const match = gameConfigs.find(config => {
+            if (!config.romPath) return false;
+            const existingRomFileName = getRomFileName(config.romPath);
+            return existingRomFileName === romFileName;
           });
 
           return {
