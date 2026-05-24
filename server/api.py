@@ -136,6 +136,7 @@ class GameDeviceRequest(BaseModel):
     launch_command: str = ""
     state_path: str = ""
     rom_folder_path: str = ""
+    console: str = ""
 
 
 @app.get("/games/{slug}/device")
@@ -143,7 +144,7 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     gd = _get_store().get_game_device(slug, device_id)
     if not gd:
         raise HTTPException(status_code=404, detail="No device config for this game")
-    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command, "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path}
+    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command, "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path, "console": gd.console}
 
 
 @app.put("/games/{slug}/device")
@@ -159,6 +160,7 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
             launch_command=req.launch_command,
             state_path=req.state_path,
             rom_folder_path=req.rom_folder_path,
+            console=req.console,
         )
     )
     return {"ok": True}

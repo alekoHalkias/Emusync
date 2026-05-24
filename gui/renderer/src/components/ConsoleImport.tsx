@@ -189,6 +189,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
 
   async function doImport(): Promise<void> {
     const toImport = roms.filter(r => selected.has(r.romPath));
+    const consoleLabel = consoles.find(c => c.key === consoleSel)?.label ?? "";
     setProgress({ done: 0, total: toImport.length });
     setImportErrors([]);
     setPhase("importing");
@@ -204,6 +205,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           launch_command: rom.launchCommand,
           state_path: rom.stateExists ? (rom.statePath ?? "") : "",
           rom_folder_path: rom.romFolderPath ?? "",
+          console: consoleLabel,
         });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });

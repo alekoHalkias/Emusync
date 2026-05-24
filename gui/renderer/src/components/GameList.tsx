@@ -39,16 +39,11 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             getLock(g.slug),
             getGameDevice(g.slug),
           ]);
-          let console_name: string | undefined;
-          if (config.status === "fulfilled" && config.value?.rom_folder_path) {
-            const parts = config.value.rom_folder_path.split("/");
-            console_name = parts[parts.length - 1] || undefined;
-          }
           return {
             ...g,
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
-            console: console_name,
+            console: config.status === "fulfilled" && config.value?.console ? config.value.console : undefined,
           };
         })
       );
