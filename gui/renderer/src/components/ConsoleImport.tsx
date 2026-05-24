@@ -3,6 +3,33 @@ import { addGame, setGameDevice, listGames, getGameDevice, type Game } from "../
 
 type ConsoleOption = { key: string; label: string };
 
+const CONSOLE_ABBREVIATIONS: Record<string, string> = {
+  "Game Boy Advance": "GBA",
+  "Game Boy Color": "GBC",
+  "Game Boy": "GB",
+  "Nintendo DS": "NDS",
+  "Nintendo 3DS": "3DS",
+  "PlayStation": "PSX",
+  "PlayStation 2": "PS2",
+  "PlayStation Portable": "PSP",
+  "PlayStation Vita": "VITA",
+  "Sega Genesis": "Genesis",
+  "Sega Master System": "SMS",
+  "Sega Game Gear": "GG",
+  "Super Nintendo": "SNES",
+  "Nintendo 64": "N64",
+  "Nintendo Entertainment System": "NES",
+  "Atari 2600": "A2600",
+  "Atari 7800": "A7800",
+  "TurboGrafx-16": "TG16",
+  "WonderSwan": "WS",
+  "WonderSwan Color": "WSC",
+};
+
+function getConsoleAbbreviation(consoleName: string): string {
+  return CONSOLE_ABBREVIATIONS[consoleName] || consoleName;
+}
+
 type EmulatorOption = {
   id: string;
   label: string;
@@ -190,6 +217,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   async function doImport(): Promise<void> {
     const toImport = roms.filter(r => selected.has(r.romPath));
     const consoleLabel = consoles.find(c => c.key === consoleSel)?.label ?? "";
+    const consoleAbbr = getConsoleAbbreviation(consoleLabel);
     setProgress({ done: 0, total: toImport.length });
     setImportErrors([]);
     setPhase("importing");
@@ -205,7 +233,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           launch_command: rom.launchCommand,
           state_path: rom.stateExists ? (rom.statePath ?? "") : "",
           rom_folder_path: rom.romFolderPath ?? "",
-          console: consoleLabel,
+          console: consoleAbbr,
         });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
