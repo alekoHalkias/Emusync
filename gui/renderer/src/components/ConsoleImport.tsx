@@ -131,13 +131,17 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
             romFolderPath,
             existingGameSlug: match?.slug,
           };
-        })
-        // Filter out games that are already imported (have a match)
-        .filter((rom: RomEntry) => !rom.existingGameSlug);
+        });
 
-      setRoms(romsWithMatches);
+      const newRoms   = romsWithMatches.filter((rom: RomEntry) => !rom.existingGameSlug);
+      const skipCount = romsWithMatches.length - newRoms.length;
+      if (skipCount > 0 && newRoms.length === 0) {
+        setError(`${skipCount} ROM${skipCount !== 1 ? "s" : ""} found — all already imported on this device.`);
+      }
+
+      setRoms(newRoms);
       setRomDirs(result.romDirs ?? []);
-      setSelected(new Set(romsWithMatches.map((r: RomEntry) => r.romPath)));
+      setSelected(new Set(newRoms.map((r: RomEntry) => r.romPath)));
       setPhase("results");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Scan failed.");
