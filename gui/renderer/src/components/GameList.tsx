@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, type Game } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, type Game } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -12,6 +12,7 @@ type GameRow = Game & {
   lastPush?: string;
   locked?: boolean;
   syncing?: boolean;
+  console?: string;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -33,11 +34,21 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       const raw = await listGames();
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
-          const [meta, lock] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug)]);
+          const [meta, lock, config] = await Promise.allSettled([
+            getSaveMeta(g.slug),
+            getLock(g.slug),
+            getGameDevice(g.slug),
+          ]);
+          let console_name: string | undefined;
+          if (config.status === "fulfilled" && config.value?.rom_folder_path) {
+            const parts = config.value.rom_folder_path.split("/");
+            console_name = parts[parts.length - 1] || undefined;
+          }
           return {
             ...g,
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
+            console: console_name,
           };
         })
       );
@@ -138,7 +149,11 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                 style={{ marginRight: 8, cursor: "pointer" }}
               />
               <div className="game-row-header">
-                <div className="game-row-name">{g.name}</div>
+                <div className="game-row-name">{g.name.length > 20 ? g.name.slice(0, 20) + "..." : g.name}</div>
+                <div className="game-row-divider">|</div>
+                <div className="game-row-console" style={{ minWidth: "80px" }}>
+                  {g.console || "Unknown"}
+                </div>
                 <div className="game-row-divider">|</div>
                 <div className="game-row-sync">
                   {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒 In use</span>}
