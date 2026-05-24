@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { listDevices, listEvents, removeDevice, type Device, type ActivityEvent } from "../api";
+import { listDevices, listEvents, removeDevice, whoami, type Device, type ActivityEvent } from "../api";
 
 export default function DevicesButton(): React.ReactElement {
   const [open, setOpen] = useState(false);
@@ -8,16 +8,19 @@ export default function DevicesButton(): React.ReactElement {
   const [loading, setLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [devs, evts] = await Promise.all([listDevices(), listEvents()]);
+      const [devs, evts, me] = await Promise.all([listDevices(), listEvents(), whoami()]);
       setDevices(devs);
       setEvents(evts);
+      setCurrentDeviceId(me.device_id);
     } catch {
       setDevices([]);
       setEvents([]);
+      setCurrentDeviceId(null);
     } finally {
       setLoading(false);
     }
@@ -102,7 +105,8 @@ export default function DevicesButton(): React.ReactElement {
                       </div>
                       <button
                         className="btn btn-icon"
-                        title="Remove device"
+                        title={d.id === currentDeviceId ? "Cannot remove this device" : "Remove device"}
+                        disabled={d.id === currentDeviceId}
                         onClick={() => setConfirmRemove(d.id)}
                       >
                         🗑
