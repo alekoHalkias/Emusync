@@ -47,6 +47,22 @@ function stepIndex(phase: Phase): number {
   return 2;
 }
 
+function getConsoleAbbreviation(consoleKey: string): string {
+  const map: Record<string, string> = {
+    gba: "GBA",
+    gb: "GB",
+    snes: "SNES",
+    nes: "NES",
+    n64: "N64",
+    nds: "NDS",
+    genesis: "Genesis",
+    sms: "SMS",
+    pce: "PCE",
+    psx: "PSX",
+  };
+  return map[consoleKey] || consoleKey.toUpperCase();
+}
+
 export default function ConsoleImport({ onClose, onImported }: Props): React.ReactElement {
   const [phase, setPhase]         = useState<Phase>("console");
   const [consoles, setConsoles]   = useState<ConsoleOption[]>([]);
@@ -198,11 +214,12 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setImportErrors([]);
     setPhase("importing");
     const errs: string[] = [];
+    const consoleAbbr = getConsoleAbbreviation(consoleSel);
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
-        const game = await addGame(displayName);
+        const game = await addGame(displayName, consoleAbbr);
         await setGameDevice(game.slug, {
           rom_path: rom.romPath,
           save_path: rom.savePath,

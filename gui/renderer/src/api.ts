@@ -8,7 +8,7 @@ export type GameDeviceConfig = {
   rom_folder_path?: string;
 };
 
-export type Game = { slug: string; name: string };
+export type Game = { slug: string; name: string; console?: string };
 export type Device = { id: string; name: string };
 export type LockInfo = { locked: boolean; device_id?: string; acquired_at?: string };
 export type SaveMeta = { hash: string; pushed_at: string; device_id: string } | null;
@@ -57,7 +57,7 @@ export async function pair(masterToken: string, deviceId: string, deviceName: st
 }
 
 export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
-export const addGame = (name: string): Promise<Game> => _fetch("POST", "/games", { name });
+export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
 export const removeGame = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}`);
