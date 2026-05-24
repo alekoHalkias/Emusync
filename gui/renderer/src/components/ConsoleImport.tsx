@@ -16,6 +16,7 @@ type EmulatorOption = {
 type RomEntry = {
   name: string;
   romPath: string;
+  romFileName: string;
   savePath: string;
   saveExists: boolean;
   launchCommand: string;
@@ -87,13 +88,33 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     try {
       const result = await (window as any).emusync.emulator.scan(consoleSel, emuSel, paths);
       const existingGames = await listGames();
-      const romsWithMatches = result.roms.map((rom: RomEntry) => {
-        const match = existingGames.find((g: any) => g.name.toLowerCase() === rom.name.toLowerCase());
-        return {
-          ...rom,
-          existingGameSlug: match?.slug,
-        };
-      });
+
+      // Extract ROM filename from path (without extension)
+      const getRomFileName = (path: string): string => {
+        const filename = path.split("/").pop() || "";
+        return filename.replace(/\.[^.]+$/, "").toLowerCase();
+      };
+
+      const romsWithMatches = result.roms
+        .map((rom: RomEntry) => {
+          const romFileName = getRomFileName(rom.romPath);
+          const nameLower = rom.name.toLowerCase();
+
+          // Match if either game name or ROM filename matches an existing game
+          const match = existingGames.find((g: any) => {
+            const existingName = g.name.toLowerCase();
+            return existingName === nameLower || existingName === romFileName;
+          });
+
+          return {
+            ...rom,
+            romFileName,
+            existingGameSlug: match?.slug,
+          };
+        })
+        // Filter out games that are already imported (have a match)
+        .filter((rom: RomEntry) => !rom.existingGameSlug);
+
       setRoms(romsWithMatches);
       setRomDirs(result.romDirs ?? []);
       setSelected(new Set(romsWithMatches.map((r: RomEntry) => r.romPath)));
@@ -145,9 +166,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
-        const slug = rom.existingGameSlug ||
-          (await addGame(displayName)).slug;
-        await setGameDevice(slug, {
+        const game = await addGame(displayName);
+        await setGameDevice(game.slug, {
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
@@ -415,9 +435,6 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                             )}
                             {rom.statePath && rom.stateExists && (
                               <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
-                            )}
-                            {rom.existingGameSlug && (
-                              <span style={{ color: "var(--accent, #e94560)" }}>Game match found</span>
                             )}
                             {(rom.consoleName || rom.coreName) && (
                               <span style={{ opacity: 0.7 }}>
