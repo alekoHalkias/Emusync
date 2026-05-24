@@ -174,7 +174,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               <div className="game-row-header">
                 <div className="game-row-name">{g.name}</div>
                 <div className="game-row-divider">|</div>
-                <div className="game-row-console" style={{ color: "var(--text-muted)", minWidth: 60 }}>
+                <div className="game-row-console" style={{ color: "var(--text-muted)", minWidth: 35 }}>
                   {g.console || "—"}
                 </div>
                 <div className="game-row-divider">|</div>
