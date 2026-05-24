@@ -98,12 +98,11 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const romsWithMatches = result.roms
         .map((rom: RomEntry) => {
           const romFileName = getRomFileName(rom.romPath);
-          const nameLower = rom.name.toLowerCase();
 
-          // Match if either game name or ROM filename matches an existing game
+          // Match only by ROM filename (stable identifier)
           const match = existingGames.find((g: any) => {
             const existingName = g.name.toLowerCase();
-            return existingName === nameLower || existingName === romFileName;
+            return existingName === romFileName;
           });
 
           return {
