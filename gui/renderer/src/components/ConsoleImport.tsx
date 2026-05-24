@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { addGame, setGameDevice } from "../api";
+import { addGame, setGameDevice, listGames } from "../api";
 
 type ConsoleOption = { key: string; label: string };
 
@@ -21,6 +21,9 @@ type RomEntry = {
   launchCommand: string;
   consoleName?: string;
   coreName?: string;
+  statePath?: string;
+  stateExists?: boolean;
+  existingGameSlug?: string;
 };
 
 type Phase =
@@ -83,9 +86,17 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setError("");
     try {
       const result = await (window as any).emusync.emulator.scan(consoleSel, emuSel, paths);
-      setRoms(result.roms);
+      const existingGames = await listGames();
+      const romsWithMatches = result.roms.map((rom: RomEntry) => {
+        const match = existingGames.find((g: any) => g.name.toLowerCase() === rom.name.toLowerCase());
+        return {
+          ...rom,
+          existingGameSlug: match?.slug,
+        };
+      });
+      setRoms(romsWithMatches);
       setRomDirs(result.romDirs ?? []);
-      setSelected(new Set(result.roms.map((r: RomEntry) => r.romPath)));
+      setSelected(new Set(romsWithMatches.map((r: RomEntry) => r.romPath)));
       setPhase("results");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Scan failed.");
@@ -134,8 +145,9 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
-        const game = await addGame(displayName);
-        await setGameDevice(game.slug, {
+        const slug = rom.existingGameSlug ||
+          (await addGame(displayName)).slug;
+        await setGameDevice(slug, {
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
@@ -398,13 +410,14 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                           />
                           <div style={{ fontSize: 11, color: "var(--text-muted)",
                             marginTop: 1, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {rom.saveExists
-                              ? <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
-                              : <span style={{ color: "var(--yellow, #f0a500)" }}>⊕ Save will be created</span>
-                            }
-                            {rom.statePath && (rom.stateExists
-                              ? <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
-                              : <span style={{ color: "var(--yellow, #f0a500)" }}>⊕ State will be created</span>
+                            {rom.saveExists && (
+                              <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
+                            )}
+                            {rom.statePath && rom.stateExists && (
+                              <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
+                            )}
+                            {rom.existingGameSlug && (
+                              <span style={{ color: "var(--accent, #e94560)" }}>Game match found</span>
                             )}
                             {(rom.consoleName || rom.coreName) && (
                               <span style={{ opacity: 0.7 }}>
