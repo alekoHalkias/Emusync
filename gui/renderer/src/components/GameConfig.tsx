@@ -15,6 +15,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [romPath, setRomPath] = useState("");
   const [savePath, setSavePath] = useState("");
   const [launchCommand, setLaunchCommand] = useState("");
+  const [console, setConsole] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -26,6 +27,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         setRomPath(cfg.rom_path);
         setSavePath(cfg.save_path);
         setLaunchCommand(cfg.launch_command);
+        setConsole(cfg.console || "");
       })
       .catch(() => setLoadError("Could not load device config — the server may be unreachable."));
   }, [slug]);
@@ -58,6 +60,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         rom_path: romPath.trim(),
         save_path: savePath.trim(),
         launch_command: launchCommand.trim(),
+        console: console.trim(),
       };
       await setGameDevice(finalSlug!, cfg);
       onSaved();
