@@ -865,17 +865,27 @@ ipcMain.handle("emulator:scan", (_event, params: {
   extraPaths: string[];
 }): EmulatorScanResult => {
   const { consoleKey, emulatorOption, extraPaths } = params;
+  console.error(`[scan] consoleKey=${consoleKey} extraPaths=${JSON.stringify(extraPaths)} emulatorRomDirs=${JSON.stringify(emulatorOption.romDirs)}`);
+
   const consoleDef = CONSOLES.find(c => c.key === consoleKey);
-  if (!consoleDef) return { emulators: [], romDirs: [], roms: [] };
+  if (!consoleDef) {
+    console.error(`[scan] ERROR: unknown consoleKey '${consoleKey}'`);
+    return { emulators: [], romDirs: [], roms: [] };
+  }
 
   const romExtSet = new Set(consoleDef.systemKeys);
   const romDirs = [...new Set([...emulatorOption.romDirs, ...(extraPaths ?? [])].filter(Boolean))];
+  console.error(`[scan] romExtSet=${JSON.stringify([...romExtSet])} romDirs=${JSON.stringify(romDirs)}`);
+
   const firstSys = SYSTEMS[consoleDef.systemKeys[0]];
   const defaultSaveExts = firstSys?.saveExts ?? DEFAULT_SAVE_EXTS;
 
-  const roms: RomEntry[] = romDirs.flatMap(dir =>
-    scanRomDir(dir)
-      .filter(p => romExtSet.has(extname(p).slice(1).toLowerCase()))
+  const roms: RomEntry[] = romDirs.flatMap(dir => {
+    const allInDir = scanRomDir(dir);
+    console.error(`[scan] dir='${dir}' → scanRomDir found ${allInDir.length} files total`);
+    const filtered = allInDir.filter(p => romExtSet.has(extname(p).slice(1).toLowerCase()));
+    console.error(`[scan] dir='${dir}' → after ext filter (${[...romExtSet].join(",")}) kept ${filtered.length}`);
+    return filtered
       .map(romPath => {
         const romExt = extname(romPath).slice(1).toLowerCase();
         const base   = basename(romPath, extname(romPath));
@@ -911,9 +921,10 @@ ipcMain.handle("emulator:scan", (_event, params: {
           consoleName: system?.name ?? consoleDef.label,
           coreName: emulatorOption.coreFolderName,
         };
-      })
-  );
+      });
+  });
 
+  console.error(`[scan] total ROMs returning to renderer: ${roms.length}`);
   return {
     emulators: [{ type: "native" as const, label: emulatorOption.label,
       execPath: emulatorOption.execPath, saveDir: emulatorOption.saveDir,
