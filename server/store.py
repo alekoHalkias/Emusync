@@ -81,6 +81,7 @@ class GameDevice:
     save_path: str
     launch_command: str
     state_path: str = ""
+    rom_folder_path: str = ""
 
 
 @dataclass
@@ -111,6 +112,13 @@ class Store:
         try:
             self._conn.execute(
                 "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass  # column already exists
+        # Migration: add rom_folder_path column to game_devices (safe to run multiple times)
+        try:
+            self._conn.execute(
+                "ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''"
             )
         except sqlite3.OperationalError:
             pass  # column already exists
@@ -179,15 +187,15 @@ class Store:
     def set_game_device(self, gd: GameDevice) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO game_devices
-               (game_slug, device_id, rom_path, save_path, launch_command, state_path)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command, gd.state_path),
+               (game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command, gd.state_path, gd.rom_folder_path),
         )
         self._conn.commit()
 
     def get_game_device(self, game_slug: str, device_id: str) -> Optional[GameDevice]:
         row = self._conn.execute(
-            """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path
+            """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path
                FROM game_devices WHERE game_slug = ? AND device_id = ?""",
             (game_slug, device_id),
         ).fetchone()

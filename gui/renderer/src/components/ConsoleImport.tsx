@@ -25,6 +25,7 @@ type RomEntry = {
   statePath?: string;
   stateExists?: boolean;
   existingGameSlug?: string;
+  romFolderPath?: string;
 };
 
 type Phase =
@@ -110,6 +111,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const romsWithMatches = result.roms
         .map((rom: RomEntry) => {
           const romFileName = getRomFileName(rom.romPath);
+          const romFolderPath = rom.romPath.replace(/[^/]+$/, "").replace(/\/$/, "") || "/";
 
           // Match by comparing ROM filenames
           const match = gameConfigs.find(config => {
@@ -121,6 +123,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           return {
             ...rom,
             romFileName,
+            romFolderPath,
             existingGameSlug: match?.slug,
           };
         })
@@ -184,6 +187,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
           state_path: rom.stateExists ? (rom.statePath ?? "") : "",
+          rom_folder_path: rom.romFolderPath ?? "",
         });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
