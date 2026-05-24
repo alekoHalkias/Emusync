@@ -30,8 +30,8 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | File | Owns |
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`) |
-| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves` |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `games`, `game_devices`, `saves`, `locks`, `events` |
+| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves` |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `games`, `game_devices`, `saves`, `states`, `locks`, `events` |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
 | `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`) |
@@ -41,7 +41,8 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | `gui/renderer/src/App.tsx` | Root component; screen router; auto-starts server if `is_server=true` |
 | `gui/renderer/src/components/Setup.tsx` | First-launch onboarding (choose server or join) |
 | `gui/renderer/src/components/ServerStatusButton.tsx` | Server control panel modal (start/stop, PIN, LAN discovery, re-pair) |
-| `gui/renderer/src/components/GameList.tsx` | Main game list; play/edit/remove actions |
+| `gui/renderer/src/components/DevicesButton.tsx` | Paired devices list modal (shows count, last sync times, delete button per device) |
+| `gui/renderer/src/components/GameList.tsx` | Main game list; play/edit/remove actions; bulk delete with checkboxes |
 | `gui/renderer/src/components/GameConfig.tsx` | Add/edit game form with file pickers |
 | `gui/renderer/src/components/ConsoleImport.tsx` | "Add Console" wizard modal — console dropdown → emulator detection → ROM scan → import |
 

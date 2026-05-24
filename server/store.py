@@ -140,6 +140,10 @@ class Store:
         rows = self._conn.execute("SELECT id, name, token FROM devices").fetchall()
         return [Device(**dict(r)) for r in rows]
 
+    def remove_device(self, device_id: str) -> None:
+        self._conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+        self._conn.commit()
+
     # ── games ─────────────────────────────────────────────────────────────────
 
     def add_game(self, slug: str, name: str) -> Game:
