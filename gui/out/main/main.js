@@ -53,6 +53,38 @@ electron.ipcMain.handle("config:save", (_event, data) => {
   return true;
 });
 electron.ipcMain.handle("config:exists", () => fs.existsSync(CONFIG_PATH));
+electron.ipcMain.handle("config:getRecentFolders", (_event, consoleKey) => {
+  if (!fs.existsSync(CONFIG_PATH)) return [];
+  try {
+    const data = smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+    const recentFolders = data.recent_import_folders || {};
+    return recentFolders[consoleKey] || [];
+  } catch {
+    return [];
+  }
+});
+electron.ipcMain.handle("config:addRecentFolder", (_event, consoleKey, folderPath) => {
+  if (!fs.existsSync(CONFIG_PATH)) return;
+  try {
+    const data = smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+    if (!data.recent_import_folders) {
+      data.recent_import_folders = {};
+    }
+    const recentFolders = data.recent_import_folders;
+    if (!recentFolders[consoleKey]) {
+      recentFolders[consoleKey] = [];
+    }
+    const folders = recentFolders[consoleKey];
+    const index = folders.indexOf(folderPath);
+    if (index !== -1) {
+      folders.splice(index, 1);
+    }
+    folders.unshift(folderPath);
+    folders.splice(10);
+    fs.writeFileSync(CONFIG_PATH, smolToml.stringify(data));
+  } catch {
+  }
+});
 function startServerProcess() {
   if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
   return new Promise((resolve) => {

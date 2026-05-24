@@ -4,7 +4,9 @@ electron.contextBridge.exposeInMainWorld("emusync", {
   config: {
     load: () => electron.ipcRenderer.invoke("config:load"),
     save: (data) => electron.ipcRenderer.invoke("config:save", data),
-    exists: () => electron.ipcRenderer.invoke("config:exists")
+    exists: () => electron.ipcRenderer.invoke("config:exists"),
+    getRecentFolders: (consoleKey) => electron.ipcRenderer.invoke("config:getRecentFolders", consoleKey),
+    addRecentFolder: (consoleKey, folderPath) => electron.ipcRenderer.invoke("config:addRecentFolder", consoleKey, folderPath)
   },
   server: {
     start: () => electron.ipcRenderer.invoke("server:start"),

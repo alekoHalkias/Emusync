@@ -62,7 +62,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [error, setError]         = useState("");
   const [progress, setProgress]   = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
-  const [recentFolders, setRecentFolders] = useState<string[]>([]);
+  const [savedFolders, setSavedFolders] = useState<string[]>([]);
 
   useEffect(() => {
     (window as any).emusync.emulator.consoles().then(setConsoles);
@@ -71,13 +71,14 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");
     try {
-      const [{ options, suggestions: sugg }, recent] = await Promise.all([
+      const [{ options, suggestions: sugg }, saved] = await Promise.all([
         (window as any).emusync.emulator.detect(consoleSel),
         (window as any).emusync.config.getRecentFolders(consoleSel),
       ]);
       setEmulators(options);
       setSuggestions(sugg);
-      setRecentFolders(recent);
+      setSavedFolders(saved);
+      setExtraPaths(saved);
       if (options.length === 1) setEmuSel(options[0]);
       setPhase("emulator");
     } catch {
@@ -147,22 +148,25 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   async function addExtraPath(): Promise<void> {
     const folder = await (window as any).emusync.dialog.openFolder();
     if (!folder) return;
+    if (extraPaths.includes(folder)) return;
     await (window as any).emusync.config.addRecentFolder(consoleSel, folder);
     const updated = [...extraPaths, folder];
+    setSavedFolders(updated);
     setExtraPaths(updated);
     scanRoms(updated);
   }
 
-  async function useRecentFolder(folder: string): Promise<void> {
-    if (extraPaths.includes(folder)) return;
-    const updated = [...extraPaths, folder];
-    setExtraPaths(updated);
-    scanRoms(updated);
-  }
-
-  function removeExtraPath(path: string): void {
+  async function removeExtraPath(path: string): Promise<void> {
     const updated = extraPaths.filter(p => p !== path);
+    // For now, we'll just update UI. To truly persist, we'd need a removeFolder IPC handler
+    // but since we're storing entire list, we can re-add the new list
+    setSavedFolders(updated);
     setExtraPaths(updated);
+    // Update the saved list in config
+    const cfg = await (window as any).emusync.config.load();
+    if (!cfg.recent_import_folders) cfg.recent_import_folders = {};
+    cfg.recent_import_folders[consoleSel] = updated;
+    await (window as any).emusync.config.save(cfg);
     scanRoms(updated);
   }
 
@@ -342,34 +346,52 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                     </label>
                   ))}
                 </div>
-                {recentFolders.length > 0 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
-                      Recent folders:
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+                    ROM folders to scan:
+                  </p>
+                  {extraPaths.length === 0 ? (
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
+                      No folders added yet. Click "Add ROM folder" to add folders to scan.
                     </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {recentFolders.map(folder => (
-                        <button
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                      {extraPaths.map(folder => (
+                        <div
                           key={folder}
-                          className="btn btn-ghost"
-                          onClick={() => useRecentFolder(folder)}
-                          disabled={extraPaths.includes(folder)}
                           style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "8px 10px",
+                            background: "var(--surface2)",
+                            borderRadius: 4,
                             fontSize: 12,
-                            textAlign: "left",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            opacity: extraPaths.includes(folder) ? 0.5 : 1,
                           }}
-                          title={folder}
                         >
-                          📁 {folder}
-                        </button>
+                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }} title={folder}>
+                            📁 {folder}
+                          </div>
+                          <button
+                            className="btn btn-icon"
+                            onClick={() => removeExtraPath(folder)}
+                            style={{ fontSize: 10, padding: "4px 6px", marginLeft: 8 }}
+                            title="Remove folder"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                  <button
+                    className="btn btn-ghost"
+                    onClick={addExtraPath}
+                    style={{ fontSize: 12, width: "100%" }}
+                  >
+                    + Add ROM folder
+                  </button>
+                </div>
               </>
             )}
             <div className="modal-actions">
