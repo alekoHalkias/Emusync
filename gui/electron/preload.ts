@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("emusync", {
     load: (): Promise<EmusyncConfig | null> => ipcRenderer.invoke("config:load"),
     save: (data: EmusyncConfig): Promise<boolean> => ipcRenderer.invoke("config:save", data),
     exists: (): Promise<boolean> => ipcRenderer.invoke("config:exists"),
+    getRecentFolders: (consoleKey: string): Promise<string[]> => ipcRenderer.invoke("config:getRecentFolders", consoleKey),
+    addRecentFolder: (consoleKey: string, folderPath: string): Promise<void> => ipcRenderer.invoke("config:addRecentFolder", consoleKey, folderPath),
   },
   server: {
     start: (): Promise<{ ok: boolean; token: string | null }> =>

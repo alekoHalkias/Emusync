@@ -20,6 +20,7 @@ class Config:
     token: str = ""
     is_server: bool = False
     server_pin: str = ""
+    recent_import_folders: dict = field(default_factory=dict)
 
 
 def load() -> Config:
@@ -27,6 +28,11 @@ def load() -> Config:
         return Config()
     with open(CONFIG_PATH) as f:
         data = tomlkit.load(f)
+    recent_folders = {}
+    if "recent_import_folders" in data:
+        recent_folders_data = data.get("recent_import_folders", {})
+        for console_key, folders in recent_folders_data.items():
+            recent_folders[console_key] = list(folders) if isinstance(folders, list) else []
     return Config(
         server_host=str(data.get("server_host", "")),
         server_port=int(data.get("server_port", 8765)),
@@ -36,6 +42,7 @@ def load() -> Config:
         token=str(data.get("token", "")),
         is_server=bool(data.get("is_server", False)),
         server_pin=str(data.get("server_pin", "")),
+        recent_import_folders=recent_folders,
     )
 
 
@@ -51,5 +58,7 @@ def save(cfg: Config) -> None:
     doc.add("is_server", cfg.is_server)
     if cfg.server_pin:
         doc.add("server_pin", cfg.server_pin)
+    if cfg.recent_import_folders:
+        doc.add("recent_import_folders", cfg.recent_import_folders)
     with open(CONFIG_PATH, "w") as f:
         tomlkit.dump(doc, f)

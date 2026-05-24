@@ -64,6 +64,43 @@ ipcMain.handle("config:save", (_event, data: Record<string, unknown>) => {
 
 ipcMain.handle("config:exists", () => existsSync(CONFIG_PATH));
 
+ipcMain.handle("config:getRecentFolders", (_event, consoleKey: string) => {
+  if (!existsSync(CONFIG_PATH)) return [];
+  try {
+    const data = parseTOML(readFileSync(CONFIG_PATH, "utf-8"));
+    const recentFolders = (data.recent_import_folders as Record<string, any>) || {};
+    return recentFolders[consoleKey] || [];
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle("config:addRecentFolder", (_event, consoleKey: string, folderPath: string) => {
+  if (!existsSync(CONFIG_PATH)) return;
+  try {
+    const data = parseTOML(readFileSync(CONFIG_PATH, "utf-8"));
+    if (!data.recent_import_folders) {
+      data.recent_import_folders = {};
+    }
+    const recentFolders = (data.recent_import_folders as Record<string, any>);
+    if (!recentFolders[consoleKey]) {
+      recentFolders[consoleKey] = [];
+    }
+    const folders = recentFolders[consoleKey] as string[];
+    // Remove if already exists (will re-add at start)
+    const index = folders.indexOf(folderPath);
+    if (index !== -1) {
+      folders.splice(index, 1);
+    }
+    // Add to front and limit to 10 recent folders
+    folders.unshift(folderPath);
+    folders.splice(10);
+    writeFileSync(CONFIG_PATH, stringifyTOML(data as any));
+  } catch {
+    // ignore
+  }
+});
+
 function startServerProcess(): Promise<{ ok: boolean; token: string | null }> {
   if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
 

@@ -62,6 +62,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [error, setError]         = useState("");
   const [progress, setProgress]   = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [savedFolders, setSavedFolders] = useState<string[]>([]);
 
   useEffect(() => {
     (window as any).emusync.emulator.consoles().then(setConsoles);
@@ -70,10 +71,14 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");
     try {
-      const { options, suggestions: sugg } =
-        await (window as any).emusync.emulator.detect(consoleSel);
+      const [{ options, suggestions: sugg }, saved] = await Promise.all([
+        (window as any).emusync.emulator.detect(consoleSel),
+        (window as any).emusync.config.getRecentFolders(consoleSel),
+      ]);
       setEmulators(options);
       setSuggestions(sugg);
+      setSavedFolders(saved);
+      setExtraPaths(saved);
       if (options.length === 1) setEmuSel(options[0]);
       setPhase("emulator");
     } catch {
@@ -143,14 +148,25 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   async function addExtraPath(): Promise<void> {
     const folder = await (window as any).emusync.dialog.openFolder();
     if (!folder) return;
+    if (extraPaths.includes(folder)) return;
+    await (window as any).emusync.config.addRecentFolder(consoleSel, folder);
     const updated = [...extraPaths, folder];
+    setSavedFolders(updated);
     setExtraPaths(updated);
     scanRoms(updated);
   }
 
-  function removeExtraPath(path: string): void {
+  async function removeExtraPath(path: string): Promise<void> {
     const updated = extraPaths.filter(p => p !== path);
+    // For now, we'll just update UI. To truly persist, we'd need a removeFolder IPC handler
+    // but since we're storing entire list, we can re-add the new list
+    setSavedFolders(updated);
     setExtraPaths(updated);
+    // Update the saved list in config
+    const cfg = await (window as any).emusync.config.load();
+    if (!cfg.recent_import_folders) cfg.recent_import_folders = {};
+    cfg.recent_import_folders[consoleSel] = updated;
+    await (window as any).emusync.config.save(cfg);
     scanRoms(updated);
   }
 
@@ -334,7 +350,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
             )}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => {
-                setEmulators([]); setEmuSel(null); setSuggestions([]); setPhase("console");
+                setEmulators([]); setEmuSel(null); setSuggestions([]);  setPhase("console");
               }}>← Back</button>
               {emulators.length === 0 ? (
                 <button className="btn btn-ghost" onClick={onClose}>Close</button>
@@ -468,7 +484,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
 
             <div className="modal-actions" style={{ marginTop: 16 }}>
               <button className="btn btn-ghost" onClick={() => {
-                setRoms([]); setExtraPaths([]); setRomDirs([]); setPhase("emulator");
+                setRoms([]); setExtraPaths(savedFolders); setRomDirs([]); setPhase("emulator");
               }}>← Back</button>
               <button
                 className="btn btn-primary"
