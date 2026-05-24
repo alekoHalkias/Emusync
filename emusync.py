@@ -142,12 +142,19 @@ def server_start() -> None:
     sys.stdout.flush()
     click.echo(f"EmuSync server running on :{cfg.server_port}")
 
-    zc, info = mdns_module.advertise(cfg.device_name, cfg.server_port)
+    zc = None
+    info = None
+    try:
+        zc, info = mdns_module.advertise(cfg.device_name, cfg.server_port)
+    except Exception as e:
+        click.echo(f"Warning: mDNS registration failed ({e}). Server will work without LAN discovery.", err=True)
+
     try:
         uvicorn.run(api_module.app, host="0.0.0.0", port=cfg.server_port, log_level="warning")
     finally:
-        zc.unregister_service(info)
-        zc.close()
+        if zc and info:
+            zc.unregister_service(info)
+            zc.close()
         token_file.unlink(missing_ok=True)
         pid_file.unlink(missing_ok=True)
 
