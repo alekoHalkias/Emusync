@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, type Game } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, type Game } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
 type GameRow = Game & {
   lastPush?: string;
   locked?: boolean;
+  syncing?: boolean;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -21,6 +22,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
   const [removing, setRemoving] = useState(false);
   const [showEmulatorImport, setShowEmulatorImport] = useState(false);
+  const [syncingSlug, setSyncingSlug] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +63,18 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     }
   }
 
+  async function handleSync(slug: string): Promise<void> {
+    setSyncingSlug(slug);
+    try {
+      await pushGameSaves(slug);
+      await load();
+    } catch {
+      /* error — keep UI responsive */
+    } finally {
+      setSyncingSlug(null);
+    }
+  }
+
   return (
     <>
       <div className="section-header">
@@ -85,14 +99,23 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         <div className="game-list">
           {games.map((g) => (
             <div key={g.slug} className="game-row">
-              <div style={{ flex: 1 }}>
+              <div className="game-row-header">
                 <div className="game-row-name">{g.name}</div>
-                <div className="game-row-meta">
-                  {g.locked && <span style={{ color: "var(--red)", marginRight: 10 }}>🔒 In use</span>}
-                  {g.lastPush ? `Last sync: ${g.lastPush}` : "Never synced"}
+                <div className="game-row-divider">|</div>
+                <div className="game-row-sync">
+                  {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒 In use</span>}
+                  <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
                 </div>
               </div>
               <div className="game-row-actions">
+                <button
+                  className="btn btn-icon"
+                  title="Push saves to devices"
+                  disabled={g.locked || syncingSlug === g.slug}
+                  onClick={() => handleSync(g.slug)}
+                >
+                  {syncingSlug === g.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
+                </button>
                 <button
                   className="btn btn-icon"
                   title="Play"

@@ -754,3 +754,44 @@ async def test_update_game_name_does_not_wipe_other_games(client):
     slugs = {g["slug"] for g in games.json()}
     assert "game-one" in slugs
     assert "game-two" in slugs
+
+
+@pytest.mark.asyncio
+async def test_push_saves_endpoint(client):
+  """POST /games/:slug/push-saves pushes current save and state files from disk."""
+  import tempfile
+  from pathlib import Path
+
+  token = await _pair(client)
+  auth = {"Authorization": f"Bearer {token}"}
+
+  # Create game
+  await client.post("/games", json={"name": "Test Game"}, headers=auth)
+
+  # Create temporary save and state files
+  with tempfile.TemporaryDirectory() as tmpdir:
+    save_path = Path(tmpdir) / "game.sav"
+    state_path = Path(tmpdir) / "game.state"
+    save_path.write_bytes(b"save-data-v1")
+    state_path.write_bytes(b"state-data-v1")
+
+    # Set device config with paths to our temp files
+    await client.put("/games/test-game/device", json={
+      "rom_path": "/roms/test.gba",
+      "save_path": str(save_path),
+      "launch_command": "retroarch test.gba",
+      "state_path": str(state_path),
+    }, headers=auth)
+
+    # Push saves
+    r = await client.post("/games/test-game/push-saves", headers=auth)
+    assert r.status_code == 200
+    assert r.json()["pushed"]["save"] is True
+    assert r.json()["pushed"]["state"] is True
+
+    # Verify save and state are now in the database
+    save_meta = await client.get("/games/test-game/save/meta", headers=auth)
+    assert save_meta.status_code == 200
+
+    state_meta = await client.get("/games/test-game/state/meta", headers=auth)
+    assert state_meta.status_code == 200
