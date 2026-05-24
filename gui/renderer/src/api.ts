@@ -77,6 +77,7 @@ export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
 };
 
 export const listDevices = (): Promise<Device[]> => _fetch("GET", "/devices");
+export const removeDevice = (deviceId: string): Promise<void> => _fetch("DELETE", `/devices/${deviceId}`);
 
 export type ActivityEvent = {
   type: string;

@@ -74,6 +74,12 @@ def list_devices(device_id: str = Depends(_auth)) -> list[dict]:
     return [{"id": d.id, "name": d.name} for d in _get_store().list_devices()]
 
 
+@app.delete("/devices/{remove_device_id}")
+def remove_device(remove_device_id: str, device_id: str = Depends(_auth)) -> dict:
+    _get_store().remove_device(remove_device_id)
+    return {"ok": True}
+
+
 # ── games ─────────────────────────────────────────────────────────────────────
 
 class GameRequest(BaseModel):

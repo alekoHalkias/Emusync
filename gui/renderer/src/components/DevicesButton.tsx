@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { listDevices, listEvents, type Device, type ActivityEvent } from "../api";
+import { listDevices, listEvents, removeDevice, type Device, type ActivityEvent } from "../api";
 
 export default function DevicesButton(): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -30,6 +32,20 @@ export default function DevicesButton(): React.ReactElement {
     if (syncEvents.length === 0) return null;
     return syncEvents[0].occurred_at.slice(0, 19);
   };
+
+  async function handleRemoveDevice(): Promise<void> {
+    if (!confirmRemove) return;
+    setRemoving(true);
+    try {
+      await removeDevice(confirmRemove);
+      setConfirmRemove(null);
+      await load();
+    } catch {
+      /* error — keep UI responsive */
+    } finally {
+      setRemoving(false);
+    }
+  }
 
   return (
     <>
@@ -75,13 +91,22 @@ export default function DevicesButton(): React.ReactElement {
                         {d.id.slice(0, 12)}…
                       </div>
                     </div>
-                    <div style={{ textAlign: "right", color: "var(--text-muted)", fontSize: 12 }}>
-                      {getLastSync(d.id)
-                        ? <>
-                            <div style={{ marginBottom: 2 }}>Last sync</div>
-                            <div>{getLastSync(d.id)}</div>
-                          </>
-                        : "Never synced"}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ textAlign: "right", color: "var(--text-muted)", fontSize: 12 }}>
+                        {getLastSync(d.id)
+                          ? <>
+                              <div style={{ marginBottom: 2 }}>Last sync</div>
+                              <div>{getLastSync(d.id)}</div>
+                            </>
+                          : "Never synced"}
+                      </div>
+                      <button
+                        className="btn btn-icon"
+                        title="Remove device"
+                        onClick={() => setConfirmRemove(d.id)}
+                      >
+                        🗑
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -90,6 +115,23 @@ export default function DevicesButton(): React.ReactElement {
 
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRemove && (
+        <div className="modal-overlay" onClick={() => setConfirmRemove(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Remove device?</h3>
+            <p>This device will be removed from your paired devices. It can re-pair anytime.</p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmRemove(null)} disabled={removing}>
+                Cancel
+              </button>
+              <button className="btn btn-danger" onClick={handleRemoveDevice} disabled={removing}>
+                {removing ? <><span className="spinner" /> Removing…</> : "Remove"}
+              </button>
             </div>
           </div>
         </div>
