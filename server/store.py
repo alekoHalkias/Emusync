@@ -21,6 +21,17 @@ CREATE TABLE IF NOT EXISTS games (
     name    TEXT NOT NULL,
     console TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS consoles (
+    id                    TEXT PRIMARY KEY,
+    device_id             TEXT NOT NULL REFERENCES devices(id),
+    console_name          TEXT NOT NULL,
+    shortform_name        TEXT NOT NULL,
+    device_game_folder    TEXT NOT NULL DEFAULT '',
+    device_save_folder    TEXT NOT NULL DEFAULT '',
+    device_state_folder   TEXT NOT NULL DEFAULT '',
+    device_emulator       TEXT NOT NULL DEFAULT '',
+    UNIQUE(device_id, console_name)
+);
 CREATE TABLE IF NOT EXISTS game_devices (
     game_slug      TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
     device_id      TEXT NOT NULL REFERENCES devices(id),
@@ -73,6 +84,18 @@ class Game:
     slug: str
     name: str
     console: str = ""
+
+
+@dataclass
+class Console:
+    id: str
+    device_id: str
+    console_name: str
+    shortform_name: str
+    device_game_folder: str = ""
+    device_save_folder: str = ""
+    device_state_folder: str = ""
+    device_emulator: str = ""
 
 
 @dataclass
@@ -159,6 +182,38 @@ class Store:
 
     def remove_device(self, device_id: str) -> None:
         self._conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+        self._conn.commit()
+
+    # ── consoles ──────────────────────────────────────────────────────────────
+
+    def set_console(self, console: Console) -> None:
+        self._conn.execute(
+            """INSERT OR REPLACE INTO consoles
+               (id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (console.id, console.device_id, console.console_name, console.shortform_name,
+             console.device_game_folder, console.device_save_folder, console.device_state_folder, console.device_emulator),
+        )
+        self._conn.commit()
+
+    def get_console(self, device_id: str, console_name: str) -> Optional[Console]:
+        row = self._conn.execute(
+            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator
+               FROM consoles WHERE device_id = ? AND console_name = ?""",
+            (device_id, console_name),
+        ).fetchone()
+        return Console(**dict(row)) if row else None
+
+    def list_consoles(self, device_id: str) -> list[Console]:
+        rows = self._conn.execute(
+            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator
+               FROM consoles WHERE device_id = ?""",
+            (device_id,),
+        ).fetchall()
+        return [Console(**dict(r)) for r in rows]
+
+    def remove_console(self, console_id: str) -> None:
+        self._conn.execute("DELETE FROM consoles WHERE id = ?", (console_id,))
         self._conn.commit()
 
     # ── games ─────────────────────────────────────────────────────────────────
