@@ -440,6 +440,56 @@ class Store:
         )
         self._conn.commit()
 
+    # ── parity ────────────────────────────────────────────────────────────────
+
+    def get_game_parity(self, game: str) -> dict:
+        """Get parity info for a game across all devices.
+
+        Returns a dict with device_id -> {device_name, exists, save_info, state_info}
+        """
+        all_devices = self.list_devices()
+        result = {}
+
+        for device in all_devices:
+            game_record = self.get_game(game, device.id)
+            device_info = {
+                "device_name": device.name,
+                "exists": game_record is not None,
+            }
+
+            if game_record:
+                # Get latest save for this device
+                save_row = self._conn.execute(
+                    "SELECT hash, pushed_at FROM saves WHERE game = ? AND device_id = ? ORDER BY pushed_at DESC LIMIT 1",
+                    (game, device.id),
+                ).fetchone()
+                if save_row:
+                    device_info["save_hash"] = save_row["hash"]
+                    device_info["save_pushed_at"] = save_row["pushed_at"]
+                else:
+                    device_info["save_hash"] = None
+                    device_info["save_pushed_at"] = None
+
+                # Get latest state for this device (only if state_path is configured)
+                if game_record.state_path:
+                    state_row = self._conn.execute(
+                        "SELECT hash, pushed_at FROM states WHERE game = ? AND device_id = ? ORDER BY pushed_at DESC LIMIT 1",
+                        (game, device.id),
+                    ).fetchone()
+                    if state_row:
+                        device_info["state_hash"] = state_row["hash"]
+                        device_info["state_pushed_at"] = state_row["pushed_at"]
+                    else:
+                        device_info["state_hash"] = None
+                        device_info["state_pushed_at"] = None
+                    device_info["state_path"] = game_record.state_path
+                else:
+                    device_info["state_path"] = None
+
+            result[device.id] = device_info
+
+        return result
+
     # ── events ────────────────────────────────────────────────────────────────
 
     def log_event(self, event_type: str, game: Optional[str] = None, device_id: Optional[str] = None) -> None:

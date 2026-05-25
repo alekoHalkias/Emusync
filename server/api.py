@@ -329,6 +329,19 @@ def get_state_meta(game: str, device_id: str = Depends(_auth)) -> Response:
     )
 
 
+# ── parity ────────────────────────────────────────────────────────────────────
+
+@app.get("/games/{game}/parity")
+def get_game_parity(game: str, device_id: str = Depends(_auth)) -> dict:
+    """Get parity info for a game across all devices."""
+    store = _get_store()
+    parity_data = store.get_game_parity(game)
+    return {
+        "game": game,
+        "devices": parity_data,
+    }
+
+
 # ── locks ─────────────────────────────────────────────────────────────────────
 
 @app.post("/games/{game}/lock")

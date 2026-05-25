@@ -160,3 +160,8 @@ class SyncClient:
             return None
         r.raise_for_status()
         return r.json()
+
+    def get_game_parity(self, slug: str) -> dict:
+        r = httpx.get(self._url(f"/games/{slug}/parity"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()

@@ -847,3 +847,140 @@ async def test_push_saves_endpoint(client):
 
     state_meta = await client.get("/games/test-game/state/meta", headers=auth)
     assert state_meta.status_code == 200
+
+
+# ── parity ────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_parity_game_on_all_devices(client):
+  """GET /games/{game}/parity shows game as existing on all devices."""
+  token = await _pair(client)
+  auth = {"Authorization": f"Bearer {token}"}
+
+  # Create game and add it to device
+  await client.post("/games", json={"name": "Test Game"}, headers=auth)
+  await client.put("/games/test-game/device", json={
+    "rom_path": "/roms/test.gba",
+    "save_path": "/saves/test.sav",
+    "launch_command": "retroarch test.gba",
+  }, headers=auth)
+
+  # Check parity
+  r = await client.get("/games/test-game/parity", headers=auth)
+  assert r.status_code == 200
+  parity = r.json()
+  assert parity["game"] == "test-game"
+  assert DEVICE_ID in parity["devices"]
+  assert parity["devices"][DEVICE_ID]["exists"] is True
+
+
+@pytest.mark.asyncio
+async def test_parity_game_missing_on_device(client):
+  """GET /games/{game}/parity shows game as missing for devices without it."""
+  token1 = await _pair(client)
+  auth1 = {"Authorization": f"Bearer {token1}"}
+
+  # Pair a second device
+  r = await client.post("/pair", json={
+    "master_token": MASTER_TOKEN,
+    "device_id": "device-xyz",
+    "device_name": "other-pc",
+  })
+  token2 = r.json()["token"]
+
+  # Create game on device 1 only
+  await client.post("/games", json={"name": "Test Game"}, headers=auth1)
+  await client.put("/games/test-game/device", json={
+    "rom_path": "/roms/test.gba",
+    "save_path": "/saves/test.sav",
+    "launch_command": "retroarch test.gba",
+  }, headers=auth1)
+
+  # Check parity
+  r = await client.get("/games/test-game/parity", headers=auth1)
+  assert r.status_code == 200
+  parity = r.json()
+  assert parity["devices"][DEVICE_ID]["exists"] is True
+  assert parity["devices"]["device-xyz"]["exists"] is False
+
+
+@pytest.mark.asyncio
+async def test_parity_save_sync(client):
+  """GET /games/{game}/parity returns save hash and pushed_at."""
+  token = await _pair(client)
+  auth = {"Authorization": f"Bearer {token}"}
+
+  # Create game
+  await client.post("/games", json={"name": "Test Game"}, headers=auth)
+  await client.put("/games/test-game/device", json={
+    "rom_path": "/roms/test.gba",
+    "save_path": "/saves/test.sav",
+    "launch_command": "retroarch test.gba",
+  }, headers=auth)
+
+  # Push a save
+  await client.post("/games/test-game/save", content=b"save-data", headers={**auth, "Content-Type": "application/octet-stream"})
+
+  # Check parity
+  r = await client.get("/games/test-game/parity", headers=auth)
+  assert r.status_code == 200
+  parity = r.json()
+  device_info = parity["devices"][DEVICE_ID]
+  assert device_info["exists"] is True
+  assert device_info["save_hash"] is not None
+  assert device_info["save_pushed_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_parity_state_sync(client):
+  """GET /games/{game}/parity returns state hash and pushed_at when state_path is set."""
+  token = await _pair(client)
+  auth = {"Authorization": f"Bearer {token}"}
+
+  # Create game with state_path
+  await client.post("/games", json={"name": "Test Game"}, headers=auth)
+  await client.put("/games/test-game/device", json={
+    "rom_path": "/roms/test.gba",
+    "save_path": "/saves/test.sav",
+    "launch_command": "retroarch test.gba",
+    "state_path": "/states/test.state",
+  }, headers=auth)
+
+  # Push a state
+  await client.post("/games/test-game/state", content=b"state-data", headers={**auth, "Content-Type": "application/octet-stream"})
+
+  # Check parity
+  r = await client.get("/games/test-game/parity", headers=auth)
+  assert r.status_code == 200
+  parity = r.json()
+  device_info = parity["devices"][DEVICE_ID]
+  assert device_info["state_path"] == "/states/test.state"
+  assert device_info["state_hash"] is not None
+  assert device_info["state_pushed_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_parity_no_save_no_state(client):
+  """GET /games/{game}/parity shows None for hashes when no save/state exists."""
+  token = await _pair(client)
+  auth = {"Authorization": f"Bearer {token}"}
+
+  # Create game but don't push save or state
+  await client.post("/games", json={"name": "Test Game"}, headers=auth)
+  await client.put("/games/test-game/device", json={
+    "rom_path": "/roms/test.gba",
+    "save_path": "/saves/test.sav",
+    "launch_command": "retroarch test.gba",
+    "state_path": "/states/test.state",
+  }, headers=auth)
+
+  # Check parity
+  r = await client.get("/games/test-game/parity", headers=auth)
+  assert r.status_code == 200
+  parity = r.json()
+  device_info = parity["devices"][DEVICE_ID]
+  assert device_info["exists"] is True
+  assert device_info["save_hash"] is None
+  assert device_info["save_pushed_at"] is None
+  assert device_info["state_hash"] is None
+  assert device_info["state_pushed_at"] is None
