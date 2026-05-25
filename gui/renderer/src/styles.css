@@ -175,6 +175,15 @@ input.error { border-color: var(--red); }
   cursor: col-resize;
   white-space: nowrap;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.col-header.sortable {
+  cursor: pointer;
+}
+.col-header.sortable:hover {
+  background: var(--surface);
 }
 
 .resize-handle {

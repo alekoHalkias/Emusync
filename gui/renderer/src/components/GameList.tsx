@@ -54,6 +54,8 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
   const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150 });
+  const [sortBy, setSortBy] = useState<'default' | 'game' | 'lastSave' | 'synced'>('default');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const resizingCol = useRef<keyof typeof colWidths | null>(null);
   const resizeStartX = useRef(0);
@@ -176,6 +178,44 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     };
   }
 
+  function handleSort(col: 'game' | 'lastSave' | 'synced') {
+    if (sortBy === col) {
+      // Same column: toggle direction
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Different column: set new column and reset to asc
+      setSortBy(col);
+      setSortDir('asc');
+    }
+  }
+
+  function getSortedGames() {
+    if (sortBy === 'default') {
+      return games; // unsorted, will be grouped by console
+    }
+
+    const sorted = [...games];
+    const mult = sortDir === 'asc' ? 1 : -1;
+
+    if (sortBy === 'game') {
+      sorted.sort((a, b) => mult * a.name.localeCompare(b.name));
+    } else if (sortBy === 'lastSave') {
+      sorted.sort((a, b) => {
+        const aTime = a.lastSave || '';
+        const bTime = b.lastSave || '';
+        return mult * aTime.localeCompare(bTime);
+      });
+    } else if (sortBy === 'synced') {
+      sorted.sort((a, b) => {
+        const aTime = a.lastPush || '';
+        const bTime = b.lastPush || '';
+        return mult * aTime.localeCompare(bTime);
+      });
+    }
+
+    return sorted;
+  }
+
   useEffect(() => {
     function onMove(e: MouseEvent) {
       if (!resizingCol.current) return;
@@ -222,94 +262,156 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px ${colWidths.lastSave}px ${colWidths.synced}px 1fr` }}>
           {/* Column headers */}
           <div className="col-header" />
-          <div className="col-header" onMouseDown={startResize("name")}>
-            Game <span className="resize-handle" />
+          <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('game'); }} title="Click to sort">
+            Game {sortBy === 'game' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("name")} />
           </div>
-          <div className="col-header" onMouseDown={startResize("lastSave")}>
-            Last Saved <span className="resize-handle" />
+          <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('lastSave'); }} title="Click to sort">
+            Last Saved {sortBy === 'lastSave' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("lastSave")} />
           </div>
-          <div className="col-header" onMouseDown={startResize("synced")}>
-            Synced <span className="resize-handle" />
+          <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('synced'); }} title="Click to sort">
+            Synced {sortBy === 'synced' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("synced")} />
           </div>
           <div className="col-header">Actions</div>
 
           {(() => {
-            const grouped = games.reduce<Record<string, GameRow[]>>((acc, g) => {
-              const key = g.console || "Other";
-              (acc[key] ??= []).push(g);
-              return acc;
-            }, {});
-            const consoleKeys = Object.keys(grouped).sort();
+            const sorted = getSortedGames();
 
-            return consoleKeys.map(key => (
-              <React.Fragment key={key}>
-                {/* Console section header spans all columns */}
-                <div className="console-section-header" style={{ gridColumn: "1 / -1" }} onClick={() => toggleConsole(key)}>
-                  <ConsoleCheckbox
-                    games={grouped[key]}
-                    selectedSlugs={selectedSlugs}
-                    onToggle={() => toggleConsoleSelection(key, grouped[key])}
-                  />
-                  <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
-                  <span style={{ flex: 1 }}>{key}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
-                </div>
+            if (sortBy === 'default') {
+              // Group by console
+              const grouped = sorted.reduce<Record<string, GameRow[]>>((acc, g) => {
+                const key = g.console || "Other";
+                (acc[key] ??= []).push(g);
+                return acc;
+              }, {});
+              const consoleKeys = Object.keys(grouped).sort();
 
-                {/* Game rows — each game is 5 grid cells */}
-                {!collapsedConsoles.has(key) && grouped[key].map((g) => (
-                  <React.Fragment key={g.slug}>
-                    <div className="game-cell">
-                      <input
-                        type="checkbox"
-                        checked={selectedSlugs.has(g.slug)}
-                        onChange={() => toggleSelection(g.slug)}
-                        style={{ cursor: "pointer" }}
-                      />
-                    </div>
-                    <div className="game-cell game-cell-name">{g.name}</div>
-                    <div className="game-cell game-cell-muted">
-                      {g.lastSave ? g.lastSave : "No save locally"}
-                    </div>
-                    <div className="game-cell game-cell-muted">
-                      {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
-                      <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
-                    </div>
-                    <div className="game-cell game-cell-actions">
-                      <button
-                        className="btn btn-icon"
-                        title="Push saves to devices"
-                        disabled={g.locked || syncingSlug === g.slug}
-                        onClick={() => handleSync(g.slug)}
-                      >
-                        {syncingSlug === g.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
-                      </button>
-                      <button
-                        className="btn btn-icon"
-                        title="Play"
-                        disabled={g.locked}
-                        onClick={() => onPlay(g.slug, g.name)}
-                      >
-                        ▶
-                      </button>
-                      <button
-                        className="btn btn-icon"
-                        title="Settings"
-                        onClick={() => onEdit(g)}
-                      >
-                        ⚙
-                      </button>
-                      <button
-                        className="btn btn-icon"
-                        title="Remove from EmuSync"
-                        onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  </React.Fragment>
-                ))}
-              </React.Fragment>
-            ));
+              return consoleKeys.map(key => (
+                <React.Fragment key={key}>
+                  {/* Console section header spans all columns */}
+                  <div className="console-section-header" style={{ gridColumn: "1 / -1" }} onClick={() => toggleConsole(key)}>
+                    <ConsoleCheckbox
+                      games={grouped[key]}
+                      selectedSlugs={selectedSlugs}
+                      onToggle={() => toggleConsoleSelection(key, grouped[key])}
+                    />
+                    <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
+                    <span style={{ flex: 1 }}>{key}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
+                  </div>
+
+                  {/* Game rows — each game is 5 grid cells */}
+                  {!collapsedConsoles.has(key) && grouped[key].map((g) => {
+                    const renderGameRow = (game: GameRow) => (
+                      <React.Fragment key={game.slug}>
+                        <div className="game-cell">
+                          <input
+                            type="checkbox"
+                            checked={selectedSlugs.has(game.slug)}
+                            onChange={() => toggleSelection(game.slug)}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </div>
+                        <div className="game-cell game-cell-name">{game.name}</div>
+                        <div className="game-cell game-cell-muted">
+                          {game.lastSave ? game.lastSave : "No save locally"}
+                        </div>
+                        <div className="game-cell game-cell-muted">
+                          {game.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
+                          <span>{game.lastPush ? game.lastPush : "Never synced"}</span>
+                        </div>
+                        <div className="game-cell game-cell-actions">
+                          <button
+                            className="btn btn-icon"
+                            title="Push saves to devices"
+                            disabled={game.locked || syncingSlug === game.slug}
+                            onClick={() => handleSync(game.slug)}
+                          >
+                            {syncingSlug === game.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
+                          </button>
+                          <button
+                            className="btn btn-icon"
+                            title="Play"
+                            disabled={game.locked}
+                            onClick={() => onPlay(game.slug, game.name)}
+                          >
+                            ▶
+                          </button>
+                          <button
+                            className="btn btn-icon"
+                            title="Settings"
+                            onClick={() => onEdit(game)}
+                          >
+                            ⚙
+                          </button>
+                          <button
+                            className="btn btn-icon"
+                            title="Remove from EmuSync"
+                            onClick={() => setConfirmRemove({ slug: game.slug, name: game.name })}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </React.Fragment>
+                    );
+                    return renderGameRow(g);
+                  })}
+                </React.Fragment>
+              ));
+            } else {
+              // Flat sorted list
+              return sorted.map((g) => (
+                <React.Fragment key={g.slug}>
+                  <div className="game-cell">
+                    <input
+                      type="checkbox"
+                      checked={selectedSlugs.has(g.slug)}
+                      onChange={() => toggleSelection(g.slug)}
+                      style={{ cursor: "pointer" }}
+                    />
+                  </div>
+                  <div className="game-cell game-cell-name">{g.name}</div>
+                  <div className="game-cell game-cell-muted">
+                    {g.lastSave ? g.lastSave : "No save locally"}
+                  </div>
+                  <div className="game-cell game-cell-muted">
+                    {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
+                    <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
+                  </div>
+                  <div className="game-cell game-cell-actions">
+                    <button
+                      className="btn btn-icon"
+                      title="Push saves to devices"
+                      disabled={g.locked || syncingSlug === g.slug}
+                      onClick={() => handleSync(g.slug)}
+                    >
+                      {syncingSlug === g.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
+                    </button>
+                    <button
+                      className="btn btn-icon"
+                      title="Play"
+                      disabled={g.locked}
+                      onClick={() => onPlay(g.slug, g.name)}
+                    >
+                      ▶
+                    </button>
+                    <button
+                      className="btn btn-icon"
+                      title="Settings"
+                      onClick={() => onEdit(g)}
+                    >
+                      ⚙
+                    </button>
+                    <button
+                      className="btn btn-icon"
+                      title="Remove from EmuSync"
+                      onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </React.Fragment>
+              ));
+            }
           })()}
         </div>
       )}
