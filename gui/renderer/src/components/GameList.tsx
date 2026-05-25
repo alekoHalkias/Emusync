@@ -13,6 +13,7 @@ type GameRow = Game & {
   lastSave?: string | null;
   locked?: boolean;
   syncing?: boolean;
+  save_path?: string;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -48,6 +49,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
   const [removing, setRemoving] = useState(false);
   const [showEmulatorImport, setShowEmulatorImport] = useState(false);
+  const [importStartConsole, setImportStartConsole] = useState<string | null>(null);
   const [syncingSlug, setSyncingSlug] = useState<string | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
@@ -68,8 +70,10 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
           const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
-          let lastSave: string | null = undefined;
+          let lastSave: string | null = null;
+          let save_path: string | undefined;
           if (config.status === "fulfilled" && config.value?.save_path) {
+            save_path = config.value.save_path;
             lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
           }
           return {
@@ -77,6 +81,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             lastSave,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
+            save_path,
           };
         })
       );
@@ -286,18 +291,37 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               consoleKeys = consoleKeys.reverse();
             }
 
-            return consoleKeys.map(key => (
+            return consoleKeys.map(key => {
+              const consoleGames = grouped[key];
+              const hasMissingSavePath = consoleGames.some(g => !g.save_path);
+              return (
               <React.Fragment key={key}>
                 {/* Console section header spans all columns */}
-                <div className="console-section-header" style={{ gridColumn: "1 / -1" }} onClick={() => toggleConsole(key)}>
-                  <ConsoleCheckbox
-                    games={grouped[key]}
-                    selectedSlugs={selectedSlugs}
-                    onToggle={() => toggleConsoleSelection(key, grouped[key])}
-                  />
-                  <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
-                  <span style={{ flex: 1 }}>{key}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
+                <div className="console-section-header" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", justifyContent: "space-between" }} onClick={() => toggleConsole(key)}>
+                  <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
+                    <ConsoleCheckbox
+                      games={consoleGames}
+                      selectedSlugs={selectedSlugs}
+                      onToggle={() => toggleConsoleSelection(key, consoleGames)}
+                    />
+                    <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
+                    <span style={{ flex: 1 }}>{key}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{consoleGames.length} game{consoleGames.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  {hasMissingSavePath && (
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 12, padding: "4px 12px", marginLeft: 8 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setImportStartConsole(key);
+                        setShowEmulatorImport(true);
+                      }}
+                      title="Select save location for this console"
+                    >
+                      📁 Select save location
+                    </button>
+                  )}
                 </div>
 
                 {/* Game rows — each game is 5 grid cells */}
@@ -354,15 +378,20 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   </React.Fragment>
                 ))}
               </React.Fragment>
-            ));
+            );
+            });
           })()}
         </div>
       )}
 
       {showEmulatorImport && (
         <ConsoleImport
-          onClose={() => setShowEmulatorImport(false)}
+          onClose={() => {
+            setShowEmulatorImport(false);
+            setImportStartConsole(null);
+          }}
           onImported={load}
+          startConsole={importStartConsole ?? undefined}
         />
       )}
 

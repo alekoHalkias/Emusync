@@ -37,7 +37,7 @@ type Phase =
   | "importing"  // import in progress
   | "done";      // finished
 
-type Props = { onClose: () => void; onImported: () => void };
+type Props = { onClose: () => void; onImported: () => void; startConsole?: string };
 
 const STEP_LABELS = ["Console", "Emulator", "ROMs"];
 
@@ -63,7 +63,7 @@ function getConsoleAbbreviation(consoleKey: string): string {
   return map[consoleKey] || consoleKey.toUpperCase();
 }
 
-export default function ConsoleImport({ onClose, onImported }: Props): React.ReactElement {
+export default function ConsoleImport({ onClose, onImported, startConsole }: Props): React.ReactElement {
   const [phase, setPhase]         = useState<Phase>("console");
   const [consoles, setConsoles]   = useState<ConsoleOption[]>([]);
   const [consoleSel, setConsoleSel] = useState("");
@@ -84,6 +84,18 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     (window as any).emusync.emulator.consoles().then(setConsoles);
   }, []);
 
+  useEffect(() => {
+    if (startConsole && consoles.length > 0 && phase === "console") {
+      setConsoleSel(startConsole);
+    }
+  }, [startConsole, consoles, phase]);
+
+  useEffect(() => {
+    if (startConsole && consoleSel === startConsole && phase === "console") {
+      detectEmulators();
+    }
+  }, [startConsole, consoleSel, phase]);
+
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");
     try {
@@ -95,7 +107,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       setSuggestions(sugg);
       setSavedFolders(saved);
       setExtraPaths(saved);
-      if (options.length === 1) setEmuSel(options[0]);
+      if (options.length > 0) setEmuSel(options[0]);
       setPhase("emulator");
     } catch {
       setEmulators([]);

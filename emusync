@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec "/home/Aleko/Documents/Scripts/Emusync/.venv/bin/python" "/home/Aleko/Documents/Scripts/Emusync/emusync.py" "$@"
+exec "/home/deck/git/Emusync/.venv/bin/python" "/home/deck/git/Emusync/emusync.py" "$@"
