@@ -21,7 +21,7 @@ function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   games: GameRow[]; selectedSlugs: Set<string>; onToggle: () => void;
 }): React.ReactElement {
   const ref = useRef<HTMLInputElement>(null);
-  const selected = games.filter(g => selectedSlugs.has(g.slug)).length;
+  const selected = games.filter(g => selectedSlugs.has(g.game || g.slug || '')).length;
   const allSelected = selected === games.length && games.length > 0;
   const someSelected = selected > 0 && !allSelected;
 
@@ -67,7 +67,8 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       const raw = await listGames();
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
-          const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
+          const gameId = g.game || g.slug || '';
+          const [meta, lock, config] = await Promise.allSettled([getSaveMeta(gameId), getLock(gameId), getGameDevice(gameId)]);
           let lastSave: string | null = undefined;
           if (config.status === "fulfilled" && config.value?.save_path) {
             lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
@@ -130,7 +131,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   }
 
   function toggleConsoleSelection(consoleKey: string, consoleGames: GameRow[]): void {
-    const consoleSlugs = consoleGames.map(g => g.slug);
+    const consoleSlugs = consoleGames.map(g => g.game || g.slug || '');
     const allSelected = consoleSlugs.every(s => selectedSlugs.has(s));
     setSelectedSlugs(prev => {
       const next = new Set(prev);
@@ -157,7 +158,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     const errs: string[] = [];
     for (const slug of slugsToDelete) {
       try {
-        const game = games.find(g => g.slug === slug);
+        const game = games.find(g => (g.game || g.slug || '') === slug);
         const gameName = game?.name || slug;
         // Log deleted game
         await (window as any).emusync.log.message(
@@ -312,12 +313,12 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
 
                 {/* Game rows — each game is 5 grid cells */}
                 {!collapsedConsoles.has(key) && getSortedGamesInConsole(grouped[key]).map((g) => (
-                  <React.Fragment key={g.slug}>
+                  <React.Fragment key={g.game || g.slug || ''}>
                     <div className="game-cell">
                       <input
                         type="checkbox"
-                        checked={selectedSlugs.has(g.slug)}
-                        onChange={() => toggleSelection(g.slug)}
+                        checked={selectedSlugs.has(g.game || g.slug || '')}
+                        onChange={() => toggleSelection(g.game || g.slug || '')}
                         style={{ cursor: "pointer" }}
                       />
                     </div>
@@ -333,16 +334,16 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                       <button
                         className="btn btn-icon"
                         title="Push saves to devices"
-                        disabled={g.locked || syncingSlug === g.slug}
-                        onClick={() => handleSync(g.slug)}
+                        disabled={g.locked || syncingSlug === (g.game || g.slug || '')}
+                        onClick={() => handleSync(g.game || g.slug || '')}
                       >
-                        {syncingSlug === g.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
+                        {syncingSlug === (g.game || g.slug || '') ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
                       </button>
                       <button
                         className="btn btn-icon"
                         title="Play"
                         disabled={g.locked}
-                        onClick={() => onPlay(g.slug, g.name)}
+                        onClick={() => onPlay(g.game || g.slug || '', g.name)}
                       >
                         ▶
                       </button>
@@ -356,7 +357,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                       <button
                         className="btn btn-icon"
                         title="Remove from EmuSync"
-                        onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
+                        onClick={() => setConfirmRemove({ slug: g.game || g.slug || '', name: g.name })}
                       >
                         🗑
                       </button>
