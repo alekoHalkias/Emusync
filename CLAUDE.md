@@ -29,8 +29,8 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`) |
-| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves` |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`, `parity`) |
+| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/parity` |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games` (device-specific), `saves` (global), `states` (global), `locks`, `events` |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
@@ -373,6 +373,34 @@ node scripts/scan-roms.mjs ~/Games/GBA --ext gba --verbose
 
 The `emulator:scan` IPC handler emits `[scan]` lines to stderr when running in
 dev mode — visible in the `make dev-gui` terminal.
+
+---
+
+## Parity Checking
+
+The `emusync parity check` command validates game/save/state synchronization across all paired devices.
+
+**Usage:**
+```bash
+emusync parity check --game <slug>    # Check single game
+emusync parity check --all             # Check all games
+```
+
+**Three-level validation:**
+
+1. **Game presence** — Verifies game exists on all paired devices. Reports missing devices.
+2. **Save file sync** — When game exists on all devices, compares save file hashes and timestamps. Reports mismatches and missing saves.
+3. **State file sync** — When state_path is configured, compares state file hashes and timestamps. Reports mismatches and missing states.
+
+**Output format:**
+- One line per discrepancy (no output = all devices match)
+- Example: `zelda-link-to-past: Device 'Steam Deck' missing`
+- Exit code: 0 if all match, 1 if discrepancies found
+
+**Implementation:**
+- `Store.get_game_parity()` queries all devices' save/state metadata from the database
+- API endpoint: `GET /games/{game}/parity` returns per-device sync status
+- CLI command provides user-friendly output with device names and clear error messages
 
 ---
 
