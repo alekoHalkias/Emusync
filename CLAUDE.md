@@ -392,6 +392,8 @@ dev mode — visible in the `make dev-gui` terminal.
 
 **`store.add_game` uses UPDATE for existing games** — `add_game(game)` checks if the game record already exists and uses UPDATE instead of INSERT OR REPLACE to preserve associated saves and locks. Use `update_game_name(game, device_id, name)` to rename an existing game.
 
+**Game import logging** — When games are imported via the GUI, the Python API logs a `[IMPORT]` line to stdout for each game with all game record data (game ID, device_id, name, console, rom_path, save_path, launch_command, state_path, rom_folder_path). This is useful for debugging import issues and verifying correct path detection.
+
 **Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks the lock state. If the lock is already held (by this device or another), it calls `_show_game_running_popup` which displays "\<game\> is already running. Please close it on \<device\>." and then exits. The popup uses a subprocess fallback chain — `notify-send` → `zenity` → `kdialog` → `xmessage` → tkinter — so it works on Wayland, X11, Steam Deck Gaming Mode (gamescope), and environments where `libtk` may not be installed. `notify-send` fires first and is non-blocking (auto-dismisses); the chain then continues to the first available blocking dialog so desktop users still get a modal. The race-condition path (409 from `acquire_lock`) follows the same flow.
 
 ---
