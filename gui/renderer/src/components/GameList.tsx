@@ -152,6 +152,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                 style={{ marginRight: 0, cursor: "pointer" }}
                 title="Select all games"
               />
+              <div style={{ flex: 1 }} />
               {selectedSlugs.size > 0 && (
                 <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
                   🗑 Delete {selectedSlugs.size}
