@@ -16,6 +16,31 @@ type GameRow = Game & {
 
 type ConfirmRemove = { slug: string; name: string } | null;
 
+function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
+  games: GameRow[]; selectedSlugs: Set<string>; onToggle: () => void;
+}): React.ReactElement {
+  const ref = useRef<HTMLInputElement>(null);
+  const selected = games.filter(g => selectedSlugs.has(g.slug)).length;
+  const allSelected = selected === games.length && games.length > 0;
+  const someSelected = selected > 0 && !allSelected;
+
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={allSelected}
+      onChange={onToggle}
+      style={{ cursor: "pointer", marginRight: 8 }}
+      onClick={(e) => e.stopPropagation()}
+      title={allSelected ? "Deselect all in this console" : "Select all in this console"}
+    />
+  );
+}
+
 export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactElement {
   const [games, setGames] = useState<GameRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +52,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
-  const selectAllRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,12 +77,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = selectedSlugs.size > 0 && selectedSlugs.size < games.length;
-    }
-  }, [selectedSlugs, games.length]);
 
   async function handleRemove(): Promise<void> {
     if (!confirmRemove) return;
@@ -94,13 +112,18 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     });
   }
 
-  function toggleSelectAll(): void {
-    const allSlugs = games.map(g => g.slug);
-    if (selectedSlugs.size === games.length) {
-      setSelectedSlugs(new Set());
-    } else {
-      setSelectedSlugs(new Set(allSlugs));
-    }
+  function toggleConsoleSelection(consoleKey: string, consoleGames: GameRow[]): void {
+    const consoleSlugs = consoleGames.map(g => g.slug);
+    const allSelected = consoleSlugs.every(s => selectedSlugs.has(s));
+    setSelectedSlugs(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        consoleSlugs.forEach(s => next.delete(s));
+      } else {
+        consoleSlugs.forEach(s => next.add(s));
+      }
+      return next;
+    });
   }
 
   function toggleConsole(consoleKey: string): void {
@@ -137,6 +160,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     <>
       <div className="section-header">
         <h2>Games</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          {selectedSlugs.size > 0 && (
+            <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
+              🗑 Delete {selectedSlugs.size}
+            </button>
+          )}
+          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
+          <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
+        </div>
       </div>
 
       {loading ? (
@@ -151,26 +183,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         </div>
       ) : (
         <div className="game-list">
-          {games.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
-              <input
-                ref={selectAllRef}
-                type="checkbox"
-                checked={selectedSlugs.size === games.length}
-                onChange={toggleSelectAll}
-                style={{ marginRight: 0, cursor: "pointer" }}
-                title="Select all games"
-              />
-              <div style={{ flex: 1 }} />
-              {selectedSlugs.size > 0 && (
-                <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
-                  🗑 Delete {selectedSlugs.size}
-                </button>
-              )}
-              <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
-              <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
-            </div>
-          )}
           {(() => {
             const grouped = games.reduce<Record<string, GameRow[]>>((acc, g) => {
               const key = g.console || "Other";
@@ -182,6 +194,11 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             return consoleKeys.map(key => (
               <React.Fragment key={key}>
                 <div className="console-section-header" onClick={() => toggleConsole(key)}>
+                  <ConsoleCheckbox
+                    games={grouped[key]}
+                    selectedSlugs={selectedSlugs}
+                    onToggle={() => toggleConsoleSelection(key, grouped[key])}
+                  />
                   <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
                   <span style={{ flex: 1 }}>{key}</span>
                   <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
