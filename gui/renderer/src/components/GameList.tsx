@@ -279,7 +279,12 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               (acc[key] ??= []).push(g);
               return acc;
             }, {});
-            const consoleKeys = Object.keys(grouped).sort();
+            let consoleKeys = Object.keys(grouped).sort();
+
+            // If sorting by game, also sort console headers in the same direction
+            if (sortBy === 'game' && sortDir === 'desc') {
+              consoleKeys = consoleKeys.reverse();
+            }
 
             return consoleKeys.map(key => (
               <React.Fragment key={key}>
