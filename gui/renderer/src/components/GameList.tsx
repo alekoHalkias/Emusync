@@ -128,15 +128,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     <>
       <div className="section-header">
         <h2>Games</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          {selectedSlugs.size > 0 && (
-            <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
-              🗑 Delete {selectedSlugs.size}
-            </button>
-          )}
-          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
-          <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
-        </div>
       </div>
 
       {loading ? (
@@ -161,6 +152,14 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                 style={{ marginRight: 0, cursor: "pointer" }}
                 title="Select all games"
               />
+              <div style={{ flex: 1 }} />
+              {selectedSlugs.size > 0 && (
+                <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
+                  🗑 Delete {selectedSlugs.size}
+                </button>
+              )}
+              <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
+              <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
             </div>
           )}
           {games.map((g) => (
