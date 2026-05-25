@@ -216,18 +216,32 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setPhase("importing");
     const errs: string[] = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel);
+    const deviceId = (await (window as any).emusync.whoami?.()).device_id || "unknown";
+
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
         const game = await addGame(displayName, consoleAbbr);
-        await setGameDevice(game.slug, {
+        const gameId = game.game || game.slug || "unknown";
+
+        await setGameDevice(gameId, {
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
           state_path: rom.stateExists ? (rom.statePath ?? "") : "",
           rom_folder_path: rom.romFolderPath ?? "",
         });
+
+        // Log imported game details
+        console.log(
+          `[IMPORT] game=${JSON.stringify(gameId)} device_id=${JSON.stringify(deviceId)} ` +
+          `name=${JSON.stringify(displayName)} console=${JSON.stringify(consoleAbbr)} ` +
+          `rom_path=${JSON.stringify(rom.romPath)} save_path=${JSON.stringify(rom.savePath)} ` +
+          `launch_command=${JSON.stringify(rom.launchCommand)} ` +
+          `state_path=${JSON.stringify(rom.stateExists ? (rom.statePath ?? "") : "")} ` +
+          `rom_folder_path=${JSON.stringify(rom.romFolderPath ?? "")}`
+        );
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
     }

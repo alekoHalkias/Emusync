@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import uuid
 from typing import Optional
 
@@ -44,18 +43,6 @@ def _auth(authorization: str = Header(None)) -> str:
     if not device:
         raise HTTPException(status_code=401, detail="Invalid token")
     return device.id
-
-
-def _log_game_import(game: Game) -> None:
-    """Log imported game details to stdout."""
-    print(
-        f"[IMPORT] game={game.game!r} device_id={game.device_id!r} name={game.name!r} "
-        f"console={game.console!r} rom_path={game.rom_path!r} save_path={game.save_path!r} "
-        f"launch_command={game.launch_command!r} state_path={game.state_path!r} "
-        f"rom_folder_path={game.rom_folder_path!r}",
-        file=sys.stdout,
-        flush=True,
-    )
 
 
 # ── public ────────────────────────────────────────────────────────────────────
@@ -158,7 +145,6 @@ def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
             added_at=now,
         )
     )
-    _log_game_import(game)
     return {
         "game": game.game,
         "name": game.name,
