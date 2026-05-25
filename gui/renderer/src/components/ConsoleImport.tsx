@@ -37,7 +37,12 @@ type Phase =
   | "importing"  // import in progress
   | "done";      // finished
 
-type Props = { onClose: () => void; onImported: () => void; startConsole?: string };
+type Props = {
+  onClose: () => void;
+  onImported: () => void;
+  startConsole?: string;
+  onConsoleSettingsUpdate?: (emulatorId: string, romFolder: string) => Promise<void>;
+};
 
 const STEP_LABELS = ["Console", "Emulator", "ROMs"];
 
@@ -63,7 +68,7 @@ function getConsoleAbbreviation(consoleKey: string): string {
   return map[consoleKey] || consoleKey.toUpperCase();
 }
 
-export default function ConsoleImport({ onClose, onImported, startConsole }: Props): React.ReactElement {
+export default function ConsoleImport({ onClose, onImported, startConsole, onConsoleSettingsUpdate }: Props): React.ReactElement {
   const [phase, setPhase]         = useState<Phase>("console");
   const [consoles, setConsoles]   = useState<ConsoleOption[]>([]);
   const [consoleSel, setConsoleSel] = useState("");
@@ -393,7 +398,12 @@ export default function ConsoleImport({ onClose, onImported, startConsole }: Pro
                 <button
                   className="btn btn-primary"
                   disabled={!emuSel}
-                  onClick={() => scanRoms(extraPaths)}
+                  onClick={async () => {
+                    if (emuSel && onConsoleSettingsUpdate && extraPaths.length > 0) {
+                      await onConsoleSettingsUpdate(emuSel.id, extraPaths[0]);
+                    }
+                    scanRoms(extraPaths);
+                  }}
                 >
                   Scan for ROMs →
                 </button>

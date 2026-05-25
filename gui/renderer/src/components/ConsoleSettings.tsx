@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ConsoleImport from "./ConsoleImport";
 
 type ConsoleInfo = {
   key: string;
@@ -16,6 +17,13 @@ type DetectedEmulator = {
   label: string;
   saveDir: string;
   stateDir?: string;
+};
+
+type ConsoleConfig = {
+  emulator?: string;
+  rom_folder?: string;
+  save_folder?: string;
+  state_folder?: string;
 };
 
 type Props = {
@@ -43,28 +51,37 @@ export default function ConsoleSettings({ onClose }: Props): React.ReactElement 
   const [selectedEmulators, setSelectedEmulators] = useState<Record<string, string>>({});
   const [editingPaths, setEditingPaths] = useState<Record<string, boolean>>({});
   const [pathValues, setPathValues] = useState<Record<string, { rom?: string; save?: string; state?: string }>>({});
+  const [showImport, setShowImport] = useState(false);
+  const [importConsole, setImportConsole] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadConsoles(): Promise<void> {
-      try {
-        const consoleDefs = await (window as any).emusync.emulator.consoles();
-        const infos: ConsoleInfo[] = consoleDefs.map((c: any) => ({
+  async function loadConsoles(): Promise<void> {
+    try {
+      const cfg = await (window as any).emusync.config.load();
+      const consoleConfigs = (cfg?.console_settings as Record<string, ConsoleConfig>) || {};
+
+      const consoleDefs = await (window as any).emusync.emulator.consoles();
+      const infos: ConsoleInfo[] = consoleDefs.map((c: any) => {
+        const consoleConfig = consoleConfigs[c.key] || {};
+        return {
           key: c.key,
           longName: c.label,
           abbreviation: CONSOLE_ABBREV[c.key] || c.key.toUpperCase(),
-          emulator: null,
+          emulator: consoleConfig.emulator || null,
           emulatorPath: null,
-          romFolder: null,
-          saveFolder: null,
-          stateFolder: null,
-        }));
-        setConsoles(infos);
-        setLoading(false);
-      } catch (e) {
-        console.error("Failed to load consoles:", e);
-        setLoading(false);
-      }
+          romFolder: consoleConfig.rom_folder || null,
+          saveFolder: consoleConfig.save_folder || null,
+          stateFolder: consoleConfig.state_folder || null,
+        };
+      });
+      setConsoles(infos);
+      setLoading(false);
+    } catch (e) {
+      console.error("Failed to load consoles:", e);
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     loadConsoles();
   }, []);
 
@@ -122,6 +139,33 @@ export default function ConsoleSettings({ onClose }: Props): React.ReactElement 
     if (folder) {
       updatePath(consoleKey, pathType, folder);
     }
+  }
+
+  async function saveConsoleSetting(consoleKey: string, emulator?: string, romFolder?: string, saveFolder?: string, stateFolder?: string): Promise<void> {
+    try {
+      const cfg = await (window as any).emusync.config.load() || {};
+      if (!cfg.console_settings) {
+        cfg.console_settings = {};
+      }
+      const consoleConfig: ConsoleConfig = cfg.console_settings[consoleKey] || {};
+      if (emulator !== undefined) consoleConfig.emulator = emulator || undefined;
+      if (romFolder !== undefined) consoleConfig.rom_folder = romFolder || undefined;
+      if (saveFolder !== undefined) consoleConfig.save_folder = saveFolder || undefined;
+      if (stateFolder !== undefined) consoleConfig.state_folder = stateFolder || undefined;
+      cfg.console_settings[consoleKey] = consoleConfig;
+      await (window as any).emusync.config.save(cfg);
+    } catch (e) {
+      console.error("Failed to save console settings:", e);
+    }
+  }
+
+  async function handleImportDone(consoleKey: string, selectedEmulatorId?: string, romFolder?: string): Promise<void> {
+    if (selectedEmulatorId || romFolder) {
+      await saveConsoleSetting(consoleKey, selectedEmulatorId, romFolder);
+      await loadConsoles();
+    }
+    setShowImport(false);
+    setImportConsole(null);
   }
 
   return (
@@ -286,13 +330,26 @@ export default function ConsoleSettings({ onClose }: Props): React.ReactElement 
                       )}
                     </td>
                     <td style={{ padding: "12px 8px", verticalAlign: "top" }}>
-                      <button
-                        className="btn btn-ghost"
-                        style={{ fontSize: 11, padding: "4px 8px" }}
-                        onClick={() => togglePathEditing(console.key)}
-                      >
-                        {isEditing ? "✓ Done" : "✎ Edit"}
-                      </button>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize: 11, padding: "4px 8px" }}
+                          onClick={() => {
+                            setImportConsole(console.key);
+                            setShowImport(true);
+                          }}
+                          title="Configure using import workflow"
+                        >
+                          ⚙ Setup
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize: 11, padding: "4px 8px" }}
+                          onClick={() => togglePathEditing(console.key)}
+                        >
+                          {isEditing ? "✓ Done" : "✎ Edit"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -300,6 +357,25 @@ export default function ConsoleSettings({ onClose }: Props): React.ReactElement 
             </tbody>
           </table>
         </div>
+      )}
+
+      {showImport && importConsole && (
+        <ConsoleImport
+          onClose={() => {
+            setShowImport(false);
+            setImportConsole(null);
+          }}
+          onImported={() => {
+            // Import completed, reload settings
+            loadConsoles();
+            setShowImport(false);
+            setImportConsole(null);
+          }}
+          startConsole={importConsole}
+          onConsoleSettingsUpdate={async (emulatorId: string, romFolder: string) => {
+            await handleImportDone(importConsole, emulatorId, romFolder);
+          }}
+        />
       )}
     </div>
   );
