@@ -125,6 +125,35 @@ def list_games(device_id: str = Depends(_auth)) -> list[dict]:
     ]
 
 
+@app.get("/library")
+def list_all_games(device_id: str = Depends(_auth)) -> dict:
+    """List all games on the server across all devices with device info."""
+    store = _get_store()
+    all_games = store.list_all_games()
+    devices = {d.id: d.name for d in store.list_devices()}
+
+    result = {}
+    for game_id, game_list in all_games.items():
+        result[game_id] = {
+            "name": game_list[0].name,  # All copies have same name
+            "console": game_list[0].console,  # All copies have same console
+            "devices": [
+                {
+                    "device_id": g.device_id,
+                    "device_name": devices.get(g.device_id, g.device_id),
+                    "rom_path": g.rom_path,
+                    "save_path": g.save_path,
+                    "launch_command": g.launch_command,
+                    "state_path": g.state_path,
+                    "rom_folder_path": g.rom_folder_path,
+                    "enabled": g.enabled,
+                }
+                for g in game_list
+            ],
+        }
+    return result
+
+
 @app.post("/games")
 def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
     import re

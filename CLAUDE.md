@@ -30,7 +30,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | File | Owns |
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`) |
-| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves` |
+| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/library`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/parity` |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games` (device-specific), `saves` (global), `states` (global), `locks`, `events` |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
@@ -358,6 +358,43 @@ Games are now stored with **device scope** — each device maintains its own cop
 **Saves and states remain global** — they are shared across all devices and stored by game ID only (not keyed per-device). When device A syncs a save, device B can pull it even if device B hasn't imported the game locally yet.
 
 **Locks are per-device** — a lock is (game, device_id), so multiple devices can each hold a lock on the same game without conflict.
+
+---
+
+## Cross-Device Game Library
+
+The `GET /library` endpoint returns all games on the server across all paired devices. Each device can see:
+- Every unique game registered on any device
+- Which devices have imported each game
+- Device-specific paths (ROM, save, state) for each device's copy
+
+**Usage:**
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:8765/library
+```
+
+**Response structure:**
+```json
+{
+  "game-id": {
+    "name": "Game Name",
+    "console": "GBA",
+    "devices": [
+      {
+        "device_id": "device-abc",
+        "device_name": "Gaming PC",
+        "rom_path": "/games/roms/game.gba",
+        "save_path": "/games/saves/game.sav",
+        "launch_command": "retroarch game.gba",
+        "state_path": "/games/states/game.state",
+        "enabled": true
+      }
+    ]
+  }
+}
+```
+
+This enables the GUI to show a unified game library view where users can see which devices have which games and which ROM paths are configured on each device.
 
 ---
 

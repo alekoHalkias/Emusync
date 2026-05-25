@@ -284,6 +284,25 @@ class Store:
         ).fetchall()
         return [Game(**dict(r)) for r in rows]
 
+    def list_all_games(self) -> dict[str, list[Game]]:
+        """List all unique games on the server, grouped by game ID.
+
+        Returns a dict mapping game_id -> list of Game records (one per device that has it).
+        Useful for seeing which devices have which games.
+        """
+        cols = "game, device_id, name, console, rom_path, save_path, launch_command, state_path, rom_folder_path, last_synced_at, sync_state, local_save_time, remote_save_time, save_hash, added_at, last_played_at, enabled"
+        rows = self._conn.execute(
+            f"SELECT {cols} FROM games ORDER BY game, device_id"
+        ).fetchall()
+
+        result: dict[str, list[Game]] = {}
+        for row in rows:
+            game_obj = Game(**dict(row))
+            if game_obj.game not in result:
+                result[game_obj.game] = []
+            result[game_obj.game].append(game_obj)
+        return result
+
     def get_game(self, game: str, device_id: str) -> Optional[Game]:
         cols = "game, device_id, name, console, rom_path, save_path, launch_command, state_path, rom_folder_path, last_synced_at, sync_state, local_save_time, remote_save_time, save_hash, added_at, last_played_at, enabled"
         row = self._conn.execute(

@@ -46,5 +46,8 @@ electron.contextBridge.exposeInMainWorld("emusync", {
     offExited: (cb) => {
       electron.ipcRenderer.removeListener("game:exited", cb);
     }
+  },
+  log: {
+    message: (message) => electron.ipcRenderer.invoke("log:message", message)
   }
 });

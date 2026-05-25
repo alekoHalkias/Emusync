@@ -847,3 +847,61 @@ async def test_push_saves_endpoint(client):
 
     state_meta = await client.get("/games/test-game/state/meta", headers=auth)
     assert state_meta.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_library_shows_games_from_all_devices(client):
+    """GET /library should show games from all paired devices."""
+    # Device 1
+    token1 = await _pair(client)
+    auth1 = {"Authorization": f"Bearer {token1}"}
+
+    # Device 2
+    r = await client.post("/pair", json={
+        "master_token": MASTER_TOKEN,
+        "device_id": "device-xyz",
+        "device_name": "other-device",
+    })
+    assert r.status_code == 200
+    token2 = r.json()["token"]
+    auth2 = {"Authorization": f"Bearer {token2}"}
+
+    # Device 1 adds Game A
+    r = await client.post("/games", json={"name": "Game A"}, headers=auth1)
+    assert r.status_code == 200
+
+    r = await client.put("/games/game-a/device", json={
+        "rom_path": "/roms/a.gba",
+        "save_path": "/saves/a.sav",
+        "launch_command": "retroarch a.gba",
+    }, headers=auth1)
+    assert r.status_code == 200
+
+    # Device 2 adds Game B
+    r = await client.post("/games", json={"name": "Game B"}, headers=auth2)
+    assert r.status_code == 200
+
+    r = await client.put("/games/game-b/device", json={
+        "rom_path": "/roms/b.gba",
+        "save_path": "/saves/b.sav",
+        "launch_command": "retroarch b.gba",
+    }, headers=auth2)
+    assert r.status_code == 200
+
+    # Device 1 calls /library and should see both games
+    r = await client.get("/library", headers=auth1)
+    assert r.status_code == 200
+    library = r.json()
+
+    assert "game-a" in library
+    assert "game-b" in library
+
+    # Game A should only be on Device 1
+    assert len(library["game-a"]["devices"]) == 1
+    assert library["game-a"]["devices"][0]["device_id"] == DEVICE_ID
+    assert library["game-a"]["devices"][0]["rom_path"] == "/roms/a.gba"
+
+    # Game B should only be on Device 2
+    assert len(library["game-b"]["devices"]) == 1
+    assert library["game-b"]["devices"][0]["device_id"] == "device-xyz"
+    assert library["game-b"]["devices"][0]["rom_path"] == "/roms/b.gba"

@@ -85,6 +85,10 @@ electron.ipcMain.handle("config:addRecentFolder", (_event, consoleKey, folderPat
   } catch {
   }
 });
+electron.ipcMain.handle("log:message", (_event, message) => {
+  console.log(message);
+  return true;
+});
 function startServerProcess() {
   if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
   return new Promise((resolve) => {

@@ -50,6 +50,12 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def list_all_games(self) -> dict:
+        """List all games on the server across all devices."""
+        r = httpx.get(self._url("/library"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
     def add_game(self, name: str) -> dict:
         r = httpx.post(self._url("/games"), json={"name": name}, headers=self._headers, timeout=10)
         r.raise_for_status()
