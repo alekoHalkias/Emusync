@@ -359,6 +359,125 @@ def sync_status() -> None:
         click.echo(f"{slug:<30}  {lock_str:<22}  {push_str}")
 
 
+# ── parity ────────────────────────────────────────────────────────────────────
+
+@cli.group()
+def parity() -> None:
+    """Check game parity across devices."""
+
+
+@parity.command("check")
+@click.option("--game", "game_slug", default=None, help="Game slug to check (or use --all)")
+@click.option("--all", "check_all", is_flag=True, help="Check all games")
+def parity_check(game_slug: str | None, check_all: bool) -> None:
+    """Check if games and saves/states are in sync across all devices.
+
+    Shows one line per discrepancy found (no output = all match).
+    Exit code: 0 if all match, 1 if discrepancies found.
+    """
+    client = _client()
+
+    # Validate options
+    if not game_slug and not check_all:
+        click.echo("Error: specify --game <slug> or use --all", err=True)
+        sys.exit(1)
+
+    # Load all games
+    try:
+        all_games = client.list_games()
+    except Exception as e:
+        click.echo(f"Error: cannot reach server - {e}", err=True)
+        sys.exit(1)
+
+    if not all_games:
+        click.echo("No games managed.")
+        sys.exit(0)
+
+    # Determine which games to check
+    all_game_ids = {g["game"] for g in all_games}
+    if game_slug:
+        if game_slug not in all_game_ids:
+            click.echo(f"Error: game '{game_slug}' not found", err=True)
+            sys.exit(1)
+        games_to_check = [game_slug]
+    else:
+        games_to_check = sorted(all_game_ids)
+
+    discrepancies_found = False
+
+    for game_id in games_to_check:
+        try:
+            parity_data = client.get_game_parity(game_id)
+        except Exception as e:
+            click.echo(f"{game_id}: Error checking parity - {e}", err=True)
+            discrepancies_found = True
+            continue
+
+        devices_info = parity_data.get("devices", {})
+
+        # Check 1: Game presence on all devices
+        missing_on = [d_id for d_id, info in devices_info.items() if not info.get("exists")]
+        for d_id in missing_on:
+            device_name = devices_info[d_id].get("device_name", d_id)
+            click.echo(f"{game_id}: Device '{device_name}' missing")
+            discrepancies_found = True
+
+        # If game exists on all devices, check sync status
+        if not missing_on:
+            existing_devices = {d_id: info for d_id, info in devices_info.items() if info.get("exists")}
+
+            # Check 2: Save file sync
+            save_hashes = {d_id: info.get("save_hash") for d_id, info in existing_devices.items()}
+            unique_hashes = {h for h in save_hashes.values() if h is not None}
+
+            if len(unique_hashes) > 1:
+                # Multiple different hashes = out of sync
+                newest = max(
+                    existing_devices.items(),
+                    key=lambda x: x[1].get("save_pushed_at") or "",
+                    default=(None, {})
+                )
+                if newest[0]:
+                    device_name = existing_devices[newest[0]].get("device_name", newest[0])
+                    click.echo(f"{game_id}: Save out of sync (Device '{device_name}' has newer)")
+                    discrepancies_found = True
+
+            # Check for missing saves
+            missing_saves = [d_id for d_id, info in existing_devices.items() if not info.get("save_hash")]
+            for d_id in missing_saves:
+                device_name = devices_info[d_id].get("device_name", d_id)
+                click.echo(f"{game_id}: No save on Device '{device_name}'")
+                discrepancies_found = True
+
+            # Check 3: State file sync (only if state_path configured)
+            configured_states = {d_id: info for d_id, info in existing_devices.items() if info.get("state_path")}
+
+            if configured_states:
+                state_hashes = {d_id: info.get("state_hash") for d_id, info in configured_states.items()}
+                unique_state_hashes = {h for h in state_hashes.values() if h is not None}
+
+                if len(unique_state_hashes) > 1:
+                    # Multiple different hashes = out of sync
+                    newest = max(
+                        configured_states.items(),
+                        key=lambda x: x[1].get("state_pushed_at") or "",
+                        default=(None, {})
+                    )
+                    if newest[0]:
+                        device_name = configured_states[newest[0]].get("device_name", newest[0])
+                        click.echo(f"{game_id}: State out of sync (Device '{device_name}' has newer)")
+                        discrepancies_found = True
+
+                # Check for missing states
+                missing_states = [d_id for d_id, info in configured_states.items() if not info.get("state_hash")]
+                for d_id in missing_states:
+                    device_name = devices_info[d_id].get("device_name", d_id)
+                    click.echo(f"{game_id}: No state on Device '{device_name}'")
+                    discrepancies_found = True
+
+    sys.exit(1 if discrepancies_found else 0)
+
+
 # ── run ───────────────────────────────────────────────────────────────────────
 
 def _find_save_or_state_file(configured_path: str) -> str | None:
