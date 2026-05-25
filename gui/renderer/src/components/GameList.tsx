@@ -53,6 +53,11 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
+  const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150 });
+
+  const resizingCol = useRef<keyof typeof colWidths | null>(null);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -162,6 +167,33 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     }
   }
 
+  function startResize(col: keyof typeof colWidths) {
+    return (e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      resizingCol.current = col;
+      resizeStartX.current = e.clientX;
+      resizeStartWidth.current = colWidths[col];
+    };
+  }
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!resizingCol.current) return;
+      const delta = e.clientX - resizeStartX.current;
+      setColWidths(prev => ({
+        ...prev,
+        [resizingCol.current!]: Math.max(80, resizeStartWidth.current + delta),
+      }));
+    }
+    function onUp() { resizingCol.current = null; }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
   return (
     <>
       <div className="section-header">
@@ -187,7 +219,20 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
           <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
         </div>
       ) : (
-        <div className="game-list">
+        <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px ${colWidths.lastSave}px ${colWidths.synced}px 1fr` }}>
+          {/* Column headers */}
+          <div className="col-header" />
+          <div className="col-header" onMouseDown={startResize("name")}>
+            Game <span className="resize-handle" />
+          </div>
+          <div className="col-header" onMouseDown={startResize("lastSave")}>
+            Last Saved <span className="resize-handle" />
+          </div>
+          <div className="col-header" onMouseDown={startResize("synced")}>
+            Synced <span className="resize-handle" />
+          </div>
+          <div className="col-header">Actions</div>
+
           {(() => {
             const grouped = games.reduce<Record<string, GameRow[]>>((acc, g) => {
               const key = g.console || "Other";
@@ -198,7 +243,8 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
 
             return consoleKeys.map(key => (
               <React.Fragment key={key}>
-                <div className="console-section-header" onClick={() => toggleConsole(key)}>
+                {/* Console section header spans all columns */}
+                <div className="console-section-header" style={{ gridColumn: "1 / -1" }} onClick={() => toggleConsole(key)}>
                   <ConsoleCheckbox
                     games={grouped[key]}
                     selectedSlugs={selectedSlugs}
@@ -208,31 +254,27 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <span style={{ flex: 1 }}>{key}</span>
                   <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
                 </div>
+
+                {/* Game rows — each game is 5 grid cells */}
                 {!collapsedConsoles.has(key) && grouped[key].map((g) => (
-                  <div key={g.slug} className="game-row">
-                    <input
-                      type="checkbox"
-                      checked={selectedSlugs.has(g.slug)}
-                      onChange={() => toggleSelection(g.slug)}
-                      style={{ marginRight: 8, cursor: "pointer" }}
-                    />
-                    <div className="game-row-header">
-                      <div className="game-row-name">{g.name}</div>
-                      <div className="game-row-divider">|</div>
-                      <div className="game-row-console" style={{ color: "var(--text-muted)", minWidth: 35 }}>
-                        {g.console || "—"}
-                      </div>
-                      <div className="game-row-divider">|</div>
-                      <div className="game-row-save" style={{ color: "var(--text-muted)", fontSize: 12, minWidth: 110 }}>
-                        {g.lastSave ? g.lastSave : "No save locally"}
-                      </div>
-                      <div className="game-row-divider">|</div>
-                      <div className="game-row-sync">
-                        {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒 In use</span>}
-                        <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
-                      </div>
+                  <React.Fragment key={g.slug}>
+                    <div className="game-cell">
+                      <input
+                        type="checkbox"
+                        checked={selectedSlugs.has(g.slug)}
+                        onChange={() => toggleSelection(g.slug)}
+                        style={{ cursor: "pointer" }}
+                      />
                     </div>
-                    <div className="game-row-actions">
+                    <div className="game-cell game-cell-name">{g.name}</div>
+                    <div className="game-cell game-cell-muted">
+                      {g.lastSave ? g.lastSave : "No save locally"}
+                    </div>
+                    <div className="game-cell game-cell-muted">
+                      {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
+                      <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
+                    </div>
+                    <div className="game-cell game-cell-actions">
                       <button
                         className="btn btn-icon"
                         title="Push saves to devices"
@@ -264,7 +306,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                         🗑
                       </button>
                     </div>
-                  </div>
+                  </React.Fragment>
                 ))}
               </React.Fragment>
             ));

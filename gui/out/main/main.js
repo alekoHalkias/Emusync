@@ -846,6 +846,15 @@ electron.ipcMain.handle("files:ensure-save", (_event, savePath) => {
     return { created: false };
   }
 });
+electron.ipcMain.handle("files:get-save-time", (_event, savePath) => {
+  try {
+    if (!fs.existsSync(savePath)) return null;
+    const stats = fs.statSync(savePath);
+    return stats.mtime.toISOString().slice(0, 19);
+  } catch {
+    return null;
+  }
+});
 electron.ipcMain.handle("dialog:openFolder", async () => {
   const result = await electron.dialog.showOpenDialog(mainWindow, { properties: ["openDirectory"] });
   return result.canceled ? null : result.filePaths[0];

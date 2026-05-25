@@ -31,7 +31,8 @@ electron.contextBridge.exposeInMainWorld("emusync", {
     scan: (consoleKey, emulatorOption, extraPaths) => electron.ipcRenderer.invoke("emulator:scan", { consoleKey, emulatorOption, extraPaths })
   },
   files: {
-    ensureSave: (savePath) => electron.ipcRenderer.invoke("files:ensure-save", savePath)
+    ensureSave: (savePath) => electron.ipcRenderer.invoke("files:ensure-save", savePath),
+    getSaveTime: (savePath) => electron.ipcRenderer.invoke("files:get-save-time", savePath)
   },
   game: {
     launch: (slug, command) => electron.ipcRenderer.invoke("game:launch", slug, command),
