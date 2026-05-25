@@ -160,6 +160,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     <>
       <div className="section-header">
         <h2>Games</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          {selectedSlugs.size > 0 && (
+            <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
+              🗑 Delete {selectedSlugs.size}
+            </button>
+          )}
+          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
+          <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
+        </div>
       </div>
 
       {loading ? (
@@ -174,13 +183,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         </div>
       ) : (
         <div className="game-list">
-          {games.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
-              <div style={{ flex: 1 }} />
-              <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
-              <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
-            </div>
-          )}
           {(() => {
             const grouped = games.reduce<Record<string, GameRow[]>>((acc, g) => {
               const key = g.console || "Other";
@@ -199,18 +201,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   />
                   <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
                   <span style={{ flex: 1 }}>{key}</span>
-                  {(() => {
-                    const count = grouped[key].filter(g => selectedSlugs.has(g.slug)).length;
-                    return count > 0 && (
-                      <button
-                        className="btn btn-danger"
-                        style={{ fontSize: 12, padding: "4px 8px" }}
-                        onClick={(e) => { e.stopPropagation(); setConfirmBulkDelete(true); }}
-                      >
-                        🗑 Delete {count}
-                      </button>
-                    );
-                  })()}
                   <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
                 </div>
                 {!collapsedConsoles.has(key) && grouped[key].map((g) => (
