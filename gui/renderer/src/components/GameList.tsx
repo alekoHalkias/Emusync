@@ -166,8 +166,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               🗑 Delete {selectedSlugs.size}
             </button>
           )}
-          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>🕹️ Add console</button>
-          <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
+          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>Bulk import</button>
         </div>
       </div>
 
