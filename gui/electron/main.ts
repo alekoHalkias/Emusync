@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, execSync, ChildProcess } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync } from "fs";
 import { join, dirname, basename, extname } from "path";
 import { homedir } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
@@ -942,6 +942,15 @@ ipcMain.handle("files:ensure-save", (_event, savePath: string): { created: boole
     writeFileSync(savePath, Buffer.alloc(0));
     return { created: true };
   } catch { return { created: false }; }
+});
+
+// Get the last modified time of a save file
+ipcMain.handle("files:get-save-time", (_event, savePath: string): string | null => {
+  try {
+    if (!existsSync(savePath)) return null;
+    const stats = statSync(savePath);
+    return stats.mtime.toISOString().slice(0, 19);
+  } catch { return null; }
 });
 
 ipcMain.handle("dialog:openFolder", async () => {

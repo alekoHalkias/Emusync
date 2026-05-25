@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, type Game } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, type Game } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
 
 type GameRow = Game & {
   lastPush?: string;
+  lastSave?: string | null;
   locked?: boolean;
   syncing?: boolean;
 };
@@ -59,10 +60,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       const raw = await listGames();
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
-          const [meta, lock] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug)]);
+          const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
+          let lastSave: string | null = undefined;
+          if (config.status === "fulfilled" && config.value?.save_path) {
+            lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
+          }
           return {
             ...g,
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
+            lastSave,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
           };
         })
@@ -215,6 +221,10 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                       <div className="game-row-divider">|</div>
                       <div className="game-row-console" style={{ color: "var(--text-muted)", minWidth: 35 }}>
                         {g.console || "—"}
+                      </div>
+                      <div className="game-row-divider">|</div>
+                      <div className="game-row-save" style={{ color: "var(--text-muted)", fontSize: 12, minWidth: 110 }}>
+                        {g.lastSave ? g.lastSave : "No save locally"}
                       </div>
                       <div className="game-row-divider">|</div>
                       <div className="game-row-sync">
