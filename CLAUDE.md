@@ -31,7 +31,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`) |
 | `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves` |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events` |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games` (device-specific), `saves` (global), `states` (global), `locks`, `events` |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
 | `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`) |
@@ -126,7 +126,7 @@ window.emusync.files.getSaveTime(path)      // returns last modified time of sav
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 
-window.emusync.game.launch(slug, command)  // spawns emusync run
+window.emusync.game.launch(game, command)  // spawns emusync run
 window.emusync.game.stop()                 // SIGKILL game process group (in-app launches)
 window.emusync.game.stopExternal()         // kill emulator + emusync via .game_pid file (Steam launches)
 window.emusync.game.hasPidFile()           // true if .game_pid exists, process is alive, and cmdline contains emusync/python
@@ -324,7 +324,7 @@ Use `Closes #N` in the PR body so GitHub auto-closes the issue on merge.
 In addition to save files (SRAM), EmuSync now syncs **save states** (snapshots). RetroArch stores these in `states/<CoreName>/game.state` parallel to `saves/<CoreName>/game.sav`. State syncing mirrors save syncing at every layer:
 
 - **DB schema**: new `states` table; `state_path` column added to `game_devices` via migration
-- **API**: new `/games/{slug}/state` routes (GET/POST) and `/games/{slug}/state/meta`
+- **API**: new `/games/{game}/state` routes (GET/POST) and `/games/{game}/state/meta`
 - **CLI (`emusync run`)**: pulls state before launch, pushes after exit (opt-in if `state_path` is configured); auto-detects actual save/state file extensions and updates config if needed
 - **Electron**: detects `savestate_directory` from `retroarch.cfg`, scans for `.state` / `.state.auto` files per ROM
 - **GUI**: wizard shows `✓ State found` / `⊕ State will be created` badges; does not pre-create files, only tracks paths
@@ -342,7 +342,20 @@ During console import, the `rom_folder_path` is extracted from each ROM file pat
 - Tracking which folder contained each game's ROM file
 - Managing multiple games from the same directory
 
-The path is extracted from the full ROM file path during import and returned by `GET /games/{slug}/device` endpoint alongside `rom_path`, `save_path`, `state_path`, and `launch_command`.
+The path is extracted from the full ROM file path during import and returned by `GET /games/{game}/device` endpoint alongside `rom_path`, `save_path`, `state_path`, and `launch_command`.
+
+---
+
+## Games Table Architecture (Device-Specific)
+
+Games are now stored with **device scope** — each device maintains its own copy of a game record with (game, device_id) as the primary key. This allows:
+- Each device to configure its own ROM path, save path, launch command, state path
+- Per-device sync metadata (last_synced_at, sync_state, local_save_time, remote_save_time)
+- Per-device game metadata (added_at, last_played_at, enabled)
+
+**Saves and states remain global** — they are shared across all devices and stored by game ID only (not keyed per-device). When device A syncs a save, device B can pull it even if device B hasn't imported the game locally yet.
+
+**Locks are per-device** — a lock is (game, device_id), so multiple devices can each hold a lock on the same game without conflict.
 
 ---
 
@@ -377,7 +390,7 @@ dev mode — visible in the `make dev-gui` terminal.
 
 **RetroArch per-core save directory is always `saves/<CoreName>/`** — `detectEmulatorsForConsole` uses `join(ra.saveDir, core.folderName)` unconditionally. The old `resolveCoreSaveDir` fell back to the root saves dir if the subfolder did not exist yet, causing saves to land in the wrong place on fresh installs. The scan handler additionally checks the root saves dir as a fallback when looking for *existing* saves written before per-core organisation was set up.
 
-**`store.add_game` is INSERT OR IGNORE, not INSERT OR REPLACE** — `add_game` only inserts new rows; it never overwrites. Use `update_game_name(slug, name)` to rename an existing game. The original `INSERT OR REPLACE` bug cascade-deleted `game_devices`, `saves`, and `locks` every time a game was renamed, causing the game list to appear empty after a config save.
+**`store.add_game` uses UPDATE for existing games** — `add_game(game)` checks if the game record already exists and uses UPDATE instead of INSERT OR REPLACE to preserve associated saves and locks. Use `update_game_name(game, device_id, name)` to rename an existing game.
 
 **Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks the lock state. If the lock is already held (by this device or another), it calls `_show_game_running_popup` which displays "\<game\> is already running. Please close it on \<device\>." and then exits. The popup uses a subprocess fallback chain — `notify-send` → `zenity` → `kdialog` → `xmessage` → tkinter — so it works on Wayland, X11, Steam Deck Gaming Mode (gamescope), and environments where `libtk` may not be installed. `notify-send` fires first and is non-blocking (auto-dismisses); the chain then continues to the first available blocking dialog so desktop users still get a modal. The race-condition path (409 from `acquire_lock`) follows the same flow.
 
