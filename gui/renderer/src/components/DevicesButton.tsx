@@ -27,6 +27,10 @@ export default function DevicesButton(): React.ReactElement {
   }, []);
 
   useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
     if (open) load();
   }, [open, load]);
 
@@ -58,7 +62,7 @@ export default function DevicesButton(): React.ReactElement {
         style={{ fontSize: 13 }}
         title="View paired devices"
       >
-        📱 {devices.length}
+        Devices {devices.length}
       </button>
 
       {open && (
