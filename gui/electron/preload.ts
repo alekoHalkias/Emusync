@@ -56,6 +56,8 @@ contextBridge.exposeInMainWorld("emusync", {
   files: {
     ensureSave: (savePath: string): Promise<{ created: boolean }> =>
       ipcRenderer.invoke("files:ensure-save", savePath),
+    getSaveTime: (savePath: string): Promise<string | null> =>
+      ipcRenderer.invoke("files:get-save-time", savePath),
   },
   game: {
     launch: (slug: string, command: string): Promise<{ ok: boolean }> =>
