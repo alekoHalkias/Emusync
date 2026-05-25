@@ -169,6 +169,13 @@ input.error { border-color: var(--red); }
   color: var(--text-muted); flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .game-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.console-section-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; background: var(--surface2); border-radius: var(--radius);
+  margin-bottom: 4px; cursor: pointer; font-weight: 600; font-size: 13px;
+  user-select: none; transition: background 0.15s;
+}
+.console-section-header:hover { filter: brightness(1.15); }
 
 .empty-state {
   text-align: center; padding: 60px 20px; color: var(--text-muted);

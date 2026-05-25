@@ -26,6 +26,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
   const selectAllRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -102,6 +103,14 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     }
   }
 
+  function toggleConsole(consoleKey: string): void {
+    setCollapsedConsoles(prev => {
+      const next = new Set(prev);
+      next.has(consoleKey) ? next.delete(consoleKey) : next.add(consoleKey);
+      return next;
+    });
+  }
+
   async function handleBulkDelete(): Promise<void> {
     setBulkDeleting(true);
     const slugsToDelete = Array.from(selectedSlugs);
@@ -162,60 +171,78 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
             </div>
           )}
-          {games.map((g) => (
-            <div key={g.slug} className="game-row">
-              <input
-                type="checkbox"
-                checked={selectedSlugs.has(g.slug)}
-                onChange={() => toggleSelection(g.slug)}
-                style={{ marginRight: 8, cursor: "pointer" }}
-              />
-              <div className="game-row-header">
-                <div className="game-row-name">{g.name}</div>
-                <div className="game-row-divider">|</div>
-                <div className="game-row-console" style={{ color: "var(--text-muted)", minWidth: 35 }}>
-                  {g.console || "—"}
+          {(() => {
+            const grouped = games.reduce<Record<string, GameRow[]>>((acc, g) => {
+              const key = g.console || "Other";
+              (acc[key] ??= []).push(g);
+              return acc;
+            }, {});
+            const consoleKeys = Object.keys(grouped).sort();
+
+            return consoleKeys.map(key => (
+              <React.Fragment key={key}>
+                <div className="console-section-header" onClick={() => toggleConsole(key)}>
+                  <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
+                  <span style={{ flex: 1 }}>{key}</span>
+                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
                 </div>
-                <div className="game-row-divider">|</div>
-                <div className="game-row-sync">
-                  {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒 In use</span>}
-                  <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
-                </div>
-              </div>
-              <div className="game-row-actions">
-                <button
-                  className="btn btn-icon"
-                  title="Push saves to devices"
-                  disabled={g.locked || syncingSlug === g.slug}
-                  onClick={() => handleSync(g.slug)}
-                >
-                  {syncingSlug === g.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
-                </button>
-                <button
-                  className="btn btn-icon"
-                  title="Play"
-                  disabled={g.locked}
-                  onClick={() => onPlay(g.slug, g.name)}
-                >
-                  ▶
-                </button>
-                <button
-                  className="btn btn-icon"
-                  title="Settings"
-                  onClick={() => onEdit(g)}
-                >
-                  ⚙
-                </button>
-                <button
-                  className="btn btn-icon"
-                  title="Remove from EmuSync"
-                  onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
-                >
-                  🗑
-                </button>
-              </div>
-            </div>
-          ))}
+                {!collapsedConsoles.has(key) && grouped[key].map((g) => (
+                  <div key={g.slug} className="game-row">
+                    <input
+                      type="checkbox"
+                      checked={selectedSlugs.has(g.slug)}
+                      onChange={() => toggleSelection(g.slug)}
+                      style={{ marginRight: 8, cursor: "pointer" }}
+                    />
+                    <div className="game-row-header">
+                      <div className="game-row-name">{g.name}</div>
+                      <div className="game-row-divider">|</div>
+                      <div className="game-row-console" style={{ color: "var(--text-muted)", minWidth: 35 }}>
+                        {g.console || "—"}
+                      </div>
+                      <div className="game-row-divider">|</div>
+                      <div className="game-row-sync">
+                        {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒 In use</span>}
+                        <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
+                      </div>
+                    </div>
+                    <div className="game-row-actions">
+                      <button
+                        className="btn btn-icon"
+                        title="Push saves to devices"
+                        disabled={g.locked || syncingSlug === g.slug}
+                        onClick={() => handleSync(g.slug)}
+                      >
+                        {syncingSlug === g.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
+                      </button>
+                      <button
+                        className="btn btn-icon"
+                        title="Play"
+                        disabled={g.locked}
+                        onClick={() => onPlay(g.slug, g.name)}
+                      >
+                        ▶
+                      </button>
+                      <button
+                        className="btn btn-icon"
+                        title="Settings"
+                        onClick={() => onEdit(g)}
+                      >
+                        ⚙
+                      </button>
+                      <button
+                        className="btn btn-icon"
+                        title="Remove from EmuSync"
+                        onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </React.Fragment>
+            ));
+          })()}
         </div>
       )}
 
