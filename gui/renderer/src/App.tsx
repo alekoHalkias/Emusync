@@ -3,6 +3,7 @@ import { configure, getGameDevice, health, listGames, getLock, releaseLock, pair
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
+import ConsoleSettings from "./components/ConsoleSettings";
 import ServerStatusButton from "./components/ServerStatusButton";
 import DevicesButton from "./components/DevicesButton";
 
@@ -102,6 +103,7 @@ type Screen =
   | { name: "loading" }
   | { name: "setup" }
   | { name: "games" }
+  | { name: "console-settings" }
   | { name: "config-new" }
   | { name: "config-edit"; slug: string; gameName: string };
 
@@ -314,6 +316,13 @@ export default function App(): React.ReactElement {
             onAdd={() => setScreen({ name: "config-new" })}
             onEdit={(g) => setScreen({ name: "config-edit", slug: g.slug, gameName: g.name })}
             onPlay={handlePlay}
+            onShowConsoleSettings={() => setScreen({ name: "console-settings" })}
+          />
+        )}
+
+        {screen.name === "console-settings" && (
+          <ConsoleSettings
+            onClose={() => setScreen({ name: "games" })}
           />
         )}
 
