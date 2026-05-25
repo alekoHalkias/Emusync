@@ -57,6 +57,24 @@ export async function pair(masterToken: string, deviceId: string, deviceName: st
 }
 
 export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
+
+export type LibraryGame = {
+  name: string;
+  console: string;
+  devices: Array<{
+    device_id: string;
+    device_name: string;
+    rom_path: string;
+    save_path: string;
+    launch_command: string;
+    state_path?: string;
+    rom_folder_path?: string;
+    enabled: boolean;
+  }>;
+};
+
+export const listAllGames = (): Promise<Record<string, LibraryGame>> => _fetch("GET", "/library");
+
 export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });

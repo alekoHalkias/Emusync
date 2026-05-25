@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, type Game } from "../api";
+import { listAllGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, type Game, whoami } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -13,6 +13,7 @@ type GameRow = Game & {
   lastSave?: string | null;
   locked?: boolean;
   syncing?: boolean;
+  device_name?: string;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -64,17 +65,46 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const raw = await listGames();
+      const library = await listAllGames();
+      const currentDevice = await whoami();
+
+      const allGames: Array<GameRow & { gameId: string }> = [];
+
+      // Flatten library into individual game rows (one per device that has it)
+      for (const [gameId, gameInfo] of Object.entries(library)) {
+        for (const deviceInfo of gameInfo.devices) {
+          allGames.push({
+            game: gameId,
+            slug: gameId,
+            name: gameInfo.name,
+            console: gameInfo.console,
+            device_name: deviceInfo.device_name,
+            gameId,
+          });
+        }
+      }
+
+      // Enrich with metadata
       const enriched = await Promise.all(
-        raw.map(async (g): Promise<GameRow> => {
-          const gameId = g.game || g.slug || '';
-          const [meta, lock, config] = await Promise.allSettled([getSaveMeta(gameId), getLock(gameId), getGameDevice(gameId)]);
+        allGames.map(async (g): Promise<GameRow> => {
+          const gameId = g.gameId;
+          const [meta, lock] = await Promise.allSettled([getSaveMeta(gameId), getLock(gameId)]);
+
           let lastSave: string | null = undefined;
-          if (config.status === "fulfilled" && config.value?.save_path) {
-            lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
+          // Only try to get local save time if this is on the current device
+          if (g.device_name === currentDevice.device_id || g.device_name === (await whoami()).device_id) {
+            const config = await Promise.allSettled([getGameDevice(gameId)]);
+            if (config[0].status === "fulfilled" && config[0].value?.save_path) {
+              lastSave = await (window as any).emusync.files.getSaveTime(config[0].value.save_path);
+            }
           }
+
           return {
-            ...g,
+            game: g.game,
+            slug: g.slug,
+            name: g.name,
+            console: g.console,
+            device_name: g.device_name,
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             lastSave,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
@@ -322,7 +352,10 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                         style={{ cursor: "pointer" }}
                       />
                     </div>
-                    <div className="game-cell game-cell-name">{g.name}</div>
+                    <div className="game-cell game-cell-name">
+                      <div>{g.name}</div>
+                      {g.device_name && <div style={{ fontSize: 12, color: "var(--text-muted)" }}>on {g.device_name}</div>}
+                    </div>
                     <div className="game-cell game-cell-muted">
                       {g.lastSave ? g.lastSave : "No save locally"}
                     </div>
