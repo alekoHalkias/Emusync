@@ -232,8 +232,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           rom_folder_path: rom.romFolderPath ?? "",
         });
 
-        // Log imported game
-        console.log(
+        // Log imported game to main process
+        await (window as any).emusync.log.message(
           `[Imported Game] game='${gameId}' name='${displayName}' console='${consoleAbbr}' ` +
           `rom_path='${rom.romPath}' save_path='${rom.savePath}' ` +
           `launch_command='${rom.launchCommand}' state_path='${rom.stateExists ? (rom.statePath ?? "") : ""}' ` +

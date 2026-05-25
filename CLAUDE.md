@@ -133,6 +133,8 @@ window.emusync.game.hasPidFile()           // true if .game_pid exists, process 
 window.emusync.game.isRunning()            // boolean
 window.emusync.game.onExited(cb)           // subscribe to game:exited event
 window.emusync.game.offExited(cb)          // unsubscribe
+
+window.emusync.log.message(text)           // logs message to Electron main process (appears in make dev-gui terminal)
 ```
 
 When adding a new IPC channel, add the handler to `main.ts` AND the bridge entry to `preload.ts`. The renderer's TypeScript sees `window.emusync` as `any` (no separate `.d.ts`) — the global type declaration lives in `Setup.tsx`.
