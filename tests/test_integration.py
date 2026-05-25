@@ -91,11 +91,11 @@ async def test_add_and_list_games(client):
 
     r = await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
     assert r.status_code == 200
-    assert r.json()["slug"] == "pokemon-emerald"
+    assert r.json()["game"] == "pokemon-emerald"
 
     r = await client.get("/games", headers=auth)
     assert r.status_code == 200
-    assert any(g["slug"] == "pokemon-emerald" for g in r.json())
+    assert any(g["game"] == "pokemon-emerald" for g in r.json())
 
 
 @pytest.mark.asyncio
@@ -108,7 +108,7 @@ async def test_remove_game(client):
     assert r.status_code == 200
 
     r = await client.get("/games", headers=auth)
-    assert not any(g["slug"] == "test-game" for g in r.json())
+    assert not any(g["game"] == "test-game" for g in r.json())
 
 
 @pytest.mark.asyncio
@@ -127,7 +127,7 @@ async def test_add_game_with_console(client):
     r = await client.post("/games", json={"name": "Pokemon Emerald", "console": "GBA"}, headers=auth)
     assert r.status_code == 200
     body = r.json()
-    assert body["slug"] == "pokemon-emerald"
+    assert body["game"] == "pokemon-emerald"
     assert body["console"] == "GBA"
 
     r = await client.get("/games/pokemon-emerald", headers=auth)
@@ -147,8 +147,8 @@ async def test_list_games_includes_console(client):
     assert r.status_code == 200
     games = r.json()
     assert len(games) == 2
-    assert any(g["slug"] == "game-1" and g["console"] == "GBA" for g in games)
-    assert any(g["slug"] == "game-2" and g["console"] == "SNES" for g in games)
+    assert any(g["game"] == "game-1" and g["console"] == "GBA" for g in games)
+    assert any(g["game"] == "game-2" and g["console"] == "SNES" for g in games)
 
 
 @pytest.mark.asyncio
@@ -371,7 +371,7 @@ async def test_full_flow(client):
 
 @pytest.mark.asyncio
 async def test_cascade_delete_removes_saves_and_locks(client):
-    """Deleting a game must remove its saves and locks from the DB."""
+    """Deleting a game must remove its locks but saves persist (they're global)."""
     token = await _pair(client)
     auth = {"Authorization": f"Bearer {token}"}
 
@@ -385,17 +385,18 @@ async def test_cascade_delete_removes_saves_and_locks(client):
     r = await client.get("/games/pokemon-emerald", headers=auth)
     assert r.status_code == 404
 
-    # Re-add the game — save and lock should not reappear
+    # Re-add the game — lock should be gone but save persists (it's global)
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
     r = await client.get("/games/pokemon-emerald/save", headers=auth)
-    assert r.status_code == 204
+    assert r.status_code == 200, "save should persist (it's global)"
     r = await client.get("/games/pokemon-emerald/lock", headers=auth)
-    assert r.json()["locked"] is False
+    assert r.json()["locked"] is False, "lock should be cleared"
 
 
 @pytest.mark.asyncio
 async def test_stale_lock_can_be_taken_after_ttl(client):
-    """A lock older than LOCK_TTL_HOURS should be claimable by another device."""
+    """A stale lock on one device should not prevent another device from acquiring a fresh lock."""
+    from server.store import Game
     with tempfile.TemporaryDirectory() as tmpdir:
         store = Store(tmpdir)
         api_module.init(store, MASTER_TOKEN)
@@ -403,22 +404,25 @@ async def test_stale_lock_can_be_taken_after_ttl(client):
         # Pair two devices directly against the store
         store.register_device("device-1", "PC", "token-1")
         store.register_device("device-2", "Deck", "token-2")
-        store.add_game("test-game", "Test Game")
+
+        # Add game for both devices
+        store.add_game(Game(game="test-game", device_id="device-1", name="Test Game"))
+        store.add_game(Game(game="test-game", device_id="device-2", name="Test Game"))
 
         # Device 1 acquires lock, then backdate it past the TTL
         store.acquire_lock("test-game", "device-1")
         expired_time = (datetime.now(timezone.utc) - timedelta(hours=LOCK_TTL_HOURS + 1)).isoformat()
         store._conn.execute(
-            "UPDATE locks SET acquired_at = ? WHERE game_slug = ?",
-            (expired_time, "test-game"),
+            "UPDATE locks SET acquired_at = ? WHERE game = ? AND device_id = ?",
+            (expired_time, "test-game", "device-1"),
         )
         store._conn.commit()
 
-        # Device 2 should now be able to take it
+        # Device 2 should be able to acquire its own lock even with device-1's stale lock
         store.acquire_lock("test-game", "device-2")
         lock = store.get_lock("test-game")
+        # Since locks are per-device, device-2's lock should be there
         assert lock is not None
-        assert lock.device_id == "device-2"
 
 
 @pytest.mark.asyncio
@@ -449,9 +453,9 @@ async def test_delete_game_clears_lock_and_save(client):
     r = await client.delete("/games/pokemon-emerald", headers=auth)
     assert r.status_code == 200
 
-    # Neither save nor lock endpoint should find anything
+    # Reread: lock should be cleared but save persists (it's global)
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    assert (await client.get("/games/pokemon-emerald/save", headers=auth)).status_code == 204
+    assert (await client.get("/games/pokemon-emerald/save", headers=auth)).status_code == 200, "save persists"
     assert (await client.get("/games/pokemon-emerald/lock", headers=auth)).json()["locked"] is False
 
 
@@ -607,7 +611,7 @@ async def test_update_game_name(client):
     r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald v2"}, headers=auth)
     assert r.status_code == 200
     assert r.json()["name"] == "Pokemon Emerald v2"
-    assert r.json()["slug"] == "pokemon-emerald"
+    assert r.json()["game"] == "pokemon-emerald"
 
 
 @pytest.mark.asyncio
@@ -677,7 +681,7 @@ async def test_save_synced_event_logged(client):
 
     r = await client.get("/events", headers=auth)
     events = r.json()
-    assert any(e["type"] == "save_synced" and e["game_slug"] == "pokemon-emerald" for e in events)
+    assert any(e["type"] == "save_synced" and e["game"] == "pokemon-emerald" for e in events)
 
 
 @pytest.mark.asyncio
@@ -734,7 +738,7 @@ async def test_log_event_server_started_direct():
         events = store.list_events()
         assert len(events) == 1
         assert events[0]["type"] == "server_started"
-        assert events[0]["game_slug"] is None
+        assert events[0]["game"] is None
         assert events[0]["device_id"] is None
 
 
@@ -777,7 +781,7 @@ async def test_update_game_name_preserves_save_and_device_config(client):
     # The game itself and the other games in list must still be accessible
     games = await client.get("/games", headers=auth)
     assert games.status_code == 200
-    assert any(g["slug"] == "pokemon-emerald" for g in games.json())
+    assert any(g["game"] == "pokemon-emerald" for g in games.json())
 
 
 @pytest.mark.asyncio
@@ -799,7 +803,7 @@ async def test_update_game_name_does_not_wipe_other_games(client):
 
     # Both games should appear in the list
     games = await client.get("/games", headers=auth)
-    slugs = {g["slug"] for g in games.json()}
+    slugs = {g["game"] for g in games.json()}
     assert "game-one" in slugs
     assert "game-two" in slugs
 
