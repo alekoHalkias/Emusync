@@ -56,7 +56,10 @@ export async function pair(masterToken: string, deviceId: string, deviceName: st
   return (await data.json()).token;
 }
 
-export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
+export const listGames = async (): Promise<Game[]> => {
+  const games = await _fetch<Array<any>>("GET", "/games");
+  return games.map(g => ({ ...g, slug: g.game }));
+};
 export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
