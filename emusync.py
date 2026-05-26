@@ -38,7 +38,7 @@ def _client(cfg=None) -> SyncClient:
     if cfg is None:
         cfg = cfg_module.load()
     host = cfg.server_host or "localhost"
-    return SyncClient(host, cfg.server_port, cfg.token)
+    return SyncClient(host, cfg.server_port, cfg.server_pin, cfg.device_id, cfg.device_name)
 
 
 def _slugify(name: str) -> str:
@@ -185,12 +185,12 @@ def device() -> None:
     """Manage device pairing."""
 
 
-@device.command("pair")
+@device.command("connect")
 @click.option("--host", default=None, help="Server host (auto-discovered via mDNS if omitted)")
 @click.option("--port", default=None, type=int, help="Server port (default: 8765)")
-@click.option("--token", required=True, help="Master token printed by 'emusync server start'")
-def device_pair(host: str | None, port: int | None, token: str) -> None:
-    """Pair this device with an EmuSync server."""
+@click.option("--pin", default="", help="Server PIN (leave blank for open servers)")
+def device_connect(host: str | None, port: int | None, pin: str) -> None:
+    """Connect this device to an EmuSync server."""
     cfg = cfg_module.load()
 
     if not host:
@@ -214,13 +214,19 @@ def device_pair(host: str | None, port: int | None, token: str) -> None:
             host, port = servers[idx].host, servers[idx].port
 
     port = port or cfg.server_port
-    client = SyncClient(host, port, "")
-    new_token = client.pair(token, cfg.device_id, cfg.device_name)
+    # Verify we can authenticate with the given PIN before saving
+    client = SyncClient(host, port, pin, cfg.device_id, cfg.device_name)
+    try:
+        devices = client.list_devices()
+        click.echo(f"Connected — {len(devices)} device(s) on server.")
+    except Exception as e:
+        click.echo(f"Connection failed: {e}", err=True)
+        sys.exit(1)
     cfg.server_host = host
     cfg.server_port = port
-    cfg.token = new_token
+    cfg.server_pin = pin
     cfg_module.save(cfg)
-    click.echo("Paired successfully. Token saved to ~/.emusync/emusync.toml")
+    click.echo("Connected. Settings saved to ~/.emusync/emusync.toml")
 
 
 @device.command("list")

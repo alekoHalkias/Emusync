@@ -13,7 +13,6 @@ const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
 })();
 
 let serverProcess: ChildProcess | null = null;
-let serverToken: string | null = null;
 let gameProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 
@@ -101,40 +100,39 @@ ipcMain.handle("config:addRecentFolder", (_event, consoleKey: string, folderPath
   }
 });
 
-function startServerProcess(): Promise<{ ok: boolean; token: string | null }> {
-  if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
+function startServerProcess(): Promise<{ ok: boolean }> {
+  if (serverProcess) return Promise.resolve({ ok: true });
 
-  return new Promise<{ ok: boolean; token: string | null }>((resolve) => {
-    let token: string | null = null;
+  return new Promise<{ ok: boolean }>((resolve) => {
+    let resolved = false;
     const proc = spawn(PYTHON, [SCRIPT, "server", "start"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PYTHONUNBUFFERED: "1" },
     });
     serverProcess = proc;
 
+    // Resolve as soon as the server prints its startup line (before uvicorn binds)
     proc.stdout?.on("data", (chunk: Buffer) => {
       const line = chunk.toString();
-      const match = line.match(/Pairing token: (\S+)/);
-      if (match) {
-        token = match[1];
-        serverToken = token;
-        resolve({ ok: true, token });
+      if (!resolved && line.includes("Pairing token:")) {
+        resolved = true;
+        resolve({ ok: true });
       }
     });
 
     proc.on("error", (err) => {
       serverProcess = null;
-      resolve({ ok: false, token: null });
+      if (!resolved) { resolved = true; resolve({ ok: false }); }
       console.error("Server process error:", err);
     });
 
     proc.on("exit", () => {
       serverProcess = null;
-      serverToken = null;
     });
 
+    // Fallback: resolve after 5 s if we never see the startup line
     setTimeout(() => {
-      if (token === null) resolve({ ok: true, token: null });
+      if (!resolved) { resolved = true; resolve({ ok: true }); }
     }, 5000);
   });
 }
@@ -168,20 +166,12 @@ ipcMain.handle("server:stop", async () => {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
   }
-  serverToken = null;
   killServerByPid();
   await killOrphanServers();
   return true;
 });
 
-ipcMain.handle("server:token", () => {
-  if (serverToken) return serverToken;
-  const tokenFile = join(homedir(), ".emusync", ".server_token");
-  try {
-    if (existsSync(tokenFile)) return readFileSync(tokenFile, "utf-8").trim();
-  } catch {}
-  return null;
-});
+ipcMain.handle("server:token", () => null); // deprecated — PIN auth no longer uses per-device tokens
 
 ipcMain.handle("server:discover", () => {
   return new Promise<Array<{ name: string; host: string; port: number }>>((resolve) => {
@@ -202,7 +192,6 @@ ipcMain.handle("server:change-pin", async (_event, pin: string | null) => {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
   }
-  serverToken = null;
   killServerByPid();
   await killOrphanServers();
 
@@ -214,13 +203,6 @@ ipcMain.handle("server:change-pin", async (_event, pin: string | null) => {
     delete raw.server_pin;
   }
   writeFileSync(CONFIG_PATH, stringifyTOML(raw as any));
-
-  // Clear all paired devices so they must re-pair
-  await new Promise<void>((resolve) => {
-    const proc = spawn(PYTHON, [SCRIPT, "server", "clear-devices"], { stdio: "ignore" });
-    proc.on("exit", () => resolve());
-    proc.on("error", () => resolve());
-  });
 
   return startServerProcess();
 });
@@ -992,6 +974,6 @@ app.on("window-all-closed", () => {
     serverProcess = null;
   }
   killServerByPid();
-  spawn("pkill", ["-9", "-f", "emusync.py server start"], { stdio: "ignore" });
+  void killOrphanServers();
   if (process.platform !== "darwin") app.quit();
 });

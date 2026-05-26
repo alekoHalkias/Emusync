@@ -17,7 +17,6 @@ class Config:
     data_dir: str = field(default_factory=lambda: str(Path.home() / ".emusync"))
     device_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     device_name: str = field(default_factory=lambda: os.uname().nodename)
-    token: str = ""
     is_server: bool = False
     server_pin: str = ""
     recent_import_folders: dict = field(default_factory=dict)
@@ -39,7 +38,6 @@ def load() -> Config:
         data_dir=str(data.get("data_dir", str(Path.home() / ".emusync"))),
         device_id=str(data.get("device_id", str(uuid.uuid4()))),
         device_name=str(data.get("device_name", os.uname().nodename)),
-        token=str(data.get("token", "")),
         is_server=bool(data.get("is_server", False)),
         server_pin=str(data.get("server_pin", "")),
         recent_import_folders=recent_folders,
@@ -54,7 +52,6 @@ def save(cfg: Config) -> None:
     doc.add("data_dir", cfg.data_dir)
     doc.add("device_id", cfg.device_id)
     doc.add("device_name", cfg.device_name)
-    doc.add("token", cfg.token)
     doc.add("is_server", cfg.is_server)
     if cfg.server_pin:
         doc.add("server_pin", cfg.server_pin)

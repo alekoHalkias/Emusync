@@ -20,9 +20,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from server import api as api_module
 from server.store import Store, LOCK_TTL_HOURS
 
-MASTER_TOKEN = "test-master-token"
+MASTER_PIN = "test-master-pin"
 DEVICE_ID = "device-abc"
 DEVICE_NAME = "test-pc"
+
+# Standard auth headers for the default test device
+AUTH = {
+    "Authorization": f"Bearer {MASTER_PIN}",
+    "X-Device-ID": DEVICE_ID,
+    "X-Device-Name": DEVICE_NAME,
+}
+
+
+def _device_auth(device_id: str, device_name: str, pin: str = MASTER_PIN) -> dict:
+    """Build auth headers for a specific device."""
+    return {
+        "Authorization": f"Bearer {pin}",
+        "X-Device-ID": device_id,
+        "X-Device-Name": device_name,
+    }
 
 
 @pytest_asyncio.fixture
@@ -30,23 +46,12 @@ async def client():
     """Fresh in-memory store + FastAPI app for each test."""
     with tempfile.TemporaryDirectory() as tmpdir:
         store = Store(tmpdir)
-        api_module.init(store, MASTER_TOKEN)
+        api_module.init(store, MASTER_PIN)
         async with AsyncClient(
             transport=ASGITransport(app=api_module.app),
             base_url="http://test",
         ) as c:
             yield c
-
-
-async def _pair(client: AsyncClient) -> str:
-    """Pair a device and return its bearer token."""
-    r = await client.post("/pair", json={
-        "master_token": MASTER_TOKEN,
-        "device_id": DEVICE_ID,
-        "device_name": DEVICE_NAME,
-    })
-    assert r.status_code == 200
-    return r.json()["token"]
 
 
 # ── health ────────────────────────────────────────────────────────────────────
@@ -58,92 +63,120 @@ async def test_health(client):
     assert r.json() == {"status": "ok"}
 
 
-# ── pairing ───────────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_pair_success(client):
-    token = await _pair(client)
-    assert isinstance(token, str) and len(token) > 0
-
-
-@pytest.mark.asyncio
-async def test_pair_wrong_master_token(client):
-    r = await client.post("/pair", json={
-        "master_token": "wrong",
-        "device_id": DEVICE_ID,
-        "device_name": DEVICE_NAME,
-    })
-    assert r.status_code == 403
-
+# ── authentication ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_auth_required(client):
+    """Requests without headers should be rejected."""
     r = await client.get("/games")
     assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_wrong_pin_rejected(client):
+    """Wrong PIN should be rejected with 401."""
+    bad_auth = _device_auth(DEVICE_ID, DEVICE_NAME, pin="wrong")
+    r = await client.get("/games", headers=bad_auth)
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_missing_device_id_rejected(client):
+    """Missing X-Device-ID header should be rejected."""
+    r = await client.get("/games", headers={"Authorization": f"Bearer {MASTER_PIN}"})
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_device_auto_registered_on_first_request(client):
+    """Devices should be auto-registered on first authenticated request — no explicit pair step."""
+    r = await client.get("/games", headers=AUTH)
+    assert r.status_code == 200
+
+    r = await client.get("/devices", headers=AUTH)
+    devices = r.json()
+    assert any(d["id"] == DEVICE_ID for d in devices)
+    assert any(d["name"] == DEVICE_NAME for d in devices)
+
+
+# ── blank PIN (open access) ───────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_blank_pin_server_allows_any_device():
+    """When server_pin is blank, any device connects without a code."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, "")  # blank = open access
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app),
+            base_url="http://test",
+        ) as c:
+            r = await c.get("/games", headers={"Authorization": "Bearer ", "X-Device-ID": "open-device", "X-Device-Name": "Open"})
+            assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_blank_pin_server_ignores_wrong_pin():
+    """Blank server PIN accepts requests even with a non-empty PIN value."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, "")
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app),
+            base_url="http://test",
+        ) as c:
+            r = await c.get("/games", headers={"Authorization": "Bearer wrong-pin", "X-Device-ID": "d1", "X-Device-Name": "D1"})
+            assert r.status_code == 200
 
 
 # ── games ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_add_and_list_games(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    r = await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    r = await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
     assert r.status_code == 200
     assert r.json()["slug"] == "pokemon-emerald"
 
-    r = await client.get("/games", headers=auth)
+    r = await client.get("/games", headers=AUTH)
     assert r.status_code == 200
     assert any(g["slug"] == "pokemon-emerald" for g in r.json())
 
 
 @pytest.mark.asyncio
 async def test_remove_game(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    await client.post("/games", json={"name": "Test Game"}, headers=auth)
-    r = await client.delete("/games/test-game", headers=auth)
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+    r = await client.delete("/games/test-game", headers=AUTH)
     assert r.status_code == 200
 
-    r = await client.get("/games", headers=auth)
+    r = await client.get("/games", headers=AUTH)
     assert not any(g["slug"] == "test-game" for g in r.json())
 
 
 @pytest.mark.asyncio
 async def test_get_nonexistent_game(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    r = await client.get("/games/does-not-exist", headers=auth)
+    r = await client.get("/games/does-not-exist", headers=AUTH)
     assert r.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_add_game_with_console(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    r = await client.post("/games", json={"name": "Pokemon Emerald", "console": "GBA"}, headers=auth)
+    r = await client.post("/games", json={"name": "Pokemon Emerald", "console": "GBA"}, headers=AUTH)
     assert r.status_code == 200
     body = r.json()
     assert body["slug"] == "pokemon-emerald"
     assert body["console"] == "GBA"
 
-    r = await client.get("/games/pokemon-emerald", headers=auth)
+    r = await client.get("/games/pokemon-emerald", headers=AUTH)
     assert r.status_code == 200
     assert r.json()["console"] == "GBA"
 
 
 @pytest.mark.asyncio
 async def test_list_games_includes_console(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Game 1", "console": "GBA"}, headers=AUTH)
+    await client.post("/games", json={"name": "Game 2", "console": "SNES"}, headers=AUTH)
 
-    await client.post("/games", json={"name": "Game 1", "console": "GBA"}, headers=auth)
-    await client.post("/games", json={"name": "Game 2", "console": "SNES"}, headers=auth)
-
-    r = await client.get("/games", headers=auth)
+    r = await client.get("/games", headers=AUTH)
     assert r.status_code == 200
     games = r.json()
     assert len(games) == 2
@@ -153,16 +186,13 @@ async def test_list_games_includes_console(client):
 
 @pytest.mark.asyncio
 async def test_update_game_console(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
 
-    await client.post("/games", json={"name": "Test Game"}, headers=auth)
-
-    r = await client.put("/games/test-game", json={"name": "Test Game", "console": "GB"}, headers=auth)
+    r = await client.put("/games/test-game", json={"name": "Test Game", "console": "GB"}, headers=AUTH)
     assert r.status_code == 200
     assert r.json()["console"] == "GB"
 
-    r = await client.get("/games/test-game", headers=auth)
+    r = await client.get("/games/test-game", headers=AUTH)
     assert r.status_code == 200
     assert r.json()["console"] == "GB"
 
@@ -171,19 +201,17 @@ async def test_update_game_console(client):
 
 @pytest.mark.asyncio
 async def test_set_and_get_device_config(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
     cfg = {
         "rom_path": "/roms/emerald.gba",
         "save_path": "/roms/emerald.srm",
         "launch_command": "retroarch -L mgba.so /roms/emerald.gba",
     }
-    r = await client.put("/games/pokemon-emerald/device", json=cfg, headers=auth)
+    r = await client.put("/games/pokemon-emerald/device", json=cfg, headers=AUTH)
     assert r.status_code == 200
 
-    r = await client.get("/games/pokemon-emerald/device", headers=auth)
+    r = await client.get("/games/pokemon-emerald/device", headers=AUTH)
     assert r.status_code == 200
     body = r.json()
     assert body["rom_path"] == cfg["rom_path"]
@@ -195,17 +223,15 @@ async def test_set_and_get_device_config(client):
 
 @pytest.mark.asyncio
 async def test_push_and_pull_save(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
     save_v1 = b"\x00\x01\x02\x03" * 256
-    r = await client.post("/games/pokemon-emerald/save", content=save_v1, headers=auth)
+    r = await client.post("/games/pokemon-emerald/save", content=save_v1, headers=AUTH)
     assert r.status_code == 200
     pushed_hash = r.json()["hash"]
     assert pushed_hash == hashlib.sha256(save_v1).hexdigest()
 
-    r = await client.get("/games/pokemon-emerald/save", headers=auth)
+    r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
     assert r.status_code == 200
     assert r.content == save_v1
     assert r.headers["x-save-hash"] == pushed_hash
@@ -213,41 +239,34 @@ async def test_push_and_pull_save(client):
 
 @pytest.mark.asyncio
 async def test_push_save_updates_version(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
     save_v1 = b"save version 1"
     save_v2 = b"save version 2 with more progress"
 
-    await client.post("/games/pokemon-emerald/save", content=save_v1, headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=save_v2, headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=save_v1, headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=save_v2, headers=AUTH)
 
-    r = await client.get("/games/pokemon-emerald/save", headers=auth)
+    r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
     assert r.content == save_v2
     assert r.headers["x-save-hash"] == hashlib.sha256(save_v2).hexdigest()
 
 
 @pytest.mark.asyncio
 async def test_pull_save_no_save_returns_204(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-
-    r = await client.get("/games/pokemon-emerald/save", headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
     assert r.status_code == 204
 
 
 @pytest.mark.asyncio
 async def test_save_meta(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
     save_data = b"some save data"
-    await client.post("/games/pokemon-emerald/save", content=save_data, headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=save_data, headers=AUTH)
 
-    r = await client.get("/games/pokemon-emerald/save/meta", headers=auth)
+    r = await client.get("/games/pokemon-emerald/save/meta", headers=AUTH)
     assert r.status_code == 200
     meta = r.json()
     assert meta["hash"] == hashlib.sha256(save_data).hexdigest()
@@ -258,46 +277,29 @@ async def test_save_meta(client):
 
 @pytest.mark.asyncio
 async def test_acquire_and_release_lock(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
-    r = await client.get("/games/pokemon-emerald/lock", headers=auth)
+    r = await client.get("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.json()["locked"] is False
 
-    r = await client.post("/games/pokemon-emerald/lock", headers=auth)
+    r = await client.post("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.status_code == 200
 
-    r = await client.get("/games/pokemon-emerald/lock", headers=auth)
+    r = await client.get("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.json()["locked"] is True
 
-    r = await client.delete("/games/pokemon-emerald/lock", headers=auth)
+    r = await client.delete("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.status_code == 200
 
-    r = await client.get("/games/pokemon-emerald/lock", headers=auth)
+    r = await client.get("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.json()["locked"] is False
 
 
 @pytest.mark.asyncio
 async def test_second_device_cannot_acquire_held_lock(client):
     """Two different devices — second one must be rejected while first holds the lock."""
-    # Pair device 1
-    r = await client.post("/pair", json={
-        "master_token": MASTER_TOKEN,
-        "device_id": "device-1",
-        "device_name": "PC",
-    })
-    token1 = r.json()["token"]
-    auth1 = {"Authorization": f"Bearer {token1}"}
-
-    # Pair device 2
-    r = await client.post("/pair", json={
-        "master_token": MASTER_TOKEN,
-        "device_id": "device-2",
-        "device_name": "Steam Deck",
-    })
-    token2 = r.json()["token"]
-    auth2 = {"Authorization": f"Bearer {token2}"}
+    auth1 = _device_auth("device-1", "PC")
+    auth2 = _device_auth("device-2", "Steam Deck")
 
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth1)
 
@@ -312,24 +314,20 @@ async def test_second_device_cannot_acquire_held_lock(client):
 
 @pytest.mark.asyncio
 async def test_same_device_can_reacquire_own_lock(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
-    await client.post("/games/pokemon-emerald/lock", headers=auth)
-    r = await client.post("/games/pokemon-emerald/lock", headers=auth)
+    await client.post("/games/pokemon-emerald/lock", headers=AUTH)
+    r = await client.post("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_get_lock_reflects_owning_device(client):
     """get_lock returns the device_id so emusync run can detect its own duplicate launch."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
-    await client.post("/games/pokemon-emerald/lock", headers=auth)
-    r = await client.get("/games/pokemon-emerald/lock", headers=auth)
+    await client.post("/games/pokemon-emerald/lock", headers=AUTH)
+    r = await client.get("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.status_code == 200
     data = r.json()
     assert data["locked"] is True
@@ -340,30 +338,27 @@ async def test_get_lock_reflects_owning_device(client):
 
 @pytest.mark.asyncio
 async def test_full_flow(client):
-    """Smoke test: pair → add game → push save → verify hash → lock → unlock."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    await client.post("/games", json={"name": "Metroid Fusion"}, headers=auth)
+    """Smoke test: connect → add game → push save → verify hash → lock → unlock."""
+    await client.post("/games", json={"name": "Metroid Fusion"}, headers=AUTH)
     await client.put("/games/metroid-fusion/device", json={
         "rom_path": "/roms/fusion.gba",
         "save_path": "/roms/fusion.srm",
         "launch_command": "retroarch -L mgba.so /roms/fusion.gba",
-    }, headers=auth)
+    }, headers=AUTH)
 
     save = b"\xDE\xAD\xBE\xEF" * 512
-    r = await client.post("/games/metroid-fusion/save", content=save, headers=auth)
+    r = await client.post("/games/metroid-fusion/save", content=save, headers=AUTH)
     assert r.json()["hash"] == hashlib.sha256(save).hexdigest()
 
-    r = await client.get("/games/metroid-fusion/save", headers=auth)
+    r = await client.get("/games/metroid-fusion/save", headers=AUTH)
     assert r.content == save
 
-    await client.post("/games/metroid-fusion/lock", headers=auth)
-    r = await client.get("/games/metroid-fusion/lock", headers=auth)
+    await client.post("/games/metroid-fusion/lock", headers=AUTH)
+    r = await client.get("/games/metroid-fusion/lock", headers=AUTH)
     assert r.json()["locked"] is True
 
-    await client.delete("/games/metroid-fusion/lock", headers=auth)
-    r = await client.get("/games/metroid-fusion/lock", headers=auth)
+    await client.delete("/games/metroid-fusion/lock", headers=AUTH)
+    r = await client.get("/games/metroid-fusion/lock", headers=AUTH)
     assert r.json()["locked"] is False
 
 
@@ -372,24 +367,21 @@ async def test_full_flow(client):
 @pytest.mark.asyncio
 async def test_cascade_delete_removes_saves_and_locks(client):
     """Deleting a game must remove its saves and locks from the DB."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=AUTH)
+    await client.post("/games/pokemon-emerald/lock", headers=AUTH)
 
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=auth)
-    await client.post("/games/pokemon-emerald/lock", headers=auth)
-
-    await client.delete("/games/pokemon-emerald", headers=auth)
+    await client.delete("/games/pokemon-emerald", headers=AUTH)
 
     # Game is gone
-    r = await client.get("/games/pokemon-emerald", headers=auth)
+    r = await client.get("/games/pokemon-emerald", headers=AUTH)
     assert r.status_code == 404
 
     # Re-add the game — save and lock should not reappear
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    r = await client.get("/games/pokemon-emerald/save", headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
     assert r.status_code == 204
-    r = await client.get("/games/pokemon-emerald/lock", headers=auth)
+    r = await client.get("/games/pokemon-emerald/lock", headers=AUTH)
     assert r.json()["locked"] is False
 
 
@@ -398,11 +390,11 @@ async def test_stale_lock_can_be_taken_after_ttl(client):
     """A lock older than LOCK_TTL_HOURS should be claimable by another device."""
     with tempfile.TemporaryDirectory() as tmpdir:
         store = Store(tmpdir)
-        api_module.init(store, MASTER_TOKEN)
+        api_module.init(store, MASTER_PIN)
 
-        # Pair two devices directly against the store
-        store.register_device("device-1", "PC", "token-1")
-        store.register_device("device-2", "Deck", "token-2")
+        # Register two devices directly via ensure_device
+        store.ensure_device("device-1", "PC")
+        store.ensure_device("device-2", "Deck")
         store.add_game("test-game", "Test Game")
 
         # Device 1 acquires lock, then backdate it past the TTL
@@ -424,14 +416,12 @@ async def test_stale_lock_can_be_taken_after_ttl(client):
 @pytest.mark.asyncio
 async def test_push_save_twice_keeps_only_latest(client):
     """Pushing a save twice must replace the first — only one row in the DB."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
-    await client.post("/games/pokemon-emerald/save", content=b"version one", headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=b"version two", headers=auth)
+    await client.post("/games/pokemon-emerald/save", content=b"version one", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=b"version two", headers=AUTH)
 
-    r = await client.get("/games/pokemon-emerald/save", headers=auth)
+    r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
     assert r.content == b"version two"
 
 
@@ -439,44 +429,35 @@ async def test_push_save_twice_keeps_only_latest(client):
 
 @pytest.mark.asyncio
 async def test_delete_game_clears_lock_and_save(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=b"save", headers=AUTH)
+    await client.post("/games/pokemon-emerald/lock", headers=AUTH)
 
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=b"save", headers=auth)
-    await client.post("/games/pokemon-emerald/lock", headers=auth)
-
-    r = await client.delete("/games/pokemon-emerald", headers=auth)
+    r = await client.delete("/games/pokemon-emerald", headers=AUTH)
     assert r.status_code == 200
 
     # Neither save nor lock endpoint should find anything
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    assert (await client.get("/games/pokemon-emerald/save", headers=auth)).status_code == 204
-    assert (await client.get("/games/pokemon-emerald/lock", headers=auth)).json()["locked"] is False
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    assert (await client.get("/games/pokemon-emerald/save", headers=AUTH)).status_code == 204
+    assert (await client.get("/games/pokemon-emerald/lock", headers=AUTH)).json()["locked"] is False
 
 
 @pytest.mark.asyncio
 async def test_set_device_config_nonexistent_game(client):
     """PUT /games/:slug/device on a slug that doesn't exist should 404 or fail gracefully."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
     r = await client.put("/games/ghost-game/device", json={
         "rom_path": "/roms/ghost.gba",
         "save_path": "/roms/ghost.srm",
         "launch_command": "retroarch ghost.gba",
-    }, headers=auth)
+    }, headers=AUTH)
     # Should not silently succeed — foreign key constraint on game_slug
     assert r.status_code in (404, 422, 500)
 
 
 @pytest.mark.asyncio
 async def test_save_meta_returns_204_when_no_save(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-
-    r = await client.get("/games/pokemon-emerald/save/meta", headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    r = await client.get("/games/pokemon-emerald/save/meta", headers=AUTH)
     assert r.status_code == 204
 
 
@@ -485,23 +466,8 @@ async def test_save_meta_returns_204_when_no_save(client):
 @pytest.mark.asyncio
 async def test_two_device_save_sync(client):
     """Device A pushes v1, device B pulls and verifies, B pushes v2, A pulls and gets v2."""
-    # Pair device A
-    r = await client.post("/pair", json={
-        "master_token": MASTER_TOKEN,
-        "device_id": "device-a",
-        "device_name": "Gaming PC",
-    })
-    token_a = r.json()["token"]
-    auth_a = {"Authorization": f"Bearer {token_a}"}
-
-    # Pair device B
-    r = await client.post("/pair", json={
-        "master_token": MASTER_TOKEN,
-        "device_id": "device-b",
-        "device_name": "Steam Deck",
-    })
-    token_b = r.json()["token"]
-    auth_b = {"Authorization": f"Bearer {token_b}"}
+    auth_a = _device_auth("device-a", "Gaming PC")
+    auth_b = _device_auth("device-b", "Steam Deck")
 
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth_a)
 
@@ -530,53 +496,11 @@ async def test_two_device_save_sync(client):
     assert r.headers["x-save-hash"] == hash_v2
 
 
-# ── blank PIN (open access) ───────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_pair_with_blank_pin_succeeds():
-    """When server_pin is blank any device can pair without a code."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = Store(tmpdir)
-        api_module.init(store, "")  # blank master token = open access
-        async with AsyncClient(
-            transport=ASGITransport(app=api_module.app),
-            base_url="http://test",
-        ) as c:
-            r = await c.post("/pair", json={
-                "master_token": "",
-                "device_id": "open-device",
-                "device_name": "Open Device",
-            })
-            assert r.status_code == 200
-            assert r.json()["token"]
-
-
-@pytest.mark.asyncio
-async def test_pair_with_blank_pin_ignores_wrong_code():
-    """Blank server PIN means even a wrong code is accepted."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = Store(tmpdir)
-        api_module.init(store, "")
-        async with AsyncClient(
-            transport=ASGITransport(app=api_module.app),
-            base_url="http://test",
-        ) as c:
-            r = await c.post("/pair", json={
-                "master_token": "some-random-garbage",
-                "device_id": "open-device",
-                "device_name": "Open Device",
-            })
-            assert r.status_code == 200
-
-
 # ── devices endpoint ──────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_list_devices(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    r = await client.get("/devices", headers=auth)
+    r = await client.get("/devices", headers=AUTH)
     assert r.status_code == 200
     devices = r.json()
     assert any(d["id"] == DEVICE_ID for d in devices)
@@ -584,12 +508,15 @@ async def test_list_devices(client):
 
 
 @pytest.mark.asyncio
-async def test_list_devices_shows_all_paired(client):
-    r1 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d1", "device_name": "PC"})
-    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d2", "device_name": "Deck"})
-    auth = {"Authorization": f"Bearer {r1.json()['token']}"}
+async def test_list_devices_shows_all_connected(client):
+    auth1 = _device_auth("d1", "PC")
+    auth2 = _device_auth("d2", "Deck")
 
-    r = await client.get("/devices", headers=auth)
+    # Trigger auto-registration for both devices
+    await client.get("/games", headers=auth1)
+    await client.get("/games", headers=auth2)
+
+    r = await client.get("/devices", headers=auth1)
     ids = [d["id"] for d in r.json()]
     assert "d1" in ids
     assert "d2" in ids
@@ -599,12 +526,9 @@ async def test_list_devices_shows_all_paired(client):
 
 @pytest.mark.asyncio
 async def test_update_game_name(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-
-    r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald v2"}, headers=auth)
+    r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald v2"}, headers=AUTH)
     assert r.status_code == 200
     assert r.json()["name"] == "Pokemon Emerald v2"
     assert r.json()["slug"] == "pokemon-emerald"
@@ -612,83 +536,50 @@ async def test_update_game_name(client):
 
 @pytest.mark.asyncio
 async def test_update_nonexistent_game_returns_404(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    r = await client.put("/games/ghost-game", json={"name": "Ghost"}, headers=auth)
+    r = await client.put("/games/ghost-game", json={"name": "Ghost"}, headers=AUTH)
     assert r.status_code == 404
 
 
 # ── clear_devices ─────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_clear_devices_removes_all(client):
-    await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d1", "device_name": "PC"})
-    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d2", "device_name": "Deck"})
-    auth = {"Authorization": f"Bearer {r2.json()['token']}"}
-
-    r = await client.get("/devices", headers=auth)
-    assert len(r.json()) == 2
-
+async def test_clear_devices_removes_all():
+    """store.clear_devices() removes all device records."""
     with tempfile.TemporaryDirectory() as tmpdir:
         store = Store(tmpdir)
-        store.register_device("d1", "PC", "tok1")
-        store.register_device("d2", "Deck", "tok2")
+        store.ensure_device("d1", "PC")
+        store.ensure_device("d2", "Deck")
         assert len(store.list_devices()) == 2
         store.clear_devices()
         assert store.list_devices() == []
-
-
-# ── pair idempotency ──────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_pair_same_device_id_updates_token(client):
-    """Pairing the same device_id twice issues a new token, not a duplicate row."""
-    r1 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": DEVICE_ID, "device_name": DEVICE_NAME})
-    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": DEVICE_ID, "device_name": DEVICE_NAME})
-    token1 = r1.json()["token"]
-    token2 = r2.json()["token"]
-
-    # New token issued each time
-    assert token1 != token2
-
-    # Old token should no longer be valid
-    r = await client.get("/games", headers={"Authorization": f"Bearer {token1}"})
-    assert r.status_code == 401
 
 
 # ── activity events ───────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_events_empty_on_fresh_store(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    r = await client.get("/events", headers=auth)
+    r = await client.get("/events", headers=AUTH)
     assert r.status_code == 200
     assert r.json() == []
 
 
 @pytest.mark.asyncio
 async def test_save_synced_event_logged(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=AUTH)
 
-    r = await client.get("/events", headers=auth)
+    r = await client.get("/events", headers=AUTH)
     events = r.json()
     assert any(e["type"] == "save_synced" and e["game_slug"] == "pokemon-emerald" for e in events)
 
 
 @pytest.mark.asyncio
 async def test_game_started_and_stopped_events_logged(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    await client.post("/games/pokemon-emerald/lock", headers=auth)
-    await client.delete("/games/pokemon-emerald/lock", headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    await client.post("/games/pokemon-emerald/lock", headers=AUTH)
+    await client.delete("/games/pokemon-emerald/lock", headers=AUTH)
 
-    r = await client.get("/events", headers=auth)
+    r = await client.get("/events", headers=AUTH)
     types = [e["type"] for e in r.json()]
     assert "game_started" in types
     assert "game_stopped" in types
@@ -696,25 +587,21 @@ async def test_game_started_and_stopped_events_logged(client):
 
 @pytest.mark.asyncio
 async def test_events_include_device_name(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=AUTH)
 
-    r = await client.get("/events", headers=auth)
+    r = await client.get("/events", headers=AUTH)
     save_event = next(e for e in r.json() if e["type"] == "save_synced")
     assert save_event["device_name"] == DEVICE_NAME
 
 
 @pytest.mark.asyncio
 async def test_events_ordered_newest_first(client):
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    await client.post("/games/pokemon-emerald/lock", headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=b"save", headers=auth)
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    await client.post("/games/pokemon-emerald/lock", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=b"save", headers=AUTH)
 
-    r = await client.get("/events", headers=auth)
+    r = await client.get("/events", headers=AUTH)
     events = r.json()
     assert events[0]["type"] == "save_synced"
     assert events[1]["type"] == "game_started"
@@ -742,40 +629,31 @@ async def test_log_event_server_started_direct():
 
 @pytest.mark.asyncio
 async def test_update_game_name_preserves_save_and_device_config(client):
-    """Renaming a game must not cascade-delete its saves or device config.
-
-    Regression: update_game previously called store.add_game() which uses
-    INSERT OR REPLACE, deleting the existing row (and cascading to saves,
-    game_devices, locks) before re-inserting it.  The fix uses UPDATE instead.
-    """
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    # Create game + push a save + set device config
-    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
-    await client.post("/games/pokemon-emerald/save", content=b"save-data-v1", headers=auth)
+    """Renaming a game must not cascade-delete its saves or device config."""
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=b"save-data-v1", headers=AUTH)
     await client.put("/games/pokemon-emerald/device", json={
         "rom_path": "/roms/emerald.gba",
         "save_path": "/saves/emerald.sav",
         "launch_command": "retroarch emerald.gba",
-    }, headers=auth)
+    }, headers=AUTH)
 
     # Rename the game
-    r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald GBA"}, headers=auth)
+    r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald GBA"}, headers=AUTH)
     assert r.status_code == 200
     assert r.json()["name"] == "Pokemon Emerald GBA"
 
     # Save must still be present
-    save_meta = await client.get("/games/pokemon-emerald/save/meta", headers=auth)
+    save_meta = await client.get("/games/pokemon-emerald/save/meta", headers=AUTH)
     assert save_meta.status_code == 200, "save was cascade-deleted by rename (regression)"
 
     # Device config must still be present
-    device_cfg = await client.get("/games/pokemon-emerald/device", headers=auth)
+    device_cfg = await client.get("/games/pokemon-emerald/device", headers=AUTH)
     assert device_cfg.status_code == 200, "device config was cascade-deleted by rename (regression)"
     assert device_cfg.json()["rom_path"] == "/roms/emerald.gba"
 
-    # The game itself and the other games in list must still be accessible
-    games = await client.get("/games", headers=auth)
+    # The game must still appear in the list
+    games = await client.get("/games", headers=AUTH)
     assert games.status_code == 200
     assert any(g["slug"] == "pokemon-emerald" for g in games.json())
 
@@ -783,22 +661,19 @@ async def test_update_game_name_preserves_save_and_device_config(client):
 @pytest.mark.asyncio
 async def test_update_game_name_does_not_wipe_other_games(client):
     """Renaming one game must not affect other games' data."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    await client.post("/games", json={"name": "Game One"}, headers=auth)
-    await client.post("/games", json={"name": "Game Two"}, headers=auth)
-    await client.post("/games/game-two/save", content=b"save-two", headers=auth)
+    await client.post("/games", json={"name": "Game One"}, headers=AUTH)
+    await client.post("/games", json={"name": "Game Two"}, headers=AUTH)
+    await client.post("/games/game-two/save", content=b"save-two", headers=AUTH)
 
     # Rename Game One
-    await client.put("/games/game-one", json={"name": "Game One Renamed"}, headers=auth)
+    await client.put("/games/game-one", json={"name": "Game One Renamed"}, headers=AUTH)
 
     # Game Two's save must be intact
-    meta = await client.get("/games/game-two/save/meta", headers=auth)
+    meta = await client.get("/games/game-two/save/meta", headers=AUTH)
     assert meta.status_code == 200, "other game's save was wiped when a different game was renamed"
 
     # Both games should appear in the list
-    games = await client.get("/games", headers=auth)
+    games = await client.get("/games", headers=AUTH)
     slugs = {g["slug"] for g in games.json()}
     assert "game-one" in slugs
     assert "game-two" in slugs
@@ -806,43 +681,40 @@ async def test_update_game_name_does_not_wipe_other_games(client):
 
 @pytest.mark.asyncio
 async def test_push_saves_endpoint(client):
-  """POST /games/:slug/push-saves pushes current save and state files from disk."""
-  import tempfile
-  from pathlib import Path
+    """POST /games/:slug/push-saves pushes current save and state files from disk."""
+    import tempfile
+    from pathlib import Path
 
-  token = await _pair(client)
-  auth = {"Authorization": f"Bearer {token}"}
+    # Create game
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
 
-  # Create game
-  await client.post("/games", json={"name": "Test Game"}, headers=auth)
+    # Create temporary save and state files
+    with tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "game.sav"
+        state_path = Path(tmpdir) / "game.state"
+        save_path.write_bytes(b"save-data-v1")
+        state_path.write_bytes(b"state-data-v1")
 
-  # Create temporary save and state files
-  with tempfile.TemporaryDirectory() as tmpdir:
-    save_path = Path(tmpdir) / "game.sav"
-    state_path = Path(tmpdir) / "game.state"
-    save_path.write_bytes(b"save-data-v1")
-    state_path.write_bytes(b"state-data-v1")
+        # Set device config with paths to our temp files
+        await client.put("/games/test-game/device", json={
+            "rom_path": "/roms/test.gba",
+            "save_path": str(save_path),
+            "launch_command": "retroarch test.gba",
+            "state_path": str(state_path),
+        }, headers=AUTH)
 
-    # Set device config with paths to our temp files
-    await client.put("/games/test-game/device", json={
-      "rom_path": "/roms/test.gba",
-      "save_path": str(save_path),
-      "launch_command": "retroarch test.gba",
-      "state_path": str(state_path),
-    }, headers=auth)
+        # Push saves
+        r = await client.post("/games/test-game/push-saves", headers=AUTH)
+        assert r.status_code == 200
+        assert r.json()["pushed"]["save"] is True
+        assert r.json()["pushed"]["state"] is True
 
-    # Push saves
-    r = await client.post("/games/test-game/push-saves", headers=auth)
-    assert r.status_code == 200
-    assert r.json()["pushed"]["save"] is True
-    assert r.json()["pushed"]["state"] is True
+        # Verify save and state are now in the database
+        save_meta = await client.get("/games/test-game/save/meta", headers=AUTH)
+        assert save_meta.status_code == 200
 
-    # Verify save and state are now in the database
-    save_meta = await client.get("/games/test-game/save/meta", headers=auth)
-    assert save_meta.status_code == 200
-
-    state_meta = await client.get("/games/test-game/state/meta", headers=auth)
-    assert state_meta.status_code == 200
+        state_meta = await client.get("/games/test-game/state/meta", headers=AUTH)
+        assert state_meta.status_code == 200
 
 
 # ── game devices list ─────────────────────────────────────────────────────────
@@ -850,10 +722,8 @@ async def test_push_saves_endpoint(client):
 @pytest.mark.asyncio
 async def test_list_game_devices_returns_devices_with_game(client):
     """GET /games/{slug}/devices returns all devices that have the game installed."""
-    r1 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d1", "device_name": "PC"})
-    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d2", "device_name": "Steam Deck"})
-    auth1 = {"Authorization": f"Bearer {r1.json()['token']}"}
-    auth2 = {"Authorization": f"Bearer {r2.json()['token']}"}
+    auth1 = _device_auth("d1", "PC")
+    auth2 = _device_auth("d2", "Steam Deck")
 
     # Add game (as device 1)
     await client.post("/games", json={"name": "Metroid"}, headers=auth1)
@@ -886,12 +756,9 @@ async def test_list_game_devices_returns_devices_with_game(client):
 @pytest.mark.asyncio
 async def test_list_game_devices_empty_when_no_devices(client):
     """GET /games/{slug}/devices returns empty list if no device has the game configured."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    await client.post("/games", json={"name": "Ghost Trick"}, headers=AUTH)
 
-    await client.post("/games", json={"name": "Ghost Trick"}, headers=auth)
-
-    r = await client.get("/games/ghost-trick/devices", headers=auth)
+    r = await client.get("/games/ghost-trick/devices", headers=AUTH)
     assert r.status_code == 200
     assert r.json() == []
 
@@ -899,10 +766,7 @@ async def test_list_game_devices_empty_when_no_devices(client):
 @pytest.mark.asyncio
 async def test_list_game_devices_404_for_unknown_game(client):
     """GET /games/{slug}/devices returns 404 if the game doesn't exist."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    r = await client.get("/games/nonexistent-game/devices", headers=auth)
+    r = await client.get("/games/nonexistent-game/devices", headers=AUTH)
     assert r.status_code == 404
 
 
@@ -911,36 +775,29 @@ async def test_list_game_devices_404_for_unknown_game(client):
 @pytest.mark.asyncio
 async def test_devices_list_includes_last_ip_and_last_seen(client):
     """GET /devices returns last_ip and last_seen_at fields."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
     # Make any authenticated request so touch_device fires
-    await client.get("/whoami", headers=auth)
+    await client.get("/whoami", headers=AUTH)
 
-    r = await client.get("/devices", headers=auth)
+    r = await client.get("/devices", headers=AUTH)
     assert r.status_code == 200
     device = next(d for d in r.json() if d["id"] == DEVICE_ID)
     assert "last_ip" in device
     assert "last_seen_at" in device
-    # last_seen_at should be set after the authenticated request above
     assert device["last_seen_at"] is not None
 
 
 @pytest.mark.asyncio
 async def test_touch_device_updates_last_seen(client):
     """Each authenticated request updates last_seen_at."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
-
-    await client.get("/whoami", headers=auth)
-    r1 = await client.get("/devices", headers=auth)
+    await client.get("/whoami", headers=AUTH)
+    r1 = await client.get("/devices", headers=AUTH)
     seen1 = next(d for d in r1.json() if d["id"] == DEVICE_ID)["last_seen_at"]
 
     import asyncio
     await asyncio.sleep(0.05)  # ensure clock advances
 
-    await client.get("/whoami", headers=auth)
-    r2 = await client.get("/devices", headers=auth)
+    await client.get("/whoami", headers=AUTH)
+    r2 = await client.get("/devices", headers=AUTH)
     seen2 = next(d for d in r2.json() if d["id"] == DEVICE_ID)["last_seen_at"]
 
     assert seen2 >= seen1

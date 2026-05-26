@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { configure, health, pair, listEvents, type ActivityEvent } from "../api";
+import { configure, configureDevice, health, listEvents, type ActivityEvent } from "../api";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
@@ -24,17 +24,14 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
 
-  // Pairing modal
-  const [showPairingModal, setShowPairingModal] = useState(false);
-
   // LAN discovery warning
   const [existingServers, setExistingServers] = useState<Array<{ name: string; host: string; port: number }>>([]);
   const [startWarningConfirmed, setStartWarningConfirmed] = useState(false);
 
-  // Pairing form
+  // Connect-to-server form
   const [pairHost, setPairHost] = useState("");
   const [pairPort, setPairPort] = useState("8765");
-  const [pairToken, setPairToken] = useState("");
+  const [pairPin, setPairPin] = useState("");
   const [pairBusy, setPairBusy] = useState(false);
   const [pairError, setPairError] = useState("");
   const [pairSuccess, setPairSuccess] = useState(false);
@@ -130,21 +127,21 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
     }
   }
 
-  async function doPair(): Promise<void> {
+  async function doConnect(): Promise<void> {
     if (!pairHost) {
       setPairError("Host is required.");
       return;
     }
 
     // Warn if this machine is currently acting as a server
-    const pairingToExternal = pairHost !== "localhost" && pairHost !== "127.0.0.1";
-    if (pairingToExternal && isServer && serverState === "online" && !pairServerWarning) {
+    const connectingToExternal = pairHost !== "localhost" && pairHost !== "127.0.0.1";
+    if (connectingToExternal && isServer && serverState === "online" && !pairServerWarning) {
       setPairServerWarning(true);
       return;
     }
 
-    // Stop local server before pairing as client
-    if (pairingToExternal && serverState === "online") {
+    // Stop local server before connecting as client
+    if (connectingToExternal && serverState === "online") {
       await window.emusync.server.stop();
       setStartState("idle");
       setServerState("offline");
@@ -155,31 +152,35 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
     setPairError("");
     setPairSuccess(false);
     try {
-      const cfg = (await window.emusync.config.load()) ?? {};
+      const cfg      = (await window.emusync.config.load()) ?? {};
       const deviceId = (cfg.device_id as string) ?? crypto.randomUUID();
-      const devName = (cfg.device_name as string) ?? "unknown";
-      const port = parseInt(pairPort) || 8765;
+      const devName  = (cfg.device_name as string) ?? "unknown";
+      const port     = parseInt(pairPort) || 8765;
+      const pin      = pairPin.trim();
 
-      configure(pairHost, port, "");
-      const newToken = await pair(pairToken.trim(), deviceId, devName);
+      // Verify we can reach the server with these credentials
+      configure(pairHost, port, pin);
+      configureDevice(deviceId, devName);
+      if (!(await health())) {
+        throw new Error("Could not reach the server. Check the address and make sure the server is running.");
+      }
 
       await window.emusync.config.save({
         ...cfg,
         server_host: pairHost,
         server_port: port,
+        server_pin: pin,
         device_id: deviceId,
         device_name: devName,
-        token: newToken,
         is_server: false,
       });
 
-      configure(pairHost, port, newToken);
       setPairSuccess(true);
-      setPairToken("");
+      setPairPin("");
       poll();
       onRepaired();
     } catch (e: unknown) {
-      setPairError(e instanceof Error ? e.message : "Pairing failed. Check the code and server address.");
+      setPairError(e instanceof Error ? e.message : "Connection failed. Check the PIN and server address.");
     } finally {
       setPairBusy(false);
     }
@@ -321,7 +322,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                   </div>
                   {pinConfirming && (
                     <p style={{ fontSize: 12, color: "var(--red, #f87171)", marginTop: 8 }}>
-                      ⚠ This will restart the server and disconnect all paired devices. They must re-pair.
+                      ⚠ This will restart the server. Other devices will need to update their PIN to reconnect.
                     </p>
                   )}
                   {pinError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{pinError}</span>}
@@ -339,9 +340,9 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                 {pairServerWarning && (
                   <div style={{ marginBottom: 12, padding: "10px 12px", background: "var(--bg)", border: "1px solid var(--red, #f87171)", borderRadius: "var(--radius)", fontSize: 12 }}>
                     <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}>⚠ This machine is currently running as a server</p>
-                    <p style={{ color: "var(--text-muted)" }}>Pairing to an external host will stop this server and disconnect all clients. Continue?</p>
+                    <p style={{ color: "var(--text-muted)" }}>Connecting to an external host will stop this server. Continue?</p>
                     <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                      <button className="btn btn-danger" onClick={doPair}>Stop server & pair</button>
+                      <button className="btn btn-danger" onClick={doConnect}>Stop server & connect</button>
                       <button className="btn btn-ghost" onClick={() => setPairServerWarning(false)}>Cancel</button>
                     </div>
                   </div>
@@ -365,16 +366,16 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                         type="text"
                         inputMode="numeric"
                         maxLength={4}
-                        value={pairToken}
-                        onChange={(e) => setPairToken(e.target.value.replace(/\D/g, ""))}
+                        value={pairPin}
+                        onChange={(e) => setPairPin(e.target.value.replace(/\D/g, ""))}
                         placeholder="1234"
                         className={pairError ? "error" : ""}
                       />
                       {pairError && <span className="error-msg">{pairError}</span>}
-                      {pairSuccess && <span style={{ fontSize: 12, color: "var(--green)" }}>Paired successfully.</span>}
+                      {pairSuccess && <span style={{ fontSize: 12, color: "var(--green)" }}>Connected successfully.</span>}
                     </div>
-                    <button className="btn btn-primary" onClick={doPair} disabled={pairBusy || !pairHost.trim()}>
-                      {pairBusy ? <><span className="spinner" /> Pairing…</> : "Pair device"}
+                    <button className="btn btn-primary" onClick={doConnect} disabled={pairBusy || !pairHost.trim()}>
+                      {pairBusy ? <><span className="spinner" /> Connecting…</> : "Connect"}
                     </button>
                   </div>
                 )}
@@ -420,61 +421,6 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Pairing modal */}
-      {showPairingModal && (
-        <div className="modal-overlay" onClick={() => setShowPairingModal(false)}>
-          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3>{isServer ? "Re-pair this device" : "Connect to server"}</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowPairingModal(false)}>✕</button>
-            </div>
-
-            {pairServerWarning && (
-              <div style={{ marginBottom: 16, padding: "10px 12px", background: "var(--bg)", border: "1px solid var(--red, #f87171)", borderRadius: "var(--radius)", fontSize: 12 }}>
-                <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}>⚠ This machine is currently running as a server</p>
-                <p style={{ color: "var(--text-muted)" }}>Pairing to an external host will stop this server and disconnect all clients. Continue?</p>
-                <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                  <button className="btn btn-danger" onClick={doPair}>Stop server & pair</button>
-                  <button className="btn btn-ghost" onClick={() => setPairServerWarning(false)}>Cancel</button>
-                </div>
-              </div>
-            )}
-
-            {!pairServerWarning && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div className="input-group" style={{ flex: 2 }}>
-                    <label>Server host</label>
-                    <input type="text" value={pairHost} onChange={(e) => setPairHost(e.target.value)} placeholder="192.168.1.50" />
-                  </div>
-                  <div className="input-group" style={{ flex: 1 }}>
-                    <label>Port</label>
-                    <input type="number" value={pairPort} onChange={(e) => setPairPort(e.target.value)} />
-                  </div>
-                </div>
-                <div className="input-group">
-                  <label>PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={pairToken}
-                    onChange={(e) => setPairToken(e.target.value.replace(/\D/g, ""))}
-                    placeholder="1234"
-                    className={pairError ? "error" : ""}
-                  />
-                  {pairError && <span className="error-msg">{pairError}</span>}
-                  {pairSuccess && <span style={{ fontSize: 12, color: "var(--green)" }}>Paired successfully.</span>}
-                </div>
-                <button className="btn btn-primary" onClick={doPair} disabled={pairBusy || !pairHost.trim()}>
-                  {pairBusy ? <><span className="spinner" /> Pairing…</> : "Pair device"}
-                </button>
               </div>
             )}
           </div>

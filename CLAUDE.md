@@ -30,12 +30,12 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | File | Owns |
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`) |
-| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/games/{slug}/devices`; `_auth` calls `touch_device()` on every authenticated request to record client IP + timestamp |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events` |
+| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
-| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`) |
-| `gui/electron/main.ts` | IPC handlers; spawns/kills Python server; manages `serverProcess`, `serverToken`, PID file |
+| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`); sends PIN + device headers for auth |
+| `gui/electron/main.ts` | IPC handlers; spawns/kills Python server; manages `serverProcess` PID file; `changePin` simplifies to restart without clearing devices |
 | `gui/electron/preload.ts` | `contextBridge` — everything in `window.emusync.*` is defined here |
 | `gui/renderer/src/api.ts` | Fetch wrapper for the Python REST API; holds `_base` URL + `_token` |
 | `gui/renderer/src/App.tsx` | Root component; screen router; auto-starts server if `is_server=true` |
@@ -109,10 +109,10 @@ window.emusync.config.exists()                        // boolean
 window.emusync.config.getRecentFolders(consoleKey)   // returns string[] of recent ROM folders for console
 window.emusync.config.addRecentFolder(consoleKey, path) // adds folder to recent list (keeps max 10)
 
-window.emusync.server.start()     // spawns emusync.py server start → { ok, token }
-window.emusync.server.stop()      // SIGKILL server + pkill orphans + clean pid/token files
-window.emusync.server.token()     // returns stored token (in-memory or from .server_token file)
-window.emusync.server.changePin() // stops server, saves PIN, clears devices, restarts
+window.emusync.server.start()     // spawns emusync.py server start → { ok: boolean }
+window.emusync.server.stop()      // SIGKILL server + pkill orphans + clean pid file
+window.emusync.server.token()     // deprecated; returns null (no per-device tokens)
+window.emusync.server.changePin(pin) // stops server, saves PIN to config, restarts
 window.emusync.server.discover()  // runs emusync.py server discover-json → server list
 
 window.emusync.dialog.openFile()  // native file picker
@@ -145,30 +145,31 @@ When adding a new IPC channel, add the handler to `main.ts` AND the bridge entry
 
 | Path | Contents |
 |------|----------|
-| `~/.emusync/emusync.toml` | Per-device config (server host, port, token, is_server, server_pin) |
+| `~/.emusync/emusync.toml` | Per-device config (server host, port, PIN, device ID/name, is_server flag, recent ROM folders) |
 | `~/.emusync/emusync.db` | SQLite database (devices, games, saves, locks) |
 | `~/.emusync/.server_pid` | PID of the running server process (written on start, deleted on clean exit) |
-| `~/.emusync/.server_token` | Current pairing PIN (written on start, deleted on clean exit) |
 | `~/.emusync/.game_pid` | Two-line file: line 1 = emusync run PID, line 2 = emulator child PID (written by `emusync run`, deleted on exit) |
 
-Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_name`, `token`, `is_server`, `server_pin` (optional), `recent_import_folders` (dict mapping console keys to lists of recent folder paths).
+Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_name`, `is_server`, `server_pin` (optional — blank = open access), `recent_import_folders` (dict mapping console keys to lists of recent folder paths).
 
 ---
 
 ## Server process lifecycle
 
-- **Start:** `startServerProcess()` in `main.ts` spawns Python with `PYTHONUNBUFFERED=1`; reads `Pairing token: <value>` from stdout; stores in `serverToken` and `.server_token` file.
+- **Start:** `startServerProcess()` in `main.ts` spawns Python with `PYTHONUNBUFFERED=1`; waits for server startup signal in stdout; returns `{ ok: boolean }`. Renderer health-polls to confirm server is ready.
 - **Stop:** SIGKILL `serverProcess` + read `.server_pid` and SIGKILL that PID + `pkill -9 -f "emusync.py server start"` to catch any orphaned processes. All three are needed: in-session reference, cross-session PID file, and pattern fallback.
 - **App close:** `window-all-closed` does the same kill sequence before quitting.
 - **Auto-start:** `App.tsx` calls `server.start()` on init if `is_server=true` in config.
 
 ---
 
-## Authentication
+## Authentication (PIN-only model)
 
-- **Master token (PIN):** Set in `server_pin` config field. Used only during `/pair`. If empty, any device can pair without a code.
-- **Device token:** UUID issued by `/pair`, stored in the client's config as `token`, sent as `Authorization: Bearer <token>` on all authenticated requests.
-- Changing the PIN via `server:change-pin` IPC: clears all device records from the DB (they must re-pair), restarts the server.
+- **Server PIN:** Set in `server_pin` config field. All clients send `Authorization: Bearer {PIN}` on API requests.
+- **Device registration:** Devices auto-register on first authenticated request using `X-Device-ID` and `X-Device-Name` headers. No explicit pair/token step.
+- **Blank PIN:** If `server_pin` is empty, any request is allowed (open access — useful on trusted LANs).
+- **Changing the PIN:** `server:change-pin` IPC saves new PIN to config and restarts the server. Existing device records persist; they just need the new PIN for reconnection.
+- **Client connection:** On first launch, user enters server host/port/PIN. Renderer calls `configure(host, port, pin)` and `configureDevice(deviceId, deviceName)` (or these are auto-loaded from config). All subsequent API calls include PIN + device headers.
 
 ---
 
@@ -197,20 +198,40 @@ When adding or changing code, write tests if any of the following are true:
 **How to write a test** — follow the pattern in `tests/test_integration.py`:
 
 ```python
+MASTER_PIN = "test-master-pin"
+AUTH = {
+    "Authorization": f"Bearer {MASTER_PIN}",
+    "X-Device-ID": "device-abc",
+    "X-Device-Name": "test-pc",
+}
+
 @pytest.mark.asyncio
 async def test_your_scenario(client):          # client fixture = fresh DB + app
-    token = await _pair(client)               # pair a device to get a bearer token
-    auth = {"Authorization": f"Bearer {token}"}
-    r = await client.post("/your-route", json={...}, headers=auth)
+    r = await client.post("/your-route", json={...}, headers=AUTH)
     assert r.status_code == 200
 ```
 
-For tests that need blank-PIN (open access) or direct store access, spin up your own fixture:
+For multi-device tests or tests needing custom PINs:
+
+```python
+def _device_auth(device_id: str, device_name: str, pin: str) -> dict:
+    return {
+        "Authorization": f"Bearer {pin}",
+        "X-Device-ID": device_id,
+        "X-Device-Name": device_name,
+    }
+
+# Device 1 and 2 both connect with same PIN
+auth1 = _device_auth("d1", "PC", MASTER_PIN)
+auth2 = _device_auth("d2", "Steam Deck", MASTER_PIN)
+```
+
+For tests that need blank-PIN (open access) or direct store access:
 
 ```python
 with tempfile.TemporaryDirectory() as tmpdir:
     store = Store(tmpdir)
-    api_module.init(store, "")   # blank = open access
+    api_module.init(store, "")   # blank PIN = open access
     async with AsyncClient(transport=ASGITransport(app=api_module.app), base_url="http://test") as c:
         ...
 ```

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, getGameDevice, health, listGames, getLock, releaseLock, pair } from "./api";
+import { configure, configureDevice, getGameDevice, health, listGames, getLock, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
@@ -178,50 +178,33 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     async function init(): Promise<void> {
-      const exists = await window.emusync.config.exists();
-      if (!exists) {
-        setScreen({ name: "setup" });
-        return;
-      }
+      // config.load() returns null when absent — no need for a separate exists() call.
       const cfg = await window.emusync.config.load();
       if (!cfg) {
         setScreen({ name: "setup" });
         return;
       }
+      const deviceId   = (cfg.device_id   as string) || "";
+      const deviceName = (cfg.device_name as string) || "";
       configure(
         (cfg.server_host as string) || "localhost",
         (cfg.server_port as number) || 8765,
-        (cfg.token as string) || "",
+        (cfg.server_pin  as string) || "",
       );
+      configureDevice(deviceId, deviceName);
       setIsServer(!!(cfg.is_server as boolean));
       if (cfg.is_server) {
         setLoadingMessage("Starting server…");
-        const serverResult = await window.emusync.server.start();
+        await window.emusync.server.start();
         setLoadingMessage("Waiting for server…");
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 100; i++) {
           if (await health()) break;
-          await new Promise<void>((r) => setTimeout(r, 500));
-        }
-        // Self-pair if this device has no token yet (first run, or after PIN change cleared devices)
-        if (!cfg.token) {
-          try {
-            setLoadingMessage("Pairing with local server…");
-            const deviceId  = (cfg.device_id  as string) ?? crypto.randomUUID();
-            const deviceName = (cfg.device_name as string) || "Server";
-            const newToken  = await pair(serverResult.token || "", deviceId, deviceName);
-            const updatedCfg = { ...cfg, device_id: deviceId, device_name: deviceName, token: newToken };
-            await window.emusync.config.save(updatedCfg);
-            configure(
-              (updatedCfg.server_host as string) || "localhost",
-              (updatedCfg.server_port as number) || 8765,
-              newToken,
-            );
-          } catch { /* self-pair failed — continue; API calls will show auth errors */ }
+          await new Promise<void>((r) => setTimeout(r, 100));
         }
       }
-      // Release any stale locks this device left from a previous crash
-      if (cfg.device_id) await releaseStaleLocks(cfg.device_id as string);
+      // Show games immediately; release stale locks in the background.
       setScreen({ name: "games" });
+      if (deviceId) releaseStaleLocks(deviceId);
     }
     init();
   }, []);
@@ -232,8 +215,9 @@ export default function App(): React.ReactElement {
       configure(
         (cfg.server_host as string) || "localhost",
         (cfg.server_port as number) || 8765,
-        (cfg.token as string) || "",
+        (cfg.server_pin  as string) || "",
       );
+      configureDevice((cfg.device_id as string) || "", (cfg.device_name as string) || "");
       setIsServer(!!(cfg.is_server as boolean));
       setScreen({ name: "games" });
     });
@@ -245,8 +229,9 @@ export default function App(): React.ReactElement {
       configure(
         (cfg.server_host as string) || "localhost",
         (cfg.server_port as number) || 8765,
-        (cfg.token as string) || "",
+        (cfg.server_pin  as string) || "",
       );
+      configureDevice((cfg.device_id as string) || "", (cfg.device_name as string) || "");
       setGameListKey((k) => k + 1);
     });
   }

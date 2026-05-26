@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
@@ -19,13 +18,13 @@ app.add_middleware(
 )
 
 _store: Optional[Store] = None
-_master_token: str = ""
+_master_pin: str = ""
 
 
-def init(store: Store, master_token: str) -> None:
-    global _store, _master_token
+def init(store: Store, master_pin: str) -> None:
+    global _store, _master_pin
     _store = store
-    _master_token = master_token
+    _master_pin = master_pin
 
 
 def _get_store() -> Store:
@@ -34,17 +33,30 @@ def _get_store() -> Store:
     return _store
 
 
-def _auth(request: Request, authorization: str = Header(None)) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid token")
-    token = authorization.removeprefix("Bearer ")
+def _auth(
+    request: Request,
+    authorization: str = Header(None),
+    x_device_id: str = Header(None),
+    x_device_name: str = Header(None),
+) -> str:
+    """Authenticate with PIN + device identity headers.
+
+    Authorization: Bearer <server_pin>   (empty string for open servers)
+    X-Device-ID:   <device_uuid>         (required)
+    X-Device-Name: <display_name>        (optional — used on first auto-register)
+
+    The device is auto-registered on first request; no explicit /pair step needed.
+    """
+    pin = (authorization or "").removeprefix("Bearer ")
+    if _master_pin and pin != _master_pin:
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+    if not x_device_id:
+        raise HTTPException(status_code=401, detail="Missing X-Device-ID header")
     store = _get_store()
-    device = store.device_by_token(token)
-    if not device:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    store.ensure_device(x_device_id, x_device_name or x_device_id)
     if request.client:
-        store.touch_device(device.id, request.client.host)
-    return device.id
+        store.touch_device(x_device_id, request.client.host)
+    return x_device_id
 
 
 # ── public ────────────────────────────────────────────────────────────────────
@@ -52,21 +64,6 @@ def _auth(request: Request, authorization: str = Header(None)) -> str:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
-
-
-class PairRequest(BaseModel):
-    master_token: str
-    device_name: str
-    device_id: str
-
-
-@app.post("/pair")
-def pair(req: PairRequest) -> dict:
-    if _master_token and req.master_token != _master_token:
-        raise HTTPException(status_code=403, detail="Invalid master token")
-    token = str(uuid.uuid4())
-    device = _get_store().register_device(req.device_id, req.device_name, token)
-    return {"device_id": device.id, "token": device.token}
 
 
 # ── devices ───────────────────────────────────────────────────────────────────
@@ -288,35 +285,33 @@ def get_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
 
 @app.post("/games/{slug}/push-saves")
 def push_saves(slug: str, device_id: str = Depends(_auth)) -> dict:
-  """Manually trigger a push of the game's save and state files to the server."""
-  from pathlib import Path
+    """Manually trigger a push of the game's save and state files to the server."""
+    from pathlib import Path
 
-  game = _get_store().get_game(slug)
-  if not game:
-    raise HTTPException(status_code=404, detail="Game not found")
+    game = _get_store().get_game(slug)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
 
-  gd = _get_store().get_game_device(slug, device_id)
-  if not gd:
-    raise HTTPException(status_code=404, detail="Game device config not found")
+    gd = _get_store().get_game_device(slug, device_id)
+    if not gd:
+        raise HTTPException(status_code=404, detail="Game device config not found")
 
-  pushed = {"save": False, "state": False}
+    pushed = {"save": False, "state": False}
 
-  # Push save if it exists
-  if gd.save_path:
-    save_path = Path(gd.save_path)
-    if save_path.exists():
-      data = save_path.read_bytes()
-      meta = _get_store().push_save(slug, device_id, data)
-      _get_store().log_event("save_synced", slug, device_id)
-      pushed["save"] = True
+    if gd.save_path:
+        save_path = Path(gd.save_path)
+        if save_path.exists():
+            data = save_path.read_bytes()
+            _get_store().push_save(slug, device_id, data)
+            _get_store().log_event("save_synced", slug, device_id)
+            pushed["save"] = True
 
-  # Push state if configured and exists
-  if gd.state_path:
-    state_path = Path(gd.state_path)
-    if state_path.exists():
-      data = state_path.read_bytes()
-      meta = _get_store().push_state(slug, device_id, data)
-      _get_store().log_event("state_synced", slug, device_id)
-      pushed["state"] = True
+    if gd.state_path:
+        state_path = Path(gd.state_path)
+        if state_path.exists():
+            data = state_path.read_bytes()
+            _get_store().push_state(slug, device_id, data)
+            _get_store().log_event("state_synced", slug, device_id)
+            pushed["state"] = True
 
-  return {"ok": True, "pushed": pushed}
+    return {"ok": True, "pushed": pushed}

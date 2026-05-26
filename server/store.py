@@ -10,11 +10,17 @@ from typing import Optional
 
 LOCK_TTL_HOURS = 4
 
+# Bump whenever a new migration block is added below.
+_SCHEMA_VERSION = 1
+
+# Full current schema — used for fresh databases only.  Columns added via
+# ALTER TABLE migrations are included here so new installs never run migrations.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
-    id   TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    token TEXT NOT NULL UNIQUE
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    last_ip      TEXT,
+    last_seen_at TEXT
 );
 CREATE TABLE IF NOT EXISTS games (
     slug    TEXT PRIMARY KEY,
@@ -33,11 +39,13 @@ CREATE TABLE IF NOT EXISTS consoles (
     UNIQUE(device_id, console_name)
 );
 CREATE TABLE IF NOT EXISTS game_devices (
-    game_slug      TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
-    device_id      TEXT NOT NULL REFERENCES devices(id),
-    rom_path       TEXT NOT NULL DEFAULT '',
-    save_path      TEXT NOT NULL DEFAULT '',
-    launch_command TEXT NOT NULL DEFAULT '',
+    game_slug       TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id       TEXT NOT NULL REFERENCES devices(id),
+    rom_path        TEXT NOT NULL DEFAULT '',
+    save_path       TEXT NOT NULL DEFAULT '',
+    launch_command  TEXT NOT NULL DEFAULT '',
+    state_path      TEXT NOT NULL DEFAULT '',
+    rom_folder_path TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (game_slug, device_id)
 );
 CREATE TABLE IF NOT EXISTS saves (
@@ -72,11 +80,33 @@ CREATE TABLE IF NOT EXISTS events (
 """
 
 
+def _try(conn: sqlite3.Connection, sql: str) -> None:
+    """Execute a DDL statement, silently ignoring OperationalError (already exists / column missing)."""
+    try:
+        conn.execute(sql)
+    except sqlite3.OperationalError:
+        pass
+
+
+def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
+    """Apply incremental migrations for databases older than _SCHEMA_VERSION."""
+    if from_version < 1:
+        # Add columns that may not exist on pre-versioned databases
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''")
+        _try(conn, "ALTER TABLE devices ADD COLUMN last_ip TEXT")
+        _try(conn, "ALTER TABLE devices ADD COLUMN last_seen_at TEXT")
+        # Drop the per-device UUID token — auth is now PIN-based (see api.py _auth).
+        # SQLite 3.35+ supports DROP COLUMN; the constraint is on 'token' not 'id' so FKs are safe.
+        _try(conn, "ALTER TABLE devices DROP COLUMN token")
+    conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+
+
 @dataclass
 class Device:
     id: str
     name: str
-    token: str
     last_ip: Optional[str] = None
     last_seen_at: Optional[str] = None
 
@@ -133,63 +163,32 @@ class Store:
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
-        # Migration: add state_path column to game_devices (safe to run multiple times)
-        try:
-            self._conn.execute(
-                "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''"
-            )
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        # Migration: add rom_folder_path column to game_devices (safe to run multiple times)
-        try:
-            self._conn.execute(
-                "ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''"
-            )
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        # Migration: add console column to games (safe to run multiple times)
-        try:
-            self._conn.execute(
-                "ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''"
-            )
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        # Migration: add last_ip + last_seen_at to devices (safe to run multiple times)
-        for col_def in [
-            "ALTER TABLE devices ADD COLUMN last_ip TEXT",
-            "ALTER TABLE devices ADD COLUMN last_seen_at TEXT",
-        ]:
-            try:
-                self._conn.execute(col_def)
-            except sqlite3.OperationalError:
-                pass  # column already exists
+        db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
+        if db_version < _SCHEMA_VERSION:
+            _migrate(self._conn, db_version)
         self._conn.commit()
 
     # ── devices ──────────────────────────────────────────────────────────────
 
-    def register_device(self, id: str, name: str, token: str) -> Device:
+    def ensure_device(self, id: str, name: str) -> Device:
+        """Register a device if new; update name if it changed. Idempotent."""
         self._conn.execute(
-            "INSERT OR REPLACE INTO devices (id, name, token) VALUES (?, ?, ?)",
-            (id, name, token),
+            "INSERT INTO devices (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name",
+            (id, name),
         )
         self._conn.commit()
-        return Device(id=id, name=name, token=token)
+        return Device(id=id, name=name)
 
     def clear_devices(self) -> None:
         self._conn.execute("DELETE FROM devices")
         self._conn.commit()
 
-    def device_by_token(self, token: str) -> Optional[Device]:
-        row = self._conn.execute(
-            "SELECT id, name, token, last_ip, last_seen_at FROM devices WHERE token = ?", (token,)
-        ).fetchone()
-        return Device(**dict(row)) if row else None
-
     def list_devices(self) -> list[Device]:
         rows = self._conn.execute(
-            "SELECT id, name, token, last_ip, last_seen_at FROM devices"
+            "SELECT id, name, last_ip, last_seen_at FROM devices"
         ).fetchall()
         return [Device(**dict(r)) for r in rows]
 

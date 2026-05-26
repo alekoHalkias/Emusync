@@ -22,9 +22,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from server import api as api_module
 from server.store import Store
 
-MASTER_TOKEN = "test-master-token"
+MASTER_PIN = "test-master-pin"
 DEVICE_ID = "device-abc"
 DEVICE_NAME = "test-pc"
+
+AUTH = {
+    "Authorization": f"Bearer {MASTER_PIN}",
+    "X-Device-ID": DEVICE_ID,
+    "X-Device-Name": DEVICE_NAME,
+}
 
 # Path to test ROM folder (relative to repo root)
 TEST_ROM_BASE = Path(__file__).parent.parent / "test_rom_folders"
@@ -61,7 +67,7 @@ async def client():
     """Fresh in-memory store + FastAPI app for each test."""
     with tempfile.TemporaryDirectory() as tmpdir:
         store = Store(tmpdir)
-        api_module.init(store, MASTER_TOKEN)
+        api_module.init(store, MASTER_PIN)
         async with AsyncClient(
             transport=ASGITransport(app=api_module.app),
             base_url="http://test",
@@ -69,22 +75,10 @@ async def client():
             yield c
 
 
-async def _pair(client: AsyncClient) -> str:
-    """Pair a device and return its bearer token."""
-    r = await client.post("/pair", json={
-        "master_token": MASTER_TOKEN,
-        "device_id": DEVICE_ID,
-        "device_name": DEVICE_NAME,
-    })
-    assert r.status_code == 200
-    return r.json()["token"]
-
-
 @pytest.mark.asyncio
 async def test_scan_gba_roms(client):
     """Test 1a: Scan GBA test ROMs from CLI-accessible folder (skipped if test ROMs not present)."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    auth = AUTH
 
     gba_path = TEST_CONSOLES["gba"]["path"]
     if not gba_path.exists():
@@ -99,8 +93,7 @@ async def test_scan_gba_roms(client):
 @pytest.mark.asyncio
 async def test_scan_gb_roms(client):
     """Test 1b: Scan GB test ROMs from CLI-accessible folder (skipped if test ROMs not present)."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    auth = AUTH
 
     gb_path = TEST_CONSOLES["gb"]["path"]
     if not gb_path.exists():
@@ -115,8 +108,7 @@ async def test_scan_gb_roms(client):
 @pytest.mark.asyncio
 async def test_scan_snes_roms(client):
     """Test 1c: Scan SNES test ROMs from CLI-accessible folder (skipped if test ROMs not present)."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    auth = AUTH
 
     snes_path = TEST_CONSOLES["snes"]["path"]
     if not snes_path.exists():
@@ -131,8 +123,7 @@ async def test_scan_snes_roms(client):
 @pytest.mark.asyncio
 async def test_import_all_test_roms(client):
     """Test 2: Import all 6 test ROMs (2 per console: GBA, GB, SNES)."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    auth = AUTH
 
     imported_games = []
 
@@ -194,8 +185,7 @@ async def test_import_all_test_roms(client):
 @pytest.mark.asyncio
 async def test_list_all_imported_roms(client):
     """Test 3: List all 6 imported games and verify they appear."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    auth = AUTH
 
     # First, import all the test ROMs
     imported_slugs = []
@@ -256,8 +246,7 @@ async def test_list_all_imported_roms(client):
 @pytest.mark.asyncio
 async def test_delete_all_imported_roms(client):
     """Test 4: Delete all 6 imported games and verify they are gone."""
-    token = await _pair(client)
-    auth = {"Authorization": f"Bearer {token}"}
+    auth = AUTH
 
     # First, import all the test ROMs
     imported_slugs = []

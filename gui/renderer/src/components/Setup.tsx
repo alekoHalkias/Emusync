@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { pair } from "../api";
-import { configure } from "../api";
+import { configure, configureDevice, health } from "../api";
 
 type Step =
   | "choose"
@@ -8,7 +7,7 @@ type Step =
   | "server-ready"
   | "join-scanning"
   | "join-select"
-  | "join-token";
+  | "join-pin";
 
 type DiscoveredServer = { name: string; host: string; port: number };
 
@@ -19,16 +18,43 @@ declare global {
         load: () => Promise<Record<string, unknown> | null>;
         save: (data: Record<string, unknown>) => Promise<boolean>;
         exists: () => Promise<boolean>;
+        getRecentFolders: (consoleKey: string) => Promise<string[]>;
+        addRecentFolder: (consoleKey: string, path: string) => Promise<void>;
       };
       server: {
-        start: () => Promise<{ ok: boolean; token: string | null }>;
+        start: () => Promise<{ ok: boolean }>;
         stop: () => Promise<boolean>;
         token: () => Promise<string | null>;
-        changePin: (pin: string | null) => Promise<{ ok: boolean; token: string | null }>;
+        changePin: (pin: string | null) => Promise<{ ok: boolean }>;
         discover: () => Promise<Array<{ name: string; host: string; port: number }>>;
       };
       dialog: {
         openFile: (opts?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
+        openFolder: () => Promise<string | null>;
+      };
+      emulator: {
+        consoles: () => Promise<Array<{ key: string; label: string }>>;
+        detect: (consoleKey: string) => Promise<unknown>;
+        scan: (consoleKey: string, emulatorOption: unknown, extraPaths: string[]) => Promise<unknown>;
+      };
+      files: {
+        ensureSave: (path: string) => Promise<void>;
+        getSaveTime: (path: string) => Promise<string | null>;
+      };
+      device: {
+        probe: (ip: string, port: number) => Promise<boolean>;
+      };
+      launcher: {
+        path: () => Promise<string>;
+      };
+      game: {
+        launch: (slug: string, command: string) => Promise<void>;
+        stop: () => Promise<void>;
+        stopExternal: () => Promise<void>;
+        hasPidFile: () => Promise<boolean>;
+        isRunning: () => Promise<boolean>;
+        onExited: (cb: () => void) => void;
+        offExited: (cb: () => void) => void;
       };
     };
   }
@@ -40,7 +66,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
   const [step, setStep] = useState<Step>("choose");
   const [servers, setServers] = useState<DiscoveredServer[]>([]);
   const [selectedServer, setSelectedServer] = useState<DiscoveredServer | null>(null);
-  const [inputToken, setInputToken] = useState("");
+  const [inputPin, setInputPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deviceName, setDeviceName] = useState("");
@@ -53,25 +79,34 @@ export default function Setup({ onDone }: Props): React.ReactElement {
 
   async function startServer(): Promise<void> {
     setStep("server-starting");
-    const existing   = (await window.emusync.config.load()) ?? {};
-    const devName    = deviceName || (existing.device_name as string) || "Server";
-    const deviceId   = (existing.device_id as string) ?? crypto.randomUUID();
-    await window.emusync.config.save({ ...existing, is_server: true, device_name: devName, device_id: deviceId });
+    const existing  = (await window.emusync.config.load()) ?? {};
+    const devName   = deviceName || (existing.device_name as string) || "Server";
+    const deviceId  = (existing.device_id as string) ?? crypto.randomUUID();
+    const port      = (existing.server_port as number) || 8765;
+    const pin       = (existing.server_pin as string) || "";
+
+    await window.emusync.config.save({
+      ...existing,
+      is_server: true,
+      device_name: devName,
+      device_id: deviceId,
+    });
+
     const result = await window.emusync.server.start();
     if (!result.ok) {
       setError("Failed to start server. Make sure Python and emusync.py are available.");
       setStep("choose");
       return;
     }
-    // Self-pair so this machine can use its own API (add/import games, etc.)
-    try {
-      configure("localhost", (existing.server_port as number) || 8765, "");
-      const token = await pair(result.token || "", deviceId, devName);
-      await window.emusync.config.save({
-        ...existing, is_server: true, device_name: devName, device_id: deviceId, token,
-      });
-      configure("localhost", (existing.server_port as number) || 8765, token);
-    } catch { /* non-fatal; user can still continue */ }
+
+    // Wait for server to be ready before proceeding
+    configure("localhost", port, pin);
+    configureDevice(deviceId, devName);
+    for (let i = 0; i < 100; i++) {
+      if (await health()) break;
+      await new Promise<void>((r) => setTimeout(r, 100));
+    }
+
     setStep("server-ready");
   }
 
@@ -81,7 +116,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
     setStep("join-select");
   }
 
-  async function doPair(): Promise<void> {
+  async function doConnect(): Promise<void> {
     if (!selectedServer) {
       setError("Enter the server details.");
       return;
@@ -89,23 +124,30 @@ export default function Setup({ onDone }: Props): React.ReactElement {
     setBusy(true);
     setError("");
     try {
-      configure(selectedServer.host, selectedServer.port, "");
-      const cfg = (await window.emusync.config.load()) ?? {};
+      const cfg      = (await window.emusync.config.load()) ?? {};
       const deviceId = (cfg.device_id as string) ?? crypto.randomUUID();
-      const devName = deviceName || (cfg.device_name as string) || "unknown";
-      const token = await pair(inputToken.trim(), deviceId, devName);
+      const devName  = deviceName || (cfg.device_name as string) || "unknown";
+      const pin      = inputPin.trim();
+
+      // Verify connection before saving
+      configure(selectedServer.host, selectedServer.port, pin);
+      configureDevice(deviceId, devName);
+      if (!(await health())) {
+        throw new Error("Could not reach the server. Check the address and make sure the server is running.");
+      }
+
       await window.emusync.config.save({
         ...cfg,
         server_host: selectedServer.host,
         server_port: selectedServer.port,
+        server_pin: pin,
         device_id: deviceId,
         device_name: devName,
-        token,
         is_server: false,
       });
       onDone();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Pairing failed. Check the PIN and server address.");
+      setError(e instanceof Error ? e.message : "Connection failed. Check the PIN and server address.");
     } finally {
       setBusy(false);
     }
@@ -235,14 +277,14 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               className="btn btn-primary"
               style={{ marginTop: 20, width: "100%" }}
               disabled={!selectedServer?.host}
-              onClick={() => setStep("join-token")}
+              onClick={() => setStep("join-pin")}
             >
               Next
             </button>
           </>
         )}
 
-        {step === "join-token" && (
+        {step === "join-pin" && (
           <>
             <h1>Enter PIN</h1>
             <p>If the server has a PIN set, enter it below. Otherwise leave it blank.</p>
@@ -253,8 +295,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                 inputMode="numeric"
                 maxLength={4}
                 placeholder="1234"
-                value={inputToken}
-                onChange={(e) => setInputToken(e.target.value.replace(/\D/g, ""))}
+                value={inputPin}
+                onChange={(e) => setInputPin(e.target.value.replace(/\D/g, ""))}
                 className={error ? "error" : ""}
                 autoFocus
               />
@@ -264,8 +306,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               <button className="btn btn-ghost" onClick={() => setStep("join-select")} disabled={busy}>
                 Back
               </button>
-              <button className="btn btn-primary" onClick={doPair} disabled={busy} style={{ flex: 1 }}>
-                {busy ? <><span className="spinner" /> Pairing…</> : "Connect"}
+              <button className="btn btn-primary" onClick={doConnect} disabled={busy} style={{ flex: 1 }}>
+                {busy ? <><span className="spinner" /> Connecting…</> : "Connect"}
               </button>
             </div>
           </>
