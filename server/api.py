@@ -277,19 +277,6 @@ def get_save_device_count(game: str, device_id: str = Depends(_auth)) -> dict:
     return {"device_count": count}
 
 
-@app.get("/games/{game}/devices")
-def get_game_devices(game: str, device_id: str = Depends(_auth)) -> dict:
-    device_ids = _get_store().get_game_devices(game)
-    all_devices = _get_store().list_devices()
-    devices_with_game = [d.id for d in all_devices if d.id in device_ids]
-    return {
-        "devices": [
-            {"id": d.id, "name": d.name, "has_game": d.id in devices_with_game}
-            for d in all_devices
-        ]
-    }
-
-
 # ── states ────────────────────────────────────────────────────────────────────
 
 @app.get("/games/{game}/state")

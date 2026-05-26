@@ -366,12 +366,6 @@ class Store:
         ).fetchone()
         return row["count"] if row else 0
 
-    def get_game_devices(self, game: str) -> list[str]:
-        rows = self._conn.execute(
-            "SELECT DISTINCT device_id FROM games WHERE game = ?", (game,)
-        ).fetchall()
-        return [row["device_id"] for row in rows]
-
     # ── states ─────────────────────────────────────────────────────────────────
 
     def push_state(self, game: str, device_id: str, data: bytes) -> SaveMeta:
