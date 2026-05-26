@@ -120,14 +120,17 @@ def server() -> None:
 def server_start() -> None:
     """Start the EmuSync server and print the pairing token."""
     import signal
+    import threading
     import uvicorn
     from server.store import Store
     from server import api as api_module
     from server import mdns as mdns_module
 
     cfg = cfg_module.load()
-    cfg.is_server = True
-    cfg_module.save(cfg)
+    # Only write config if is_server isn't already set (avoid unnecessary disk write)
+    if not cfg.is_server:
+        cfg.is_server = True
+        cfg_module.save(cfg)
 
     store = Store(cfg.data_dir)
     master_token = cfg.server_pin
@@ -138,23 +141,40 @@ def server_start() -> None:
     api_module.init(store, master_token)
     store.log_event("server_started")
 
+    # Print token immediately so Electron can resolve server.start() without
+    # waiting for mDNS registration (which can take several hundred ms).
     click.echo(f"Pairing token: {master_token}")
     sys.stdout.flush()
     click.echo(f"EmuSync server running on :{cfg.server_port}")
 
+    # Advertise via mDNS in a background thread so it doesn't block uvicorn startup.
     zc = None
     info = None
-    try:
-        zc, info = mdns_module.advertise(cfg.device_name, cfg.server_port)
-    except Exception as e:
-        click.echo(f"Warning: mDNS registration failed ({e}). Server will work without LAN discovery.", err=True)
+    _mdns_lock = threading.Lock()
+
+    def _advertise_mdns() -> None:
+        nonlocal zc, info
+        try:
+            _zc, _info = mdns_module.advertise(cfg.device_name, cfg.server_port)
+            with _mdns_lock:
+                zc, info = _zc, _info
+        except Exception as e:
+            click.echo(
+                f"Warning: mDNS registration failed ({e}). Server will work without LAN discovery.",
+                err=True,
+            )
+
+    mdns_thread = threading.Thread(target=_advertise_mdns, daemon=True)
+    mdns_thread.start()
 
     try:
         uvicorn.run(api_module.app, host="0.0.0.0", port=cfg.server_port, log_level="warning")
     finally:
-        if zc and info:
-            zc.unregister_service(info)
-            zc.close()
+        mdns_thread.join(timeout=2)
+        with _mdns_lock:
+            if zc and info:
+                zc.unregister_service(info)
+                zc.close()
         token_file.unlink(missing_ok=True)
         pid_file.unlink(missing_ok=True)
 
