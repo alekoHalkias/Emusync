@@ -56,10 +56,7 @@ export async function pair(masterToken: string, deviceId: string, deviceName: st
   return (await data.json()).token;
 }
 
-export const listGames = async (): Promise<Game[]> => {
-  const games = await _fetch<Array<any>>("GET", "/games");
-  return games.map(g => ({ ...g, slug: g.game }));
-};
+export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
 export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
@@ -80,12 +77,6 @@ export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
   return res.json();
 };
 
-export const getSaveDeviceCount = (slug: string): Promise<{ device_count: number }> =>
-  _fetch("GET", `/games/${slug}/save-device-count`);
-
-export const getGameDevices = (slug: string): Promise<{ devices: Array<{ id: string; name: string; has_game: boolean }> }> =>
-  _fetch("GET", `/games/${slug}/devices`);
-
 export const listDevices = (): Promise<Device[]> => _fetch("GET", "/devices");
 export const whoami = (): Promise<{ device_id: string }> => _fetch("GET", "/whoami");
 export const removeDevice = (deviceId: string): Promise<void> => _fetch("DELETE", `/devices/${deviceId}`);
@@ -101,3 +92,5 @@ export type ActivityEvent = {
 export const listEvents = (): Promise<ActivityEvent[]> => _fetch("GET", "/events");
 
 export const pushGameSaves = (slug: string): Promise<void> => _fetch("POST", `/games/${slug}/push-saves`);
+
+export const listGameDevices = (slug: string): Promise<Device[]> => _fetch("GET", `/games/${slug}/devices`);

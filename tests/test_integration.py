@@ -91,11 +91,11 @@ async def test_add_and_list_games(client):
 
     r = await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth)
     assert r.status_code == 200
-    assert r.json()["game"] == "pokemon-emerald"
+    assert r.json()["slug"] == "pokemon-emerald"
 
     r = await client.get("/games", headers=auth)
     assert r.status_code == 200
-    assert any(g["game"] == "pokemon-emerald" for g in r.json())
+    assert any(g["slug"] == "pokemon-emerald" for g in r.json())
 
 
 @pytest.mark.asyncio
@@ -108,7 +108,7 @@ async def test_remove_game(client):
     assert r.status_code == 200
 
     r = await client.get("/games", headers=auth)
-    assert not any(g["game"] == "test-game" for g in r.json())
+    assert not any(g["slug"] == "test-game" for g in r.json())
 
 
 @pytest.mark.asyncio
@@ -127,7 +127,7 @@ async def test_add_game_with_console(client):
     r = await client.post("/games", json={"name": "Pokemon Emerald", "console": "GBA"}, headers=auth)
     assert r.status_code == 200
     body = r.json()
-    assert body["game"] == "pokemon-emerald"
+    assert body["slug"] == "pokemon-emerald"
     assert body["console"] == "GBA"
 
     r = await client.get("/games/pokemon-emerald", headers=auth)
@@ -147,8 +147,8 @@ async def test_list_games_includes_console(client):
     assert r.status_code == 200
     games = r.json()
     assert len(games) == 2
-    assert any(g["game"] == "game-1" and g["console"] == "GBA" for g in games)
-    assert any(g["game"] == "game-2" and g["console"] == "SNES" for g in games)
+    assert any(g["slug"] == "game-1" and g["console"] == "GBA" for g in games)
+    assert any(g["slug"] == "game-2" and g["console"] == "SNES" for g in games)
 
 
 @pytest.mark.asyncio
@@ -409,7 +409,7 @@ async def test_stale_lock_can_be_taken_after_ttl(client):
         store.acquire_lock("test-game", "device-1")
         expired_time = (datetime.now(timezone.utc) - timedelta(hours=LOCK_TTL_HOURS + 1)).isoformat()
         store._conn.execute(
-            "UPDATE locks SET acquired_at = ? WHERE game = ?",
+            "UPDATE locks SET acquired_at = ? WHERE game_slug = ?",
             (expired_time, "test-game"),
         )
         store._conn.commit()
@@ -466,7 +466,7 @@ async def test_set_device_config_nonexistent_game(client):
         "save_path": "/roms/ghost.srm",
         "launch_command": "retroarch ghost.gba",
     }, headers=auth)
-    # Should not silently succeed — foreign key constraint on game
+    # Should not silently succeed — foreign key constraint on game_slug
     assert r.status_code in (404, 422, 500)
 
 
@@ -607,7 +607,7 @@ async def test_update_game_name(client):
     r = await client.put("/games/pokemon-emerald", json={"name": "Pokemon Emerald v2"}, headers=auth)
     assert r.status_code == 200
     assert r.json()["name"] == "Pokemon Emerald v2"
-    assert r.json()["game"] == "pokemon-emerald"
+    assert r.json()["slug"] == "pokemon-emerald"
 
 
 @pytest.mark.asyncio
@@ -677,7 +677,7 @@ async def test_save_synced_event_logged(client):
 
     r = await client.get("/events", headers=auth)
     events = r.json()
-    assert any(e["type"] == "save_synced" and e["game"] == "pokemon-emerald" for e in events)
+    assert any(e["type"] == "save_synced" and e["game_slug"] == "pokemon-emerald" for e in events)
 
 
 @pytest.mark.asyncio
@@ -734,7 +734,7 @@ async def test_log_event_server_started_direct():
         events = store.list_events()
         assert len(events) == 1
         assert events[0]["type"] == "server_started"
-        assert events[0]["game"] is None
+        assert events[0]["game_slug"] is None
         assert events[0]["device_id"] is None
 
 
@@ -777,7 +777,7 @@ async def test_update_game_name_preserves_save_and_device_config(client):
     # The game itself and the other games in list must still be accessible
     games = await client.get("/games", headers=auth)
     assert games.status_code == 200
-    assert any(g["game"] == "pokemon-emerald" for g in games.json())
+    assert any(g["slug"] == "pokemon-emerald" for g in games.json())
 
 
 @pytest.mark.asyncio
@@ -799,7 +799,7 @@ async def test_update_game_name_does_not_wipe_other_games(client):
 
     # Both games should appear in the list
     games = await client.get("/games", headers=auth)
-    slugs = {g["game"] for g in games.json()}
+    slugs = {g["slug"] for g in games.json()}
     assert "game-one" in slugs
     assert "game-two" in slugs
 
@@ -843,3 +843,64 @@ async def test_push_saves_endpoint(client):
 
     state_meta = await client.get("/games/test-game/state/meta", headers=auth)
     assert state_meta.status_code == 200
+
+
+# ── game devices list ─────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_list_game_devices_returns_devices_with_game(client):
+    """GET /games/{slug}/devices returns all devices that have the game installed."""
+    r1 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d1", "device_name": "PC"})
+    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d2", "device_name": "Steam Deck"})
+    auth1 = {"Authorization": f"Bearer {r1.json()['token']}"}
+    auth2 = {"Authorization": f"Bearer {r2.json()['token']}"}
+
+    # Add game (as device 1)
+    await client.post("/games", json={"name": "Metroid"}, headers=auth1)
+
+    # Device 1 sets its game config
+    await client.put("/games/metroid/device", json={
+        "rom_path": "/roms/metroid.gba",
+        "save_path": "/saves/metroid.sav",
+        "launch_command": "retroarch metroid.gba",
+    }, headers=auth1)
+
+    # Device 2 also sets its game config
+    await client.put("/games/metroid/device", json={
+        "rom_path": "/home/deck/roms/metroid.gba",
+        "save_path": "/home/deck/saves/metroid.sav",
+        "launch_command": "retroarch metroid.gba",
+    }, headers=auth2)
+
+    r = await client.get("/games/metroid/devices", headers=auth1)
+    assert r.status_code == 200
+    devices = r.json()
+    ids = [d["id"] for d in devices]
+    assert "d1" in ids
+    assert "d2" in ids
+    names = [d["name"] for d in devices]
+    assert "PC" in names
+    assert "Steam Deck" in names
+
+
+@pytest.mark.asyncio
+async def test_list_game_devices_empty_when_no_devices(client):
+    """GET /games/{slug}/devices returns empty list if no device has the game configured."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Ghost Trick"}, headers=auth)
+
+    r = await client.get("/games/ghost-trick/devices", headers=auth)
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_list_game_devices_404_for_unknown_game(client):
+    """GET /games/{slug}/devices returns 404 if the game doesn't exist."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    r = await client.get("/games/nonexistent-game/devices", headers=auth)
+    assert r.status_code == 404
