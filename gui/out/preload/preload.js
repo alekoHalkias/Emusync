@@ -34,6 +34,9 @@ electron.contextBridge.exposeInMainWorld("emusync", {
     ensureSave: (savePath) => electron.ipcRenderer.invoke("files:ensure-save", savePath),
     getSaveTime: (savePath) => electron.ipcRenderer.invoke("files:get-save-time", savePath)
   },
+  device: {
+    probe: (ip, port) => electron.ipcRenderer.invoke("device:probe", ip, port)
+  },
   game: {
     launch: (slug, command) => electron.ipcRenderer.invoke("game:launch", slug, command),
     stop: () => electron.ipcRenderer.invoke("game:stop"),

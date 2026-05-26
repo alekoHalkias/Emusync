@@ -178,11 +178,7 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     async function init(): Promise<void> {
-      const exists = await window.emusync.config.exists();
-      if (!exists) {
-        setScreen({ name: "setup" });
-        return;
-      }
+      // config.load() returns null when absent — no need for a separate exists() call.
       const cfg = await window.emusync.config.load();
       if (!cfg) {
         setScreen({ name: "setup" });
@@ -198,9 +194,11 @@ export default function App(): React.ReactElement {
         setLoadingMessage("Starting server…");
         const serverResult = await window.emusync.server.start();
         setLoadingMessage("Waiting for server…");
-        for (let i = 0; i < 20; i++) {
+        // Poll at 100ms so we react as soon as uvicorn is ready (typically ~300ms
+        // after the token prints) instead of waiting a full 500ms tick.
+        for (let i = 0; i < 100; i++) {
           if (await health()) break;
-          await new Promise<void>((r) => setTimeout(r, 500));
+          await new Promise<void>((r) => setTimeout(r, 100));
         }
         // Self-pair if this device has no token yet (first run, or after PIN change cleared devices)
         if (!cfg.token) {
@@ -219,14 +217,17 @@ export default function App(): React.ReactElement {
           } catch { /* self-pair failed — continue; API calls will show auth errors */ }
         }
       }
-      // Release any stale locks this device left from a previous crash
-      if (cfg.device_id) await releaseStaleLocks(cfg.device_id as string);
+      // Show the games screen immediately; release stale locks in the background
+      // so a crash-recovery edge case never delays the loading screen.
       setScreen({ name: "games" });
+      if (cfg.device_id) releaseStaleLocks(cfg.device_id as string);
     }
     init();
   }, []);
 
   function handleSetupDone(): void {
+    // After Setup completes, just reload and transition to games.
+    // The server is already running (started in Setup.tsx) and already has a token.
     window.emusync.config.load().then((cfg) => {
       if (!cfg) return;
       configure(
@@ -236,6 +237,8 @@ export default function App(): React.ReactElement {
       );
       setIsServer(!!(cfg.is_server as boolean));
       setScreen({ name: "games" });
+      // Release stale locks in the background.
+      if (cfg.device_id) releaseStaleLocks(cfg.device_id as string);
     });
   }
 

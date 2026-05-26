@@ -383,6 +383,16 @@ dev mode — visible in the `make dev-gui` terminal.
 
 **Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks the lock state. If the lock is already held (by this device or another), it calls `_show_game_running_popup` which displays "\<game\> is already running. Please close it on \<device\>." and then exits. The popup uses a subprocess fallback chain — `notify-send` → `zenity` → `kdialog` → `xmessage` → tkinter — so it works on Wayland, X11, Steam Deck Gaming Mode (gamescope), and environments where `libtk` may not be installed. `notify-send` fires first and is non-blocking (auto-dismisses); the chain then continues to the first available blocking dialog so desktop users still get a modal. The race-condition path (409 from `acquire_lock`) follows the same flow.
 
+**DB schema versioning — use `PRAGMA user_version`, not try/except** — `store.py` tracks the schema version in `PRAGMA user_version` (currently `_SCHEMA_VERSION = 5`). When adding a new migration: (1) add a new `if from_version < N:` block in `_migrate()`, (2) bump `_SCHEMA_VERSION` to N, (3) add the new column to `_SCHEMA` so fresh DBs get it without running migrations. Do not add bare `try/except ALTER TABLE` blocks outside `_migrate()` — warm-start DBs skip `_migrate()` entirely via the version check.
+
+**`config:load` returns `null` when config is absent** — `main.ts` IPC handler `config:load` returns `null` both when the TOML file doesn't exist and when it fails to parse. Callers should check for `null` rather than calling the separate `config:exists` IPC first (which is kept for backwards compatibility but is now redundant).
+
+**mDNS runs in a background thread** — In `emusync.py server start`, mDNS advertisement runs in a `daemon=True` thread so the pairing token is printed (and Electron can resolve) without waiting for mDNS socket/network probing. The server's `finally` block joins the thread (2 s timeout) before unregistering the service.
+
+**Token is printed before uvicorn binds** — `emusync.py server start` prints `Pairing token:` before calling `uvicorn.run()`. Any code that calls `server.start()` and then immediately calls the API will get connection refused. Always poll `/health` after `server.start()` resolves before making any API calls (including `/pair`). Both `App.tsx` and `Setup.tsx` do this.
+
+**Blank PIN servers must match in the token regex** — `startServerProcess` in `main.ts` looks for `Pairing token: (\S*)` (zero-or-more, not `\S+`). `server_pin` defaults to `""`, so the printed line is `"Pairing token: "` with no value. Using `\S+` would never match and fall through to the 5-second timeout.
+
 ---
 
 ## Keeping this file updated
