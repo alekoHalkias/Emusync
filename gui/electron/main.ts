@@ -120,9 +120,10 @@ function startServerProcess(): Promise<{ ok: boolean; token: string | null }> {
 
     proc.stdout?.on("data", (chunk: Buffer) => {
       const line = chunk.toString();
-      const match = line.match(/Pairing token: (\S+)/);
+      // \S* (not \S+) so blank-PIN servers ("Pairing token: ") also match.
+      const match = line.match(/Pairing token: (\S*)/);
       if (match) {
-        const token = match[1];
+        const token = match[1] || null;  // normalise "" → null
         serverToken = token;
         finish({ ok: true, token });
       }

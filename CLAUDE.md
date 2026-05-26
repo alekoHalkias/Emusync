@@ -389,6 +389,10 @@ dev mode — visible in the `make dev-gui` terminal.
 
 **mDNS runs in a background thread** — In `emusync.py server start`, mDNS advertisement runs in a `daemon=True` thread so the pairing token is printed (and Electron can resolve) without waiting for mDNS socket/network probing. The server's `finally` block joins the thread (2 s timeout) before unregistering the service.
 
+**Token is printed before uvicorn binds** — `emusync.py server start` prints `Pairing token:` before calling `uvicorn.run()`. Any code that calls `server.start()` and then immediately calls the API will get connection refused. Always poll `/health` after `server.start()` resolves before making any API calls (including `/pair`). Both `App.tsx` and `Setup.tsx` do this.
+
+**Blank PIN servers must match in the token regex** — `startServerProcess` in `main.ts` looks for `Pairing token: (\S*)` (zero-or-more, not `\S+`). `server_pin` defaults to `""`, so the printed line is `"Pairing token: "` with no value. Using `\S+` would never match and fall through to the 5-second timeout.
+
 ---
 
 ## Keeping this file updated

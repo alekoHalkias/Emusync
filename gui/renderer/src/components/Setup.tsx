@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { pair } from "../api";
-import { configure } from "../api";
+import { pair, health, configure } from "../api";
 
 type Step =
   | "choose"
@@ -63,14 +62,21 @@ export default function Setup({ onDone }: Props): React.ReactElement {
       setStep("choose");
       return;
     }
+    // The pairing token is printed before uvicorn binds the port, so we must
+    // wait for /health before calling /pair — otherwise we get connection refused.
+    const port = (existing.server_port as number) || 8765;
+    configure("localhost", port, "");
+    for (let i = 0; i < 100; i++) {
+      if (await health()) break;
+      await new Promise<void>((r) => setTimeout(r, 100));
+    }
     // Self-pair so this machine can use its own API (add/import games, etc.)
     try {
-      configure("localhost", (existing.server_port as number) || 8765, "");
       const token = await pair(result.token || "", deviceId, devName);
       await window.emusync.config.save({
         ...existing, is_server: true, device_name: devName, device_id: deviceId, token,
       });
-      configure("localhost", (existing.server_port as number) || 8765, token);
+      configure("localhost", port, token);
     } catch { /* non-fatal; user can still continue */ }
     setStep("server-ready");
   }
