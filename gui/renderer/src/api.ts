@@ -83,6 +83,9 @@ export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
 export const getSaveDeviceCount = (slug: string): Promise<{ device_count: number }> =>
   _fetch("GET", `/games/${slug}/save-device-count`);
 
+export const getGameDevices = (slug: string): Promise<{ devices: Array<{ id: string; name: string; has_game: boolean }> }> =>
+  _fetch("GET", `/games/${slug}/devices`);
+
 export const listDevices = (): Promise<Device[]> => _fetch("GET", "/devices");
 export const whoami = (): Promise<{ device_id: string }> => _fetch("GET", "/whoami");
 export const removeDevice = (deviceId: string): Promise<void> => _fetch("DELETE", `/devices/${deviceId}`);

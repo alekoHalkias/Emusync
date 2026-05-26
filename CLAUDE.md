@@ -30,7 +30,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | File | Owns |
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`) |
-| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/save-device-count` |
+| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/save-device-count`, `/games/{game}/devices` |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events` |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |

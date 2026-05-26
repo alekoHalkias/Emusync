@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listDevices, getSaveDeviceCount, type Game, type Device } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listDevices, getSaveDeviceCount, getGameDevices, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -58,6 +58,9 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150, device: 140 });
   const [sortBy, setSortBy] = useState<'default' | 'game' | 'lastSave' | 'synced'>('default');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [deviceModalGame, setDeviceModalGame] = useState<{ slug: string; name: string } | null>(null);
+  const [deviceModalData, setDeviceModalData] = useState<Array<{ id: string; name: string; has_game: boolean }> | null>(null);
+  const [deviceModalLoading, setDeviceModalLoading] = useState(false);
 
   const resizingCol = useRef<keyof typeof colWidths | null>(null);
   const resizeStartX = useRef(0);
@@ -120,6 +123,19 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       /* error — keep UI responsive */
     } finally {
       setSyncingSlug(null);
+    }
+  }
+
+  async function handleOpenDeviceModal(slug: string, name: string): Promise<void> {
+    setDeviceModalGame({ slug, name });
+    setDeviceModalLoading(true);
+    try {
+      const result = await getGameDevices(slug);
+      setDeviceModalData(result.devices);
+    } catch {
+      /* error — keep UI responsive */
+    } finally {
+      setDeviceModalLoading(false);
     }
   }
 
@@ -328,7 +344,11 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                     </div>
                     <div className="game-cell">
                       {g.deviceCount !== undefined && g.totalDevices ? (
-                        <button className="btn btn-sm btn-ghost" title={`Saved on ${g.deviceCount} of ${g.totalDevices} device${g.totalDevices !== 1 ? 's' : ''}`}>
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          title={`Saved on ${g.deviceCount} of ${g.totalDevices} device${g.totalDevices !== 1 ? 's' : ''}`}
+                          onClick={() => handleOpenDeviceModal(g.slug, g.name)}
+                        >
                           {g.deviceCount}/{g.totalDevices}
                         </button>
                       ) : (
@@ -416,6 +436,47 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               </button>
               <button className="btn btn-danger" onClick={handleBulkDelete} disabled={bulkDeleting}>
                 {bulkDeleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deviceModalGame && (
+        <div className="modal-overlay" onClick={() => setDeviceModalGame(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{deviceModalGame.name} — Devices</h3>
+            {deviceModalLoading ? (
+              <div style={{ textAlign: "center", padding: 20 }}>
+                <span className="spinner" style={{ width: 24, height: 24 }} />
+              </div>
+            ) : deviceModalData ? (
+              <div style={{ marginBottom: 16 }}>
+                {deviceModalData.map(device => (
+                  <div
+                    key={device.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: 12,
+                      borderBottom: "1px solid var(--border)",
+                      gap: 12,
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>
+                      {device.has_game ? "✓" : "✗"}
+                    </span>
+                    <span style={{ flex: 1 }}>{device.name}</span>
+                    {device.has_game && (
+                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>installed</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setDeviceModalGame(null)}>
+                Close
               </button>
             </div>
           </div>
