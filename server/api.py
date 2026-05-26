@@ -150,6 +150,13 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command, "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path}
 
 
+@app.get("/games/{slug}/devices")
+def list_game_devices(slug: str, device_id: str = Depends(_auth)) -> list[dict]:
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")
+    return _get_store().list_devices_for_game(slug)
+
+
 @app.put("/games/{slug}/device")
 def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(_auth)) -> dict:
     if not _get_store().get_game(slug):

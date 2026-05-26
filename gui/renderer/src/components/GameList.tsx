@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, type Game } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listGameDevices, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -16,6 +16,7 @@ type GameRow = Game & {
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
+type DeviceModal = { slug: string; name: string; devices: Device[] | null } | null;
 
 function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   games: GameRow[]; selectedSlugs: Set<string>; onToggle: () => void;
@@ -53,6 +54,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
+  const [deviceModal, setDeviceModal] = useState<DeviceModal>(null);
   const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150 });
   const [sortBy, setSortBy] = useState<'default' | 'game' | 'lastSave' | 'synced'>('default');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -114,6 +116,16 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       /* error — keep UI responsive */
     } finally {
       setSyncingSlug(null);
+    }
+  }
+
+  async function handleOpenDeviceModal(slug: string, name: string): Promise<void> {
+    setDeviceModal({ slug, name, devices: null });
+    try {
+      const devices = await listGameDevices(slug);
+      setDeviceModal({ slug, name, devices });
+    } catch {
+      setDeviceModal({ slug, name, devices: [] });
     }
   }
 
@@ -322,6 +334,13 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                     <div className="game-cell game-cell-actions">
                       <button
                         className="btn btn-icon"
+                        title="Show devices with this game"
+                        onClick={() => handleOpenDeviceModal(g.slug, g.name)}
+                      >
+                        🖥
+                      </button>
+                      <button
+                        className="btn btn-icon"
                         title="Push saves to devices"
                         disabled={g.locked || syncingSlug === g.slug}
                         onClick={() => handleSync(g.slug)}
@@ -381,6 +400,34 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               <button className="btn btn-danger" onClick={handleRemove} disabled={removing}>
                 {removing ? <><span className="spinner" /> Removing…</> : "Remove"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deviceModal && (
+        <div className="modal-overlay" onClick={() => setDeviceModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Devices — {deviceModal.name}</h3>
+            {deviceModal.devices === null ? (
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <span className="spinner" style={{ width: 20, height: 20 }} />
+              </div>
+            ) : deviceModal.devices.length === 0 ? (
+              <p style={{ color: "var(--text-muted)" }}>No devices have this game installed.</p>
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: "12px 0" }}>
+                {deviceModal.devices.map(d => (
+                  <li key={d.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>🖥</span>
+                    <span>{d.name}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 11, marginLeft: "auto" }}>{d.id}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setDeviceModal(null)}>Close</button>
             </div>
           </div>
         </div>

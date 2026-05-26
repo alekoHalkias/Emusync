@@ -272,6 +272,17 @@ class Store:
         ).fetchone()
         return GameDevice(**dict(row)) if row else None
 
+    def list_devices_for_game(self, game_slug: str) -> list[dict]:
+        rows = self._conn.execute(
+            """SELECT d.id, d.name
+               FROM game_devices gd
+               JOIN devices d ON d.id = gd.device_id
+               WHERE gd.game_slug = ?
+               ORDER BY d.name""",
+            (game_slug,),
+        ).fetchall()
+        return [{"id": row["id"], "name": row["name"]} for row in rows]
+
     # ── saves ─────────────────────────────────────────────────────────────────
 
     def push_save(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:

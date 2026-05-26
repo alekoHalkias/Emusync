@@ -843,3 +843,64 @@ async def test_push_saves_endpoint(client):
 
     state_meta = await client.get("/games/test-game/state/meta", headers=auth)
     assert state_meta.status_code == 200
+
+
+# ── game devices list ─────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_list_game_devices_returns_devices_with_game(client):
+    """GET /games/{slug}/devices returns all devices that have the game installed."""
+    r1 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d1", "device_name": "PC"})
+    r2 = await client.post("/pair", json={"master_token": MASTER_TOKEN, "device_id": "d2", "device_name": "Steam Deck"})
+    auth1 = {"Authorization": f"Bearer {r1.json()['token']}"}
+    auth2 = {"Authorization": f"Bearer {r2.json()['token']}"}
+
+    # Add game (as device 1)
+    await client.post("/games", json={"name": "Metroid"}, headers=auth1)
+
+    # Device 1 sets its game config
+    await client.put("/games/metroid/device", json={
+        "rom_path": "/roms/metroid.gba",
+        "save_path": "/saves/metroid.sav",
+        "launch_command": "retroarch metroid.gba",
+    }, headers=auth1)
+
+    # Device 2 also sets its game config
+    await client.put("/games/metroid/device", json={
+        "rom_path": "/home/deck/roms/metroid.gba",
+        "save_path": "/home/deck/saves/metroid.sav",
+        "launch_command": "retroarch metroid.gba",
+    }, headers=auth2)
+
+    r = await client.get("/games/metroid/devices", headers=auth1)
+    assert r.status_code == 200
+    devices = r.json()
+    ids = [d["id"] for d in devices]
+    assert "d1" in ids
+    assert "d2" in ids
+    names = [d["name"] for d in devices]
+    assert "PC" in names
+    assert "Steam Deck" in names
+
+
+@pytest.mark.asyncio
+async def test_list_game_devices_empty_when_no_devices(client):
+    """GET /games/{slug}/devices returns empty list if no device has the game configured."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.post("/games", json={"name": "Ghost Trick"}, headers=auth)
+
+    r = await client.get("/games/ghost-trick/devices", headers=auth)
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_list_game_devices_404_for_unknown_game(client):
+    """GET /games/{slug}/devices returns 404 if the game doesn't exist."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    r = await client.get("/games/nonexistent-game/devices", headers=auth)
+    assert r.status_code == 404

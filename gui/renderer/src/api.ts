@@ -92,3 +92,5 @@ export type ActivityEvent = {
 export const listEvents = (): Promise<ActivityEvent[]> => _fetch("GET", "/events");
 
 export const pushGameSaves = (slug: string): Promise<void> => _fetch("POST", `/games/${slug}/push-saves`);
+
+export const listGameDevices = (slug: string): Promise<Device[]> => _fetch("GET", `/games/${slug}/devices`);
