@@ -63,8 +63,8 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const raw = await listGames();
       const enriched = await Promise.all(
@@ -85,13 +85,18 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       setGames(enriched);
     } catch {
       // Server offline — show empty list, StatusBadge shows the offline indicator
-      setGames([]);
+      if (!silent) setGames([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const id = setInterval(() => load(true), 5000);
+    return () => clearInterval(id);
+  }, [load]);
 
   async function handleRemove(): Promise<void> {
     if (!confirmRemove) return;
