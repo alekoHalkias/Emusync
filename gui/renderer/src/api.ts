@@ -14,11 +14,18 @@ export type LockInfo = { locked: boolean; device_id?: string; acquired_at?: stri
 export type SaveMeta = { hash: string; pushed_at: string; device_id: string } | null;
 
 let _base = "http://localhost:8765";
-let _token = "";
+let _pin = "";
+let _deviceId = "";
+let _deviceName = "";
 
-export function configure(host: string, port: number, token: string): void {
+export function configure(host: string, port: number, pin: string): void {
   _base = `http://${host || "localhost"}:${port || 8765}`;
-  _token = token;
+  _pin = pin;
+}
+
+export function configureDevice(deviceId: string, deviceName: string): void {
+  _deviceId = deviceId;
+  _deviceName = deviceName;
 }
 
 async function _fetch<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -26,7 +33,9 @@ async function _fetch<T>(method: string, path: string, body?: unknown): Promise<
     method,
     headers: {
       ...(body ? { "Content-Type": "application/json" } : {}),
-      Authorization: `Bearer ${_token}`,
+      "Authorization": `Bearer ${_pin}`,
+      "X-Device-ID": _deviceId,
+      "X-Device-Name": _deviceName,
     },
     body: body != null ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(5000),
@@ -47,16 +56,6 @@ export async function health(): Promise<boolean> {
   }
 }
 
-export async function pair(masterToken: string, deviceId: string, deviceName: string): Promise<string> {
-  const data = await fetch(`${_base}/pair`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ master_token: masterToken, device_id: deviceId, device_name: deviceName }),
-  });
-  if (!data.ok) throw new Error((await data.json()).detail);
-  return (await data.json()).token;
-}
-
 export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
 export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
@@ -72,7 +71,11 @@ export const getLock = (slug: string): Promise<LockInfo> => _fetch("GET", `/game
 export const releaseLock = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}/lock`);
 export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
   const res = await fetch(`${_base}/games/${slug}/save/meta`, {
-    headers: { Authorization: `Bearer ${_token}` },
+    headers: {
+      "Authorization": `Bearer ${_pin}`,
+      "X-Device-ID": _deviceId,
+      "X-Device-Name": _deviceName,
+    },
     signal: AbortSignal.timeout(5000),
   });
   if (res.status === 204 || !res.ok) return null;

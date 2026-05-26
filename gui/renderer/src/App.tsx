@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, getGameDevice, health, listGames, getLock, releaseLock, pair } from "./api";
+import { configure, configureDevice, getGameDevice, health, listGames, getLock, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
@@ -184,61 +184,42 @@ export default function App(): React.ReactElement {
         setScreen({ name: "setup" });
         return;
       }
+      const deviceId   = (cfg.device_id   as string) || "";
+      const deviceName = (cfg.device_name as string) || "";
       configure(
         (cfg.server_host as string) || "localhost",
         (cfg.server_port as number) || 8765,
-        (cfg.token as string) || "",
+        (cfg.server_pin  as string) || "",
       );
+      configureDevice(deviceId, deviceName);
       setIsServer(!!(cfg.is_server as boolean));
       if (cfg.is_server) {
         setLoadingMessage("Starting server…");
-        const serverResult = await window.emusync.server.start();
+        await window.emusync.server.start();
         setLoadingMessage("Waiting for server…");
-        // Poll at 100ms so we react as soon as uvicorn is ready (typically ~300ms
-        // after the token prints) instead of waiting a full 500ms tick.
         for (let i = 0; i < 100; i++) {
           if (await health()) break;
           await new Promise<void>((r) => setTimeout(r, 100));
         }
-        // Self-pair if this device has no token yet (first run, or after PIN change cleared devices)
-        if (!cfg.token) {
-          try {
-            setLoadingMessage("Pairing with local server…");
-            const deviceId  = (cfg.device_id  as string) ?? crypto.randomUUID();
-            const deviceName = (cfg.device_name as string) || "Server";
-            const newToken  = await pair(serverResult.token || "", deviceId, deviceName);
-            const updatedCfg = { ...cfg, device_id: deviceId, device_name: deviceName, token: newToken };
-            await window.emusync.config.save(updatedCfg);
-            configure(
-              (updatedCfg.server_host as string) || "localhost",
-              (updatedCfg.server_port as number) || 8765,
-              newToken,
-            );
-          } catch { /* self-pair failed — continue; API calls will show auth errors */ }
-        }
       }
-      // Show the games screen immediately; release stale locks in the background
-      // so a crash-recovery edge case never delays the loading screen.
+      // Show games immediately; release stale locks in the background.
       setScreen({ name: "games" });
-      if (cfg.device_id) releaseStaleLocks(cfg.device_id as string);
+      if (deviceId) releaseStaleLocks(deviceId);
     }
     init();
   }, []);
 
   function handleSetupDone(): void {
-    // After Setup completes, just reload and transition to games.
-    // The server is already running (started in Setup.tsx) and already has a token.
     window.emusync.config.load().then((cfg) => {
       if (!cfg) return;
       configure(
         (cfg.server_host as string) || "localhost",
         (cfg.server_port as number) || 8765,
-        (cfg.token as string) || "",
+        (cfg.server_pin  as string) || "",
       );
+      configureDevice((cfg.device_id as string) || "", (cfg.device_name as string) || "");
       setIsServer(!!(cfg.is_server as boolean));
       setScreen({ name: "games" });
-      // Release stale locks in the background.
-      if (cfg.device_id) releaseStaleLocks(cfg.device_id as string);
     });
   }
 
@@ -248,8 +229,9 @@ export default function App(): React.ReactElement {
       configure(
         (cfg.server_host as string) || "localhost",
         (cfg.server_port as number) || 8765,
-        (cfg.token as string) || "",
+        (cfg.server_pin  as string) || "",
       );
+      configureDevice((cfg.device_id as string) || "", (cfg.device_name as string) || "");
       setGameListKey((k) => k + 1);
     });
   }

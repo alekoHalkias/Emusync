@@ -12,7 +12,6 @@ const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
   return require("fs").existsSync(venv) ? venv : "python3";
 })();
 let serverProcess = null;
-let serverToken = null;
 let gameProcess = null;
 let mainWindow = null;
 function createWindow() {
@@ -86,15 +85,9 @@ electron.ipcMain.handle("config:addRecentFolder", (_event, consoleKey, folderPat
   }
 });
 function startServerProcess() {
-  if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
+  if (serverProcess) return Promise.resolve({ ok: true });
   return new Promise((resolve) => {
     let resolved = false;
-    const finish = (result) => {
-      if (!resolved) {
-        resolved = true;
-        resolve(result);
-      }
-    };
     const proc = child_process.spawn(PYTHON, [SCRIPT, "server", "start"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PYTHONUNBUFFERED: "1" }
@@ -102,24 +95,28 @@ function startServerProcess() {
     serverProcess = proc;
     proc.stdout?.on("data", (chunk) => {
       const line = chunk.toString();
-      const match = line.match(/Pairing token: (\S*)/);
-      if (match) {
-        const token = match[1] || null;
-        serverToken = token;
-        finish({ ok: true, token });
+      if (!resolved && line.includes("Pairing token:")) {
+        resolved = true;
+        resolve({ ok: true });
       }
     });
     proc.on("error", (err) => {
       serverProcess = null;
+      if (!resolved) {
+        resolved = true;
+        resolve({ ok: false });
+      }
       console.error("Server process error:", err);
-      finish({ ok: false, token: null });
     });
-    proc.on("exit", (code) => {
+    proc.on("exit", () => {
       serverProcess = null;
-      serverToken = null;
-      finish({ ok: false, token: null });
     });
-    setTimeout(() => finish({ ok: true, token: null }), 5e3);
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve({ ok: true });
+      }
+    }, 5e3);
   });
 }
 electron.ipcMain.handle("server:start", () => startServerProcess());
@@ -154,20 +151,11 @@ electron.ipcMain.handle("server:stop", async () => {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
   }
-  serverToken = null;
   killServerByPid();
   await killOrphanServers();
   return true;
 });
-electron.ipcMain.handle("server:token", () => {
-  if (serverToken) return serverToken;
-  const tokenFile = path.join(os.homedir(), ".emusync", ".server_token");
-  try {
-    if (fs.existsSync(tokenFile)) return fs.readFileSync(tokenFile, "utf-8").trim();
-  } catch {
-  }
-  return null;
-});
+electron.ipcMain.handle("server:token", () => null);
 electron.ipcMain.handle("server:discover", () => {
   return new Promise((resolve) => {
     const proc = child_process.spawn(PYTHON, [SCRIPT, "server", "discover-json"], {
@@ -193,7 +181,6 @@ electron.ipcMain.handle("server:change-pin", async (_event, pin) => {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
   }
-  serverToken = null;
   killServerByPid();
   await killOrphanServers();
   const raw = fs.existsSync(CONFIG_PATH) ? smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) : {};
@@ -203,11 +190,6 @@ electron.ipcMain.handle("server:change-pin", async (_event, pin) => {
     delete raw.server_pin;
   }
   fs.writeFileSync(CONFIG_PATH, smolToml.stringify(raw));
-  await new Promise((resolve) => {
-    const proc = child_process.spawn(PYTHON, [SCRIPT, "server", "clear-devices"], { stdio: "ignore" });
-    proc.on("exit", () => resolve());
-    proc.on("error", () => resolve());
-  });
   return startServerProcess();
 });
 electron.ipcMain.handle("launcher:path", () => path.join(path.dirname(SCRIPT), "emusync"));
@@ -893,6 +875,6 @@ electron.app.on("window-all-closed", () => {
     serverProcess = null;
   }
   killServerByPid();
-  child_process.spawn("pkill", ["-9", "-f", "emusync.py server start"], { stdio: "ignore" });
+  void killOrphanServers();
   if (process.platform !== "darwin") electron.app.quit();
 });

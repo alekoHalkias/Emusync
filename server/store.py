@@ -10,17 +10,15 @@ from typing import Optional
 
 LOCK_TTL_HOURS = 4
 
-# Bump this whenever a new migration is added below.
-_SCHEMA_VERSION = 5
+# Bump whenever a new migration block is added below.
+_SCHEMA_VERSION = 1
 
-# Full current schema — used for fresh databases.  All columns that were added
-# via ALTER TABLE migrations are included here so new installs get everything in
-# one shot without running any migrations.
+# Full current schema — used for fresh databases only.  Columns added via
+# ALTER TABLE migrations are included here so new installs never run migrations.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
     id           TEXT PRIMARY KEY,
     name         TEXT NOT NULL,
-    token        TEXT NOT NULL UNIQUE,
     last_ip      TEXT,
     last_seen_at TEXT
 );
@@ -82,31 +80,26 @@ CREATE TABLE IF NOT EXISTS events (
 """
 
 
+def _try(conn: sqlite3.Connection, sql: str) -> None:
+    """Execute a DDL statement, silently ignoring OperationalError (already exists / column missing)."""
+    try:
+        conn.execute(sql)
+    except sqlite3.OperationalError:
+        pass
+
+
 def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
-    """Apply incremental ALTER TABLE migrations for databases older than _SCHEMA_VERSION.
-
-    Each migration is guarded by a try/except so it is safe to re-run on a DB
-    that already has the column (e.g. a fresh DB where _SCHEMA already includes it).
-    After all migrations the user_version pragma is updated so this block is
-    skipped entirely on subsequent starts.
-    """
-    def _try(sql: str) -> None:
-        try:
-            conn.execute(sql)
-        except sqlite3.OperationalError:
-            pass  # column/table already exists
-
+    """Apply incremental migrations for databases older than _SCHEMA_VERSION."""
     if from_version < 1:
-        _try("ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''")
-    if from_version < 2:
-        _try("ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''")
-    if from_version < 3:
-        _try("ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''")
-    if from_version < 4:
-        _try("ALTER TABLE devices ADD COLUMN last_ip TEXT")
-    if from_version < 5:
-        _try("ALTER TABLE devices ADD COLUMN last_seen_at TEXT")
-
+        # Add columns that may not exist on pre-versioned databases
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''")
+        _try(conn, "ALTER TABLE devices ADD COLUMN last_ip TEXT")
+        _try(conn, "ALTER TABLE devices ADD COLUMN last_seen_at TEXT")
+        # Drop the per-device UUID token — auth is now PIN-based (see api.py _auth).
+        # SQLite 3.35+ supports DROP COLUMN; the constraint is on 'token' not 'id' so FKs are safe.
+        _try(conn, "ALTER TABLE devices DROP COLUMN token")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
 
@@ -114,7 +107,6 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
 class Device:
     id: str
     name: str
-    token: str
     last_ip: Optional[str] = None
     last_seen_at: Optional[str] = None
 
@@ -171,14 +163,9 @@ class Store:
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
-        # NORMAL is safe with WAL: only uncommitted in-flight transactions can be
-        # lost on an OS crash; the database itself is never corrupted.
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
-        # Only run ALTER TABLE migrations when the stored schema version is behind
-        # the current one.  On a fully up-to-date DB this is a single integer
-        # comparison instead of five try/except round-trips.
         db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
         if db_version < _SCHEMA_VERSION:
             _migrate(self._conn, db_version)
@@ -186,27 +173,22 @@ class Store:
 
     # ── devices ──────────────────────────────────────────────────────────────
 
-    def register_device(self, id: str, name: str, token: str) -> Device:
+    def ensure_device(self, id: str, name: str) -> Device:
+        """Register a device if new; update name if it changed. Idempotent."""
         self._conn.execute(
-            "INSERT OR REPLACE INTO devices (id, name, token) VALUES (?, ?, ?)",
-            (id, name, token),
+            "INSERT INTO devices (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name",
+            (id, name),
         )
         self._conn.commit()
-        return Device(id=id, name=name, token=token)
+        return Device(id=id, name=name)
 
     def clear_devices(self) -> None:
         self._conn.execute("DELETE FROM devices")
         self._conn.commit()
 
-    def device_by_token(self, token: str) -> Optional[Device]:
-        row = self._conn.execute(
-            "SELECT id, name, token, last_ip, last_seen_at FROM devices WHERE token = ?", (token,)
-        ).fetchone()
-        return Device(**dict(row)) if row else None
-
     def list_devices(self) -> list[Device]:
         rows = self._conn.execute(
-            "SELECT id, name, token, last_ip, last_seen_at FROM devices"
+            "SELECT id, name, last_ip, last_seen_at FROM devices"
         ).fetchall()
         return [Device(**dict(r)) for r in rows]
 

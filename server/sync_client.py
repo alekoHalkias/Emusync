@@ -17,9 +17,13 @@ class GameDeviceConfig:
 
 
 class SyncClient:
-    def __init__(self, host: str, port: int, token: str) -> None:
+    def __init__(self, host: str, port: int, pin: str, device_id: str, device_name: str) -> None:
         self._base = f"http://{host}:{port}"
-        self._headers = {"Authorization": f"Bearer {token}"}
+        self._headers = {
+            "Authorization": f"Bearer {pin}",
+            "X-Device-ID": device_id,
+            "X-Device-Name": device_name,
+        }
 
     def _url(self, path: str) -> str:
         return f"{self._base}{path}"
@@ -30,15 +34,6 @@ class SyncClient:
             return r.status_code == 200
         except Exception:
             return False
-
-    def pair(self, master_token: str, device_id: str, device_name: str) -> str:
-        r = httpx.post(
-            self._url("/pair"),
-            json={"master_token": master_token, "device_id": device_id, "device_name": device_name},
-            timeout=10,
-        )
-        r.raise_for_status()
-        return r.json()["token"]
 
     def list_devices(self) -> list[dict]:
         r = httpx.get(self._url("/devices"), headers=self._headers, timeout=10)
