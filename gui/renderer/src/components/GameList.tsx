@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listGameDevices, listDevices, type Game, type Device } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listGameDevices, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
+import { useDevices } from "../DeviceContext";
 
 type Props = {
   onAdd: () => void;
@@ -21,8 +22,29 @@ type DeviceModal = {
   name: string;
   installed: Device[] | null;   // devices that have the game
   missing: Device[] | null;     // paired devices that don't
-  reachable: Record<string, boolean> | null; // device id → online status
 } | null;
+
+/**
+ * A single device row in the per-game device modal.
+ * Status is derived from last_seen_at (updated by the server on every
+ * authenticated request from that device — no TCP probe needed):
+ *   green  = active in the last 5 minutes
+ *   yellow = seen in the last 30 minutes
+ *   grey   = stale / never seen
+ */
+function DeviceRow({ d, dim }: { d: Device; dim: boolean }): React.ReactElement {
+  const freshness = deviceFreshness(d.last_seen_at);
+  return (
+    <li style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: dim ? 0.6 : 1 }}>
+      <span>🖥</span>
+      <span>{d.name}</span>
+      <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}>●</span>
+        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{d.last_ip ?? "—"}</span>
+      </span>
+    </li>
+  );
+}
 
 function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   games: GameRow[]; selectedSlugs: Set<string>; onToggle: () => void;
@@ -49,7 +71,29 @@ function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   );
 }
 
+/** Returns a freshness tier based on last_seen_at ISO string. */
+function deviceFreshness(lastSeenAt: string | null | undefined): "online" | "recent" | "stale" {
+  if (!lastSeenAt) return "stale";
+  const ageMs = Date.now() - new Date(lastSeenAt).getTime();
+  if (ageMs < 5 * 60 * 1000) return "online";
+  if (ageMs < 30 * 60 * 1000) return "recent";
+  return "stale";
+}
+
+const FRESHNESS_COLOR = {
+  online: "var(--green, #4caf50)",
+  recent: "var(--yellow, #f59e0b)",
+  stale: "var(--text-muted)",
+} as const;
+
+const FRESHNESS_TITLE = {
+  online: "Active in the last 5 minutes",
+  recent: "Seen in the last 30 minutes",
+  stale: "Not seen recently",
+} as const;
+
 export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactElement {
+  const { devices: allDevices } = useDevices();
   const [games, setGames] = useState<GameRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
@@ -131,25 +175,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   }
 
   async function handleOpenDeviceModal(slug: string, name: string): Promise<void> {
-    setDeviceModal({ slug, name, installed: null, missing: null, reachable: null });
+    setDeviceModal({ slug, name, installed: null, missing: null });
     try {
-      const [installed, all] = await Promise.all([listGameDevices(slug), listDevices()]);
+      // Use the already-fetched context device list — no extra listDevices() call.
+      const installed = await listGameDevices(slug);
       const installedIds = new Set(installed.map(d => d.id));
-      const missing = all.filter(d => !installedIds.has(d.id));
-      // Show device lists immediately, probe reachability in parallel
-      setDeviceModal({ slug, name, installed, missing, reachable: null });
-      const allDevices = [...installed, ...missing];
-      const probeResults = await Promise.all(
-        allDevices.map(async d => {
-          if (!d.last_ip) return [d.id, false] as const;
-          const online = await (window as any).emusync.device.probe(d.last_ip, 8765);
-          return [d.id, online] as const;
-        })
-      );
-      const reachable = Object.fromEntries(probeResults);
-      setDeviceModal(prev => prev ? { ...prev, reachable } : prev);
+      const missing = allDevices.filter(d => !installedIds.has(d.id));
+      setDeviceModal({ slug, name, installed, missing });
     } catch {
-      setDeviceModal({ slug, name, installed: [], missing: [], reachable: {} });
+      setDeviceModal({ slug, name, installed: [], missing: [] });
     }
   }
 
@@ -443,23 +477,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 12px" }}>
-                      {deviceModal.installed.map(d => {
-                        const online = deviceModal.reachable?.[d.id];
-                        const probing = deviceModal.reachable === null;
-                        return (
-                          <li key={d.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
-                            <span>🖥</span>
-                            <span>{d.name}</span>
-                            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-                              {probing
-                                ? <span className="spinner" style={{ width: 10, height: 10 }} />
-                                : <span style={{ color: online ? "var(--green, #4caf50)" : "var(--text-muted)", fontSize: 14 }} title={online ? "Online" : (d.last_ip ? "Unreachable" : "Never seen")}>●</span>
-                              }
-                              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{d.last_ip ?? "—"}</span>
-                            </span>
-                          </li>
-                        );
-                      })}
+                      {deviceModal.installed.map(d => <DeviceRow key={d.id} d={d} dim={false} />)}
                     </ul>
                   </>
                 )}
@@ -467,23 +485,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Not installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                      {deviceModal.missing.map(d => {
-                        const online = deviceModal.reachable?.[d.id];
-                        const probing = deviceModal.reachable === null;
-                        return (
-                          <li key={d.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: 0.6 }}>
-                            <span>🖥</span>
-                            <span>{d.name}</span>
-                            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-                              {probing
-                                ? <span className="spinner" style={{ width: 10, height: 10 }} />
-                                : <span style={{ color: online ? "var(--green, #4caf50)" : "var(--text-muted)", fontSize: 14 }} title={online ? "Online" : (d.last_ip ? "Unreachable" : "Never seen")}>●</span>
-                              }
-                              <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{d.last_ip ?? "—"}</span>
-                            </span>
-                          </li>
-                        );
-                      })}
+                      {deviceModal.missing.map(d => <DeviceRow key={d.id} d={d} dim={true} />)}
                     </ul>
                   </>
                 )}

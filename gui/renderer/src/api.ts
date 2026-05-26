@@ -29,6 +29,7 @@ async function _fetch<T>(method: string, path: string, body?: unknown): Promise<
       Authorization: `Bearer ${_token}`,
     },
     body: body != null ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) {
     const msg = await res.json().catch(() => ({ detail: res.statusText }));
@@ -72,6 +73,7 @@ export const releaseLock = (slug: string): Promise<void> => _fetch("DELETE", `/g
 export const getSaveMeta = async (slug: string): Promise<SaveMeta> => {
   const res = await fetch(`${_base}/games/${slug}/save/meta`, {
     headers: { Authorization: `Bearer ${_token}` },
+    signal: AbortSignal.timeout(5000),
   });
   if (res.status === 204 || !res.ok) return null;
   return res.json();
