@@ -39,7 +39,7 @@ function DeviceRow({ d, dim, displayIp }: { d: Device; dim: boolean; displayIp?:
       <span>🖥</span>
       <span>{d.name}</span>
       <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}>●</span>
-      {ip && <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{ip}</span>}
+      <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{ip ?? "—"}</span>
     </li>
   );
 }
