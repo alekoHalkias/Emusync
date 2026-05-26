@@ -17,24 +17,9 @@ CREATE TABLE IF NOT EXISTS devices (
     token TEXT NOT NULL UNIQUE
 );
 CREATE TABLE IF NOT EXISTS games (
-    game                TEXT NOT NULL,
-    device_id           TEXT NOT NULL REFERENCES devices(id),
-    name                TEXT NOT NULL,
-    console             TEXT DEFAULT '',
-    rom_path            TEXT NOT NULL DEFAULT '',
-    save_path           TEXT NOT NULL DEFAULT '',
-    launch_command      TEXT NOT NULL DEFAULT '',
-    state_path          TEXT NOT NULL DEFAULT '',
-    rom_folder_path     TEXT NOT NULL DEFAULT '',
-    last_synced_at      TEXT,
-    sync_state          TEXT DEFAULT 'synced',
-    local_save_time     TEXT,
-    remote_save_time    TEXT,
-    save_hash           TEXT,
-    added_at            TEXT,
-    last_played_at      TEXT,
-    enabled             BOOLEAN DEFAULT 1,
-    PRIMARY KEY (game, device_id)
+    slug    TEXT PRIMARY KEY,
+    name    TEXT NOT NULL,
+    console TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS consoles (
     id                    TEXT PRIMARY KEY,
@@ -47,33 +32,39 @@ CREATE TABLE IF NOT EXISTS consoles (
     device_emulator       TEXT NOT NULL DEFAULT '',
     UNIQUE(device_id, console_name)
 );
+CREATE TABLE IF NOT EXISTS game_devices (
+    game_slug      TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id      TEXT NOT NULL REFERENCES devices(id),
+    rom_path       TEXT NOT NULL DEFAULT '',
+    save_path      TEXT NOT NULL DEFAULT '',
+    launch_command TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (game_slug, device_id)
+);
 CREATE TABLE IF NOT EXISTS saves (
     id         TEXT PRIMARY KEY,
-    game       TEXT NOT NULL,
-    device_id  TEXT NOT NULL,
+    game_slug  TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id  TEXT NOT NULL REFERENCES devices(id),
     data       BLOB NOT NULL,
     hash       TEXT NOT NULL,
     pushed_at  TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS states (
     id         TEXT PRIMARY KEY,
-    game       TEXT NOT NULL,
-    device_id  TEXT NOT NULL,
+    game_slug  TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id  TEXT NOT NULL REFERENCES devices(id),
     data       BLOB NOT NULL,
     hash       TEXT NOT NULL,
     pushed_at  TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS locks (
-    game        TEXT NOT NULL,
-    device_id   TEXT NOT NULL,
-    acquired_at TEXT NOT NULL,
-    PRIMARY KEY (game, device_id),
-    FOREIGN KEY (game, device_id) REFERENCES games(game, device_id) ON DELETE CASCADE
+    game_slug   TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE,
+    device_id   TEXT NOT NULL REFERENCES devices(id),
+    acquired_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS events (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     type        TEXT NOT NULL,
-    game        TEXT,
+    game_slug   TEXT,
     device_id   TEXT,
     device_name TEXT,
     occurred_at TEXT NOT NULL
@@ -90,23 +81,9 @@ class Device:
 
 @dataclass
 class Game:
-    game: str
-    device_id: str
+    slug: str
     name: str
     console: str = ""
-    rom_path: str = ""
-    save_path: str = ""
-    launch_command: str = ""
-    state_path: str = ""
-    rom_folder_path: str = ""
-    last_synced_at: Optional[str] = None
-    sync_state: str = "synced"
-    local_save_time: Optional[str] = None
-    remote_save_time: Optional[str] = None
-    save_hash: Optional[str] = None
-    added_at: Optional[str] = None
-    last_played_at: Optional[str] = None
-    enabled: bool = True
 
 
 @dataclass
@@ -134,7 +111,7 @@ class GameDevice:
 
 @dataclass
 class SaveMeta:
-    game: str
+    game_slug: str
     device_id: str
     hash: str
     pushed_at: str
@@ -142,7 +119,7 @@ class SaveMeta:
 
 @dataclass
 class Lock:
-    game: str
+    game_slug: str
     device_id: str
     acquired_at: str
 
@@ -241,68 +218,38 @@ class Store:
 
     # ── games ─────────────────────────────────────────────────────────────────
 
-    def add_game(self, game: Game) -> Game:
-        """Insert or update a game record. Uses INSERT OR IGNORE to preserve existing saves/locks on first insert."""
-        existing = self.get_game(game.game, game.device_id)
-        if existing:
-            # Update existing game
-            self._conn.execute(
-                """UPDATE games SET name=?, console=?, rom_path=?, save_path=?, launch_command=?,
-                   state_path=?, rom_folder_path=?, last_synced_at=?, sync_state=?, local_save_time=?,
-                   remote_save_time=?, save_hash=?, added_at=?, last_played_at=?, enabled=?
-                   WHERE game=? AND device_id=?""",
-                (game.name, game.console, game.rom_path, game.save_path, game.launch_command,
-                 game.state_path, game.rom_folder_path, game.last_synced_at, game.sync_state,
-                 game.local_save_time, game.remote_save_time, game.save_hash, game.added_at,
-                 game.last_played_at, game.enabled, game.game, game.device_id)
-            )
-        else:
-            # Insert new game
-            self._conn.execute(
-                """INSERT INTO games
-                   (game, device_id, name, console, rom_path, save_path, launch_command,
-                    state_path, rom_folder_path, last_synced_at, sync_state, local_save_time,
-                    remote_save_time, save_hash, added_at, last_played_at, enabled)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (game.game, game.device_id, game.name, game.console, game.rom_path,
-                 game.save_path, game.launch_command, game.state_path, game.rom_folder_path,
-                 game.last_synced_at, game.sync_state, game.local_save_time,
-                 game.remote_save_time, game.save_hash, game.added_at, game.last_played_at,
-                 game.enabled)
-            )
-        self._conn.commit()
-        return game
-
-    def update_game_name(self, game: str, device_id: str, name: str) -> None:
-        """Rename a game without touching its saves or locks."""
+    def add_game(self, slug: str, name: str, console: str = "") -> Game:
         self._conn.execute(
-            "UPDATE games SET name = ? WHERE game = ? AND device_id = ?", (name, game, device_id)
+            "INSERT OR IGNORE INTO games (slug, name, console) VALUES (?, ?, ?)", (slug, name, console)
+        )
+        self._conn.commit()
+        return Game(slug=slug, name=name, console=console)
+
+    def update_game_name(self, slug: str, name: str) -> None:
+        """Rename a game without touching its saves, locks, or device config."""
+        self._conn.execute(
+            "UPDATE games SET name = ? WHERE slug = ?", (name, slug)
         )
         self._conn.commit()
 
-    def update_game_console(self, game: str, device_id: str, console: str) -> None:
+    def update_game_console(self, slug: str, console: str) -> None:
         """Update the console type for a game."""
         self._conn.execute(
-            "UPDATE games SET console = ? WHERE game = ? AND device_id = ?", (console, game, device_id)
+            "UPDATE games SET console = ? WHERE slug = ?", (console, slug)
         )
         self._conn.commit()
 
-    def remove_game(self, game: str, device_id: str) -> None:
-        self._conn.execute("DELETE FROM games WHERE game = ? AND device_id = ?", (game, device_id))
+    def remove_game(self, slug: str) -> None:
+        self._conn.execute("DELETE FROM games WHERE slug = ?", (slug,))
         self._conn.commit()
 
-    def list_games(self, device_id: str) -> list[Game]:
-        """List all games for a device."""
-        cols = "game, device_id, name, console, rom_path, save_path, launch_command, state_path, rom_folder_path, last_synced_at, sync_state, local_save_time, remote_save_time, save_hash, added_at, last_played_at, enabled"
-        rows = self._conn.execute(
-            f"SELECT {cols} FROM games WHERE device_id = ?", (device_id,)
-        ).fetchall()
+    def list_games(self) -> list[Game]:
+        rows = self._conn.execute("SELECT slug, name, console FROM games").fetchall()
         return [Game(**dict(r)) for r in rows]
 
-    def get_game(self, game: str, device_id: str) -> Optional[Game]:
-        cols = "game, device_id, name, console, rom_path, save_path, launch_command, state_path, rom_folder_path, last_synced_at, sync_state, local_save_time, remote_save_time, save_hash, added_at, last_played_at, enabled"
+    def get_game(self, slug: str) -> Optional[Game]:
         row = self._conn.execute(
-            f"SELECT {cols} FROM games WHERE game = ? AND device_id = ?", (game, device_id)
+            "SELECT slug, name, console FROM games WHERE slug = ?", (slug,)
         ).fetchone()
         return Game(**dict(row)) if row else None
 
@@ -327,86 +274,80 @@ class Store:
 
     # ── saves ─────────────────────────────────────────────────────────────────
 
-    def push_save(self, game: str, device_id: str, data: bytes) -> SaveMeta:
+    def push_save(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
         h = hashlib.sha256(data).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
-        self._conn.execute("DELETE FROM saves WHERE game = ?", (game,))
+        self._conn.execute("DELETE FROM saves WHERE game_slug = ?", (game_slug,))
         self._conn.execute(
-            "INSERT INTO saves (id, game, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), game, device_id, data, h, now),
+            "INSERT INTO saves (id, game_slug, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), game_slug, device_id, data, h, now),
         )
         self._conn.commit()
-        return SaveMeta(game=game, device_id=device_id, hash=h, pushed_at=now)
+        return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now)
 
-    def pull_save(self, game: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
+    def pull_save(self, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
         row = self._conn.execute(
-            "SELECT data, game, device_id, hash, pushed_at FROM saves WHERE game = ? ORDER BY pushed_at DESC LIMIT 1",
-            (game,),
+            "SELECT data, game_slug, device_id, hash, pushed_at FROM saves WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
         ).fetchone()
         if not row:
             return None, None
         meta = SaveMeta(
-            game=row["game"],
+            game_slug=row["game_slug"],
             device_id=row["device_id"],
             hash=row["hash"],
             pushed_at=row["pushed_at"],
         )
         return bytes(row["data"]), meta
 
-    def get_save_meta(self, game: str) -> Optional[SaveMeta]:
+    def get_save_meta(self, game_slug: str) -> Optional[SaveMeta]:
         row = self._conn.execute(
-            "SELECT game, device_id, hash, pushed_at FROM saves WHERE game = ? ORDER BY pushed_at DESC LIMIT 1",
-            (game,),
+            "SELECT game_slug, device_id, hash, pushed_at FROM saves WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
         ).fetchone()
         return SaveMeta(**dict(row)) if row else None
 
-    def count_save_devices(self, game: str) -> int:
-        row = self._conn.execute(
-            "SELECT COUNT(DISTINCT device_id) as count FROM games WHERE game = ?", (game,)
-        ).fetchone()
-        return row["count"] if row else 0
-
     # ── states ─────────────────────────────────────────────────────────────────
 
-    def push_state(self, game: str, device_id: str, data: bytes) -> SaveMeta:
+    def push_state(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
         h = hashlib.sha256(data).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
-        self._conn.execute("DELETE FROM states WHERE game = ?", (game,))
+        self._conn.execute("DELETE FROM states WHERE game_slug = ?", (game_slug,))
         self._conn.execute(
-            "INSERT INTO states (id, game, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), game, device_id, data, h, now),
+            "INSERT INTO states (id, game_slug, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), game_slug, device_id, data, h, now),
         )
         self._conn.commit()
-        return SaveMeta(game=game, device_id=device_id, hash=h, pushed_at=now)
+        return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now)
 
-    def pull_state(self, game: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
+    def pull_state(self, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
         row = self._conn.execute(
-            "SELECT data, game, device_id, hash, pushed_at FROM states WHERE game = ? ORDER BY pushed_at DESC LIMIT 1",
-            (game,),
+            "SELECT data, game_slug, device_id, hash, pushed_at FROM states WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
         ).fetchone()
         if not row:
             return None, None
         meta = SaveMeta(
-            game=row["game"],
+            game_slug=row["game_slug"],
             device_id=row["device_id"],
             hash=row["hash"],
             pushed_at=row["pushed_at"],
         )
         return bytes(row["data"]), meta
 
-    def get_state_meta(self, game: str) -> Optional[SaveMeta]:
+    def get_state_meta(self, game_slug: str) -> Optional[SaveMeta]:
         row = self._conn.execute(
-            "SELECT game, device_id, hash, pushed_at FROM states WHERE game = ? ORDER BY pushed_at DESC LIMIT 1",
-            (game,),
+            "SELECT game_slug, device_id, hash, pushed_at FROM states WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
         ).fetchone()
         return SaveMeta(**dict(row)) if row else None
 
     # ── locks ─────────────────────────────────────────────────────────────────
 
-    def acquire_lock(self, game: str, device_id: str) -> None:
+    def acquire_lock(self, game_slug: str, device_id: str) -> None:
         now = datetime.now(timezone.utc)
         row = self._conn.execute(
-            "SELECT device_id, acquired_at FROM locks WHERE game = ?", (game,)
+            "SELECT device_id, acquired_at FROM locks WHERE game_slug = ?", (game_slug,)
         ).fetchone()
         if row:
             holder = row["device_id"]
@@ -416,50 +357,50 @@ class Store:
             age_hours = (now - acquired).total_seconds() / 3600
             if holder == device_id:
                 self._conn.execute(
-                    "UPDATE locks SET acquired_at = ? WHERE game = ? AND device_id = ?",
-                    (now.isoformat(), game, device_id),
+                    "UPDATE locks SET acquired_at = ? WHERE game_slug = ?",
+                    (now.isoformat(), game_slug),
                 )
                 self._conn.commit()
                 return
             if age_hours < LOCK_TTL_HOURS:
                 raise ValueError(f"Game is locked by device {holder}")
         self._conn.execute(
-            "INSERT OR REPLACE INTO locks (game, device_id, acquired_at) VALUES (?, ?, ?)",
-            (game, device_id, now.isoformat()),
+            "INSERT OR REPLACE INTO locks (game_slug, device_id, acquired_at) VALUES (?, ?, ?)",
+            (game_slug, device_id, now.isoformat()),
         )
         self._conn.commit()
 
-    def release_lock(self, game: str, device_id: str) -> None:
+    def release_lock(self, game_slug: str, device_id: str) -> None:
         self._conn.execute(
-            "DELETE FROM locks WHERE game = ? AND device_id = ?",
-            (game, device_id),
+            "DELETE FROM locks WHERE game_slug = ? AND device_id = ?",
+            (game_slug, device_id),
         )
         self._conn.commit()
 
     # ── events ────────────────────────────────────────────────────────────────
 
-    def log_event(self, event_type: str, game: Optional[str] = None, device_id: Optional[str] = None) -> None:
+    def log_event(self, event_type: str, game_slug: Optional[str] = None, device_id: Optional[str] = None) -> None:
         now = datetime.now(timezone.utc).isoformat()
         device_name: Optional[str] = None
         if device_id:
             row = self._conn.execute("SELECT name FROM devices WHERE id = ?", (device_id,)).fetchone()
             device_name = row["name"] if row else device_id
         self._conn.execute(
-            "INSERT INTO events (type, game, device_id, device_name, occurred_at) VALUES (?, ?, ?, ?, ?)",
-            (event_type, game, device_id, device_name, now),
+            "INSERT INTO events (type, game_slug, device_id, device_name, occurred_at) VALUES (?, ?, ?, ?, ?)",
+            (event_type, game_slug, device_id, device_name, now),
         )
         self._conn.commit()
 
     def list_events(self, limit: int = 100) -> list[dict]:
         rows = self._conn.execute(
-            "SELECT type, game, device_id, device_name, occurred_at FROM events ORDER BY id DESC LIMIT ?",
+            "SELECT type, game_slug, device_id, device_name, occurred_at FROM events ORDER BY id DESC LIMIT ?",
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def get_lock(self, game: str, device_id: str) -> Optional[Lock]:
+    def get_lock(self, game_slug: str) -> Optional[Lock]:
         row = self._conn.execute(
-            "SELECT game, device_id, acquired_at FROM locks WHERE game = ? AND device_id = ?",
-            (game, device_id),
+            "SELECT game_slug, device_id, acquired_at FROM locks WHERE game_slug = ?",
+            (game_slug,),
         ).fetchone()
         return Lock(**dict(row)) if row else None

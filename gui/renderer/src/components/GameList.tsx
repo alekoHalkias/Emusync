@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listDevices, getSaveDeviceCount, type Game, type Device } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listDevices, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -13,8 +13,7 @@ type GameRow = Game & {
   lastSave?: string | null;
   locked?: boolean;
   syncing?: boolean;
-  deviceCount?: number;
-  totalDevices?: number;
+  lastSyncDeviceName?: string;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -67,22 +66,21 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     setLoading(true);
     try {
       const [raw, devices] = await Promise.all([listGames(), listDevices()]);
-      const totalDevices = devices.length;
+      const deviceMap = new Map(devices.map(d => [d.id, d.name]));
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
-          const [meta, lock, config, deviceCount] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug), getSaveDeviceCount(g.slug)]);
+          const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
           let lastSave: string | null = undefined;
           if (config.status === "fulfilled" && config.value?.save_path) {
             lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
           }
-          const count = deviceCount.status === "fulfilled" ? deviceCount.value.device_count : 0;
+          const lastSyncDeviceName = meta.status === "fulfilled" && meta.value ? deviceMap.get(meta.value.device_id) : undefined;
           return {
             ...g,
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             lastSave,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
-            deviceCount: count,
-            totalDevices,
+            lastSyncDeviceName,
           };
         })
       );
@@ -327,9 +325,9 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                       <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
                     </div>
                     <div className="game-cell">
-                      {g.deviceCount !== undefined && g.totalDevices ? (
-                        <button className="btn btn-sm btn-ghost" title={`Saved on ${g.deviceCount} of ${g.totalDevices} device${g.totalDevices !== 1 ? 's' : ''}`}>
-                          {g.deviceCount}/{g.totalDevices}
+                      {g.lastSyncDeviceName ? (
+                        <button className="btn btn-sm btn-ghost" title={`Last synced from ${g.lastSyncDeviceName}`}>
+                          {g.lastSyncDeviceName}
                         </button>
                       ) : (
                         <span className="game-cell-muted">—</span>
