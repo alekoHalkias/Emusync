@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, type Game } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listDevices, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -13,6 +13,7 @@ type GameRow = Game & {
   lastSave?: string | null;
   locked?: boolean;
   syncing?: boolean;
+  lastSyncDeviceName?: string;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -53,7 +54,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
-  const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150 });
+  const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150, device: 140 });
   const [sortBy, setSortBy] = useState<'default' | 'game' | 'lastSave' | 'synced'>('default');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -64,7 +65,8 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const raw = await listGames();
+      const [raw, devices] = await Promise.all([listGames(), listDevices()]);
+      const deviceMap = new Map(devices.map(d => [d.id, d.name]));
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
           const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
@@ -72,11 +74,13 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
           if (config.status === "fulfilled" && config.value?.save_path) {
             lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
           }
+          const lastSyncDeviceName = meta.status === "fulfilled" && meta.value ? deviceMap.get(meta.value.device_id) : undefined;
           return {
             ...g,
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             lastSave,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
+            lastSyncDeviceName,
           };
         })
       );
@@ -259,7 +263,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
           <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
         </div>
       ) : (
-        <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px ${colWidths.lastSave}px ${colWidths.synced}px 1fr` }}>
+        <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px ${colWidths.lastSave}px ${colWidths.synced}px ${colWidths.device}px 1fr` }}>
           {/* Column headers */}
           <div className="col-header" />
           <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('game'); }} title="Click to sort">
@@ -271,6 +275,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
           <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('synced'); }} title="Click to sort">
             Synced {sortBy === 'synced' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("synced")} />
           </div>
+          <div className="col-header">Device <span className="resize-handle" onMouseDown={startResize("device")} /></div>
           <div className="col-header">Actions</div>
 
           {(() => {
@@ -318,6 +323,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                     <div className="game-cell game-cell-muted">
                       {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
                       <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
+                    </div>
+                    <div className="game-cell">
+                      {g.lastSyncDeviceName ? (
+                        <button className="btn btn-sm btn-ghost" title={`Last synced from ${g.lastSyncDeviceName}`}>
+                          {g.lastSyncDeviceName}
+                        </button>
+                      ) : (
+                        <span className="game-cell-muted">—</span>
+                      )}
                     </div>
                     <div className="game-cell game-cell-actions">
                       <button
