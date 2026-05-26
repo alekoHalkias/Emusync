@@ -95,10 +95,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     if (!confirmRemove) return;
     setRemoving(true);
     try {
-      // Log deleted game
-      await (window as any).emusync.log.message(
-        `[Deleted Game] game='${confirmRemove.slug}' name='${confirmRemove.name}'`
-      );
       await removeGame(confirmRemove.slug);
       setConfirmRemove(null);
       await load();
@@ -157,12 +153,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     const errs: string[] = [];
     for (const slug of slugsToDelete) {
       try {
-        const game = games.find(g => g.slug === slug);
-        const gameName = game?.name || slug;
-        // Log deleted game
-        await (window as any).emusync.log.message(
-          `[Deleted Game] game='${slug}' name='${gameName}'`
-        );
         await removeGame(slug);
       } catch (e) {
         errs.push(slug);

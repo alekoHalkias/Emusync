@@ -101,11 +101,6 @@ ipcMain.handle("config:addRecentFolder", (_event, consoleKey: string, folderPath
   }
 });
 
-ipcMain.handle("log:message", (_event, message: string) => {
-  console.log(message);
-  return true;
-});
-
 function startServerProcess(): Promise<{ ok: boolean; token: string | null }> {
   if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
 

@@ -69,7 +69,4 @@ contextBridge.exposeInMainWorld("emusync", {
     onExited: (cb: () => void): void => { ipcRenderer.on("game:exited", cb); },
     offExited: (cb: () => void): void => { ipcRenderer.removeListener("game:exited", cb); },
   },
-  log: {
-    message: (message: string): Promise<boolean> => ipcRenderer.invoke("log:message", message),
-  },
 });

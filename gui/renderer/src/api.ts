@@ -8,7 +8,7 @@ export type GameDeviceConfig = {
   rom_folder_path?: string;
 };
 
-export type Game = { game?: string; slug?: string; name: string; console?: string };
+export type Game = { slug: string; name: string; console?: string };
 export type Device = { id: string; name: string };
 export type LockInfo = { locked: boolean; device_id?: string; acquired_at?: string };
 export type SaveMeta = { hash: string; pushed_at: string; device_id: string } | null;

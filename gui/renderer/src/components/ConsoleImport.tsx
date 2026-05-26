@@ -216,29 +216,18 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setPhase("importing");
     const errs: string[] = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel);
-
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
         const game = await addGame(displayName, consoleAbbr);
-        const gameId = game.game || game.slug || "unknown";
-
-        await setGameDevice(gameId, {
+        await setGameDevice(game.slug, {
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
           state_path: rom.stateExists ? (rom.statePath ?? "") : "",
           rom_folder_path: rom.romFolderPath ?? "",
         });
-
-        // Log imported game to main process
-        await (window as any).emusync.log.message(
-          `[Imported Game] game='${gameId}' name='${displayName}' console='${consoleAbbr}' ` +
-          `rom_path='${rom.romPath}' save_path='${rom.savePath}' ` +
-          `launch_command='${rom.launchCommand}' state_path='${rom.stateExists ? (rom.statePath ?? "") : ""}' ` +
-          `rom_folder_path='${rom.romFolderPath ?? ""}'`
-        );
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
     }
