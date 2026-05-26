@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listGameDevices, type Game, type Device } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listGameDevices, listDevices, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
 type Props = {
@@ -16,7 +16,12 @@ type GameRow = Game & {
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
-type DeviceModal = { slug: string; name: string; devices: Device[] | null } | null;
+type DeviceModal = {
+  slug: string;
+  name: string;
+  installed: Device[] | null;   // devices that have the game
+  missing: Device[] | null;     // paired devices that don't
+} | null;
 
 function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   games: GameRow[]; selectedSlugs: Set<string>; onToggle: () => void;
@@ -125,12 +130,14 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   }
 
   async function handleOpenDeviceModal(slug: string, name: string): Promise<void> {
-    setDeviceModal({ slug, name, devices: null });
+    setDeviceModal({ slug, name, installed: null, missing: null });
     try {
-      const devices = await listGameDevices(slug);
-      setDeviceModal({ slug, name, devices });
+      const [installed, all] = await Promise.all([listGameDevices(slug), listDevices()]);
+      const installedIds = new Set(installed.map(d => d.id));
+      const missing = all.filter(d => !installedIds.has(d.id));
+      setDeviceModal({ slug, name, installed, missing });
     } catch {
-      setDeviceModal({ slug, name, devices: [] });
+      setDeviceModal({ slug, name, installed: [], missing: [] });
     }
   }
 
@@ -414,22 +421,47 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         <div className="modal-overlay" onClick={() => setDeviceModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Devices — {deviceModal.name}</h3>
-            {deviceModal.devices === null ? (
+            {deviceModal.installed === null ? (
               <div style={{ textAlign: "center", padding: "16px 0" }}>
                 <span className="spinner" style={{ width: 20, height: 20 }} />
               </div>
-            ) : deviceModal.devices.length === 0 ? (
-              <p style={{ color: "var(--text-muted)" }}>No devices have this game installed.</p>
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: "12px 0" }}>
-                {deviceModal.devices.map(d => (
-                  <li key={d.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
-                    <span>🖥</span>
-                    <span>{d.name}</span>
-                    <span style={{ color: "var(--text-muted)", fontSize: 11, marginLeft: "auto" }}>{d.id}</span>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {deviceModal.installed.length > 0 && (
+                  <>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Installed</p>
+                    <ul style={{ listStyle: "none", padding: 0, margin: "0 0 12px" }}>
+                      {deviceModal.installed.map(d => (
+                        <li key={d.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
+                          <span>🖥</span>
+                          <span>{d.name}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: 11, marginLeft: "auto" }}>{d.id}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {deviceModal.missing !== null && deviceModal.missing.length > 0 && (
+                  <>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Not installed</p>
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                      {deviceModal.missing.map(d => (
+                        <li key={d.id} style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: 0.5 }}>
+                          <span>🖥</span>
+                          <span>{d.name}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: 11, marginLeft: "auto" }}>{d.id}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {deviceModal.installed.length === 0 && deviceModal.missing?.length === 0 && (
+                  <p style={{ color: "var(--text-muted)" }}>No paired devices found.</p>
+                )}
+                {deviceModal.installed.length === 0 && (deviceModal.missing?.length ?? 0) > 0 && (
+                  <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 8 }}>No devices have this game installed yet.</p>
+                )}
+              </>
             )}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setDeviceModal(null)}>Close</button>
