@@ -1,41 +1,35 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { listDevices, listEvents, removeDevice, whoami, type Device, type ActivityEvent } from "../api";
+import { listEvents, removeDevice, type ActivityEvent } from "../api";
+import { useDevices } from "../DeviceContext";
 
 export default function DevicesButton(): React.ReactElement {
+  const { devices, currentDeviceId, initialLoading, refresh } = useDevices();
   const [open, setOpen] = useState(false);
-  const [devices, setDevices] = useState<Device[]>([]);
   const [events, setEvents] = useState<ActivityEvent[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [eventsLoading, setEventsLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
-  const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Only fetch events when the modal is actually open.
+  const loadEvents = useCallback(async () => {
+    setEventsLoading(true);
     try {
-      const [devs, evts, me] = await Promise.all([listDevices(), listEvents(), whoami()]);
-      setDevices(devs);
-      setEvents(evts);
-      setCurrentDeviceId(me.device_id);
+      setEvents(await listEvents());
     } catch {
-      setDevices([]);
       setEvents([]);
-      setCurrentDeviceId(null);
     } finally {
-      setLoading(false);
+      setEventsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    if (open) load();
-  }, [open, load]);
+    if (open) loadEvents();
+  }, [open, loadEvents]);
 
   const getLastSync = (deviceId: string): string | null => {
-    const syncEvents = events.filter(e => e.device_id === deviceId && (e.type === "save_synced" || e.type === "state_synced"));
+    const syncEvents = events.filter(
+      e => e.device_id === deviceId && (e.type === "save_synced" || e.type === "state_synced"),
+    );
     if (syncEvents.length === 0) return null;
     return syncEvents[0].occurred_at.slice(0, 19);
   };
@@ -46,13 +40,17 @@ export default function DevicesButton(): React.ReactElement {
     try {
       await removeDevice(confirmRemove);
       setConfirmRemove(null);
-      await load();
+      await refresh();
     } catch {
       /* error — keep UI responsive */
     } finally {
       setRemoving(false);
     }
   }
+
+  // Show a dash while the very first load is in flight so users don't see a
+  // misleading "0" that immediately jumps to the real count.
+  const countLabel = initialLoading ? "—" : String(devices.length);
 
   return (
     <>
@@ -62,7 +60,7 @@ export default function DevicesButton(): React.ReactElement {
         style={{ fontSize: 13 }}
         title="View paired devices"
       >
-        Devices {devices.length}
+        Devices {countLabel}
       </button>
 
       {open && (
@@ -70,7 +68,7 @@ export default function DevicesButton(): React.ReactElement {
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 450 }}>
             <h3 style={{ marginBottom: 16 }}>Paired devices ({devices.length})</h3>
 
-            {loading ? (
+            {eventsLoading ? (
               <div style={{ textAlign: "center", padding: "20px 0" }}>
                 <span className="spinner" style={{ width: 20, height: 20 }} />
               </div>

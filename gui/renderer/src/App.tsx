@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { configure, getGameDevice, health, listGames, getLock, releaseLock, pair } from "./api";
+import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
@@ -284,6 +285,7 @@ export default function App(): React.ReactElement {
   }
 
   return (
+    <DeviceProvider>
     <div className="layout">
       <header className="topbar">
         <span className="topbar-title">EmuSync</span>
@@ -346,5 +348,6 @@ export default function App(): React.ReactElement {
       )}
 
     </div>
+    </DeviceProvider>
   );
 }
