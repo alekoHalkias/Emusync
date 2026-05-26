@@ -22,65 +22,25 @@ type DeviceModal = {
   name: string;
   installed: Device[] | null;   // devices that have the game
   missing: Device[] | null;     // paired devices that don't
-  /** Per-device TCP probe result (true/false), null = probe not yet requested. */
-  probed: Record<string, boolean | null>;
-  /** Set of device IDs currently being TCP-probed. */
-  probing: Set<string>;
 } | null;
 
 /**
  * A single device row in the per-game device modal.
- *
- * Status indicator priority:
- *  1. If a TCP probe result exists for this device, show that (green/red).
- *  2. Otherwise show freshness from last_seen_at: green <5min, yellow <30min, grey older.
- *
- * A "Check now" button triggers an on-demand TCP probe so users can verify
- * real-time reachability without blocking the modal open.
+ * Status is derived from last_seen_at (updated by the server on every
+ * authenticated request from that device — no TCP probe needed):
+ *   green  = active in the last 5 minutes
+ *   yellow = seen in the last 30 minutes
+ *   grey   = stale / never seen
  */
-function DeviceRow({ d, probed, probing, onProbe, dim }: {
-  d: Device;
-  probed: Record<string, boolean | null>;
-  probing: Set<string>;
-  onProbe: (id: string, ip: string | null | undefined) => void;
-  dim: boolean;
-}): React.ReactElement {
-  const isProbing = probing.has(d.id);
-  const probeResult = probed[d.id]; // undefined = not yet probed, true/false = result
-
-  let dotColor: string;
-  let dotTitle: string;
-
-  if (probeResult !== undefined) {
-    // TCP probe result takes precedence.
-    dotColor = probeResult ? "var(--green, #4caf50)" : "var(--red, #ef4444)";
-    dotTitle = probeResult ? "Reachable (TCP)" : "Unreachable (TCP)";
-  } else {
-    const freshness = deviceFreshness(d.last_seen_at);
-    dotColor = FRESHNESS_COLOR[freshness];
-    dotTitle = FRESHNESS_TITLE[freshness];
-  }
-
+function DeviceRow({ d, dim }: { d: Device; dim: boolean }): React.ReactElement {
+  const freshness = deviceFreshness(d.last_seen_at);
   return (
     <li style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: dim ? 0.6 : 1 }}>
       <span>🖥</span>
       <span>{d.name}</span>
       <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-        {isProbing
-          ? <span className="spinner" style={{ width: 10, height: 10 }} />
-          : <span style={{ color: dotColor, fontSize: 14 }} title={dotTitle}>●</span>
-        }
+        <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}>●</span>
         <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{d.last_ip ?? "—"}</span>
-        {d.last_ip && !isProbing && (
-          <button
-            className="btn btn-icon"
-            style={{ fontSize: 10, padding: "1px 4px", opacity: 0.7 }}
-            title="TCP-probe this device right now"
-            onClick={(e) => { e.stopPropagation(); onProbe(d.id, d.last_ip); }}
-          >
-            ↻
-          </button>
-        )}
       </span>
     </li>
   );
@@ -215,34 +175,16 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   }
 
   async function handleOpenDeviceModal(slug: string, name: string): Promise<void> {
-    setDeviceModal({ slug, name, installed: null, missing: null, probed: {}, probing: new Set() });
+    setDeviceModal({ slug, name, installed: null, missing: null });
     try {
       // Use the already-fetched context device list — no extra listDevices() call.
       const installed = await listGameDevices(slug);
       const installedIds = new Set(installed.map(d => d.id));
       const missing = allDevices.filter(d => !installedIds.has(d.id));
-      // Show device lists immediately — freshness indicators render from last_seen_at with no wait.
-      setDeviceModal({ slug, name, installed, missing, probed: {}, probing: new Set() });
+      setDeviceModal({ slug, name, installed, missing });
     } catch {
-      setDeviceModal({ slug, name, installed: [], missing: [], probed: {}, probing: new Set() });
+      setDeviceModal({ slug, name, installed: [], missing: [] });
     }
-  }
-
-  async function handleProbeDevice(deviceId: string, ip: string | null | undefined): Promise<void> {
-    if (!ip) return;
-    setDeviceModal(prev => {
-      if (!prev) return prev;
-      const probing = new Set(prev.probing);
-      probing.add(deviceId);
-      return { ...prev, probing };
-    });
-    const online = await (window as any).emusync.device.probe(ip, 8765);
-    setDeviceModal(prev => {
-      if (!prev) return prev;
-      const probing = new Set(prev.probing);
-      probing.delete(deviceId);
-      return { ...prev, probing, probed: { ...prev.probed, [deviceId]: online } };
-    });
   }
 
   function toggleSelection(slug: string): void {
@@ -535,7 +477,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 12px" }}>
-                      {deviceModal.installed.map(d => <DeviceRow key={d.id} d={d} probed={deviceModal.probed} probing={deviceModal.probing} onProbe={handleProbeDevice} dim={false} />)}
+                      {deviceModal.installed.map(d => <DeviceRow key={d.id} d={d} dim={false} />)}
                     </ul>
                   </>
                 )}
@@ -543,7 +485,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Not installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                      {deviceModal.missing.map(d => <DeviceRow key={d.id} d={d} probed={deviceModal.probed} probing={deviceModal.probing} onProbe={handleProbeDevice} dim={true} />)}
+                      {deviceModal.missing.map(d => <DeviceRow key={d.id} d={d} dim={true} />)}
                     </ul>
                   </>
                 )}
