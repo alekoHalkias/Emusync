@@ -274,6 +274,9 @@ def get_save_meta(game: str, device_id: str = Depends(_auth)) -> Response:
 @app.get("/games/{game}/save-device-count")
 def get_save_device_count(game: str, device_id: str = Depends(_auth)) -> dict:
     count = _get_store().count_save_devices(game)
+    game_obj = _get_store().get_game(game, device_id)
+    if game_obj and count == 0:
+        count = 1
     return {"device_count": count}
 
 
@@ -281,7 +284,12 @@ def get_save_device_count(game: str, device_id: str = Depends(_auth)) -> dict:
 def get_game_devices(game: str, device_id: str = Depends(_auth)) -> dict:
     device_ids = _get_store().get_game_devices(game)
     all_devices = _get_store().list_devices()
+    game_obj = _get_store().get_game(game, device_id)
     devices_with_game = [d.id for d in all_devices if d.id in device_ids]
+
+    if game_obj and device_id not in devices_with_game:
+        devices_with_game.append(device_id)
+
     return {
         "devices": [
             {"id": d.id, "name": d.name, "has_game": d.id in devices_with_game}
