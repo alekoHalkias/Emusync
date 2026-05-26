@@ -362,10 +362,9 @@ class Store:
 
     def count_save_devices(self, game: str) -> int:
         row = self._conn.execute(
-            "SELECT COUNT(DISTINCT device_id) as count FROM games WHERE game = ? AND device_id IS NOT NULL", (game,)
+            "SELECT COUNT(DISTINCT device_id) as count FROM games WHERE game = ?", (game,)
         ).fetchone()
-        count = row["count"] if row else 0
-        return max(count, 0)
+        return row["count"] if row else 0
 
     def get_game_devices(self, game: str) -> list[str]:
         rows = self._conn.execute(
