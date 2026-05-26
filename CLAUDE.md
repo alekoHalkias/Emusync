@@ -30,7 +30,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | File | Owns |
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`) |
-| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/games/{slug}/devices` |
+| `server/api.py` | FastAPI routes; auth via Bearer token; `/health`, `/pair`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/push-saves`, `/games/{slug}/devices`; `_auth` calls `touch_device()` on every authenticated request to record client IP + timestamp |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events` |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
@@ -123,6 +123,8 @@ window.emusync.emulator.detect(consoleKey)  // scans for installed emulators for
 window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; uses emulatorOption.saveDir (already resolved to core subfolder); returns { emulators, romDirs, roms[] } with consoleName+coreName on each entry
 window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
 window.emusync.files.getSaveTime(path)      // returns last modified time of save file as ISO string (YYYY-MM-DDTHH:MM:SS), or null if file doesn't exist
+
+window.emusync.device.probe(ip, port)      // TCP probe: resolves true if ip:port reachable within 2 s
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 

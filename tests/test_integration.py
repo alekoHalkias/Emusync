@@ -904,3 +904,43 @@ async def test_list_game_devices_404_for_unknown_game(client):
 
     r = await client.get("/games/nonexistent-game/devices", headers=auth)
     assert r.status_code == 404
+
+
+# ── device last_ip / last_seen_at ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_devices_list_includes_last_ip_and_last_seen(client):
+    """GET /devices returns last_ip and last_seen_at fields."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    # Make any authenticated request so touch_device fires
+    await client.get("/whoami", headers=auth)
+
+    r = await client.get("/devices", headers=auth)
+    assert r.status_code == 200
+    device = next(d for d in r.json() if d["id"] == DEVICE_ID)
+    assert "last_ip" in device
+    assert "last_seen_at" in device
+    # last_seen_at should be set after the authenticated request above
+    assert device["last_seen_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_touch_device_updates_last_seen(client):
+    """Each authenticated request updates last_seen_at."""
+    token = await _pair(client)
+    auth = {"Authorization": f"Bearer {token}"}
+
+    await client.get("/whoami", headers=auth)
+    r1 = await client.get("/devices", headers=auth)
+    seen1 = next(d for d in r1.json() if d["id"] == DEVICE_ID)["last_seen_at"]
+
+    import asyncio
+    await asyncio.sleep(0.05)  # ensure clock advances
+
+    await client.get("/whoami", headers=auth)
+    r2 = await client.get("/devices", headers=auth)
+    seen2 = next(d for d in r2.json() if d["id"] == DEVICE_ID)["last_seen_at"]
+
+    assert seen2 >= seen1

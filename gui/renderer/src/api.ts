@@ -9,7 +9,7 @@ export type GameDeviceConfig = {
 };
 
 export type Game = { slug: string; name: string; console?: string };
-export type Device = { id: string; name: string };
+export type Device = { id: string; name: string; last_ip?: string | null; last_seen_at?: string | null };
 export type LockInfo = { locked: boolean; device_id?: string; acquired_at?: string };
 export type SaveMeta = { hash: string; pushed_at: string; device_id: string } | null;
 

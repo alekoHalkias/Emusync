@@ -958,6 +958,25 @@ ipcMain.handle("dialog:openFolder", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+// TCP probe — resolves true if a TCP connection to ip:port succeeds within 2 s
+ipcMain.handle("device:probe", (_event, ip: string, port: number): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const net = require("net");
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (result: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(2000);
+    socket.connect(port, ip, () => finish(true));
+    socket.on("error", () => finish(false));
+    socket.on("timeout", () => finish(false));
+  });
+});
+
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {

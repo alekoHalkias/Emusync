@@ -77,6 +77,8 @@ class Device:
     id: str
     name: str
     token: str
+    last_ip: Optional[str] = None
+    last_seen_at: Optional[str] = None
 
 
 @dataclass
@@ -154,6 +156,15 @@ class Store:
             )
         except sqlite3.OperationalError:
             pass  # column already exists
+        # Migration: add last_ip + last_seen_at to devices (safe to run multiple times)
+        for col_def in [
+            "ALTER TABLE devices ADD COLUMN last_ip TEXT",
+            "ALTER TABLE devices ADD COLUMN last_seen_at TEXT",
+        ]:
+            try:
+                self._conn.execute(col_def)
+            except sqlite3.OperationalError:
+                pass  # column already exists
         self._conn.commit()
 
     # ── devices ──────────────────────────────────────────────────────────────
@@ -172,13 +183,23 @@ class Store:
 
     def device_by_token(self, token: str) -> Optional[Device]:
         row = self._conn.execute(
-            "SELECT id, name, token FROM devices WHERE token = ?", (token,)
+            "SELECT id, name, token, last_ip, last_seen_at FROM devices WHERE token = ?", (token,)
         ).fetchone()
         return Device(**dict(row)) if row else None
 
     def list_devices(self) -> list[Device]:
-        rows = self._conn.execute("SELECT id, name, token FROM devices").fetchall()
+        rows = self._conn.execute(
+            "SELECT id, name, token, last_ip, last_seen_at FROM devices"
+        ).fetchall()
         return [Device(**dict(r)) for r in rows]
+
+    def touch_device(self, device_id: str, ip: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            "UPDATE devices SET last_ip = ?, last_seen_at = ? WHERE id = ?",
+            (ip, now, device_id),
+        )
+        self._conn.commit()
 
     def remove_device(self, device_id: str) -> None:
         self._conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
