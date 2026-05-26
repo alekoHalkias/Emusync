@@ -31,16 +31,15 @@ type DeviceModal = {
  *   yellow = seen in the last 30 minutes
  *   grey   = stale / never seen
  */
-function DeviceRow({ d, dim }: { d: Device; dim: boolean }): React.ReactElement {
+function DeviceRow({ d, dim, displayIp }: { d: Device; dim: boolean; displayIp?: string | null }): React.ReactElement {
   const freshness = deviceFreshness(d.last_seen_at);
+  const ip = displayIp ?? d.last_ip;
   return (
     <li style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: dim ? 0.6 : 1 }}>
       <span>🖥</span>
       <span>{d.name}</span>
-      <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}>●</span>
-        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{d.last_ip ?? "—"}</span>
-      </span>
+      <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}>●</span>
+      {ip && <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{ip}</span>}
     </li>
   );
 }
@@ -92,7 +91,8 @@ const FRESHNESS_TITLE = {
 } as const;
 
 export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactElement {
-  const { devices: allDevices } = useDevices();
+  const { devices: allDevices, currentDeviceId } = useDevices();
+  const [localIp, setLocalIp] = useState<string | null>(null);
   const [games, setGames] = useState<GameRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
@@ -145,6 +145,10 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     const id = setInterval(() => load(true), 5000);
     return () => clearInterval(id);
   }, [load]);
+
+  useEffect(() => {
+    (window as any).emusync.server.localIp().then(setLocalIp).catch(() => {});
+  }, []);
 
   async function handleRemove(): Promise<void> {
     if (!confirmRemove) return;
@@ -455,7 +459,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 12px" }}>
-                      {deviceModal.installed.map(d => <DeviceRow key={d.id} d={d} dim={false} />)}
+                      {deviceModal.installed.map(d => <DeviceRow key={d.id} d={d} dim={false} displayIp={d.id === currentDeviceId ? localIp : undefined} />)}
                     </ul>
                   </>
                 )}
@@ -463,7 +467,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Not installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                      {deviceModal.missing.map(d => <DeviceRow key={d.id} d={d} dim={true} />)}
+                      {deviceModal.missing.map(d => <DeviceRow key={d.id} d={d} dim={true} displayIp={d.id === currentDeviceId ? localIp : undefined} />)}
                     </ul>
                   </>
                 )}

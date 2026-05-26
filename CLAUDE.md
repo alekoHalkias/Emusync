@@ -114,6 +114,7 @@ window.emusync.server.stop()      // SIGKILL server + pkill orphans + clean pid 
 window.emusync.server.token()     // deprecated; returns null (no per-device tokens)
 window.emusync.server.changePin(pin) // stops server, saves PIN to config, restarts
 window.emusync.server.discover()  // runs emusync.py server discover-json → server list
+window.emusync.server.localIp()   // returns this machine's LAN IPv4 address (os.networkInterfaces); null if none found
 
 window.emusync.dialog.openFile()  // native file picker
 window.emusync.dialog.openFolder() // native folder picker

@@ -13,7 +13,8 @@ electron.contextBridge.exposeInMainWorld("emusync", {
     stop: () => electron.ipcRenderer.invoke("server:stop"),
     token: () => electron.ipcRenderer.invoke("server:token"),
     changePin: (pin) => electron.ipcRenderer.invoke("server:change-pin", pin),
-    discover: () => electron.ipcRenderer.invoke("server:discover")
+    discover: () => electron.ipcRenderer.invoke("server:discover"),
+    localIp: () => electron.ipcRenderer.invoke("server:local-ip")
   },
   launcher: {
     path: () => electron.ipcRenderer.invoke("launcher:path")
