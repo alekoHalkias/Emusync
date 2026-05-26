@@ -168,8 +168,10 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     setDeviceModal({ slug, name, installed: null, missing: null });
     try {
       // Use the already-fetched context device list — no extra listDevices() call.
-      const installed = await listGameDevices(slug);
-      const installedIds = new Set(installed.map(d => d.id));
+      // listGameDevices only returns id+name; enrich with last_ip/last_seen_at from context.
+      const partial = await listGameDevices(slug);
+      const installedIds = new Set(partial.map(d => d.id));
+      const installed = partial.map(d => allDevices.find(a => a.id === d.id) ?? d);
       const missing = allDevices.filter(d => !installedIds.has(d.id));
       setDeviceModal({ slug, name, installed, missing });
     } catch {
