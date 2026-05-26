@@ -142,7 +142,7 @@ async def test_import_all_test_roms(client):
         game_name = f"GBA-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
         assert r.status_code == 200
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_games.append(slug)
 
         # Set device config for the ROM
@@ -159,7 +159,7 @@ async def test_import_all_test_roms(client):
         game_name = f"GB-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
         assert r.status_code == 200
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_games.append(slug)
 
         # Set device config for the ROM
@@ -176,7 +176,7 @@ async def test_import_all_test_roms(client):
         game_name = f"SNES-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
         assert r.status_code == 200
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_games.append(slug)
 
         # Set device config for the ROM
@@ -206,7 +206,7 @@ async def test_list_all_imported_roms(client):
         game_name = f"GBA-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
         assert r.status_code == 200
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_slugs.append(slug)
         await client.put(f"/games/{slug}/device", json={
             "rom_path": str(rom_path),
@@ -220,7 +220,7 @@ async def test_list_all_imported_roms(client):
         game_name = f"GB-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
         assert r.status_code == 200
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_slugs.append(slug)
         await client.put(f"/games/{slug}/device", json={
             "rom_path": str(rom_path),
@@ -234,7 +234,7 @@ async def test_list_all_imported_roms(client):
         game_name = f"SNES-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
         assert r.status_code == 200
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_slugs.append(slug)
         await client.put(f"/games/{slug}/device", json={
             "rom_path": str(rom_path),
@@ -246,7 +246,7 @@ async def test_list_all_imported_roms(client):
     r = await client.get("/games", headers=auth)
     assert r.status_code == 200
     games = r.json()
-    game_slugs = [g["game"] for g in games]
+    game_slugs = [g["slug"] for g in games]
 
     assert len(games) == 6, f"Expected 6 games in list, got {len(games)}"
     for slug in imported_slugs:
@@ -267,7 +267,7 @@ async def test_delete_all_imported_roms(client):
         rom_path = TEST_CONSOLES["gba"]["path"] / rom_def["file"]
         game_name = f"GBA-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_slugs.append(slug)
         await client.put(f"/games/{slug}/device", json={
             "rom_path": str(rom_path),
@@ -280,7 +280,7 @@ async def test_delete_all_imported_roms(client):
         rom_path = TEST_CONSOLES["gb"]["path"] / rom_def["file"]
         game_name = f"GB-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_slugs.append(slug)
         await client.put(f"/games/{slug}/device", json={
             "rom_path": str(rom_path),
@@ -293,7 +293,7 @@ async def test_delete_all_imported_roms(client):
         rom_path = TEST_CONSOLES["snes"]["path"] / rom_def["file"]
         game_name = f"SNES-test-{i+1}"
         r = await client.post("/games", json={"name": game_name}, headers=auth)
-        slug = r.json()["game"]
+        slug = r.json()["slug"]
         imported_slugs.append(slug)
         await client.put(f"/games/{slug}/device", json={
             "rom_path": str(rom_path),
