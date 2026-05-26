@@ -225,28 +225,28 @@ export default function App(): React.ReactElement {
     init();
   }, []);
 
-  function handleSetupDone(): void {
-    window.emusync.config.load().then(async (cfg) => {
-      if (!cfg) return;
-      configure(
-        (cfg.server_host as string) || "localhost",
-        (cfg.server_port as number) || 8765,
-        (cfg.token as string) || "",
-      );
-      setIsServer(!!(cfg.is_server as boolean));
-      // If this device is the server and it's already running (from Setup), wait for
-      // health before transitioning to games so API calls don't fail on arrival.
-      if (cfg.is_server) {
-        setLoadingMessage("Waiting for server…");
-        for (let i = 0; i < 100; i++) {
-          if (await health()) break;
-          await new Promise<void>((r) => setTimeout(r, 100));
-        }
+  async function handleSetupDone(): Promise<void> {
+    const cfg = await window.emusync.config.load();
+    if (!cfg) return;
+    configure(
+      (cfg.server_host as string) || "localhost",
+      (cfg.server_port as number) || 8765,
+      (cfg.token as string) || "",
+    );
+    setIsServer(!!(cfg.is_server as boolean));
+    // If this device is the server and it's already running (from Setup), wait for
+    // health before transitioning to games so API calls don't fail on arrival.
+    if (cfg.is_server) {
+      setLoadingMessage("Waiting for server…");
+      setScreen({ name: "loading" });
+      for (let i = 0; i < 100; i++) {
+        if (await health()) break;
+        await new Promise<void>((r) => setTimeout(r, 100));
       }
-      // Release any stale locks from a previous crash in the background.
-      if (cfg.device_id) releaseStaleLocks(cfg.device_id as string);
-      setScreen({ name: "games" });
-    });
+    }
+    // Release any stale locks from a previous crash in the background.
+    if (cfg.device_id) releaseStaleLocks(cfg.device_id as string);
+    setScreen({ name: "games" });
   }
 
   function handleRepaired(): void {
