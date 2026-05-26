@@ -88,7 +88,13 @@ electron.ipcMain.handle("config:addRecentFolder", (_event, consoleKey, folderPat
 function startServerProcess() {
   if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
   return new Promise((resolve) => {
-    let token = null;
+    let resolved = false;
+    const finish = (result) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(result);
+      }
+    };
     const proc = child_process.spawn(PYTHON, [SCRIPT, "server", "start"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PYTHONUNBUFFERED: "1" }
@@ -96,25 +102,24 @@ function startServerProcess() {
     serverProcess = proc;
     proc.stdout?.on("data", (chunk) => {
       const line = chunk.toString();
-      const match = line.match(/Pairing token: (\S+)/);
+      const match = line.match(/Pairing token: (\S*)/);
       if (match) {
-        token = match[1];
+        const token = match[1] || null;
         serverToken = token;
-        resolve({ ok: true, token });
+        finish({ ok: true, token });
       }
     });
     proc.on("error", (err) => {
       serverProcess = null;
-      resolve({ ok: false, token: null });
       console.error("Server process error:", err);
+      finish({ ok: false, token: null });
     });
-    proc.on("exit", () => {
+    proc.on("exit", (code) => {
       serverProcess = null;
       serverToken = null;
+      finish({ ok: false, token: null });
     });
-    setTimeout(() => {
-      if (token === null) resolve({ ok: true, token: null });
-    }, 5e3);
+    setTimeout(() => finish({ ok: true, token: null }), 5e3);
   });
 }
 electron.ipcMain.handle("server:start", () => startServerProcess());
@@ -858,6 +863,23 @@ electron.ipcMain.handle("files:get-save-time", (_event, savePath) => {
 electron.ipcMain.handle("dialog:openFolder", async () => {
   const result = await electron.dialog.showOpenDialog(mainWindow, { properties: ["openDirectory"] });
   return result.canceled ? null : result.filePaths[0];
+});
+electron.ipcMain.handle("device:probe", (_event, ip, port) => {
+  return new Promise((resolve) => {
+    const net = require("net");
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(2e3);
+    socket.connect(port, ip, () => finish(true));
+    socket.on("error", () => finish(false));
+    socket.on("timeout", () => finish(false));
+  });
 });
 electron.app.whenReady().then(() => {
   createWindow();
