@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, pushGameSaves, getGameDevice, listGameDevices, type Game, type Device } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, getGameDevice, listGameDevices, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import { useDevices } from "../DeviceContext";
 
@@ -13,7 +13,6 @@ type GameRow = Game & {
   lastPush?: string;
   lastSave?: string | null;
   locked?: boolean;
-  syncing?: boolean;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -99,7 +98,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
   const [removing, setRemoving] = useState(false);
   const [showEmulatorImport, setShowEmulatorImport] = useState(false);
-  const [syncingSlug, setSyncingSlug] = useState<string | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -159,18 +157,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       /* ignore — game might not exist */
     } finally {
       setRemoving(false);
-    }
-  }
-
-  async function handleSync(slug: string): Promise<void> {
-    setSyncingSlug(slug);
-    try {
-      await pushGameSaves(slug);
-      await load();
-    } catch {
-      /* error — keep UI responsive */
-    } finally {
-      setSyncingSlug(null);
     }
   }
 
@@ -396,14 +382,6 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                         onClick={() => handleOpenDeviceModal(g.slug, g.name)}
                       >
                         🖥
-                      </button>
-                      <button
-                        className="btn btn-icon"
-                        title="Push saves to devices"
-                        disabled={g.locked || syncingSlug === g.slug}
-                        onClick={() => handleSync(g.slug)}
-                      >
-                        {syncingSlug === g.slug ? <span className="spinner" style={{ width: 12, height: 12 }} /> : "↑"}
                       </button>
                       <button
                         className="btn btn-icon"
