@@ -34,7 +34,7 @@ def _get_store() -> Store:
     return _store
 
 
-def _auth(authorization: str = Header(None)) -> str:
+def _auth(request: Request, authorization: str = Header(None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid token")
     token = authorization.removeprefix("Bearer ")
@@ -42,6 +42,8 @@ def _auth(authorization: str = Header(None)) -> str:
     device = store.device_by_token(token)
     if not device:
         raise HTTPException(status_code=401, detail="Invalid token")
+    if request.client:
+        store.touch_device(device.id, request.client.host)
     return device.id
 
 
@@ -71,7 +73,10 @@ def pair(req: PairRequest) -> dict:
 
 @app.get("/devices")
 def list_devices(device_id: str = Depends(_auth)) -> list[dict]:
-    return [{"id": d.id, "name": d.name} for d in _get_store().list_devices()]
+    return [
+        {"id": d.id, "name": d.name, "last_ip": d.last_ip, "last_seen_at": d.last_seen_at}
+        for d in _get_store().list_devices()
+    ]
 
 
 @app.get("/whoami")
