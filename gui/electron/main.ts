@@ -48,6 +48,8 @@ function createWindow(): void {
 // ── IPC handlers ──────────────────────────────────────────────────────────────
 
 ipcMain.handle("config:load", () => {
+  // Returns null when the file is absent or unparseable — callers treat null as
+  // "config does not exist" (replaces the old separate config:exists call).
   if (!existsSync(CONFIG_PATH)) return null;
   try {
     return parseTOML(readFileSync(CONFIG_PATH, "utf-8"));
@@ -105,7 +107,11 @@ function startServerProcess(): Promise<{ ok: boolean; token: string | null }> {
   if (serverProcess) return Promise.resolve({ ok: true, token: serverToken });
 
   return new Promise<{ ok: boolean; token: string | null }>((resolve) => {
-    let token: string | null = null;
+    let resolved = false;
+    const finish = (result: { ok: boolean; token: string | null }) => {
+      if (!resolved) { resolved = true; resolve(result); }
+    };
+
     const proc = spawn(PYTHON, [SCRIPT, "server", "start"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PYTHONUNBUFFERED: "1" },
@@ -116,26 +122,29 @@ function startServerProcess(): Promise<{ ok: boolean; token: string | null }> {
       const line = chunk.toString();
       const match = line.match(/Pairing token: (\S+)/);
       if (match) {
-        token = match[1];
+        const token = match[1];
         serverToken = token;
-        resolve({ ok: true, token });
+        finish({ ok: true, token });
       }
     });
 
     proc.on("error", (err) => {
       serverProcess = null;
-      resolve({ ok: false, token: null });
       console.error("Server process error:", err);
+      finish({ ok: false, token: null });
     });
 
-    proc.on("exit", () => {
+    proc.on("exit", (code) => {
       serverProcess = null;
       serverToken = null;
+      // If the process exits before we saw a token it crashed — resolve
+      // immediately so the UI doesn't hang for the full 5-second fallback.
+      finish({ ok: false, token: null });
     });
 
-    setTimeout(() => {
-      if (token === null) resolve({ ok: true, token: null });
-    }, 5000);
+    // Last-resort fallback: if stdout never emits the token line (e.g. the
+    // server is already running and we lost the race) unblock after 5 s.
+    setTimeout(() => finish({ ok: true, token: null }), 5000);
   });
 }
 

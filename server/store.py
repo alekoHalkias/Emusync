@@ -10,11 +10,19 @@ from typing import Optional
 
 LOCK_TTL_HOURS = 4
 
+# Bump this whenever a new migration is added below.
+_SCHEMA_VERSION = 5
+
+# Full current schema — used for fresh databases.  All columns that were added
+# via ALTER TABLE migrations are included here so new installs get everything in
+# one shot without running any migrations.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
-    id   TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    token TEXT NOT NULL UNIQUE
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    token        TEXT NOT NULL UNIQUE,
+    last_ip      TEXT,
+    last_seen_at TEXT
 );
 CREATE TABLE IF NOT EXISTS games (
     slug    TEXT PRIMARY KEY,
@@ -33,11 +41,13 @@ CREATE TABLE IF NOT EXISTS consoles (
     UNIQUE(device_id, console_name)
 );
 CREATE TABLE IF NOT EXISTS game_devices (
-    game_slug      TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
-    device_id      TEXT NOT NULL REFERENCES devices(id),
-    rom_path       TEXT NOT NULL DEFAULT '',
-    save_path      TEXT NOT NULL DEFAULT '',
-    launch_command TEXT NOT NULL DEFAULT '',
+    game_slug       TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id       TEXT NOT NULL REFERENCES devices(id),
+    rom_path        TEXT NOT NULL DEFAULT '',
+    save_path       TEXT NOT NULL DEFAULT '',
+    launch_command  TEXT NOT NULL DEFAULT '',
+    state_path      TEXT NOT NULL DEFAULT '',
+    rom_folder_path TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (game_slug, device_id)
 );
 CREATE TABLE IF NOT EXISTS saves (
@@ -70,6 +80,34 @@ CREATE TABLE IF NOT EXISTS events (
     occurred_at TEXT NOT NULL
 );
 """
+
+
+def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
+    """Apply incremental ALTER TABLE migrations for databases older than _SCHEMA_VERSION.
+
+    Each migration is guarded by a try/except so it is safe to re-run on a DB
+    that already has the column (e.g. a fresh DB where _SCHEMA already includes it).
+    After all migrations the user_version pragma is updated so this block is
+    skipped entirely on subsequent starts.
+    """
+    def _try(sql: str) -> None:
+        try:
+            conn.execute(sql)
+        except sqlite3.OperationalError:
+            pass  # column/table already exists
+
+    if from_version < 1:
+        _try("ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''")
+    if from_version < 2:
+        _try("ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''")
+    if from_version < 3:
+        _try("ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''")
+    if from_version < 4:
+        _try("ALTER TABLE devices ADD COLUMN last_ip TEXT")
+    if from_version < 5:
+        _try("ALTER TABLE devices ADD COLUMN last_seen_at TEXT")
+
+    conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
 
 @dataclass
@@ -133,38 +171,17 @@ class Store:
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
+        # NORMAL is safe with WAL: only uncommitted in-flight transactions can be
+        # lost on an OS crash; the database itself is never corrupted.
+        self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA)
-        # Migration: add state_path column to game_devices (safe to run multiple times)
-        try:
-            self._conn.execute(
-                "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''"
-            )
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        # Migration: add rom_folder_path column to game_devices (safe to run multiple times)
-        try:
-            self._conn.execute(
-                "ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''"
-            )
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        # Migration: add console column to games (safe to run multiple times)
-        try:
-            self._conn.execute(
-                "ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''"
-            )
-        except sqlite3.OperationalError:
-            pass  # column already exists
-        # Migration: add last_ip + last_seen_at to devices (safe to run multiple times)
-        for col_def in [
-            "ALTER TABLE devices ADD COLUMN last_ip TEXT",
-            "ALTER TABLE devices ADD COLUMN last_seen_at TEXT",
-        ]:
-            try:
-                self._conn.execute(col_def)
-            except sqlite3.OperationalError:
-                pass  # column already exists
+        # Only run ALTER TABLE migrations when the stored schema version is behind
+        # the current one.  On a fully up-to-date DB this is a single integer
+        # comparison instead of five try/except round-trips.
+        db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
+        if db_version < _SCHEMA_VERSION:
+            _migrate(self._conn, db_version)
         self._conn.commit()
 
     # ── devices ──────────────────────────────────────────────────────────────
