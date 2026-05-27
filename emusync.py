@@ -116,6 +116,67 @@ def server() -> None:
     """Manage the EmuSync server."""
 
 
+def _is_server_running(data_dir: str) -> tuple[bool, int | None]:
+    """Check if a server is already running on this device.
+
+    Returns (is_running, pid) where pid is the process ID if running, else None.
+    """
+    pid_file = Path(data_dir) / ".server_pid"
+    if not pid_file.exists():
+        return False, None
+
+    try:
+        pid = int(pid_file.read_text().strip())
+        # Check if process exists by sending signal 0 (no-op)
+        os.kill(pid, 0)
+        return True, pid
+    except (ValueError, FileNotFoundError, ProcessLookupError):
+        # File doesn't exist, is invalid, or process is gone
+        pid_file.unlink(missing_ok=True)
+        return False, None
+
+
+def _initialize_server_interactive(cfg: cfg_module.Config) -> cfg_module.Config:
+    """Interactively initialize the server with user input.
+
+    Prompts the user to set a PIN and confirm the port. Returns updated config.
+    """
+    click.echo("\n" + "=" * 60)
+    click.echo("EmuSync Server Initialization")
+    click.echo("=" * 60)
+    click.echo(f"Device name: {cfg.device_name}")
+    click.echo(f"Data directory: {cfg.data_dir}")
+    click.echo()
+
+    # Set PIN
+    pin = click.prompt(
+        "Enter a PIN for this server (leave blank for open access)",
+        default="",
+        show_default=False,
+        type=str,
+    ).strip()
+    cfg.server_pin = pin
+
+    # Confirm port
+    default_port = cfg.server_port
+    port_input = click.prompt(
+        f"Server port",
+        default=default_port,
+        type=int,
+    )
+    cfg.server_port = port_input
+
+    cfg.is_server = True
+    cfg_module.save(cfg)
+
+    click.echo("\n✓ Server initialized.")
+    click.echo(f"  PIN: {'(open access)' if not pin else '***'}")
+    click.echo(f"  Port: {cfg.server_port}")
+    click.echo()
+
+    return cfg
+
+
 @server.command("start")
 def server_start() -> None:
     """Start the EmuSync server and print the pairing token."""
@@ -127,10 +188,22 @@ def server_start() -> None:
     from server import mdns as mdns_module
 
     cfg = cfg_module.load()
-    # Only write config if is_server isn't already set (avoid unnecessary disk write)
+
+    # Check if server needs initialization
     if not cfg.is_server:
-        cfg.is_server = True
-        cfg_module.save(cfg)
+        click.echo("Server not yet initialized on this device.")
+        should_init = click.confirm("Initialize now?", default=True)
+        if not should_init:
+            click.echo("Cancelled.")
+            sys.exit(0)
+        cfg = _initialize_server_interactive(cfg)
+
+    # Check if server is already running
+    is_running, running_pid = _is_server_running(cfg.data_dir)
+    if is_running:
+        click.echo(f"EmuSync server is already running (PID: {running_pid})")
+        click.echo(f"  on :{cfg.server_port}")
+        sys.exit(0)
 
     store = Store(cfg.data_dir)
     master_token = cfg.server_pin

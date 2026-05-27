@@ -157,6 +157,8 @@ Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_na
 
 ## Server process lifecycle
 
+- **Initialization:** When `emusync server start` is run on a fresh device (`is_server=false`), the user is prompted to initialize the server interactively. This sets a PIN and confirms the port before startup.
+- **Duplicate-launch detection:** `emusync server start` checks if a server is already running by reading `.server_pid` and verifying the process exists. If running, it exits gracefully with a message showing the PID and port. Stale PID files are cleaned up automatically.
 - **Start:** `startServerProcess()` in `main.ts` spawns Python with `PYTHONUNBUFFERED=1`; waits for server startup signal in stdout; returns `{ ok: boolean }`. Renderer health-polls to confirm server is ready.
 - **Stop:** SIGKILL `serverProcess` + read `.server_pid` and SIGKILL that PID + `pkill -9 -f "emusync.py server start"` to catch any orphaned processes. All three are needed: in-session reference, cross-session PID file, and pattern fallback.
 - **App close:** `window-all-closed` does the same kill sequence before quitting.
@@ -387,7 +389,7 @@ dev mode — visible in the `make dev-gui` terminal.
 
 ## Common gotchas
 
-**Orphaned server processes** — If Electron exits abnormally, the uvicorn server can keep running. The stop handler uses three kill strategies (see Server process lifecycle above). If you see "port already in use", run: `pkill -9 -f "emusync.py server start"`.
+**Orphaned server processes** — If Electron exits abnormally, the uvicorn server can keep running. The stop handler uses three kill strategies (see Server process lifecycle above). If you see "port already in use", run: `pkill -9 -f "emusync.py server start"`. Note: `emusync server start` now detects running servers and exits gracefully instead of attempting to start a duplicate.
 
 **SIGKILL skips Python finally blocks** — `.server_pid` and `.server_token` files may not be cleaned up after a hard kill. The stop handler manually deletes them.
 
