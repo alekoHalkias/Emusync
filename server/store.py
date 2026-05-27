@@ -2,13 +2,34 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 LOCK_TTL_HOURS = 4
+
+
+class _LockedConnection:
+    """Wraps sqlite3.Connection and serializes all access via a lock."""
+
+    def __init__(self, conn: sqlite3.Connection, lock: threading.RLock) -> None:
+        self._conn = conn
+        self._lock = lock
+
+    def execute(self, *args: Any, **kwargs: Any) -> Any:
+        with self._lock:
+            return self._conn.execute(*args, **kwargs)
+
+    def commit(self) -> None:
+        with self._lock:
+            return self._conn.commit()
+
+    def __getattr__(self, name: str) -> Any:
+        with self._lock:
+            return getattr(self._conn, name)
 
 # Bump whenever a new migration block is added below.
 _SCHEMA_VERSION = 1
@@ -160,25 +181,35 @@ class Store:
     def __init__(self, data_dir: str) -> None:
         db_path = Path(data_dir) / "emusync.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
+        is_fresh = not db_path.exists()
+        self._lock = threading.RLock()
+        raw_conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=30.0)
+        raw_conn.row_factory = sqlite3.Row
+        self._conn = _LockedConnection(raw_conn, self._lock)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.executescript(_SCHEMA)
+        self._conn.commit()
+        if is_fresh:
+            # Split schema statements and execute individually (executescript() incompatible with WAL)
+            for statement in _SCHEMA.split(";"):
+                statement = statement.strip()
+                if statement:
+                    self._conn.execute(statement)
+                    self._conn.commit()
         db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
         if db_version < _SCHEMA_VERSION:
-            _migrate(self._conn, db_version)
+            _migrate(raw_conn, db_version)
         self._conn.commit()
 
     # ── devices ──────────────────────────────────────────────────────────────
 
     def ensure_device(self, id: str, name: str) -> Device:
         """Register a device if new; update name if it changed. Idempotent."""
-        self._conn.execute(
-            "INSERT INTO devices (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name",
-            (id, name),
-        )
+        try:
+            self._conn.execute("INSERT INTO devices (id, name) VALUES (?, ?)", (id, name))
+        except sqlite3.IntegrityError:
+            self._conn.execute("UPDATE devices SET name = ? WHERE id = ?", (name, id))
         self._conn.commit()
         return Device(id=id, name=name)
 

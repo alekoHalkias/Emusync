@@ -13,6 +13,7 @@ const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
 })();
 
 let serverProcess: ChildProcess | null = null;
+let serverStartedByApp = false;
 let gameProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 
@@ -116,6 +117,7 @@ function startServerProcess(): Promise<{ ok: boolean }> {
       const line = chunk.toString();
       if (!resolved && line.includes("Pairing token:")) {
         resolved = true;
+        serverStartedByApp = true; // Server actually started; only kill it on close if we started it
         resolve({ ok: true });
       }
     });
@@ -168,6 +170,7 @@ ipcMain.handle("server:stop", async () => {
   }
   killServerByPid();
   await killOrphanServers();
+  serverStartedByApp = false; // User explicitly stopped the server
   return true;
 });
 
@@ -983,7 +986,9 @@ app.on("window-all-closed", () => {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
   }
-  killServerByPid();
-  void killOrphanServers();
+  if (serverStartedByApp) {
+    killServerByPid();
+    void killOrphanServers();
+  }
   if (process.platform !== "darwin") app.quit();
 });

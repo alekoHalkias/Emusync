@@ -157,10 +157,12 @@ Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_na
 
 ## Server process lifecycle
 
+- **Initialization:** When `emusync server start` is run on a fresh device (`is_server=false`), the user is prompted to initialize the server interactively. This sets a PIN and confirms the port before startup.
+- **Duplicate-launch detection:** `emusync server start` checks if a server is already running by reading `.server_pid` and verifying the process exists. If running, it exits gracefully with a message showing the PID and port. Stale PID files are cleaned up automatically.
 - **Start:** `startServerProcess()` in `main.ts` spawns Python with `PYTHONUNBUFFERED=1`; waits for server startup signal in stdout; returns `{ ok: boolean }`. Renderer health-polls to confirm server is ready.
-- **Stop:** SIGKILL `serverProcess` + read `.server_pid` and SIGKILL that PID + `pkill -9 -f "emusync.py server start"` to catch any orphaned processes. All three are needed: in-session reference, cross-session PID file, and pattern fallback.
-- **App close:** `window-all-closed` does the same kill sequence before quitting.
-- **Auto-start:** `App.tsx` calls `server.start()` on init if `is_server=true` in config.
+- **Stop:** User clicks "Stop Server" button. SIGKILL `serverProcess` + read `.server_pid` and SIGKILL that PID + `pkill -9 -f "emusync.py server start"` to catch any orphaned processes. All three are needed: in-session reference, cross-session PID file, and pattern fallback. Resets `serverStartedByApp` flag.
+- **App close:** `window-all-closed` only kills the server if the GUI spawned it (`serverStartedByApp=true`). This flag is set only when `startServerProcess()` detects the "Pairing token:" message in stdout, not when the Python process exits due to duplicate-launch detection. This allows users to start a server externally (e.g., via terminal) and close the GUI without killing it.
+- **Auto-start:** `App.tsx` calls `server.start()` on init if `is_server=true` in config. If a server is already running (external start), the Python code exits gracefully with duplicate-launch detection, and the GUI does not manage its lifecycle.
 
 ---
 
@@ -387,7 +389,7 @@ dev mode — visible in the `make dev-gui` terminal.
 
 ## Common gotchas
 
-**Orphaned server processes** — If Electron exits abnormally, the uvicorn server can keep running. The stop handler uses three kill strategies (see Server process lifecycle above). If you see "port already in use", run: `pkill -9 -f "emusync.py server start"`.
+**Orphaned server processes** — If Electron exits abnormally, the uvicorn server can keep running. The stop handler uses three kill strategies (see Server process lifecycle above). If you see "port already in use", run: `pkill -9 -f "emusync.py server start"`. Note: `emusync server start` now detects running servers and exits gracefully instead of attempting to start a duplicate.
 
 **SIGKILL skips Python finally blocks** — `.server_pid` and `.server_token` files may not be cleaned up after a hard kill. The stop handler manually deletes them.
 
@@ -404,6 +406,8 @@ dev mode — visible in the `make dev-gui` terminal.
 **`store.add_game` is INSERT OR IGNORE, not INSERT OR REPLACE** — `add_game` only inserts new rows; it never overwrites. Use `update_game_name(slug, name)` to rename an existing game. The original `INSERT OR REPLACE` bug cascade-deleted `game_devices`, `saves`, and `locks` every time a game was renamed, causing the game list to appear empty after a config save.
 
 **Duplicate-launch guard in `emusync run`** — Before acquiring the lock, the wrapper checks the lock state. If the lock is already held (by this device or another), it calls `_show_game_running_popup` which displays "\<game\> is already running. Please close it on \<device\>." and then exits. The popup uses a subprocess fallback chain — `notify-send` → `zenity` → `kdialog` → `xmessage` → tkinter — so it works on Wayland, X11, Steam Deck Gaming Mode (gamescope), and environments where `libtk` may not be installed. `notify-send` fires first and is non-blocking (auto-dismisses); the chain then continues to the first available blocking dialog so desktop users still get a modal. The race-condition path (409 from `acquire_lock`) follows the same flow.
+
+**DB schema initialization & thread safety** — `store.py` wraps the SQLite connection in a `_LockedConnection` class that automatically serializes all database operations via `threading.RLock()`. This ensures thread-safe concurrent access from uvicorn worker threads without requiring manual lock management in each method. The connection is created with `check_same_thread=False` and a 30-second timeout. Schema initialization runs on fresh databases only, with each statement executed and committed individually because `executescript()` is deprecated and incompatible with WAL mode.
 
 **DB schema versioning — use `PRAGMA user_version`, not try/except** — `store.py` tracks the schema version in `PRAGMA user_version` (currently `_SCHEMA_VERSION = 5`). When adding a new migration: (1) add a new `if from_version < N:` block in `_migrate()`, (2) bump `_SCHEMA_VERSION` to N, (3) add the new column to `_SCHEMA` so fresh DBs get it without running migrations. Do not add bare `try/except ALTER TABLE` blocks outside `_migrate()` — warm-start DBs skip `_migrate()` entirely via the version check.
 
