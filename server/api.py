@@ -310,6 +310,41 @@ def get_rom_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     )
 
 
+# ── file serving (direct device-to-device transfers) ─────────────────────────
+
+@app.get("/file")
+def serve_file(path: str, device_id: str = Depends(_auth)) -> Response:
+    """Serve a file from disk by path. Used for direct device-to-device transfers."""
+    from pathlib import Path as PathlibPath
+    import hashlib
+
+    file_path = PathlibPath(path).expanduser()
+
+    # Security: prevent directory traversal
+    if ".." in str(file_path):
+        raise HTTPException(status_code=403, detail="Path traversal not allowed")
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if not file_path.is_file():
+        raise HTTPException(status_code=403, detail="Not a file")
+
+    try:
+        data = file_path.read_bytes()
+        file_hash = hashlib.sha256(data).hexdigest()
+        return Response(
+            content=data,
+            media_type="application/octet-stream",
+            headers={
+                "X-File-Hash": file_hash,
+                "X-File-Size": str(len(data)),
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {str(exc)}")
+
+
 # ── locks ─────────────────────────────────────────────────────────────────────
 
 @app.post("/games/{slug}/lock")

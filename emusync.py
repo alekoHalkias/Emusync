@@ -524,26 +524,25 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
             click.echo(f"Warning: {source['name']} is not currently online.", err=True)
         click.echo("Will pull from server instead.")
 
-    # ── 7. Check source device has game configured (if pulling directly) ──────
-    source_gd = None
+    # ── 7. Get ROM path from source device (if pulling directly) ──────────────
+    source_rom_path: str | None = None
     if use_direct:
         try:
             source_gd = client.get_game_device(game_slug)
-            if not source_gd or not source_gd.rom_path:
-                click.echo(
-                    f"Game '{game['name']}' is not configured on {source['name']}.",
-                    err=True,
-                )
-                click.echo("Will pull from server instead.")
-                use_direct = False
+            if source_gd and source_gd.rom_path:
+                source_rom_path = source_gd.rom_path
         except Exception:
-            click.echo(f"Could not check {source['name']}'s configuration.", err=True)
-            use_direct = False
+            pass
+
+        if not source_rom_path:
+            click.echo(f"Enter the path to the ROM file on {source['name']}:")
+            click.echo("  (e.g., ~/roms/gaia-v3.gba or /mnt/games/gaia-v3.gba)")
+            source_rom_path = click.prompt("ROM path on source device")
 
     # ── 8. Resolve final ROM path ─────────────────────────────────────────────
     rom_filename: str | None = None
-    if use_direct and source_gd and source_gd.rom_path:
-        rom_filename = Path(source_gd.rom_path).name
+    if use_direct and source_rom_path:
+        rom_filename = Path(source_rom_path).name
     else:
         rom_filename = f"{game_slug}.rom"
 
@@ -559,7 +558,7 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
     # ── 10. Download ROM with progress bar ────────────────────────────────────
     if use_direct:
         click.echo(f"Pulling '{game['name']}' directly from {source['name']}…")
-        url = f"http://{source_ip}:8765/games/{game_slug}/rom"
+        url = f"http://{source_ip}:8765/file?path={source_rom_path}"
     else:
         click.echo(f"Pulling '{game['name']}' from server…")
         url = f"{client.base_url}/games/{game_slug}/rom"
