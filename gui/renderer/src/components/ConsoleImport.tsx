@@ -117,11 +117,43 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       };
 
       // Annotate each ROM with folder path (always)
-      const annotated: RomEntry[] = result.roms.map((rom: RomEntry) => ({
-        ...rom,
-        romFileName: getRomFileName(rom.romPath),
-        romFolderPath: rom.romPath.replace(/[^/]+$/, "").replace(/\/$/, "") || "/",
-      }));
+      // Find the source folder that contains this ROM
+      const annotated: RomEntry[] = result.roms.map((rom: RomEntry) => {
+        let romFolderPath = "/";
+
+        // Try to match to selected paths first (for consistency)
+        for (const path of paths) {
+          const normalizedPath = path.replace(/\/$/, "");
+          const normalizedRom = rom.romPath.replace(/\/$/, "");
+          if (normalizedRom.startsWith(normalizedPath + "/") || normalizedRom === normalizedPath) {
+            romFolderPath = normalizedPath;
+            break;
+          }
+        }
+
+        // If no match found in selected paths, try romDirs from scan results
+        if (romFolderPath === "/" && result.romDirs && result.romDirs.length > 0) {
+          for (const dir of result.romDirs) {
+            const normalizedDir = dir.replace(/\/$/, "");
+            const normalizedRom = rom.romPath.replace(/\/$/, "");
+            if (normalizedRom.startsWith(normalizedDir + "/") || normalizedRom === normalizedDir) {
+              romFolderPath = normalizedDir;
+              break;
+            }
+          }
+        }
+
+        // Last resort: extract parent directory from ROM path
+        if (romFolderPath === "/") {
+          romFolderPath = rom.romPath.replace(/[^/]+$/, "").replace(/\/$/, "") || "/";
+        }
+
+        return {
+          ...rom,
+          romFileName: getRomFileName(rom.romPath),
+          romFolderPath,
+        };
+      });
 
       // Dedup: try to filter out already-imported ROMs.
       let newRoms = annotated;

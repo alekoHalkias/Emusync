@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS consoles (
     device_save_folder    TEXT NOT NULL DEFAULT '',
     device_state_folder   TEXT NOT NULL DEFAULT '',
     device_emulator       TEXT NOT NULL DEFAULT '',
-    UNIQUE(device_id, console_name)
+    UNIQUE(device_id, console_name, device_game_folder)
 );
 CREATE TABLE IF NOT EXISTS game_devices (
     game_slug       TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
