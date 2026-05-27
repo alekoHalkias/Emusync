@@ -822,3 +822,12 @@ async def test_device_compare_no_games(client):
     """Server has no games — compare returns an empty list."""
     r = await client.get("/games", headers=AUTH)
     assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_update_console_nonexistent_console(client):
+    """Updating a nonexistent console returns 404."""
+    r = await client.put("/consoles/nonexistent-id",
+                         json={"device_game_folder": "/some/path"},
+                         headers=AUTH)
+    assert r.status_code == 404
