@@ -341,7 +341,13 @@ def game() -> None:
 def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_command: str) -> None:
     """Add a game to EmuSync management."""
     client = _client()
-    result = client.add_game(name)
+    # Pass device config directly to add_game so it's stored immediately
+    result = client.add_game(
+        name,
+        rom_path=rom_path,
+        save_path=save_path,
+        launch_command=launch_command,
+    )
     actual_slug = result["slug"]
     if slug and slug != actual_slug:
         # Allow caller to specify a custom slug by re-registering
@@ -350,9 +356,6 @@ def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_
         store = Store(cfg.data_dir)
         store.add_game(slug, name)
         actual_slug = slug
-
-    if rom_path or save_path or launch_command:
-        client.set_game_device(actual_slug, GameDeviceConfig(rom_path=rom_path, save_path=save_path, launch_command=launch_command))
 
     click.echo(f"Added: {name} (slug: {actual_slug})")
 

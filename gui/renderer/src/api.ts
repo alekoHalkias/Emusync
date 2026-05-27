@@ -57,7 +57,8 @@ export async function health(): Promise<boolean> {
 }
 
 export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
-export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
+export const addGame = (name: string, console?: string, deviceConfig?: Partial<GameDeviceConfig>): Promise<Game> =>
+  _fetch("POST", "/games", { name, console, ...deviceConfig });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
 export const removeGame = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}`);

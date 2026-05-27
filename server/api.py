@@ -109,6 +109,11 @@ def list_consoles(device_id: str = Depends(_auth)) -> list[dict]:
 class GameRequest(BaseModel):
     name: str
     console: str = ""
+    rom_path: str = ""
+    save_path: str = ""
+    launch_command: str = ""
+    state_path: str = ""
+    rom_folder_path: str = ""
 
 
 @app.get("/games")
@@ -121,6 +126,21 @@ def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
     import re
     slug = re.sub(r"[^a-z0-9]+", "-", req.name.lower()).strip("-")
     game = _get_store().add_game(slug, req.name, req.console)
+
+    # If device paths are provided, store them immediately
+    if req.rom_path or req.save_path or req.launch_command or req.state_path:
+        _get_store().set_game_device(
+            GameDevice(
+                game_slug=slug,
+                device_id=device_id,
+                rom_path=req.rom_path,
+                save_path=req.save_path,
+                launch_command=req.launch_command,
+                state_path=req.state_path,
+                rom_folder_path=req.rom_folder_path,
+            )
+        )
+
     return {"slug": game.slug, "name": game.name, "console": game.console}
 
 

@@ -61,8 +61,30 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def add_game(self, name: str) -> dict:
-        r = httpx.post(self._url("/games"), json={"name": name}, headers=self._headers, timeout=10)
+    def add_game(
+        self,
+        name: str,
+        console: str = "",
+        rom_path: str = "",
+        save_path: str = "",
+        launch_command: str = "",
+        state_path: str = "",
+        rom_folder_path: str = "",
+    ) -> dict:
+        r = httpx.post(
+            self._url("/games"),
+            json={
+                "name": name,
+                "console": console,
+                "rom_path": rom_path,
+                "save_path": save_path,
+                "launch_command": launch_command,
+                "state_path": state_path,
+                "rom_folder_path": rom_folder_path,
+            },
+            headers=self._headers,
+            timeout=10,
+        )
         r.raise_for_status()
         return r.json()
 

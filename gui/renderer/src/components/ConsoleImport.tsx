@@ -220,8 +220,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
-        const game = await addGame(displayName, consoleAbbr);
-        await setGameDevice(game.slug, {
+        // Pass device config directly to addGame so it's stored immediately
+        await addGame(displayName, consoleAbbr, {
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
