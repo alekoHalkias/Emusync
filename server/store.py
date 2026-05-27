@@ -204,14 +204,19 @@ class Store:
 
     # ── devices ──────────────────────────────────────────────────────────────
 
-    def ensure_device(self, id: str, name: str) -> Device:
-        """Register a device if new; update name if it changed. Idempotent."""
+    def ensure_device(self, id: str, name: str) -> tuple[Device, bool]:
+        """Register a device if new; update name if it changed. Idempotent.
+
+        Returns (device, is_new) where is_new is True on first-ever registration.
+        """
+        is_new = False
         try:
             self._conn.execute("INSERT INTO devices (id, name) VALUES (?, ?)", (id, name))
+            is_new = True
         except sqlite3.IntegrityError:
             self._conn.execute("UPDATE devices SET name = ? WHERE id = ?", (name, id))
         self._conn.commit()
-        return Device(id=id, name=name)
+        return Device(id=id, name=name), is_new
 
     def clear_devices(self) -> None:
         self._conn.execute("DELETE FROM devices")
