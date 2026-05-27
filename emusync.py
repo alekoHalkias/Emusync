@@ -456,21 +456,78 @@ def game() -> None:
 @click.option("--rom", "rom_path", default="", help="Path to ROM file")
 @click.option("--save", "save_path", default="", help="Path to save file")
 @click.option("--command", "launch_command", default="", help="Launch command template")
-def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_command: str) -> None:
+@click.option("--console", "console_name", default="", help="Console name")
+def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_command: str, console_name: str) -> None:
     """Add a game to EmuSync management."""
+    from server.store import Store, Console
+    import uuid
+
     client = _client()
+    cfg = cfg_module.load()
+    store = Store(cfg.data_dir)
+
     result = client.add_game(name)
     actual_slug = result["slug"]
     if slug and slug != actual_slug:
         # Allow caller to specify a custom slug by re-registering
-        from server.store import Store
-        cfg = cfg_module.load()
-        store = Store(cfg.data_dir)
         store.add_game(slug, name)
         actual_slug = slug
 
     if rom_path or save_path or launch_command:
         client.set_game_device(actual_slug, GameDeviceConfig(rom_path=rom_path, save_path=save_path, launch_command=launch_command))
+
+    # Auto-configure console if game has console and paths
+    if console_name and (rom_path or save_path):
+        device_id = cfg.device_id
+        # Extract emulator/core from save path (e.g., mGBA from /path/saves/mGBA/)
+        emulator = ""
+        game_folder = ""
+        save_folder = ""
+        state_folder = ""
+
+        if save_path:
+            save_dir = os.path.dirname(save_path)
+            save_folder = save_dir
+            # Try to infer emulator from save folder structure
+            emulator = os.path.basename(save_dir)
+
+        if rom_path:
+            # Extract console folder by going up 2 levels from ROM file
+            # /path/Console/GameFolder/game.rom -> /path/Console/
+            rom_file_dir = os.path.dirname(rom_path)
+            game_folder = os.path.dirname(rom_file_dir)
+
+        if save_folder:
+            # Infer state folder by replacing 'saves' with 'states'
+            state_folder = save_folder.replace('saves', 'states')
+
+        # Check if console entry with this exact ROM folder exists
+        existing_consoles = store.list_consoles(device_id)
+        existing_console = None
+        for c in existing_consoles:
+            if c.console_name == console_name and c.device_game_folder == game_folder:
+                existing_console = c
+                break
+
+        if existing_console:
+            # Update existing console entry for this ROM folder
+            existing_console.device_save_folder = save_folder
+            existing_console.device_state_folder = state_folder
+            existing_console.device_emulator = emulator
+            store.set_console(existing_console)
+        else:
+            # Create new console entry for this ROM folder
+            console_obj = Console(
+                id=str(uuid.uuid4()),
+                device_id=device_id,
+                console_name=console_name,
+                shortform_name=console_name.lower()[:4],
+                device_game_folder=game_folder,
+                device_save_folder=save_folder,
+                device_state_folder=state_folder,
+                device_emulator=emulator,
+            )
+            store.set_console(console_obj)
 
     click.echo(f"Added: {name} (slug: {actual_slug})")
 
@@ -596,6 +653,56 @@ def game_remove(slug: str) -> None:
 
     client.remove_game(slug)
     click.echo(f"Removed: {slug}")
+
+
+# ── console ───────────────────────────────────────────────────────────────────
+
+@cli.group()
+def console() -> None:
+    """Manage console/emulator configurations."""
+
+
+@console.command("list")
+def console_list() -> None:
+    """List all configured consoles with device installations."""
+    from server.store import Store
+    cfg = cfg_module.load()
+    store = Store(cfg.data_dir)
+
+    devices = store.list_devices()
+    if not devices:
+        click.echo("No devices configured.")
+        return
+
+    rows = []
+    for device in devices:
+        consoles = store.list_consoles(device.id)
+        if not consoles:
+            continue
+        for console in consoles:
+            rows.append([
+                console.console_name,
+                device.name,
+                console.device_emulator or '-',
+                console.device_game_folder or '-',
+                console.device_save_folder or '-',
+                console.device_state_folder or '-',
+            ])
+
+    if not rows:
+        click.echo("No consoles configured.")
+        return
+
+    headers = ["Console", "Device", "Emulator/Core", "ROM Path", "Save Path", "State Path"]
+    col_widths = [max(len(headers[i]), max(len(str(row[i])) for row in rows)) for i in range(6)]
+
+    header_line = "  ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
+    separator = "  ".join("-" * w for w in col_widths)
+
+    click.echo(header_line)
+    click.echo(separator)
+    for row in rows:
+        click.echo("  ".join(str(row[i]).ljust(col_widths[i]) for i in range(6)))
 
 
 # ── sync ──────────────────────────────────────────────────────────────────────
