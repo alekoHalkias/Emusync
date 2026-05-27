@@ -601,8 +601,8 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
                 state_path=existing.state_path,
             ),
         )
-        except Exception as exc:
-            click.echo(f"  Warning: could not persist save path: {exc}", err=True)
+    except Exception as exc:
+        click.echo(f"  Warning: could not persist ROM path: {exc}", err=True)
 
 
 # ── sync ──────────────────────────────────────────────────────────────────────
