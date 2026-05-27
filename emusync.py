@@ -513,16 +513,21 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
 
     if source_online:
         click.echo(f"✓ {source['name']} is online at {source_ip}")
-        use_direct = click.confirm(f"Pull ROM directly from {source['name']}?", default=True)
     else:
-        use_direct = False
         if source.get("last_seen_at"):
             age = datetime.now(timezone.utc) - datetime.fromisoformat(source["last_seen_at"])
             mins = int(age.total_seconds() / 60)
-            click.echo(f"Warning: {source['name']} was last seen {mins} minute(s) ago.", err=True)
+            click.echo(f"⚠ {source['name']} was last seen {mins} minute(s) ago.", err=True)
         else:
-            click.echo(f"Warning: {source['name']} is not currently online.", err=True)
-        click.echo("Will pull from server instead.")
+            click.echo(f"⚠ {source['name']} is not currently online.", err=True)
+
+    # Ask user whether to try pulling directly or from server
+    use_direct = False
+    if source_ip:
+        use_direct = click.confirm(f"Try pulling directly from {source['name']}?", default=True)
+    else:
+        click.echo(f"No IP address available for {source['name']}. Will pull from server.")
+        use_direct = False
 
     # ── 7. Get ROM path from source device (if pulling directly) ──────────────
     source_rom_path: str | None = None
