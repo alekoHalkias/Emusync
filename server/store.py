@@ -166,8 +166,8 @@ class Store:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
+        self._conn.commit()
         if is_fresh:
-            self._conn.commit()
             # Split schema statements and execute individually (executescript() incompatible with WAL)
             for statement in _SCHEMA.split(";"):
                 statement = statement.strip()
