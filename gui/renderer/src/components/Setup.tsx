@@ -319,23 +319,24 @@ export default function Setup({ onDone }: Props): React.ReactElement {
             <h1>Device Name</h1>
             <p>What would you like to name this device on the server?</p>
             <div className="input-group" style={{ margin: "16px 0" }}>
-              <label>Device name</label>
+              <label>Device name <span style={{ color: "var(--error)" }}>*</span></label>
               <input
                 type="text"
                 placeholder="My Device"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") doConnect(); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && deviceName.trim()) doConnect(); }}
                 className={error ? "error" : ""}
                 autoFocus
               />
+              {!deviceName.trim() && <span className="error-msg">Device name is required</span>}
               {error && <span className="error-msg">{error}</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-ghost" onClick={() => setStep("join-pin")} disabled={busy}>
                 Back
               </button>
-              <button className="btn btn-primary" onClick={doConnect} disabled={busy} style={{ flex: 1 }}>
+              <button className="btn btn-primary" onClick={doConnect} disabled={busy || !deviceName.trim()} style={{ flex: 1 }}>
                 {busy ? <><span className="spinner" /> Connecting…</> : "Connect"}
               </button>
             </div>
