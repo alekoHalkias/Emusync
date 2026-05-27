@@ -763,3 +763,62 @@ async def test_touch_device_updates_last_seen(client):
     seen2 = next(d for d in r2.json() if d["id"] == DEVICE_ID)["last_seen_at"]
 
     assert seen2 >= seen1
+
+
+# ── device compare (API layer) ────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_device_compare_shared_and_missing(client):
+    """
+    Three games, two devices.
+    Device A has games 1 & 2; device B has games 2 & 3.
+    From device A's perspective: game 1 is exclusive, game 2 is shared, game 3 is missing.
+    """
+    auth_a = _device_auth("dev-a", "PC")
+    auth_b = _device_auth("dev-b", "Steam Deck")
+
+    await client.post("/games", json={"name": "Game One"},   headers=auth_a)
+    await client.post("/games", json={"name": "Game Two"},   headers=auth_a)
+    await client.post("/games", json={"name": "Game Three"}, headers=auth_b)
+
+    # Device A configures games 1 & 2
+    for slug in ("game-one", "game-two"):
+        await client.put(f"/games/{slug}/device",
+                         json={"save_path": f"/saves/{slug}.sav"}, headers=auth_a)
+
+    # Device B configures games 2 & 3
+    for slug in ("game-two", "game-three"):
+        await client.put(f"/games/{slug}/device",
+                         json={"save_path": f"/saves/{slug}.sav"}, headers=auth_b)
+
+    # From device A: which games are on it?
+    r = await client.get("/games/game-one/devices",   headers=auth_a)
+    assert {d["id"] for d in r.json()} == {"dev-a"}
+
+    r = await client.get("/games/game-two/devices",   headers=auth_a)
+    assert {d["id"] for d in r.json()} == {"dev-a", "dev-b"}
+
+    r = await client.get("/games/game-three/devices", headers=auth_a)
+    assert {d["id"] for d in r.json()} == {"dev-b"}   # dev-a is missing this one
+
+
+@pytest.mark.asyncio
+async def test_device_compare_all_match(client):
+    """Both devices have all games — no missing entries."""
+    auth_a = _device_auth("dev-a", "PC")
+    auth_b = _device_auth("dev-b", "Steam Deck")
+
+    await client.post("/games", json={"name": "Shared Game"}, headers=auth_a)
+    for auth in (auth_a, auth_b):
+        await client.put("/games/shared-game/device",
+                         json={"save_path": "/saves/shared.sav"}, headers=auth)
+
+    r_a = await client.get("/games/shared-game/devices", headers=auth_a)
+    assert {d["id"] for d in r_a.json()} == {"dev-a", "dev-b"}
+
+
+@pytest.mark.asyncio
+async def test_device_compare_no_games(client):
+    """Server has no games — compare returns an empty list."""
+    r = await client.get("/games", headers=AUTH)
+    assert r.json() == []

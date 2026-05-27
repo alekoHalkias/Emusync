@@ -20,7 +20,7 @@ class SyncClient:
     def __init__(self, host: str, port: int, pin: str, device_id: str, device_name: str) -> None:
         self._base = f"http://{host}:{port}"
         self._headers = {
-            "Authorization": f"Bearer {pin}",
+            **({"Authorization": f"Bearer {pin}"} if pin else {}),
             "X-Device-ID": device_id,
             "X-Device-Name": device_name,
         }
@@ -64,6 +64,11 @@ class SyncClient:
     def remove_game(self, slug: str) -> None:
         r = httpx.delete(self._url(f"/games/{slug}"), headers=self._headers, timeout=10)
         r.raise_for_status()
+
+    def list_game_devices(self, slug: str) -> list[dict]:
+        r = httpx.get(self._url(f"/games/{slug}/devices"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
 
     def get_game_device(self, slug: str) -> Optional[GameDeviceConfig]:
         r = httpx.get(self._url(f"/games/{slug}/device"), headers=self._headers, timeout=10)
