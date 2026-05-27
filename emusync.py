@@ -25,6 +25,7 @@ def _sigterm_handler(*_) -> None:
 signal.signal(signal.SIGTERM, _sigterm_handler)
 
 import click
+import httpx
 
 # Make sure the project root is on the path when invoked directly
 sys.path.insert(0, str(Path(__file__).parent))
