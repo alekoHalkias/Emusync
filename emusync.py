@@ -259,6 +259,71 @@ def device_list() -> None:
         click.echo(f"{d['id']:<36}  {d['name']}")
 
 
+@device.command("compare")
+def device_compare() -> None:
+    """Compare game coverage between this device and other paired devices."""
+    cfg = cfg_module.load()
+    client = _client(cfg)
+
+    if not client.health():
+        click.echo(
+            "Cannot reach EmuSync server. Is it running on your gaming PC?",
+            err=True,
+        )
+        sys.exit(1)
+
+    games = client.list_games()
+    if not games:
+        click.echo("No games managed. Use 'emusync game add' to add one.")
+        return
+
+    my_id = cfg.device_id
+    my_name = cfg.device_name or my_id
+
+    # Fetch per-game device lists once, in parallel-ish (sequential — no async here)
+    game_devs: dict[str, list[dict]] = {}
+    for g in games:
+        try:
+            game_devs[g["slug"]] = client.list_game_devices(g["slug"])
+        except Exception:
+            game_devs[g["slug"]] = []
+
+    # Partition into: on this device / missing from this device
+    mine: list[tuple[str, list[str]]] = []      # (game_name, [other_device_names])
+    missing: list[tuple[str, list[str]]] = []   # (game_name, [device_names_that_have_it])
+
+    for g in games:
+        devs = game_devs[g["slug"]]
+        ids = {d["id"] for d in devs}
+        if my_id in ids:
+            others = [d["name"] for d in devs if d["id"] != my_id]
+            mine.append((g["name"], others))
+        else:
+            others = [d["name"] for d in devs]
+            if others:
+                missing.append((g["name"], others))
+
+    click.echo(f"\nDevice: {my_name}  (this device)\n")
+
+    if mine:
+        click.echo("Games on this device")
+        w = max(len(n) for n, _ in mine)
+        for name, others in mine:
+            suffix = f"also on: {', '.join(others)}" if others else "only on this device"
+            click.echo(f"  {name:<{w}}   {suffix}")
+
+    if missing:
+        click.echo("\nMissing from this device")
+        w = max(len(n) for n, _ in missing)
+        for name, others in missing:
+            click.echo(f"  {name:<{w}}   on: {', '.join(others)}")
+
+    if not mine and not missing:
+        click.echo("No games found on any device.")
+    elif not missing:
+        click.echo("\n✓ All server games are installed on this device.")
+
+
 # ── game ──────────────────────────────────────────────────────────────────────
 
 @cli.group()

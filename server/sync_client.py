@@ -65,6 +65,11 @@ class SyncClient:
         r = httpx.delete(self._url(f"/games/{slug}"), headers=self._headers, timeout=10)
         r.raise_for_status()
 
+    def list_game_devices(self, slug: str) -> list[dict]:
+        r = httpx.get(self._url(f"/games/{slug}/devices"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
     def get_game_device(self, slug: str) -> Optional[GameDeviceConfig]:
         r = httpx.get(self._url(f"/games/{slug}/device"), headers=self._headers, timeout=10)
         if r.status_code == 404:
