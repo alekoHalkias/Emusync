@@ -89,6 +89,13 @@ def remove_device(remove_device_id: str, device_id: str = Depends(_auth)) -> dic
 
 # ── consoles ──────────────────────────────────────────────────────────────────
 
+class ConsoleUpdateRequest(BaseModel):
+    device_game_folder: str = ""
+    device_save_folder: str = ""
+    device_state_folder: str = ""
+    device_emulator: str = ""
+
+
 @app.get("/consoles")
 def list_consoles(device_id: str = Depends(_auth)) -> list[dict]:
     return [
@@ -102,6 +109,31 @@ def list_consoles(device_id: str = Depends(_auth)) -> list[dict]:
         }
         for c in _get_store().list_consoles(device_id)
     ]
+
+
+@app.put("/consoles/{console_id}")
+def update_console(console_id: str, req: ConsoleUpdateRequest, device_id: str = Depends(_auth)) -> dict:
+    store = _get_store()
+    console = None
+    for c in store.list_consoles(device_id):
+        if c.id == console_id:
+            console = c
+            break
+    if not console:
+        raise HTTPException(status_code=404, detail="Console not found")
+    from .store import Console
+    updated = Console(
+        id=console.id,
+        device_id=device_id,
+        console_name=console.console_name,
+        shortform_name=console.shortform_name,
+        device_game_folder=req.device_game_folder or console.device_game_folder,
+        device_save_folder=req.device_save_folder or console.device_save_folder,
+        device_state_folder=req.device_state_folder or console.device_state_folder,
+        device_emulator=req.device_emulator or console.device_emulator,
+    )
+    store.set_console(updated)
+    return {"ok": True}
 
 
 # ── games ─────────────────────────────────────────────────────────────────────

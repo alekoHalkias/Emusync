@@ -552,11 +552,11 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
                 consoles = client.list_consoles()
                 for console in consoles:
                     if console["console_name"].lower() == game_console.lower():
-                        # Update the console config with the game folder
-                        click.echo(f"Saving {game_console} game folder for future imports...")
+                        client.update_console(console["id"], device_game_folder=game_folder)
+                        click.echo(f"✓ Saved {game_console} game folder for future imports.")
                         break
-            except Exception:
-                pass
+            except Exception as exc:
+                click.echo(f"  Warning: could not save console folder: {exc}", err=True)
 
     game_folder = str(Path(game_folder).expanduser())
 
@@ -611,6 +611,7 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
                 save_path=existing.save_path,
                 launch_command=existing.launch_command,
                 state_path=existing.state_path,
+                rom_folder_path=game_folder,
             ),
         )
     except Exception as exc:

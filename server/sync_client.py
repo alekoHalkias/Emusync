@@ -14,6 +14,7 @@ class GameDeviceConfig:
     save_path: str = ""
     launch_command: str = ""
     state_path: str = ""
+    rom_folder_path: str = ""
 
 
 class SyncClient:
@@ -108,6 +109,20 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def update_console(self, console_id: str, device_game_folder: str = "", device_save_folder: str = "", device_state_folder: str = "", device_emulator: str = "") -> None:
+        r = httpx.put(
+            self._url(f"/consoles/{console_id}"),
+            json={
+                "device_game_folder": device_game_folder,
+                "device_save_folder": device_save_folder,
+                "device_state_folder": device_state_folder,
+                "device_emulator": device_emulator,
+            },
+            headers=self._headers,
+            timeout=10,
+        )
+        r.raise_for_status()
+
     def list_game_devices(self, slug: str) -> list[dict]:
         r = httpx.get(self._url(f"/games/{slug}/devices"), headers=self._headers, timeout=10)
         r.raise_for_status()
@@ -123,12 +138,20 @@ class SyncClient:
             rom_path=d.get("rom_path", ""),
             save_path=d.get("save_path", ""),
             launch_command=d.get("launch_command", ""),
+            state_path=d.get("state_path", ""),
+            rom_folder_path=d.get("rom_folder_path", ""),
         )
 
     def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:
         r = httpx.put(
             self._url(f"/games/{slug}/device"),
-            json={"rom_path": cfg.rom_path, "save_path": cfg.save_path, "launch_command": cfg.launch_command},
+            json={
+                "rom_path": cfg.rom_path,
+                "save_path": cfg.save_path,
+                "launch_command": cfg.launch_command,
+                "state_path": cfg.state_path,
+                "rom_folder_path": cfg.rom_folder_path,
+            },
             headers=self._headers,
             timeout=10,
         )
