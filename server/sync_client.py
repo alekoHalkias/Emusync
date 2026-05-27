@@ -28,6 +28,14 @@ class SyncClient:
     def _url(self, path: str) -> str:
         return f"{self._base}{path}"
 
+    @property
+    def base_url(self) -> str:
+        return self._base
+
+    @property
+    def auth_headers(self) -> dict:
+        return dict(self._headers)
+
     def health(self) -> bool:
         try:
             r = httpx.get(self._url("/health"), timeout=5)
@@ -64,6 +72,11 @@ class SyncClient:
     def remove_game(self, slug: str) -> None:
         r = httpx.delete(self._url(f"/games/{slug}"), headers=self._headers, timeout=10)
         r.raise_for_status()
+
+    def list_consoles(self) -> list[dict]:
+        r = httpx.get(self._url("/consoles"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
 
     def list_game_devices(self, slug: str) -> list[dict]:
         r = httpx.get(self._url(f"/games/{slug}/devices"), headers=self._headers, timeout=10)

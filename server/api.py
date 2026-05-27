@@ -87,6 +87,23 @@ def remove_device(remove_device_id: str, device_id: str = Depends(_auth)) -> dic
     return {"ok": True}
 
 
+# ── consoles ──────────────────────────────────────────────────────────────────
+
+@app.get("/consoles")
+def list_consoles(device_id: str = Depends(_auth)) -> list[dict]:
+    return [
+        {
+            "id": c.id,
+            "console_name": c.console_name,
+            "shortform_name": c.shortform_name,
+            "device_save_folder": c.device_save_folder,
+            "device_state_folder": c.device_state_folder,
+            "device_game_folder": c.device_game_folder,
+        }
+        for c in _get_store().list_consoles(device_id)
+    ]
+
+
 # ── games ─────────────────────────────────────────────────────────────────────
 
 class GameRequest(BaseModel):

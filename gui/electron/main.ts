@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, execSync, ChildProcess } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, copyFileSync } from "fs";
 import { join, dirname, basename, extname } from "path";
 import { homedir, networkInterfaces } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
@@ -281,6 +281,66 @@ ipcMain.handle("game:hasPidFile", () => {
       return cmdline.includes("emusync") || cmdline.includes("python");
     } catch { return true; } // non-Linux: trust the signal check
   } catch { return false; }
+});
+
+ipcMain.handle("game:pullSave", async (_event, slug: string): Promise<{ ok: boolean; path?: string; error?: string }> => {
+  if (!existsSync(CONFIG_PATH)) return { ok: false, error: "No config" };
+  let cfg: any;
+  try { cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")); } catch { return { ok: false, error: "Config error" }; }
+
+  const port = cfg.server_port || 8765;
+  const headers = {
+    "Authorization": `Bearer ${cfg.server_pin ?? ""}`,
+    "X-Device-ID": cfg.device_id ?? "",
+    "X-Device-Name": cfg.device_name ?? "",
+  };
+
+  const deviceRes = await fetch(`http://localhost:${port}/games/${slug}/device`, { headers });
+  if (!deviceRes.ok) return { ok: false, error: "No device config for this game" };
+  const gd = await deviceRes.json() as any;
+  if (!gd.save_path) return { ok: false, error: "No save path configured" };
+
+  const savePath = (gd.save_path as string).replace(/^~/, homedir());
+
+  const saveRes = await fetch(`http://localhost:${port}/games/${slug}/save`, { headers });
+  if (saveRes.status === 204) return { ok: false, error: "No save on server yet" };
+  if (!saveRes.ok) return { ok: false, error: "Failed to download save" };
+
+  const data = Buffer.from(await saveRes.arrayBuffer());
+  if (existsSync(savePath)) copyFileSync(savePath, savePath + ".bak");
+  mkdirSync(dirname(savePath), { recursive: true });
+  writeFileSync(savePath, data);
+  return { ok: true, path: savePath };
+});
+
+ipcMain.handle("game:pullState", async (_event, slug: string): Promise<{ ok: boolean; path?: string; error?: string }> => {
+  if (!existsSync(CONFIG_PATH)) return { ok: false, error: "No config" };
+  let cfg: any;
+  try { cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")); } catch { return { ok: false, error: "Config error" }; }
+
+  const port = cfg.server_port || 8765;
+  const headers = {
+    "Authorization": `Bearer ${cfg.server_pin ?? ""}`,
+    "X-Device-ID": cfg.device_id ?? "",
+    "X-Device-Name": cfg.device_name ?? "",
+  };
+
+  const deviceRes = await fetch(`http://localhost:${port}/games/${slug}/device`, { headers });
+  if (!deviceRes.ok) return { ok: false, error: "No device config for this game" };
+  const gd = await deviceRes.json() as any;
+  if (!gd.state_path) return { ok: false, error: "No state path configured" };
+
+  const statePath = (gd.state_path as string).replace(/^~/, homedir());
+
+  const stateRes = await fetch(`http://localhost:${port}/games/${slug}/state`, { headers });
+  if (stateRes.status === 204) return { ok: false, error: "No state on server yet" };
+  if (!stateRes.ok) return { ok: false, error: "Failed to download state" };
+
+  const data = Buffer.from(await stateRes.arrayBuffer());
+  if (existsSync(statePath)) copyFileSync(statePath, statePath + ".bak");
+  mkdirSync(dirname(statePath), { recursive: true });
+  writeFileSync(statePath, data);
+  return { ok: true, path: statePath };
 });
 
 // ── emulator scanning ─────────────────────────────────────────────────────────

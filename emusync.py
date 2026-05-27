@@ -417,6 +417,180 @@ def game_remove(slug: str) -> None:
     click.echo(f"Removed: {slug}")
 
 
+# ── pull ──────────────────────────────────────────────────────────────────────
+
+@cli.command("pull")
+@click.argument("game_slug")
+@click.argument("device_name_or_id")
+def pull_command(game_slug: str, device_name_or_id: str) -> None:
+    """Pull GAME_SLUG's save from DEVICE to this device's console save folder."""
+    from datetime import datetime, timezone, timedelta
+
+    cfg = cfg_module.load()
+    client = _client(cfg)
+
+    # ── 1. Server health ──────────────────────────────────────────────────────
+    if not client.health():
+        click.echo("Cannot reach EmuSync server. Is it running?", err=True)
+        sys.exit(1)
+
+    # ── 2. Find game ──────────────────────────────────────────────────────────
+    game = client.get_game(game_slug)
+    if not game:
+        click.echo(f"Game '{game_slug}' not found.", err=True)
+        games = client.list_games()
+        if games:
+            click.echo("Available games:", err=True)
+            for g in games:
+                click.echo(f"  {g['slug']}", err=True)
+        sys.exit(1)
+
+    # ── 3. Find source device ─────────────────────────────────────────────────
+    devices = client.list_devices()
+    q = device_name_or_id.lower()
+    matches = [d for d in devices
+               if d["name"].lower() == q or d["id"].lower().startswith(q)]
+
+    if not matches:
+        click.echo(f"Device '{device_name_or_id}' not found.", err=True)
+        if devices:
+            click.echo("Paired devices:", err=True)
+            for d in devices:
+                click.echo(f"  {d['name']}  ({d['id'][:8]}...)", err=True)
+        sys.exit(1)
+
+    if len(matches) > 1:
+        click.echo(f"'{device_name_or_id}' matches multiple devices — be more specific:", err=True)
+        for d in matches:
+            click.echo(f"  {d['name']}  ({d['id'][:8]}...)", err=True)
+        sys.exit(1)
+
+    source = matches[0]
+
+    # ── 4. Check server has a save ────────────────────────────────────────────
+    save_meta = client.get_save_meta(game_slug)
+    if save_meta is None:
+        click.echo(f"No save on server for '{game['name']}' yet.", err=True)
+        sys.exit(1)
+
+    # ── 5. Reachability: warn if source device is stale ───────────────────────
+    last_seen = source.get("last_seen_at")
+    if last_seen:
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(last_seen)
+        if age > timedelta(minutes=30):
+            mins = int(age.total_seconds() / 60)
+            click.echo(
+                f"Warning: {source['name']} was last seen {mins} minute(s) ago.",
+                err=True,
+            )
+            if not click.confirm("The save may be outdated. Continue anyway?", default=True):
+                sys.exit(0)
+    else:
+        click.echo(f"Warning: {source['name']} has never connected. Save may be stale.", err=True)
+        if not click.confirm("Continue anyway?", default=True):
+            sys.exit(0)
+
+    # ── 6. Warn if game is currently locked ───────────────────────────────────
+    try:
+        lock = client.get_lock(game_slug)
+        if lock.get("locked"):
+            holder = _get_device_name(client, lock.get("device_id", ""))
+            click.echo(f"Note: '{game['name']}' is currently being played on {holder}.")
+    except Exception:
+        pass
+
+    # ── 7. Resolve save destination ───────────────────────────────────────────
+    # Priority: existing game_devices save_path → console save folder → prompt
+    gd = client.get_game_device(game_slug)
+    save_path: str | None = None
+    needs_device_row = False
+
+    if gd and gd.save_path:
+        save_path = gd.save_path
+    else:
+        # Try the console's configured save folder for this device
+        save_folder: str | None = None
+        game_console = game.get("console", "")
+        if game_console:
+            try:
+                consoles = client.list_consoles()
+                match = next(
+                    (c for c in consoles
+                     if c["console_name"].lower() == game_console.lower()),
+                    None,
+                )
+                if match and match.get("device_save_folder"):
+                    save_folder = match["device_save_folder"]
+            except Exception:
+                pass
+
+        if not save_folder:
+            console_label = game_console or "this console"
+            click.echo(
+                f"No save folder configured for {console_label} on this device."
+            )
+            save_folder = click.prompt("Enter the folder to save to")
+
+        save_folder = str(Path(save_folder).expanduser())
+        save_path = str(Path(save_folder) / f"{game_slug}.sav")
+        needs_device_row = True
+
+    save_path = str(Path(save_path).expanduser())
+
+    # ── 8. Stream download with progress bar ─────────────────────────────────
+    click.echo(f"Pulling '{game['name']}' from {source['name']}…")
+    url = f"{client.base_url}/games/{game_slug}/save"
+
+    save_file = Path(save_path)
+    if save_file.exists():
+        import shutil as _shutil
+        _shutil.copy2(save_file, str(save_file) + ".bak")
+    save_file.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with httpx.stream("GET", url, headers=client.auth_headers, timeout=60) as r:
+            if r.status_code == 204:
+                click.echo("No save on server yet.", err=True)
+                sys.exit(1)
+            r.raise_for_status()
+
+            total = int(r.headers["content-length"]) if "content-length" in r.headers else None
+            label = f"  {game['name']}"
+
+            with click.progressbar(length=total, label=label, width=50,
+                                   show_percent=bool(total), show_eta=bool(total)) as bar:
+                with open(save_file, "wb") as f:
+                    for chunk in r.iter_bytes(chunk_size=8192):
+                        f.write(chunk)
+                        bar.update(len(chunk))
+
+    except httpx.HTTPStatusError as exc:
+        click.echo(f"Server error: {exc.response.status_code}", err=True)
+        sys.exit(1)
+    except httpx.RequestError as exc:
+        click.echo(f"Connection error: {exc}", err=True)
+        sys.exit(1)
+
+    click.echo(f"✓  Saved to {save_path}")
+
+    # ── 9. Persist save path so future pulls skip the prompt ──────────────────
+    if needs_device_row:
+        try:
+            existing = gd or GameDeviceConfig()
+            client.set_game_device(
+                game_slug,
+                GameDeviceConfig(
+                    rom_path=existing.rom_path,
+                    save_path=save_path,
+                    launch_command=existing.launch_command,
+                    state_path=existing.state_path,
+                ),
+            )
+            click.echo(f"  Save path stored for future pulls.")
+        except Exception as exc:
+            click.echo(f"  Warning: could not persist save path: {exc}", err=True)
+
+
 # ── sync ──────────────────────────────────────────────────────────────────────
 
 @cli.group()

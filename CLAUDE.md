@@ -134,6 +134,8 @@ window.emusync.game.stop()                 // SIGKILL game process group (in-app
 window.emusync.game.stopExternal()         // kill emulator + emusync via .game_pid file (Steam launches)
 window.emusync.game.hasPidFile()           // true if .game_pid exists, process is alive, and cmdline contains emusync/python
 window.emusync.game.isRunning()            // boolean
+window.emusync.game.pullSave(slug)         // downloads save from server and writes to local save_path; returns { ok, path?, error? }
+window.emusync.game.pullState(slug)        // downloads state from server and writes to local state_path; returns { ok, path?, error? }
 window.emusync.game.onExited(cb)           // subscribe to game:exited event
 window.emusync.game.offExited(cb)          // unsubscribe
 ```

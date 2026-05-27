@@ -21,6 +21,10 @@ type DeviceModal = {
   name: string;
   installed: Device[] | null;   // devices that have the game
   missing: Device[] | null;     // paired devices that don't
+  saveMeta?: { hash: string; pushed_at: string; device_id: string } | null;
+  pulling?: boolean;
+  pullError?: string | null;
+  pullSuccess?: boolean;
 } | null;
 
 /**
@@ -169,14 +173,29 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     try {
       // Use the already-fetched context device list — no extra listDevices() call.
       // listGameDevices only returns id+name; enrich with last_ip/last_seen_at from context.
-      const partial = await listGameDevices(slug);
+      const [partial, saveMeta] = await Promise.all([
+        listGameDevices(slug),
+        getSaveMeta(slug),
+      ]);
       const installedIds = new Set(partial.map(d => d.id));
       const installed = partial.map(d => allDevices.find(a => a.id === d.id) ?? d);
       const missing = allDevices.filter(d => !installedIds.has(d.id));
-      setDeviceModal({ slug, name, installed, missing });
+      setDeviceModal({ slug, name, installed, missing, saveMeta });
     } catch {
-      setDeviceModal({ slug, name, installed: [], missing: [] });
+      setDeviceModal({ slug, name, installed: [], missing: [], saveMeta: null });
     }
+  }
+
+  async function handlePullSave(slug: string): Promise<void> {
+    setDeviceModal(prev => prev ? { ...prev, pulling: true, pullError: null, pullSuccess: false } : prev);
+    const result = await (window as any).emusync.game.pullSave(slug);
+    setDeviceModal(prev => prev ? {
+      ...prev,
+      pulling: false,
+      pullSuccess: result.ok,
+      pullError: result.ok ? null : (result.error ?? "Pull failed"),
+    } : prev);
+    if (result.ok) load(true); // refresh lastSave timestamps
   }
 
   function toggleSelection(slug: string): void {
@@ -457,6 +476,30 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               </div>
             ) : (
               <>
+                {deviceModal.saveMeta ? (
+                  <div style={{ padding: "12px 0", borderBottom: "1px solid var(--border)", marginBottom: 12 }}>
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      Server save: {deviceModal.saveMeta.pushed_at.slice(0, 19)}
+                      {" "}by {allDevices.find(d => d.id === deviceModal.saveMeta!.device_id)?.name ?? deviceModal.saveMeta.device_id}
+                      {" "}
+                      <span style={{ color: FRESHNESS_COLOR[deviceFreshness((allDevices.find(d => d.id === deviceModal.saveMeta!.device_id)?.last_seen_at))] }}>●</span>
+                    </span>
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ fontSize: 12 }}
+                        disabled={deviceModal.pulling}
+                        onClick={() => handlePullSave(deviceModal.slug)}
+                      >
+                        {deviceModal.pulling ? <span className="spinner" style={{ width: 12, height: 12, marginRight: 4 }} /> : "↓ Pull save to this device"}
+                      </button>
+                      {deviceModal.pullSuccess && <span style={{ color: "var(--green)", marginLeft: 8 }}>✓ Pulled</span>}
+                      {deviceModal.pullError && <span style={{ color: "var(--red)", fontSize: 12, marginLeft: 8 }}>{deviceModal.pullError}</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>No save on server yet.</p>
+                )}
                 {deviceModal.installed.length > 0 && (
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Installed</p>

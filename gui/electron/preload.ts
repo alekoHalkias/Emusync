@@ -71,6 +71,10 @@ contextBridge.exposeInMainWorld("emusync", {
     isRunning: (): Promise<boolean> => ipcRenderer.invoke("game:isRunning"),
     stopExternal: (): Promise<{ ok: boolean }> => ipcRenderer.invoke("game:stop-external"),
     hasPidFile: (): Promise<boolean> => ipcRenderer.invoke("game:hasPidFile"),
+    pullSave: (slug: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke("game:pullSave", slug),
+    pullState: (slug: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke("game:pullState", slug),
     onExited: (cb: () => void): void => { ipcRenderer.on("game:exited", cb); },
     offExited: (cb: () => void): void => { ipcRenderer.removeListener("game:exited", cb); },
   },
