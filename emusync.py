@@ -696,6 +696,15 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         )
         sys.exit(1)
 
+    # Validate ROM path is configured
+    if not gd.rom_path:
+        click.echo(
+            f"No ROM path configured for '{game_slug}'. "
+            f"Run 'emusync game edit {game_slug} --rom <path>' first.",
+            err=True,
+        )
+        sys.exit(1)
+
     save_path = gd.save_path
     game_pid_file = Path(cfg.data_dir) / ".game_pid"
 
@@ -756,11 +765,25 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             if pulled:
                 click.echo(f"Pulled state for {game_slug}.")
 
+        # Pull ROM from server if available (auto-sync from other devices)
+        rom_path = gd.rom_path
+        server_rom_hash = None
+        if rom_path:
+            try:
+                pulled, server_rom_hash = client.pull_rom(game_slug, str(Path(rom_path).expanduser()))
+                if pulled:
+                    click.echo(f"Pulled ROM for {game_slug} from another device.")
+            except Exception as exc:
+                click.echo(f"Warning: failed to pull ROM: {exc}", err=True)
+
         # Push ROM if it exists (share it with other devices)
         if gd.rom_path and Path(gd.rom_path).expanduser().exists():
             try:
-                client.push_rom(game_slug, str(Path(gd.rom_path).expanduser()))
-                click.echo(f"Pushed ROM for {game_slug}.")
+                local_rom_hash = hashlib.sha256(Path(gd.rom_path).expanduser().read_bytes()).hexdigest()
+                # Only push if it's different from server version
+                if local_rom_hash != server_rom_hash:
+                    client.push_rom(game_slug, str(Path(gd.rom_path).expanduser()))
+                    click.echo(f"Pushed ROM for {game_slug}.")
             except Exception as exc:
                 click.echo(f"Warning: failed to push ROM: {exc}", err=True)
 
