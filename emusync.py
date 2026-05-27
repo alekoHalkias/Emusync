@@ -543,10 +543,13 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
             pass
 
         if not source_rom_path:
-            click.echo(f"Game '{game['name']}' is not configured on {source['name']}.")
-            click.echo(f"Enter the path to the ROM file on {source['name']}:")
-            click.echo("  (e.g., ~/roms/gaia-v3.gba or /mnt/games/gaia-v3.gba)")
-            source_rom_path = click.prompt("ROM path on source device")
+            click.echo(f"Game '{game['name']}' is not configured on {source['name']}.", err=True)
+            click.echo(f"\nTo pull this game, you must first configure it on {source['name']}:", err=True)
+            click.echo(f"  Option 1: Run the game once on {source['name']} (auto-configures it)", err=True)
+            click.echo(f"  Option 2: On {source['name']}, run:", err=True)
+            click.echo(f"    emusync game edit {game_slug} --rom <path-to-rom>", err=True)
+            click.echo(f"\nThen try pulling again.", err=True)
+            sys.exit(1)
 
     # ── 8. Resolve final ROM path ─────────────────────────────────────────────
     rom_filename: str | None = None
