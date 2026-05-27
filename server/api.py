@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
@@ -19,18 +20,56 @@ app.add_middleware(
 
 _store: Optional[Store] = None
 _master_pin: str = ""
+_online_devices: set[str] = set()
+_device_names: dict[str, str] = {}
+_presence_lock = threading.Lock()
+
+
+def _monitor_presence() -> None:
+    """Background thread: emit 'went offline' for idle devices every 30 seconds."""
+    import time
+    from datetime import datetime, timezone
+
+    OFFLINE_TIMEOUT_SECONDS = 5 * 60
+    while True:
+        time.sleep(30)
+        if _store is None:
+            continue
+        try:
+            devices = _store.list_devices()
+            now = datetime.now(timezone.utc)
+            for d in devices:
+                if d.last_seen_at is None:
+                    continue
+                last_seen = datetime.fromisoformat(d.last_seen_at)
+                if (now - last_seen).total_seconds() > OFFLINE_TIMEOUT_SECONDS:
+                    with _presence_lock:
+                        if d.id in _online_devices:
+                            _online_devices.discard(d.id)
+                            name = _device_names.pop(d.id, d.name)
+                            _print_activity(f"{name} went offline")
+        except Exception:
+            pass
 
 
 def init(store: Store, master_pin: str) -> None:
-    global _store, _master_pin
+    global _store, _master_pin, _online_devices, _device_names
     _store = store
     _master_pin = master_pin
+    _online_devices.clear()
+    _device_names.clear()
+    t = threading.Thread(target=_monitor_presence, daemon=True)
+    t.start()
 
 
 def _get_store() -> Store:
     if _store is None:
         raise RuntimeError("Store not initialized")
     return _store
+
+
+def _print_activity(msg: str) -> None:
+    print(msg, flush=True)
 
 
 def _auth(
@@ -53,9 +92,19 @@ def _auth(
     if not x_device_id:
         raise HTTPException(status_code=401, detail="Missing X-Device-ID header")
     store = _get_store()
-    store.ensure_device(x_device_id, x_device_name or x_device_id)
+    device, is_new = store.ensure_device(x_device_id, x_device_name or x_device_id)
+    ip = request.client.host if request.client else "unknown"
     if request.client:
-        store.touch_device(x_device_id, request.client.host)
+        store.touch_device(x_device_id, ip)
+
+    with _presence_lock:
+        if is_new:
+            _print_activity(f"new device paired called {device.name} at ip:{ip}")
+        elif x_device_id not in _online_devices:
+            _print_activity(f"{device.name} online")
+        _online_devices.add(x_device_id)
+        _device_names[x_device_id] = device.name
+
     return x_device_id
 
 
@@ -83,7 +132,15 @@ def whoami(device_id: str = Depends(_auth)) -> dict:
 
 @app.delete("/devices/{remove_device_id}")
 def remove_device(remove_device_id: str, device_id: str = Depends(_auth)) -> dict:
-    _get_store().remove_device(remove_device_id)
+    store = _get_store()
+    devices = store.list_devices()
+    name = next((d.name for d in devices if d.id == remove_device_id), remove_device_id)
+    store.log_event("device_removed", device_id=remove_device_id)
+    store.remove_device(remove_device_id)
+    with _presence_lock:
+        _online_devices.discard(remove_device_id)
+        _device_names.pop(remove_device_id, None)
+    _print_activity(f"{name} unpaired")
     return {"ok": True}
 
 

@@ -30,8 +30,8 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | File | Owns |
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`); `device compare` shows game coverage across paired devices |
-| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations |
+| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp; logs real-time device activity ("paired", "online", "offline", "unpaired") to stdout; background monitoring thread detects idle devices |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
 | `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`); sends PIN + device headers for auth |
@@ -164,6 +164,29 @@ Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_na
 - **Restart:** Available as `emusync server restart` CLI command. Calls `_do_stop_server()` to stop the running server (or echoes "server not running"), then calls `_do_start_server()` to start it again. Useful for applying configuration changes.
 - **App close:** `window-all-closed` only kills the server if the GUI spawned it (`serverStartedByApp=true`). This flag is set only when `startServerProcess()` detects the "Pairing token:" message in stdout, not when the Python process exits due to duplicate-launch detection. This allows users to start a server externally (e.g., via terminal) and close the GUI without killing it.
 - **Auto-start:** `App.tsx` calls `server.start()` on init if `is_server=true` in config. If a server is already running (external start), the Python code exits gracefully with duplicate-launch detection, and the GUI does not manage its lifecycle.
+
+---
+
+## Device activity logging (terminal output)
+
+The server prints real-time device connection/disconnection events to stdout for operator visibility:
+
+```
+EmuSync server running on :8765
+new device paired called steamdeck at ip:192.168.1.42
+steamdeck online
+steamdeck went offline
+steamdeck unpaired
+```
+
+**How it works:**
+
+- **"new device paired"** — Fired in `api._auth()` when `ensure_device()` performs its first INSERT (new device). Printed immediately, includes device name and IP.
+- **"online"** — Fired in `api._auth()` when a known device makes a request but wasn't previously in the `_online_devices` set (i.e., it was offline or this is its first request after server restart). Printed immediately, includes device name.
+- **"went offline"** — Fired by a background monitoring thread (`_monitor_presence()`) that wakes every 30 seconds and checks `last_seen_at` for all devices. Any device idle > 5 minutes is flagged offline. The monitoring thread is started as a daemon in `api.init()`.
+- **"unpaired"** — Fired in the `DELETE /devices/{id}` endpoint when a device is removed. Printed before deletion, includes device name.
+
+**Thread safety:** The `_online_devices` set and `_device_names` dict are protected by `_presence_lock` (threading.Lock) because FastAPI's synchronous dependencies like `_auth` may run in concurrent worker threads.
 
 ---
 
