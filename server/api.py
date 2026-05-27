@@ -182,8 +182,10 @@ class GameDeviceRequest(BaseModel):
 
 
 @app.get("/games/{slug}/device")
-def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
-    gd = _get_store().get_game_device(slug, device_id)
+def get_game_device(slug: str, for_device: str | None = None, device_id: str = Depends(_auth)) -> dict:
+    # Allow querying another device's config (for remote pulls)
+    query_device_id = for_device or device_id
+    gd = _get_store().get_game_device(slug, query_device_id)
     if not gd:
         raise HTTPException(status_code=404, detail="No device config for this game")
     return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command, "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path}

@@ -536,8 +536,8 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
     source_rom_path: str | None = None
     if use_direct:
         try:
-            # Query the source device directly for its game config
-            url = f"http://{source_ip}:8765/games/{game_slug}/device"
+            # Query the source device's game config using its device ID
+            url = f"http://{source_ip}:8765/games/{game_slug}/device?for_device={source['id']}"
             r = httpx.get(url, headers=client.auth_headers, timeout=5)
             if r.status_code == 200:
                 device_config = r.json()
