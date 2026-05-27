@@ -152,6 +152,33 @@ class SyncClient:
         r.raise_for_status()
         return r.json()["hash"]
 
+    def pull_rom(self, slug: str, rom_path: str) -> tuple[bool, Optional[str]]:
+        """Write server ROM to disk. Returns (pulled, server_hash). pulled=False if no ROM exists."""
+        r = httpx.get(self._url(f"/games/{slug}/rom"), headers=self._headers, timeout=120)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        rom = Path(rom_path)
+        if rom.exists():
+            rom.parent.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(rom, rom.with_suffix(rom.suffix + ".bak"))
+        rom.parent.mkdir(parents=True, exist_ok=True)
+        rom.write_bytes(r.content)
+        return True, r.headers.get("X-ROM-Hash")
+
+    def push_rom(self, slug: str, rom_path: str) -> str:
+        data = Path(rom_path).read_bytes()
+        filename = Path(rom_path).name
+        r = httpx.post(
+            self._url(f"/games/{slug}/rom"),
+            content=data,
+            headers={**self._headers, "Content-Type": "application/octet-stream", "X-ROM-Filename": filename},
+            timeout=120,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
     def acquire_lock(self, slug: str) -> None:
         r = httpx.post(self._url(f"/games/{slug}/lock"), headers=self._headers, timeout=10)
         if r.status_code == 409:
@@ -169,6 +196,13 @@ class SyncClient:
 
     def get_save_meta(self, slug: str) -> Optional[dict]:
         r = httpx.get(self._url(f"/games/{slug}/save/meta"), headers=self._headers, timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def get_rom_meta(self, slug: str) -> Optional[dict]:
+        r = httpx.get(self._url(f"/games/{slug}/rom/meta"), headers=self._headers, timeout=10)
         if r.status_code == 204:
             return None
         r.raise_for_status()

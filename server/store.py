@@ -11,7 +11,7 @@ from typing import Optional
 LOCK_TTL_HOURS = 4
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -77,6 +77,14 @@ CREATE TABLE IF NOT EXISTS events (
     device_name TEXT,
     occurred_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS roms (
+    id         TEXT PRIMARY KEY,
+    game_slug  TEXT NOT NULL UNIQUE REFERENCES games(slug) ON DELETE CASCADE,
+    device_id  TEXT NOT NULL REFERENCES devices(id),
+    hash       TEXT NOT NULL,
+    pushed_at  TEXT NOT NULL,
+    filename   TEXT NOT NULL
+);
 """
 
 
@@ -100,6 +108,8 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
         # Drop the per-device UUID token — auth is now PIN-based (see api.py _auth).
         # SQLite 3.35+ supports DROP COLUMN; the constraint is on 'token' not 'id' so FKs are safe.
         _try(conn, "ALTER TABLE devices DROP COLUMN token")
+    if from_version < 2:
+        _try(conn, "CREATE TABLE IF NOT EXISTS roms (id TEXT PRIMARY KEY, game_slug TEXT NOT NULL UNIQUE REFERENCES games(slug) ON DELETE CASCADE, device_id TEXT NOT NULL REFERENCES devices(id), hash TEXT NOT NULL, pushed_at TEXT NOT NULL, filename TEXT NOT NULL)")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
 
@@ -158,7 +168,8 @@ class Lock:
 
 class Store:
     def __init__(self, data_dir: str) -> None:
-        db_path = Path(data_dir) / "emusync.db"
+        self._data_dir = Path(data_dir)
+        db_path = self._data_dir / "emusync.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
@@ -369,6 +380,46 @@ class Store:
     def get_state_meta(self, game_slug: str) -> Optional[SaveMeta]:
         row = self._conn.execute(
             "SELECT game_slug, device_id, hash, pushed_at FROM states WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
+        ).fetchone()
+        return SaveMeta(**dict(row)) if row else None
+
+    # ── roms ───────────────────────────────────────────────────────────────────
+
+    def push_rom(self, game_slug: str, device_id: str, data: bytes, filename: str) -> SaveMeta:
+        h = hashlib.sha256(data).hexdigest()
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute("DELETE FROM roms WHERE game_slug = ?", (game_slug,))
+        self._conn.execute(
+            "INSERT INTO roms (id, game_slug, device_id, hash, pushed_at, filename) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), game_slug, device_id, h, now, filename),
+        )
+        self._conn.commit()
+        return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now)
+
+    def pull_rom(self, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
+        row = self._conn.execute(
+            "SELECT game_slug, device_id, hash, pushed_at, filename FROM roms WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            (game_slug,),
+        ).fetchone()
+        if not row:
+            return None, None
+        rom_dir = self._data_dir / "roms"
+        rom_path = rom_dir / row["filename"]
+        if not rom_path.exists():
+            return None, None
+        data = rom_path.read_bytes()
+        meta = SaveMeta(
+            game_slug=row["game_slug"],
+            device_id=row["device_id"],
+            hash=row["hash"],
+            pushed_at=row["pushed_at"],
+        )
+        return data, meta
+
+    def get_rom_meta(self, game_slug: str) -> Optional[SaveMeta]:
+        row = self._conn.execute(
+            "SELECT game_slug, device_id, hash, pushed_at FROM roms WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
             (game_slug,),
         ).fetchone()
         return SaveMeta(**dict(row)) if row else None

@@ -423,7 +423,7 @@ def game_remove(slug: str) -> None:
 @click.argument("game_slug")
 @click.argument("device_name_or_id")
 def pull_command(game_slug: str, device_name_or_id: str) -> None:
-    """Pull GAME_SLUG's save from DEVICE to this device's console save folder."""
+    """Pull GAME_SLUG's ROM from DEVICE to this device's console game folder."""
     from datetime import datetime, timezone, timedelta
 
     cfg = cfg_module.load()
@@ -467,10 +467,10 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
 
     source = matches[0]
 
-    # ── 4. Check server has a save ────────────────────────────────────────────
-    save_meta = client.get_save_meta(game_slug)
-    if save_meta is None:
-        click.echo(f"No save on server for '{game['name']}' yet.", err=True)
+    # ── 4. Check server has a ROM ─────────────────────────────────────────────
+    rom_meta = client.get_rom_meta(game_slug)
+    if rom_meta is None:
+        click.echo(f"No ROM on server for '{game['name']}' yet.", err=True)
         sys.exit(1)
 
     # ── 5. Reachability: warn if source device is stale ───────────────────────
@@ -483,10 +483,10 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
                 f"Warning: {source['name']} was last seen {mins} minute(s) ago.",
                 err=True,
             )
-            if not click.confirm("The save may be outdated. Continue anyway?", default=True):
+            if not click.confirm("The ROM may be outdated. Continue anyway?", default=True):
                 sys.exit(0)
     else:
-        click.echo(f"Warning: {source['name']} has never connected. Save may be stale.", err=True)
+        click.echo(f"Warning: {source['name']} has never connected. ROM may be stale.", err=True)
         if not click.confirm("Continue anyway?", default=True):
             sys.exit(0)
 
@@ -499,18 +499,18 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
     except Exception:
         pass
 
-    # ── 7a. Check if game already on local device ────────────────────────────
+    # ── 7a. Check if ROM already on local device ────────────────────────────
     gd = client.get_game_device(game_slug)
-    if gd and gd.save_path:
-        local_save = Path(gd.save_path).expanduser()
-        if local_save.exists():
+    if gd and gd.rom_path:
+        local_rom = Path(gd.rom_path).expanduser()
+        if local_rom.exists():
             click.echo(f"Game '{game['name']}' already on this device.")
             sys.exit(0)
 
     # ── 7b. Check if source device has the game configured ─────────────────
     try:
         source_gd = client.get_game_device(game_slug)
-        if not source_gd or not source_gd.save_path:
+        if not source_gd or not source_gd.rom_path:
             click.echo(
                 f"Game '{game['name']}' is not configured on {source['name']}.",
                 err=True,
@@ -520,16 +520,16 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
         click.echo(f"Could not check {source['name']}'s configuration.", err=True)
         sys.exit(1)
 
-    # ── 7c. Resolve save destination ──────────────────────────────────────────
-    # Priority: existing game_devices save_path → console save folder → prompt
-    save_path: str | None = None
+    # ── 7c. Resolve ROM destination ───────────────────────────────────────────
+    # Priority: existing game_devices rom_path → console game folder → prompt
+    rom_path: str | None = None
     needs_device_row = False
 
-    if gd and gd.save_path:
-        save_path = gd.save_path
+    if gd and gd.rom_path:
+        rom_path = gd.rom_path
     else:
-        # Try the console's configured save folder for this device
-        save_folder: str | None = None
+        # Try the console's configured game folder for this device
+        game_folder: str | None = None
         game_console = game.get("console", "")
         if game_console:
             try:
@@ -539,38 +539,39 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
                      if c["console_name"].lower() == game_console.lower()),
                     None,
                 )
-                if match and match.get("device_save_folder"):
-                    save_folder = match["device_save_folder"]
+                if match and match.get("device_game_folder"):
+                    game_folder = match["device_game_folder"]
             except Exception:
                 pass
 
-        if not save_folder:
+        if not game_folder:
             console_label = game_console or "this console"
             click.echo(
-                f"No save folder configured for {console_label} on this device."
+                f"No game folder configured for {console_label} on this device."
             )
-            save_folder = click.prompt("Enter the folder to save to")
+            game_folder = click.prompt("Enter the folder to save to")
 
-        save_folder = str(Path(save_folder).expanduser())
-        save_path = str(Path(save_folder) / f"{game_slug}.sav")
+        game_folder = str(Path(game_folder).expanduser())
+        rom_filename = Path(source_gd.rom_path).name if source_gd and source_gd.rom_path else f"{game_slug}.rom"
+        rom_path = str(Path(game_folder) / rom_filename)
         needs_device_row = True
 
-    save_path = str(Path(save_path).expanduser())
+    rom_path = str(Path(rom_path).expanduser())
 
     # ── 8. Stream download with progress bar ─────────────────────────────────
     click.echo(f"Pulling '{game['name']}' from {source['name']}…")
-    url = f"{client.base_url}/games/{game_slug}/save"
+    url = f"{client.base_url}/games/{game_slug}/rom"
 
-    save_file = Path(save_path)
-    if save_file.exists():
+    rom_file = Path(rom_path)
+    if rom_file.exists():
         import shutil as _shutil
-        _shutil.copy2(save_file, str(save_file) + ".bak")
-    save_file.parent.mkdir(parents=True, exist_ok=True)
+        _shutil.copy2(rom_file, str(rom_file) + ".bak")
+    rom_file.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with httpx.stream("GET", url, headers=client.auth_headers, timeout=60) as r:
+        with httpx.stream("GET", url, headers=client.auth_headers, timeout=300) as r:
             if r.status_code == 204:
-                click.echo("No save on server yet.", err=True)
+                click.echo("No ROM on server yet.", err=True)
                 sys.exit(1)
             r.raise_for_status()
 
@@ -579,7 +580,7 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
 
             with click.progressbar(length=total, label=label, width=50,
                                    show_percent=bool(total), show_eta=bool(total)) as bar:
-                with open(save_file, "wb") as f:
+                with open(rom_file, "wb") as f:
                     for chunk in r.iter_bytes(chunk_size=8192):
                         f.write(chunk)
                         bar.update(len(chunk))
@@ -591,22 +592,22 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
         click.echo(f"Connection error: {exc}", err=True)
         sys.exit(1)
 
-    click.echo(f"✓  Saved to {save_path}")
+    click.echo(f"✓  Saved to {rom_path}")
 
-    # ── 9. Persist save path so future pulls skip the prompt ──────────────────
+    # ── 9. Persist ROM path so future pulls skip the prompt ────────────────────
     if needs_device_row:
         try:
             existing = gd or GameDeviceConfig()
             client.set_game_device(
                 game_slug,
                 GameDeviceConfig(
-                    rom_path=existing.rom_path,
-                    save_path=save_path,
+                    rom_path=rom_path,
+                    save_path=existing.save_path,
                     launch_command=existing.launch_command,
                     state_path=existing.state_path,
                 ),
             )
-            click.echo(f"  Save path stored for future pulls.")
+            click.echo(f"  ROM path stored for future pulls.")
         except Exception as exc:
             click.echo(f"  Warning: could not persist save path: {exc}", err=True)
 

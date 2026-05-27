@@ -268,6 +268,48 @@ def get_state_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     )
 
 
+# ── roms ──────────────────────────────────────────────────────────────────────
+
+@app.get("/games/{slug}/rom")
+def pull_rom(slug: str, device_id: str = Depends(_auth)) -> Response:
+    data, meta = _get_store().pull_rom(slug)
+    if data is None:
+        return Response(status_code=204)
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={
+            "X-ROM-Hash": meta.hash,
+            "X-Pushed-At": meta.pushed_at,
+            "X-Device-Id": meta.device_id,
+        },
+    )
+
+
+@app.post("/games/{slug}/rom")
+async def push_rom(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
+    data = await request.body()
+    filename = request.headers.get("X-ROM-Filename", f"{slug}.rom")
+    rom_dir = _get_store()._data_dir / "roms"
+    rom_dir.mkdir(parents=True, exist_ok=True)
+    rom_path = rom_dir / filename
+    rom_path.write_bytes(data)
+    meta = _get_store().push_rom(slug, device_id, data, filename)
+    _get_store().log_event("rom_synced", slug, device_id)
+    return {"hash": meta.hash, "pushed_at": meta.pushed_at}
+
+
+@app.get("/games/{slug}/rom/meta")
+def get_rom_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
+    meta = _get_store().get_rom_meta(slug)
+    if not meta:
+        return Response(status_code=204)
+    return Response(
+        content=f'{{"hash":"{meta.hash}","pushed_at":"{meta.pushed_at}","device_id":"{meta.device_id}"}}',
+        media_type="application/json",
+    )
+
+
 # ── locks ─────────────────────────────────────────────────────────────────────
 
 @app.post("/games/{slug}/lock")
