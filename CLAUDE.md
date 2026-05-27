@@ -18,6 +18,8 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 **Data flow:**
 1. Electron spawns `emusync.py server start` as a child process
+   - If a server is already reachable, exits with "server already running"
+   - If device is not set up as a server, prompts user for setup (name, optional PIN)
 2. Python writes `~/.emusync/.server_pid` and `~/.emusync/.server_token` on start
 3. Renderer calls Python REST API directly (`http://localhost:8765`) via `api.ts`
 4. Electron IPC (`preload.ts` → `main.ts`) handles config I/O, server lifecycle, file dialogs, game launch

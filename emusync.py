@@ -127,10 +127,33 @@ def server_start() -> None:
     from server import mdns as mdns_module
 
     cfg = cfg_module.load()
-    # Only write config if is_server isn't already set (avoid unnecessary disk write)
+
+    # Check if a server is already reachable
+    client = _client(cfg)
+    if client.health():
+        click.echo("Server is already running.", err=True)
+        sys.exit(1)
+
+    # If this device is not set up as a server, ask the user
     if not cfg.is_server:
+        if not click.confirm("This device is not set up as a server. Would you like to set one up?"):
+            click.echo("Cancelled.", err=True)
+            sys.exit(1)
+
+        # Ask for device name
+        device_name = click.prompt("Server name", default=cfg.device_name)
+        cfg.device_name = device_name
+
+        # Ask for PIN
+        if click.confirm("Would you like to set up a PIN for the server?", default=False):
+            pin = click.prompt("Enter PIN (or leave blank for no PIN)", default="", show_default=False)
+            cfg.server_pin = pin
+        else:
+            cfg.server_pin = ""
+
         cfg.is_server = True
         cfg_module.save(cfg)
+        click.echo(f"Server configured: {device_name}")
 
     store = Store(cfg.data_dir)
     master_token = cfg.server_pin
