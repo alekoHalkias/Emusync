@@ -252,6 +252,31 @@ def server_start() -> None:
         pid_file.unlink(missing_ok=True)
 
 
+@server.command("stop")
+def server_stop() -> None:
+    """Stop the running server process."""
+    cfg = cfg_module.load()
+    is_running, pid = _is_server_running(cfg.data_dir)
+
+    if not is_running:
+        click.echo("server not running")
+        return
+
+    try:
+        os.kill(pid, signal.SIGKILL)
+        click.echo(f"Server (PID {pid}) stopped.")
+        # Clean up PID file
+        pid_file = Path(cfg.data_dir) / ".server_pid"
+        pid_file.unlink(missing_ok=True)
+    except ProcessLookupError:
+        click.echo("server not running")
+        # Clean up stale PID file
+        pid_file = Path(cfg.data_dir) / ".server_pid"
+        pid_file.unlink(missing_ok=True)
+    except Exception as e:
+        click.echo(f"Error stopping server: {e}", err=True)
+
+
 @server.command("clear-devices")
 def server_clear_devices() -> None:
     """Remove all paired devices so they must re-pair with the new PIN."""
