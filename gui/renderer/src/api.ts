@@ -91,6 +91,7 @@ export type ActivityEvent = {
   game_slug: string | null;
   device_id: string | null;
   device_name: string | null;
+  rom_path: string | null;
   occurred_at: string;
 };
 

@@ -625,6 +625,45 @@ async def test_log_event_server_started_direct():
         assert events[0]["device_id"] is None
 
 
+@pytest.mark.asyncio
+async def test_game_added_event_logged(client):
+    """When a game is imported with a rom_path, a game_added event is logged with rom_path."""
+    await client.post("/games", json={"name": "Zelda - A Link to the Past", "console": "SNES"}, headers=AUTH)
+    rom_path = "/home/user/Games/SNES/zelda3.smc"
+    await client.put("/games/zelda-a-link-to-the-past/device", json={
+        "rom_path": rom_path,
+        "save_path": "/saves/zelda3.sav",
+        "launch_command": "retroarch zelda3.smc",
+    }, headers=AUTH)
+
+    r = await client.get("/events", headers=AUTH)
+    assert r.status_code == 200
+    events = r.json()
+    game_added = next((e for e in events if e["type"] == "game_added"), None)
+    assert game_added is not None, "game_added event not found"
+    assert game_added["game_slug"] == "zelda-a-link-to-the-past"
+    assert game_added["device_id"] == DEVICE_ID
+    assert game_added["rom_path"] == rom_path
+
+
+@pytest.mark.asyncio
+async def test_game_added_event_only_when_rom_path(client):
+    """game_added event should only fire if rom_path is non-empty."""
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+    # Set device config with empty rom_path
+    await client.put("/games/test-game/device", json={
+        "rom_path": "",
+        "save_path": "/saves/test.sav",
+        "launch_command": "emulator test.rom",
+    }, headers=AUTH)
+
+    r = await client.get("/events", headers=AUTH)
+    assert r.status_code == 200
+    events = r.json()
+    game_added = next((e for e in events if e["type"] == "game_added"), None)
+    assert game_added is None, "game_added event should not fire for empty rom_path"
+
+
 # ── update_game regression: cascade delete bug ────────────────────────────────
 
 @pytest.mark.asyncio

@@ -218,9 +218,11 @@ def list_game_devices(slug: str, device_id: str = Depends(_auth)) -> list[dict]:
 
 @app.put("/games/{slug}/device")
 def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(_auth)) -> dict:
-    if not _get_store().get_game(slug):
+    store = _get_store()
+    game = store.get_game(slug)
+    if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    _get_store().set_game_device(
+    store.set_game_device(
         GameDevice(
             game_slug=slug,
             device_id=device_id,
@@ -231,6 +233,10 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
             rom_folder_path=req.rom_folder_path,
         )
     )
+    if req.rom_path:
+        store.log_event("game_added", slug, device_id, rom_path=req.rom_path)
+        device_name = _device_names.get(device_id, device_id)
+        _print_activity(f"new {game.console} game added: {game.name} to {device_name} at the local path {req.rom_path}")
     return {"ok": True}
 
 

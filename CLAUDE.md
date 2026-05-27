@@ -31,7 +31,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 |------|------|
 | `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`); `device compare` shows game coverage across paired devices |
 | `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp; logs real-time device activity ("paired", "online", "offline", "unpaired") to stdout; background monitoring thread detects idle devices |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; events table includes `rom_path` field for game import logging (version 2+) |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
 | `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`); sends PIN + device headers for auth |

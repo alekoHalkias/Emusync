@@ -32,7 +32,7 @@ class _LockedConnection:
             return getattr(self._conn, name)
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS events (
     game_slug   TEXT,
     device_id   TEXT,
     device_name TEXT,
+    rom_path    TEXT,
     occurred_at TEXT NOT NULL
 );
 """
@@ -121,6 +122,8 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
         # Drop the per-device UUID token — auth is now PIN-based (see api.py _auth).
         # SQLite 3.35+ supports DROP COLUMN; the constraint is on 'token' not 'id' so FKs are safe.
         _try(conn, "ALTER TABLE devices DROP COLUMN token")
+    if from_version < 2:
+        _try(conn, "ALTER TABLE events ADD COLUMN rom_path TEXT")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
 
@@ -446,21 +449,21 @@ class Store:
 
     # ── events ────────────────────────────────────────────────────────────────
 
-    def log_event(self, event_type: str, game_slug: Optional[str] = None, device_id: Optional[str] = None) -> None:
+    def log_event(self, event_type: str, game_slug: Optional[str] = None, device_id: Optional[str] = None, rom_path: Optional[str] = None) -> None:
         now = datetime.now(timezone.utc).isoformat()
         device_name: Optional[str] = None
         if device_id:
             row = self._conn.execute("SELECT name FROM devices WHERE id = ?", (device_id,)).fetchone()
             device_name = row["name"] if row else device_id
         self._conn.execute(
-            "INSERT INTO events (type, game_slug, device_id, device_name, occurred_at) VALUES (?, ?, ?, ?, ?)",
-            (event_type, game_slug, device_id, device_name, now),
+            "INSERT INTO events (type, game_slug, device_id, device_name, rom_path, occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (event_type, game_slug, device_id, device_name, rom_path, now),
         )
         self._conn.commit()
 
     def list_events(self, limit: int = 100) -> list[dict]:
         rows = self._conn.execute(
-            "SELECT type, game_slug, device_id, device_name, occurred_at FROM events ORDER BY id DESC LIMIT ?",
+            "SELECT type, game_slug, device_id, device_name, rom_path, occurred_at FROM events ORDER BY id DESC LIMIT ?",
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
