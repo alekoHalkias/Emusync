@@ -20,7 +20,7 @@ class SyncClient:
     def __init__(self, host: str, port: int, pin: str, device_id: str, device_name: str) -> None:
         self._base = f"http://{host}:{port}"
         self._headers = {
-            "Authorization": f"Bearer {pin}",
+            **({"Authorization": f"Bearer {pin}"} if pin else {}),
             "X-Device-ID": device_id,
             "X-Device-Name": device_name,
         }
