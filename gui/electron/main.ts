@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, execSync, ChildProcess } from "child_process";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync } from "fs";
 import { join, dirname, basename, extname } from "path";
-import { homedir } from "os";
+import { homedir, networkInterfaces } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
 
 const CONFIG_PATH = join(homedir(), ".emusync", "emusync.toml");
@@ -184,6 +184,16 @@ ipcMain.handle("server:discover", () => {
     proc.on("exit", () => { try { resolve(JSON.parse(output)); } catch { resolve([]); } });
     proc.on("error", () => resolve([]));
   });
+});
+
+ipcMain.handle("server:local-ip", (): string | null => {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const iface of nets[name] ?? []) {
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+    }
+  }
+  return null;
 });
 
 ipcMain.handle("server:change-pin", async (_event, pin: string | null) => {

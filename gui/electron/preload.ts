@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("server:change-pin", pin),
     discover: (): Promise<Array<{ name: string; host: string; port: number }>> =>
       ipcRenderer.invoke("server:discover"),
+    localIp: (): Promise<string | null> => ipcRenderer.invoke("server:local-ip"),
   },
   launcher: {
     path: (): Promise<string> => ipcRenderer.invoke("launcher:path"),

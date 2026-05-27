@@ -176,6 +176,15 @@ electron.ipcMain.handle("server:discover", () => {
     proc.on("error", () => resolve([]));
   });
 });
+electron.ipcMain.handle("server:local-ip", () => {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const iface of nets[name] ?? []) {
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+    }
+  }
+  return null;
+});
 electron.ipcMain.handle("server:change-pin", async (_event, pin) => {
   if (serverProcess) {
     serverProcess.kill("SIGKILL");
