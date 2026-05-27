@@ -212,11 +212,11 @@ class Store:
 
         Returns (device, is_new) where is_new is True on first-ever registration.
         """
-        is_new = False
-        try:
-            self._conn.execute("INSERT INTO devices (id, name) VALUES (?, ?)", (id, name))
-            is_new = True
-        except sqlite3.IntegrityError:
+        cursor = self._conn.execute(
+            "INSERT OR IGNORE INTO devices (id, name) VALUES (?, ?)", (id, name)
+        )
+        is_new = cursor.rowcount > 0
+        if not is_new:
             self._conn.execute("UPDATE devices SET name = ? WHERE id = ?", (name, id))
         self._conn.commit()
         return Device(id=id, name=name), is_new
