@@ -43,6 +43,14 @@ class SyncClient:
         except Exception:
             return False
 
+    def probe(self, ip: str, port: int) -> bool:
+        """Check if a device is reachable at ip:port."""
+        try:
+            r = httpx.get(f"http://{ip}:{port}/health", timeout=2)
+            return r.status_code == 200
+        except Exception:
+            return False
+
     def list_devices(self) -> list[dict]:
         r = httpx.get(self._url("/devices"), headers=self._headers, timeout=10)
         r.raise_for_status()

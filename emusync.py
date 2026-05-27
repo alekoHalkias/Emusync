@@ -423,7 +423,7 @@ def game_remove(slug: str) -> None:
 @click.argument("game_slug")
 @click.argument("device_name_or_id")
 def pull_command(game_slug: str, device_name_or_id: str) -> None:
-    """Pull GAME_SLUG's ROM from DEVICE to this device's console game folder."""
+    """Pull GAME_SLUG from DEVICE. Checks device connectivity; falls back to server."""
     from datetime import datetime, timezone, timedelta
 
     cfg = cfg_module.load()
@@ -467,111 +467,106 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
 
     source = matches[0]
 
-    # ── 4. Check server has a ROM ─────────────────────────────────────────────
-    rom_meta = client.get_rom_meta(game_slug)
-    if rom_meta is None:
-        click.echo(f"No ROM on server for '{game['name']}' yet.", err=True)
-        sys.exit(1)
-
-    # ── 5. Reachability: warn if source device is stale ───────────────────────
-    last_seen = source.get("last_seen_at")
-    if last_seen:
-        age = datetime.now(timezone.utc) - datetime.fromisoformat(last_seen)
-        if age > timedelta(minutes=30):
-            mins = int(age.total_seconds() / 60)
-            click.echo(
-                f"Warning: {source['name']} was last seen {mins} minute(s) ago.",
-                err=True,
-            )
-            if not click.confirm("The ROM may be outdated. Continue anyway?", default=True):
-                sys.exit(0)
-    else:
-        click.echo(f"Warning: {source['name']} has never connected. ROM may be stale.", err=True)
-        if not click.confirm("Continue anyway?", default=True):
-            sys.exit(0)
-
-    # ── 6. Warn if game is currently locked ───────────────────────────────────
-    try:
-        lock = client.get_lock(game_slug)
-        if lock.get("locked"):
-            holder = _get_device_name(client, lock.get("device_id", ""))
-            click.echo(f"Note: '{game['name']}' is currently being played on {holder}.")
-    except Exception:
-        pass
-
-    # ── 7a. Check if ROM already on local device ────────────────────────────
+    # ── 4. Check if game ROM exists on local device ───────────────────────────
     gd = client.get_game_device(game_slug)
     if gd and gd.rom_path:
         local_rom = Path(gd.rom_path).expanduser()
         if local_rom.exists():
-            click.echo(f"Game '{game['name']}' already on this device.")
+            click.echo(f"Game '{game['name']}' already on this device at {local_rom}.")
             sys.exit(0)
 
-    # ── 7b. Check if source device has the game configured ─────────────────
-    try:
-        source_gd = client.get_game_device(game_slug)
-        if not source_gd or not source_gd.rom_path:
-            click.echo(
-                f"Game '{game['name']}' is not configured on {source['name']}.",
-                err=True,
+    # ── 5. Resolve destination folder ─────────────────────────────────────────
+    game_console = game.get("console", "")
+    game_folder: str | None = None
+
+    if game_console:
+        try:
+            consoles = client.list_consoles()
+            match = next(
+                (c for c in consoles
+                 if c["console_name"].lower() == game_console.lower()),
+                None,
             )
-            sys.exit(1)
-    except Exception:
-        click.echo(f"Could not check {source['name']}'s configuration.", err=True)
-        sys.exit(1)
+            if match and match.get("device_game_folder"):
+                game_folder = match["device_game_folder"]
+        except Exception:
+            pass
 
-    # ── 7c. Resolve ROM destination ───────────────────────────────────────────
-    # Priority: existing game_devices rom_path → console game folder → prompt
-    rom_path: str | None = None
-    needs_device_row = False
+    if not game_folder:
+        console_label = game_console or "this console"
+        click.echo(f"No game folder configured for {console_label} on this device.")
+        game_folder = click.prompt("Enter the folder to pull to")
 
-    if gd and gd.rom_path:
-        rom_path = gd.rom_path
+    game_folder = str(Path(game_folder).expanduser())
+
+    # ── 6. Check if source device is online ───────────────────────────────────
+    source_ip = source.get("last_ip")
+    source_online = False
+
+    if source_ip:
+        try:
+            # Try to probe the device (assumes server port 8765)
+            source_online = client.probe(source_ip, 8765)
+        except Exception:
+            pass
+
+    if source_online:
+        click.echo(f"✓ {source['name']} is online at {source_ip}")
+        use_direct = click.confirm(f"Pull ROM directly from {source['name']}?", default=True)
     else:
-        # Try the console's configured game folder for this device
-        game_folder: str | None = None
-        game_console = game.get("console", "")
-        if game_console:
-            try:
-                consoles = client.list_consoles()
-                match = next(
-                    (c for c in consoles
-                     if c["console_name"].lower() == game_console.lower()),
-                    None,
+        use_direct = False
+        if source.get("last_seen_at"):
+            age = datetime.now(timezone.utc) - datetime.fromisoformat(source["last_seen_at"])
+            mins = int(age.total_seconds() / 60)
+            click.echo(f"Warning: {source['name']} was last seen {mins} minute(s) ago.", err=True)
+        else:
+            click.echo(f"Warning: {source['name']} is not currently online.", err=True)
+        click.echo("Will pull from server instead.")
+
+    # ── 7. Check source device has game configured (if pulling directly) ──────
+    source_gd = None
+    if use_direct:
+        try:
+            source_gd = client.get_game_device(game_slug)
+            if not source_gd or not source_gd.rom_path:
+                click.echo(
+                    f"Game '{game['name']}' is not configured on {source['name']}.",
+                    err=True,
                 )
-                if match and match.get("device_game_folder"):
-                    game_folder = match["device_game_folder"]
-            except Exception:
-                pass
+                click.echo("Will pull from server instead.")
+                use_direct = False
+        except Exception:
+            click.echo(f"Could not check {source['name']}'s configuration.", err=True)
+            use_direct = False
 
-        if not game_folder:
-            console_label = game_console or "this console"
-            click.echo(
-                f"No game folder configured for {console_label} on this device."
-            )
-            game_folder = click.prompt("Enter the folder to save to")
+    # ── 8. Resolve final ROM path ─────────────────────────────────────────────
+    rom_filename: str | None = None
+    if use_direct and source_gd and source_gd.rom_path:
+        rom_filename = Path(source_gd.rom_path).name
+    else:
+        rom_filename = f"{game_slug}.rom"
 
-        game_folder = str(Path(game_folder).expanduser())
-        rom_filename = Path(source_gd.rom_path).name if source_gd and source_gd.rom_path else f"{game_slug}.rom"
-        rom_path = str(Path(game_folder) / rom_filename)
-        needs_device_row = True
-
-    rom_path = str(Path(rom_path).expanduser())
-
-    # ── 8. Stream download with progress bar ─────────────────────────────────
-    click.echo(f"Pulling '{game['name']}' from {source['name']}…")
-    url = f"{client.base_url}/games/{game_slug}/rom"
-
+    rom_path = str(Path(game_folder) / rom_filename)
     rom_file = Path(rom_path)
+
+    # ── 9. Backup existing ROM and create parent dirs ──────────────────────────
     if rom_file.exists():
         import shutil as _shutil
         _shutil.copy2(rom_file, str(rom_file) + ".bak")
     rom_file.parent.mkdir(parents=True, exist_ok=True)
 
+    # ── 10. Download ROM with progress bar ────────────────────────────────────
+    if use_direct:
+        click.echo(f"Pulling '{game['name']}' directly from {source['name']}…")
+        url = f"http://{source_ip}:8765/games/{game_slug}/rom"
+    else:
+        click.echo(f"Pulling '{game['name']}' from server…")
+        url = f"{client.base_url}/games/{game_slug}/rom"
+
     try:
         with httpx.stream("GET", url, headers=client.auth_headers, timeout=300) as r:
             if r.status_code == 204:
-                click.echo("No ROM on server yet.", err=True)
+                click.echo(f"No ROM found on {source['name'] if use_direct else 'server'}.", err=True)
                 sys.exit(1)
             r.raise_for_status()
 
@@ -586,28 +581,26 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
                         bar.update(len(chunk))
 
     except httpx.HTTPStatusError as exc:
-        click.echo(f"Server error: {exc.response.status_code}", err=True)
+        click.echo(f"HTTP error: {exc.response.status_code}", err=True)
         sys.exit(1)
     except httpx.RequestError as exc:
         click.echo(f"Connection error: {exc}", err=True)
         sys.exit(1)
 
-    click.echo(f"✓  Saved to {rom_path}")
+    click.echo(f"✓ Saved to {rom_path}")
 
-    # ── 9. Persist ROM path so future pulls skip the prompt ────────────────────
-    if needs_device_row:
-        try:
-            existing = gd or GameDeviceConfig()
-            client.set_game_device(
-                game_slug,
-                GameDeviceConfig(
-                    rom_path=rom_path,
-                    save_path=existing.save_path,
-                    launch_command=existing.launch_command,
-                    state_path=existing.state_path,
-                ),
-            )
-            click.echo(f"  ROM path stored for future pulls.")
+    # ── 11. Persist ROM path ──────────────────────────────────────────────────
+    try:
+        existing = gd or GameDeviceConfig()
+        client.set_game_device(
+            game_slug,
+            GameDeviceConfig(
+                rom_path=rom_path,
+                save_path=existing.save_path,
+                launch_command=existing.launch_command,
+                state_path=existing.state_path,
+            ),
+        )
         except Exception as exc:
             click.echo(f"  Warning: could not persist save path: {exc}", err=True)
 
@@ -696,15 +689,6 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         )
         sys.exit(1)
 
-    # Validate ROM path is configured
-    if not gd.rom_path:
-        click.echo(
-            f"No ROM path configured for '{game_slug}'. "
-            f"Run 'emusync game edit {game_slug} --rom <path>' first.",
-            err=True,
-        )
-        sys.exit(1)
-
     save_path = gd.save_path
     game_pid_file = Path(cfg.data_dir) / ".game_pid"
 
@@ -765,27 +749,6 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             if pulled:
                 click.echo(f"Pulled state for {game_slug}.")
 
-        # Pull ROM from server if available (auto-sync from other devices)
-        rom_path = gd.rom_path
-        server_rom_hash = None
-        if rom_path:
-            try:
-                pulled, server_rom_hash = client.pull_rom(game_slug, str(Path(rom_path).expanduser()))
-                if pulled:
-                    click.echo(f"Pulled ROM for {game_slug} from another device.")
-            except Exception as exc:
-                click.echo(f"Warning: failed to pull ROM: {exc}", err=True)
-
-        # Push ROM if it exists (share it with other devices)
-        if gd.rom_path and Path(gd.rom_path).expanduser().exists():
-            try:
-                local_rom_hash = hashlib.sha256(Path(gd.rom_path).expanduser().read_bytes()).hexdigest()
-                # Only push if it's different from server version
-                if local_rom_hash != server_rom_hash:
-                    client.push_rom(game_slug, str(Path(gd.rom_path).expanduser()))
-                    click.echo(f"Pushed ROM for {game_slug}.")
-            except Exception as exc:
-                click.echo(f"Warning: failed to push ROM: {exc}", err=True)
 
         try:
             global _child_proc

@@ -44,6 +44,8 @@ electron.contextBridge.exposeInMainWorld("emusync", {
     isRunning: () => electron.ipcRenderer.invoke("game:isRunning"),
     stopExternal: () => electron.ipcRenderer.invoke("game:stop-external"),
     hasPidFile: () => electron.ipcRenderer.invoke("game:hasPidFile"),
+    pullSave: (slug) => electron.ipcRenderer.invoke("game:pullSave", slug),
+    pullState: (slug) => electron.ipcRenderer.invoke("game:pullState", slug),
     onExited: (cb) => {
       electron.ipcRenderer.on("game:exited", cb);
     },

@@ -21,7 +21,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 2. Python writes `~/.emusync/.server_pid` and `~/.emusync/.server_token` on start
 3. Renderer calls Python REST API directly (`http://localhost:8765`) via `api.ts`
 4. Electron IPC (`preload.ts` → `main.ts`) handles config I/O, server lifecycle, file dialogs, game launch
-5. `emusync run` wraps emulator launch: pull save/state → pull ROM (auto-sync) → push ROM (if newer) → launch → push save/state → release lock
+5. `emusync run` wraps emulator launch: pull save/state → launch → push save/state → release lock
 
 ---
 
@@ -29,7 +29,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `pull`, `run`, `sync`); `device compare` shows game coverage across paired devices; `pull <game> <device>` migrates ROM file from another device with auto-setup |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `pull`, `run`, `sync`); `device compare` shows game coverage across paired devices; `pull <game> <device>` probes device connectivity, pulls ROM directly if online (else from server), uses console's device_game_folder as destination |
 | `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/roms`, `/locks`, `/events`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `roms`, `locks`, `events`; ROM files stored on filesystem in `~/.emusync/roms/`; uses schema versioning (PRAGMA user_version) for migrations |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |

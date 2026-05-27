@@ -274,6 +274,62 @@ electron.ipcMain.handle("game:hasPidFile", () => {
     return false;
   }
 });
+electron.ipcMain.handle("game:pullSave", async (_event, slug) => {
+  if (!fs.existsSync(CONFIG_PATH)) return { ok: false, error: "No config" };
+  let cfg;
+  try {
+    cfg = smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  } catch {
+    return { ok: false, error: "Config error" };
+  }
+  const port = cfg.server_port || 8765;
+  const headers = {
+    "Authorization": `Bearer ${cfg.server_pin ?? ""}`,
+    "X-Device-ID": cfg.device_id ?? "",
+    "X-Device-Name": cfg.device_name ?? ""
+  };
+  const deviceRes = await fetch(`http://localhost:${port}/games/${slug}/device`, { headers });
+  if (!deviceRes.ok) return { ok: false, error: "No device config for this game" };
+  const gd = await deviceRes.json();
+  if (!gd.save_path) return { ok: false, error: "No save path configured" };
+  const savePath = gd.save_path.replace(/^~/, os.homedir());
+  const saveRes = await fetch(`http://localhost:${port}/games/${slug}/save`, { headers });
+  if (saveRes.status === 204) return { ok: false, error: "No save on server yet" };
+  if (!saveRes.ok) return { ok: false, error: "Failed to download save" };
+  const data = Buffer.from(await saveRes.arrayBuffer());
+  if (fs.existsSync(savePath)) fs.copyFileSync(savePath, savePath + ".bak");
+  fs.mkdirSync(path.dirname(savePath), { recursive: true });
+  fs.writeFileSync(savePath, data);
+  return { ok: true, path: savePath };
+});
+electron.ipcMain.handle("game:pullState", async (_event, slug) => {
+  if (!fs.existsSync(CONFIG_PATH)) return { ok: false, error: "No config" };
+  let cfg;
+  try {
+    cfg = smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  } catch {
+    return { ok: false, error: "Config error" };
+  }
+  const port = cfg.server_port || 8765;
+  const headers = {
+    "Authorization": `Bearer ${cfg.server_pin ?? ""}`,
+    "X-Device-ID": cfg.device_id ?? "",
+    "X-Device-Name": cfg.device_name ?? ""
+  };
+  const deviceRes = await fetch(`http://localhost:${port}/games/${slug}/device`, { headers });
+  if (!deviceRes.ok) return { ok: false, error: "No device config for this game" };
+  const gd = await deviceRes.json();
+  if (!gd.state_path) return { ok: false, error: "No state path configured" };
+  const statePath = gd.state_path.replace(/^~/, os.homedir());
+  const stateRes = await fetch(`http://localhost:${port}/games/${slug}/state`, { headers });
+  if (stateRes.status === 204) return { ok: false, error: "No state on server yet" };
+  if (!stateRes.ok) return { ok: false, error: "Failed to download state" };
+  const data = Buffer.from(await stateRes.arrayBuffer());
+  if (fs.existsSync(statePath)) fs.copyFileSync(statePath, statePath + ".bak");
+  fs.mkdirSync(path.dirname(statePath), { recursive: true });
+  fs.writeFileSync(statePath, data);
+  return { ok: true, path: statePath };
+});
 const ROM_EXTENSIONS = /* @__PURE__ */ new Set([
   "sfc",
   "smc",
