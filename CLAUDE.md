@@ -29,7 +29,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`); `device compare` shows game coverage across paired devices |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `pull`, `run`, `sync`); `device compare` shows game coverage across paired devices; `pull <game> <device>` migrates save from another device with auto-setup |
 | `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |

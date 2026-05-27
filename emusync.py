@@ -499,9 +499,29 @@ def pull_command(game_slug: str, device_name_or_id: str) -> None:
     except Exception:
         pass
 
-    # ── 7. Resolve save destination ───────────────────────────────────────────
-    # Priority: existing game_devices save_path → console save folder → prompt
+    # ── 7a. Check if game already on local device ────────────────────────────
     gd = client.get_game_device(game_slug)
+    if gd and gd.save_path:
+        local_save = Path(gd.save_path).expanduser()
+        if local_save.exists():
+            click.echo(f"Game '{game['name']}' already on this device.")
+            sys.exit(0)
+
+    # ── 7b. Check if source device has the game configured ─────────────────
+    try:
+        source_gd = client.get_game_device(game_slug)
+        if not source_gd or not source_gd.save_path:
+            click.echo(
+                f"Game '{game['name']}' is not configured on {source['name']}.",
+                err=True,
+            )
+            sys.exit(1)
+    except Exception:
+        click.echo(f"Could not check {source['name']}'s configuration.", err=True)
+        sys.exit(1)
+
+    # ── 7c. Resolve save destination ──────────────────────────────────────────
+    # Priority: existing game_devices save_path → console save folder → prompt
     save_path: str | None = None
     needs_device_row = False
 
