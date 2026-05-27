@@ -676,7 +676,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     """Pull save, launch emulator, push save. Use as a Steam launch wrapper."""
     cfg = cfg_module.load()
 
-    if not cfg.token:
+    if not cfg.device_id:
         click.echo(
             "EmuSync is not configured. Run 'emusync device pair' first.",
             err=True,
