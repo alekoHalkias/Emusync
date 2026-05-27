@@ -177,9 +177,11 @@ def _initialize_server_interactive(cfg: cfg_module.Config) -> cfg_module.Config:
     return cfg
 
 
-@server.command("start")
-def server_start() -> None:
-    """Start the EmuSync server and print the pairing token."""
+def _do_start_server() -> None:
+    """Core logic to start the EmuSync server.
+
+    Performs initialization check, duplicate-launch detection, and runs uvicorn.
+    """
     import signal
     import threading
     import uvicorn
@@ -252,9 +254,14 @@ def server_start() -> None:
         pid_file.unlink(missing_ok=True)
 
 
-@server.command("stop")
-def server_stop() -> None:
-    """Stop the running server process."""
+@server.command("start")
+def server_start() -> None:
+    """Start the EmuSync server and print the pairing token."""
+    _do_start_server()
+
+
+def _do_stop_server() -> None:
+    """Core logic to stop the running server process."""
     cfg = cfg_module.load()
     is_running, pid = _is_server_running(cfg.data_dir)
 
@@ -275,6 +282,20 @@ def server_stop() -> None:
         pid_file.unlink(missing_ok=True)
     except Exception as e:
         click.echo(f"Error stopping server: {e}", err=True)
+
+
+@server.command("stop")
+def server_stop() -> None:
+    """Stop the running server process."""
+    _do_stop_server()
+
+
+@server.command("restart")
+def server_restart() -> None:
+    """Stop the running server, then start it again."""
+    _do_stop_server()
+    click.echo()  # blank line for readability
+    _do_start_server()
 
 
 @server.command("clear-devices")
