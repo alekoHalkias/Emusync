@@ -477,15 +477,77 @@ def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_
 
 @game.command("list")
 def game_list() -> None:
-    """List all managed games."""
-    games = _client().list_games()
+    """List all managed games with device installations."""
+    client = _client()
+    games = client.list_games()
     if not games:
         click.echo("No games added yet. Use 'emusync game add' to add one.")
         return
-    click.echo(f"{'Slug':<30}  Name")
-    click.echo("-" * 55)
+
+    rows = []
     for g in games:
-        click.echo(f"{g['slug']:<30}  {g['name']}")
+        devices = client.list_game_devices(g['slug'])
+        if not devices:
+            rows.append([g['name'], "-", "-", "-", "-"])
+        else:
+            # Find default save folder structure across all devices
+            default_save_dir = None
+            for d in devices:
+                save_path = d.get('save_path', '-')
+                if save_path and save_path != '-':
+                    default_save_dir = os.path.dirname(save_path)
+                    break
+
+            for i, device in enumerate(devices):
+                name = g['name'] if i == 0 else ""
+                state_path = device.get('state_path', '-')
+                save_path = device.get('save_path', '-')
+                rom_path = device.get('rom_path', '-')
+
+                # Construct and create state folder as: {parent_dir}/{game_name}/
+                state_folder = '-'
+                parent_dir = None
+                if state_path and state_path != '-':
+                    # Use configured state_path
+                    parent_dir = os.path.dirname(state_path)
+                elif save_path and save_path != '-':
+                    # Infer from save_path by replacing 'saves' with 'states'
+                    parent_dir = os.path.dirname(save_path)
+                    parent_dir = parent_dir.replace('saves', 'states')
+                elif default_save_dir:
+                    # Use the default console saves folder structure and swap saves->states
+                    parent_dir = default_save_dir.replace('saves', 'states')
+
+                if parent_dir:
+                    state_folder_path = os.path.join(parent_dir, g['name'])
+                    try:
+                        os.makedirs(state_folder_path, exist_ok=True)
+                        state_folder = state_folder_path + os.sep
+                    except OSError:
+                        state_folder = '-'
+
+                rows.append([
+                    name,
+                    device.get('name', device.get('id', '-')),
+                    rom_path,
+                    save_path,
+                    state_folder,
+                ])
+
+    if not rows:
+        click.echo("No games added yet. Use 'emusync game add' to add one.")
+        return
+
+    headers = ["Game Name", "Device", "ROM Path", "Save Path", "State Folder"]
+    col_widths = [max(len(headers[i]), max(len(str(row[i])) for row in rows)) for i in range(5)]
+
+    header_line = "  ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
+    separator = "  ".join("-" * w for w in col_widths)
+
+    click.echo(header_line)
+    click.echo(separator)
+    for row in rows:
+        click.echo("  ".join(str(row[i]).ljust(col_widths[i]) for i in range(5)))
 
 
 @game.command("edit")

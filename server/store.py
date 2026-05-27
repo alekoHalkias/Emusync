@@ -333,14 +333,23 @@ class Store:
 
     def list_devices_for_game(self, game_slug: str) -> list[dict]:
         rows = self._conn.execute(
-            """SELECT d.id, d.name
+            """SELECT d.id, d.name, gd.rom_path, gd.save_path, gd.state_path
                FROM game_devices gd
                JOIN devices d ON d.id = gd.device_id
                WHERE gd.game_slug = ?
                ORDER BY d.name""",
             (game_slug,),
         ).fetchall()
-        return [{"id": row["id"], "name": row["name"]} for row in rows]
+        return [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "rom_path": row["rom_path"],
+                "save_path": row["save_path"],
+                "state_path": row["state_path"],
+            }
+            for row in rows
+        ]
 
     # ── saves ─────────────────────────────────────────────────────────────────
 
