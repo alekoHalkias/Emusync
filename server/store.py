@@ -160,12 +160,18 @@ class Store:
     def __init__(self, data_dir: str) -> None:
         db_path = Path(data_dir) / "emusync.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        self._conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=10.0)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.executescript(_SCHEMA)
+        self._conn.commit()
+        # Split schema statements and execute individually (executescript() incompatible with WAL)
+        for stmt in _SCHEMA.split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                self._conn.execute(stmt)
+                self._conn.commit()
         db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
         if db_version < _SCHEMA_VERSION:
             _migrate(self._conn, db_version)
@@ -175,10 +181,10 @@ class Store:
 
     def ensure_device(self, id: str, name: str) -> Device:
         """Register a device if new; update name if it changed. Idempotent."""
-        self._conn.execute(
-            "INSERT INTO devices (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name",
-            (id, name),
-        )
+        try:
+            self._conn.execute("INSERT INTO devices (id, name) VALUES (?, ?)", (id, name))
+        except sqlite3.IntegrityError:
+            self._conn.execute("UPDATE devices SET name = ? WHERE id = ?", (name, id))
         self._conn.commit()
         return Device(id=id, name=name)
 
