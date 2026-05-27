@@ -756,6 +756,14 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             if pulled:
                 click.echo(f"Pulled state for {game_slug}.")
 
+        # Push ROM if it exists (share it with other devices)
+        if gd.rom_path and Path(gd.rom_path).expanduser().exists():
+            try:
+                client.push_rom(game_slug, str(Path(gd.rom_path).expanduser()))
+                click.echo(f"Pushed ROM for {game_slug}.")
+            except Exception as exc:
+                click.echo(f"Warning: failed to push ROM: {exc}", err=True)
+
         try:
             global _child_proc
             _child_proc = subprocess.Popen(list(command))

@@ -21,7 +21,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 2. Python writes `~/.emusync/.server_pid` and `~/.emusync/.server_token` on start
 3. Renderer calls Python REST API directly (`http://localhost:8765`) via `api.ts`
 4. Electron IPC (`preload.ts` → `main.ts`) handles config I/O, server lifecycle, file dialogs, game launch
-5. `emusync run` wraps emulator launch: pull save → launch → push save → release lock
+5. `emusync run` wraps emulator launch: pull save/state → push ROM → launch → push save/state → release lock
 
 ---
 
