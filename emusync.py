@@ -569,19 +569,26 @@ def game_list() -> None:
                     parent_dir = os.path.dirname(state_path)
                 elif save_path and save_path != '-':
                     # Infer from save_path by replacing 'saves' with 'states'
-                    parent_dir = os.path.dirname(save_path)
-                    parent_dir = parent_dir.replace('saves', 'states')
+                    save_dir = os.path.dirname(save_path)
+                    # Replace all occurrences of 'saves' with 'states' to handle nested structures
+                    parent_dir = save_dir.replace('/saves/', '/states/').replace('/saves', '/states')
+                    # Handle case where path starts with 'saves/'
+                    if parent_dir.startswith('saves/'):
+                        parent_dir = parent_dir.replace('saves/', 'states/', 1)
                 elif default_save_dir:
                     # Use the default console saves folder structure and swap saves->states
-                    parent_dir = default_save_dir.replace('saves', 'states')
+                    parent_dir = default_save_dir.replace('/saves/', '/states/').replace('/saves', '/states')
+                    if parent_dir.startswith('saves/'):
+                        parent_dir = parent_dir.replace('saves/', 'states/', 1)
 
-                if parent_dir:
+                if parent_dir and parent_dir != '-':
                     state_folder_path = os.path.join(parent_dir, g['name'])
                     try:
                         os.makedirs(state_folder_path, exist_ok=True)
                         state_folder = state_folder_path + os.sep
-                    except OSError:
-                        state_folder = '-'
+                    except (OSError, Exception) as e:
+                        # If creation fails, still show the intended path for the user to see
+                        state_folder = state_folder_path + os.sep
 
                 rows.append([
                     name,
