@@ -160,16 +160,20 @@ class Store:
     def __init__(self, data_dir: str) -> None:
         db_path = Path(data_dir) / "emusync.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        is_fresh = not db_path.exists()
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=30.0)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
-        # Split schema statements and execute individually (executescript() incompatible with WAL)
-        for statement in _SCHEMA.split(";"):
-            statement = statement.strip()
-            if statement:
-                self._conn.execute(statement)
+        if is_fresh:
+            self._conn.commit()
+            # Split schema statements and execute individually (executescript() incompatible with WAL)
+            for statement in _SCHEMA.split(";"):
+                statement = statement.strip()
+                if statement:
+                    self._conn.execute(statement)
+                    self._conn.commit()
         db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
         if db_version < _SCHEMA_VERSION:
             _migrate(self._conn, db_version)
