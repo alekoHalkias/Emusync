@@ -712,6 +712,521 @@ def console_list() -> None:
         click.echo("  ".join(str(row[i]).ljust(col_widths[i]) for i in range(6)))
 
 
+# ── Console import helpers ────────────────────────────────────────────────────
+
+_IMPORT_CONSOLES = [
+    {"key": "gba",     "label": "Game Boy Advance",          "abbr": "GBA",
+     "system_keys": ["gba"],
+     "standalones": [{"id": "mgba", "label": "mGBA",
+                      "native_bins": ["/usr/bin/mgba-qt", "/usr/bin/mgba",
+                                      str(Path.home() / ".local/bin/mgba-qt")],
+                      "flatpak_id": "io.mgba.mGBA",
+                      "flatpak_exec": "flatpak run io.mgba.mGBA",
+                      "save_dir": str(Path.home() / ".local/share/mGBA/saves")}],
+     "suggestions": ["RetroArch with mGBA core", "mGBA standalone"]},
+    {"key": "gb",      "label": "Game Boy / Game Boy Color", "abbr": "GB",
+     "system_keys": ["gb", "gbc"],
+     "standalones": [{"id": "mgba", "label": "mGBA",
+                      "native_bins": ["/usr/bin/mgba-qt", "/usr/bin/mgba"],
+                      "flatpak_id": "io.mgba.mGBA",
+                      "flatpak_exec": "flatpak run io.mgba.mGBA",
+                      "save_dir": str(Path.home() / ".local/share/mGBA/saves")}],
+     "suggestions": ["RetroArch with Gambatte or mGBA core", "mGBA standalone"]},
+    {"key": "snes",    "label": "Super Nintendo (SNES)",      "abbr": "SNES",
+     "system_keys": ["sfc", "smc"],
+     "standalones": [], "suggestions": ["RetroArch with Snes9x core"]},
+    {"key": "nes",     "label": "NES / Famicom",              "abbr": "NES",
+     "system_keys": ["nes", "fds"],
+     "standalones": [], "suggestions": ["RetroArch with Nestopia UE or FCEUmm core"]},
+    {"key": "n64",     "label": "Nintendo 64",                "abbr": "N64",
+     "system_keys": ["n64", "z64", "v64"],
+     "standalones": [], "suggestions": ["RetroArch with Mupen64Plus-Next core"]},
+    {"key": "nds",     "label": "Nintendo DS",                "abbr": "NDS",
+     "system_keys": ["nds"],
+     "standalones": [], "suggestions": ["RetroArch with melonDS or DeSmuME core"]},
+    {"key": "genesis", "label": "Sega Genesis / Mega Drive",  "abbr": "Genesis",
+     "system_keys": ["md", "smd", "gen"],
+     "standalones": [], "suggestions": ["RetroArch with Genesis Plus GX core"]},
+    {"key": "sms",     "label": "Master System / Game Gear",  "abbr": "SMS",
+     "system_keys": ["sms", "gg"],
+     "standalones": [], "suggestions": ["RetroArch with Genesis Plus GX core"]},
+    {"key": "pce",     "label": "PC Engine",                  "abbr": "PCE",
+     "system_keys": ["pce"],
+     "standalones": [], "suggestions": ["RetroArch with Beetle PCE core"]},
+    {"key": "psx",     "label": "PlayStation",                "abbr": "PSX",
+     "system_keys": ["iso", "bin", "cue", "chd", "pbp"],
+     "standalones": [], "suggestions": ["RetroArch with PCSX-ReARMed or Beetle PSX core"]},
+]
+
+_IMPORT_SYSTEMS: dict[str, dict] = {
+    "gba": {"name": "Game Boy Advance", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "mgba_libretro", "folder": "mGBA"},
+                      {"lib": "vba_next_libretro", "folder": "VBA Next"},
+                      {"lib": "vbam_libretro", "folder": "VBA-M"}]},
+    "gb":  {"name": "Game Boy", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "gambatte_libretro", "folder": "Gambatte"},
+                      {"lib": "mgba_libretro", "folder": "mGBA"},
+                      {"lib": "gearboy_libretro", "folder": "Gearboy"}]},
+    "gbc": {"name": "Game Boy Color", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "gambatte_libretro", "folder": "Gambatte"},
+                      {"lib": "mgba_libretro", "folder": "mGBA"},
+                      {"lib": "gearboy_libretro", "folder": "Gearboy"}]},
+    "sfc": {"name": "SNES", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "snes9x_libretro", "folder": "Snes9x"},
+                      {"lib": "bsnes_libretro", "folder": "bsnes"},
+                      {"lib": "snes9x2010_libretro", "folder": "Snes9x 2010"}]},
+    "smc": {"name": "SNES", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "snes9x_libretro", "folder": "Snes9x"},
+                      {"lib": "bsnes_libretro", "folder": "bsnes"},
+                      {"lib": "snes9x2010_libretro", "folder": "Snes9x 2010"}]},
+    "nes": {"name": "NES", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "nestopia_libretro", "folder": "Nestopia UE"},
+                      {"lib": "fceumm_libretro", "folder": "FCEUmm"},
+                      {"lib": "mesen_libretro", "folder": "Mesen"}]},
+    "fds": {"name": "Famicom Disk System", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "nestopia_libretro", "folder": "Nestopia UE"},
+                      {"lib": "fceumm_libretro", "folder": "FCEUmm"}]},
+    "n64": {"name": "Nintendo 64", "save_exts": ["srm", "sav", "eep", "mpk"],
+            "cores": [{"lib": "mupen64plus_next_libretro", "folder": "Mupen64Plus-Next"},
+                      {"lib": "parallel_n64_libretro", "folder": "ParaLLEl N64"}]},
+    "z64": {"name": "Nintendo 64", "save_exts": ["srm", "sav", "eep", "mpk"],
+            "cores": [{"lib": "mupen64plus_next_libretro", "folder": "Mupen64Plus-Next"},
+                      {"lib": "parallel_n64_libretro", "folder": "ParaLLEl N64"}]},
+    "v64": {"name": "Nintendo 64", "save_exts": ["srm", "sav", "eep", "mpk"],
+            "cores": [{"lib": "mupen64plus_next_libretro", "folder": "Mupen64Plus-Next"},
+                      {"lib": "parallel_n64_libretro", "folder": "ParaLLEl N64"}]},
+    "nds": {"name": "Nintendo DS", "save_exts": ["sav", "dsv", "srm"],
+            "cores": [{"lib": "melonds_libretro", "folder": "melonDS"},
+                      {"lib": "desmume_libretro", "folder": "DeSmuME"},
+                      {"lib": "desmume2015_libretro", "folder": "DeSmuME 2015"}]},
+    "md":  {"name": "Sega Genesis", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "smd": {"name": "Sega Genesis", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "gen": {"name": "Sega Genesis", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "sms": {"name": "Sega Master System", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "gg":  {"name": "Game Gear", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"}]},
+    "pce": {"name": "PC Engine", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "mednafen_pce_libretro", "folder": "Beetle PCE"},
+                      {"lib": "mednafen_pce_fast_libretro", "folder": "Beetle PCE Fast"}]},
+    "iso": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"},
+                      {"lib": "flycast_libretro", "folder": "Flycast"}]},
+    "bin": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"}]},
+    "cue": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"}]},
+    "chd": {"name": "Disc (CHD)", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"},
+                      {"lib": "flycast_libretro", "folder": "Flycast"}]},
+    "pbp": {"name": "PSP / PS1", "save_exts": ["srm", "sav", "mcr"],
+            "cores": [{"lib": "ppsspp_libretro", "folder": "PPSSPP"},
+                      {"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"}]},
+}
+
+_DEFAULT_SAVE_EXTS = ["srm", "sav", "save"]
+_DEFAULT_STATE_EXTS = ["state", "state.auto"]
+
+
+def _parse_retroarch_cfg(cfg_path: str) -> dict[str, str]:
+    """Parse key = "value" lines from a retroarch.cfg, expanding leading ~/."""
+    out: dict[str, str] = {}
+    if not os.path.exists(cfg_path):
+        return out
+    home = str(Path.home())
+    with open(cfg_path, encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            m = re.match(r'^\s*(\w+)\s*=\s*"?([^"#\r\n]*)"?\s*$', line)
+            if m:
+                key, val = m.group(1).strip(), m.group(2).strip()
+                if val.startswith("~/"):
+                    val = os.path.join(home, val[2:])
+                elif val == "~":
+                    val = home
+                out[key] = val
+    return out
+
+
+def _detect_retroarch() -> list[dict]:
+    """Return list of detected RetroArch installs (native + flatpak)."""
+    home = str(Path.home())
+    infos: list[dict] = []
+
+    # Native
+    native_bins = ["/usr/bin/retroarch", "/usr/local/bin/retroarch",
+                   os.path.join(home, ".local/bin/retroarch")]
+    native_cfg = os.path.join(home, ".config/retroarch/retroarch.cfg")
+    for bin_path in native_bins:
+        if os.path.exists(bin_path):
+            cfg = _parse_retroarch_cfg(native_cfg)
+            rom_dir = cfg.get("rgui_browser_directory", "")
+            if rom_dir == "default":
+                rom_dir = ""
+            infos.append({
+                "type": "native",
+                "label": "RetroArch",
+                "exec_path": bin_path,
+                "save_dir": cfg.get("savefile_directory") or os.path.join(home, ".config/retroarch/saves"),
+                "states_dir": cfg.get("savestate_directory") or os.path.join(home, ".config/retroarch/states"),
+                "cores_dir": cfg.get("libretro_directory") or os.path.join(home, ".config/retroarch/cores"),
+                "rom_dirs": [rom_dir] if rom_dir else [],
+            })
+            break
+
+    # Flatpak
+    try:
+        result = subprocess.run(
+            ["flatpak", "list", "--app", "--columns=application"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if "org.libretro.RetroArch" in result.stdout:
+            flat_cfg_path = os.path.join(
+                home, ".var/app/org.libretro.RetroArch/config/retroarch/retroarch.cfg"
+            )
+            cfg = _parse_retroarch_cfg(flat_cfg_path)
+            rom_dir = cfg.get("rgui_browser_directory", "")
+            if rom_dir == "default":
+                rom_dir = ""
+            infos.append({
+                "type": "flatpak",
+                "label": "RetroArch (Flatpak)",
+                "exec_path": "flatpak run org.libretro.RetroArch",
+                "save_dir": cfg.get("savefile_directory") or os.path.join(
+                    home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
+                "states_dir": cfg.get("savestate_directory") or os.path.join(
+                    home, ".var/app/org.libretro.RetroArch/config/retroarch/states"),
+                "cores_dir": cfg.get("libretro_directory") or os.path.join(
+                    home, ".var/app/org.libretro.RetroArch/data/retroarch/cores"),
+                "rom_dirs": [rom_dir] if rom_dir else [],
+            })
+    except Exception:
+        pass
+
+    return infos
+
+
+def _find_installed_core(cores_dir: str, system: dict) -> dict | None:
+    """Return first core whose .so exists in cores_dir, or None."""
+    for core in system["cores"]:
+        so_path = os.path.join(cores_dir, f"{core['lib']}.so")
+        if os.path.exists(so_path):
+            return {"lib": so_path, "folder": core["folder"]}
+    return None
+
+
+def _detect_emulators_for_console(console_def: dict) -> list[dict]:
+    """Detect installed emulators/cores for a console. Mirrors detectEmulatorsForConsole in main.ts."""
+    home = str(Path.home())
+    options: list[dict] = []
+
+    # RetroArch
+    seen_cores: set[str] = set()
+    for ra in _detect_retroarch():
+        for sys_key in console_def["system_keys"]:
+            system = _IMPORT_SYSTEMS.get(sys_key)
+            if not system:
+                continue
+            core = _find_installed_core(ra["cores_dir"], system)
+            if not core or core["lib"] in seen_cores:
+                continue
+            seen_cores.add(core["lib"])
+            save_dir = os.path.join(ra["save_dir"], core["folder"])
+            state_dir = os.path.join(ra["states_dir"], core["folder"])
+            options.append({
+                "id": f"{ra['type']}-{core['folder'].lower().replace(' ', '-')}",
+                "label": f"{ra['label']} · {core['folder']}",
+                "exec_path": ra["exec_path"],
+                "save_dir": save_dir,
+                "state_dir": state_dir,
+                "core_path": core["lib"],
+                "core_folder": core["folder"],
+                "rom_dirs": ra["rom_dirs"],
+            })
+
+    # Standalone emulators
+    flatpak_list: str | None = None
+    for s in console_def.get("standalones", []):
+        found = False
+        for bin_path in s["native_bins"]:
+            if os.path.exists(bin_path):
+                options.append({
+                    "id": f"{s['id']}-native",
+                    "label": s["label"],
+                    "exec_path": bin_path,
+                    "save_dir": s["save_dir"],
+                    "state_dir": None,
+                    "core_path": None,
+                    "core_folder": None,
+                    "rom_dirs": [],
+                })
+                found = True
+                break
+        if not found and s.get("flatpak_id"):
+            if flatpak_list is None:
+                try:
+                    r = subprocess.run(
+                        ["flatpak", "list", "--app", "--columns=application"],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    flatpak_list = r.stdout
+                except Exception:
+                    flatpak_list = ""
+            if s["flatpak_id"] in flatpak_list:
+                options.append({
+                    "id": f"{s['id']}-flatpak",
+                    "label": f"{s['label']} (Flatpak)",
+                    "exec_path": s["flatpak_exec"],
+                    "save_dir": os.path.join(
+                        home, f".var/app/{s['flatpak_id']}/data/{s['id']}/saves"),
+                    "state_dir": None,
+                    "core_path": None,
+                    "core_folder": None,
+                    "rom_dirs": [],
+                })
+
+    return options
+
+
+_ROM_EXTENSIONS = {
+    "sfc", "smc", "gb", "gbc", "gba", "nes", "fds",
+    "n64", "z64", "v64", "nds", "md", "smd", "gen",
+    "sms", "gg", "pce", "iso", "cue", "bin", "chd", "pbp",
+}
+
+
+def _scan_rom_dir(directory: str, depth: int = 0) -> list[str]:
+    """Recursively collect ROM files (depth ≤ 3)."""
+    if depth > 3:
+        return []
+    roms: list[str] = []
+    try:
+        with os.scandir(directory) as it:
+            for entry in it:
+                if entry.is_file():
+                    ext = os.path.splitext(entry.name)[1].lstrip(".").lower()
+                    if ext in _ROM_EXTENSIONS:
+                        roms.append(entry.path)
+                elif entry.is_dir():
+                    roms.extend(_scan_rom_dir(entry.path, depth + 1))
+    except PermissionError:
+        pass
+    return roms
+
+
+def _match_save_file(save_dir: str, base_name: str, exts: list[str]) -> dict:
+    """Find save file in save_dir matching base_name + any extension."""
+    for ext in exts:
+        p = os.path.join(save_dir, f"{base_name}.{ext}")
+        if os.path.exists(p):
+            return {"path": p, "exists": True}
+    return {"path": os.path.join(save_dir, f"{base_name}.{exts[0]}"), "exists": False}
+
+
+@console.command("import")
+def console_import() -> None:
+    """Interactive wizard to bulk-import ROMs for a console (mirrors the GUI Add Console wizard)."""
+    import httpx
+
+    # ── Step 1: select console ────────────────────────────────────────────────
+    click.echo("\nAvailable consoles:")
+    for i, c in enumerate(_IMPORT_CONSOLES, 1):
+        click.echo(f"  {i:>2}. {c['label']}")
+
+    choice = click.prompt(
+        "\nSelect console",
+        type=click.IntRange(1, len(_IMPORT_CONSOLES)),
+    )
+    console_def = _IMPORT_CONSOLES[choice - 1]
+    click.echo(f"\nSelected: {console_def['label']}")
+
+    # ── Step 2: detect emulators/cores ───────────────────────────────────────
+    click.echo("Looking for compatible emulators…")
+    emulators = _detect_emulators_for_console(console_def)
+
+    if not emulators:
+        click.echo(f"\nNo compatible emulator found for {console_def['label']}.")
+        if console_def.get("suggestions"):
+            click.echo("Install one of:")
+            for s in console_def["suggestions"]:
+                click.echo(f"  • {s}")
+        return
+
+    if len(emulators) == 1:
+        emu = emulators[0]
+        click.echo(f"Found: {emu['label']}  (saves: {emu['save_dir']})")
+    else:
+        click.echo("\nMultiple emulators found:")
+        for i, e in enumerate(emulators, 1):
+            click.echo(f"  {i}. {e['label']}  (saves: {e['save_dir']})")
+        emu_choice = click.prompt(
+            "Select emulator",
+            type=click.IntRange(1, len(emulators)),
+        )
+        emu = emulators[emu_choice - 1]
+
+    # ── Step 3: ROM folder ────────────────────────────────────────────────────
+    suggested_dirs = emu.get("rom_dirs", [])
+    if suggested_dirs:
+        click.echo(f"\nRetroArch ROM directory: {suggested_dirs[0]}")
+
+    rom_folder = click.prompt(
+        "\nPath to ROM folder",
+        default=suggested_dirs[0] if suggested_dirs else "",
+    ).strip()
+
+    if not rom_folder or not os.path.isdir(rom_folder):
+        click.echo("Error: folder not found.")
+        return
+
+    # ── Step 4: scan for ROMs ─────────────────────────────────────────────────
+    click.echo("Scanning for ROMs and saves…")
+
+    rom_ext_set = set(console_def["system_keys"])
+    all_files = _scan_rom_dir(rom_folder)
+    matching = [p for p in all_files
+                if os.path.splitext(p)[1].lstrip(".").lower() in rom_ext_set]
+
+    if not matching:
+        click.echo("No ROMs found in that folder.")
+        return
+
+    # Build ROM entries (same logic as main.ts emulator:scan handler)
+    first_sys_key = console_def["system_keys"][0]
+    default_save_exts = _IMPORT_SYSTEMS.get(first_sys_key, {}).get("save_exts", _DEFAULT_SAVE_EXTS)
+
+    entries: list[dict] = []
+    for rom_path in sorted(matching):
+        ext = os.path.splitext(rom_path)[1].lstrip(".").lower()
+        system = _IMPORT_SYSTEMS.get(ext, {})
+        save_exts = system.get("save_exts", default_save_exts)
+        base = os.path.splitext(os.path.basename(rom_path))[0]
+
+        save_match = _match_save_file(emu["save_dir"], base, save_exts)
+        # Fallback: check root saves dir for pre-core-organisation saves
+        if not save_match["exists"] and emu.get("core_folder"):
+            root_save_dir = os.path.dirname(emu["save_dir"])
+            root_match = _match_save_file(root_save_dir, base, save_exts)
+            if root_match["exists"]:
+                save_match = root_match
+
+        state_match: dict | None = None
+        if emu.get("state_dir"):
+            state_match = _match_save_file(emu["state_dir"], base, _DEFAULT_STATE_EXTS)
+            if not state_match["exists"] and emu.get("core_folder"):
+                root_state_dir = os.path.dirname(emu["state_dir"])
+                root_sm = _match_save_file(root_state_dir, base, _DEFAULT_STATE_EXTS)
+                if root_sm["exists"]:
+                    state_match = root_sm
+
+        if emu.get("core_path"):
+            launch_cmd = f'{emu["exec_path"]} -L "{emu["core_path"]}" "{rom_path}"'
+        else:
+            launch_cmd = f'{emu["exec_path"]} "{rom_path}"'
+
+        entries.append({
+            "name": base,
+            "rom_path": rom_path,
+            "save_path": save_match["path"],
+            "save_exists": save_match["exists"],
+            "state_path": state_match["path"] if state_match and state_match["exists"] else "",
+            "launch_command": launch_cmd,
+            "rom_folder_path": rom_folder,
+        })
+
+    # Dedup: filter out ROMs already imported on this device
+    try:
+        client = _client()
+        existing_games = client.list_games()
+        imported_roms: set[str] = set()
+        for g in existing_games:
+            try:
+                gd = client.get_game_device(g["slug"])
+                if gd and gd.rom_path:
+                    imported_roms.add(gd.rom_path)
+                    imported_roms.add(os.path.splitext(os.path.basename(gd.rom_path))[0].lower())
+            except Exception:
+                pass
+        before = len(entries)
+        entries = [e for e in entries
+                   if e["rom_path"] not in imported_roms
+                   and os.path.splitext(os.path.basename(e["rom_path"]))[0].lower() not in imported_roms]
+        skipped = before - len(entries)
+        if skipped:
+            click.echo(f"Skipped {skipped} already-imported ROM(s).")
+    except Exception:
+        pass
+
+    if not entries:
+        click.echo("All ROMs found are already imported on this device.")
+        return
+
+    # ── Step 5: show ROMs, let user deselect ──────────────────────────────────
+    click.echo(f"\nFound {len(entries)} ROM(s):\n")
+    for i, e in enumerate(entries, 1):
+        save_tag = "  [save found]" if e["save_exists"] else ""
+        state_tag = "  [state found]" if e["state_path"] else ""
+        click.echo(f"  {i:>3}. {e['name']}{save_tag}{state_tag}")
+
+    click.echo(
+        "\nEnter numbers to exclude (comma-separated), or press Enter to import all:"
+    )
+    exclude_input = input().strip()
+    exclude_indices: set[int] = set()
+    if exclude_input:
+        for part in exclude_input.split(","):
+            part = part.strip()
+            if part.isdigit():
+                idx = int(part)
+                if 1 <= idx <= len(entries):
+                    exclude_indices.add(idx)
+
+    to_import = [e for i, e in enumerate(entries, 1) if i not in exclude_indices]
+
+    if not to_import:
+        click.echo("Nothing selected. Exiting.")
+        return
+
+    if not click.confirm(f"\nImport {len(to_import)} game(s) for {console_def['label']}?"):
+        return
+
+    # ── Step 6: import ────────────────────────────────────────────────────────
+    client = _client()
+    console_abbr = console_def["abbr"]
+    errors: list[str] = []
+
+    for i, entry in enumerate(to_import, 1):
+        click.echo(f"  [{i}/{len(to_import)}] {entry['name']}… ", nl=False)
+        try:
+            game = client.add_game(entry["name"], console_abbr)
+            slug = game["slug"]
+            client.set_game_device(slug, GameDeviceConfig(
+                rom_path=entry["rom_path"],
+                save_path=entry["save_path"],
+                launch_command=entry["launch_command"],
+                state_path=entry["state_path"],
+                rom_folder_path=entry["rom_folder_path"],
+            ))
+            click.echo("ok")
+        except (httpx.HTTPStatusError, httpx.RequestError, Exception) as exc:
+            click.echo(f"error ({exc})")
+            errors.append(entry["name"])
+
+    click.echo(f"\nDone. {len(to_import) - len(errors)}/{len(to_import)} imported.")
+    if errors:
+        click.echo(f"Failed: {', '.join(errors)}")
+
+
 # ── sync ──────────────────────────────────────────────────────────────────────
 
 @cli.group()

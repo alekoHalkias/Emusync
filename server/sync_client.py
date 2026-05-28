@@ -14,6 +14,7 @@ class GameDeviceConfig:
     save_path: str = ""
     launch_command: str = ""
     state_path: str = ""
+    rom_folder_path: str = ""
 
 
 class SyncClient:
@@ -45,8 +46,8 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def add_game(self, name: str) -> dict:
-        r = httpx.post(self._url("/games"), json={"name": name}, headers=self._headers, timeout=10)
+    def add_game(self, name: str, console: str = "") -> dict:
+        r = httpx.post(self._url("/games"), json={"name": name, "console": console}, headers=self._headers, timeout=10)
         r.raise_for_status()
         return r.json()
 
@@ -85,7 +86,8 @@ class SyncClient:
     def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:
         r = httpx.put(
             self._url(f"/games/{slug}/device"),
-            json={"rom_path": cfg.rom_path, "save_path": cfg.save_path, "launch_command": cfg.launch_command},
+            json={"rom_path": cfg.rom_path, "save_path": cfg.save_path, "launch_command": cfg.launch_command,
+                  "state_path": cfg.state_path, "rom_folder_path": cfg.rom_folder_path},
             headers=self._headers,
             timeout=10,
         )
