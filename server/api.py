@@ -453,6 +453,104 @@ def update_transfer(transfer_id: str, request_body: dict, device_id: str = Depen
     return {"ok": True}
 
 
+# ── device game-devices (any device) ─────────────────────────────────────────
+
+@app.get("/devices/{target_device_id}/game-devices")
+def get_device_game_devices(target_device_id: str, device_id: str = Depends(_auth)) -> list[dict]:
+    """Return all games configured for a specific device."""
+    return _get_store().list_game_devices_for_device(target_device_id)
+
+
+# ── rom pull requests ─────────────────────────────────────────────────────────
+
+@app.post("/games/{slug}/rom-pull-request")
+async def create_pull_request(
+    slug: str,
+    request_body: dict,
+    device_id: str = Depends(_auth),
+) -> dict:
+    """Request a ROM from another device. The source device uploads it when online."""
+    import uuid as _uuid
+
+    store = _get_store()
+    game = store.get_game(slug)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    from_device_id = request_body.get("from_device_id")
+    destination_path = request_body.get("destination_path", "")
+    if not from_device_id:
+        raise HTTPException(status_code=400, detail="Missing from_device_id")
+
+    devices = store.list_devices()
+    if not any(d.id == from_device_id for d in devices):
+        raise HTTPException(status_code=404, detail="Source device not found")
+
+    pull_request_id = str(_uuid.uuid4())
+    store.create_pull_request(
+        id=pull_request_id,
+        slug=slug,
+        from_device_id=from_device_id,
+        to_device_id=device_id,
+        destination_path=destination_path,
+    )
+
+    with _presence_lock:
+        source_online = from_device_id in _online_devices
+
+    # Notify source device via SSE if it has a stream open
+    if from_device_id in _device_event_queues:
+        await _device_event_queues[from_device_id].put({
+            "type": "rom_pull_requested",
+            "pull_request_id": pull_request_id,
+            "slug": slug,
+            "game_name": game.name,
+            "console": game.console,
+            "to_device_id": device_id,
+            "destination_path": destination_path,
+        })
+
+    source_name = next((d.name for d in devices if d.id == from_device_id), from_device_id)
+    _print_activity(f"ROM pull requested: {game.name} ← {source_name}")
+
+    return {"pull_request_id": pull_request_id, "status": "pending", "source_online": source_online}
+
+
+@app.get("/rom-pull-requests/pending")
+def list_pending_pull_requests(device_id: str = Depends(_auth)) -> list[dict]:
+    """Return pending pull requests where the calling device is the source."""
+    store = _get_store()
+    requests = store.list_pending_pull_requests_for_device(device_id)
+    result = []
+    for pr in requests:
+        game = store.get_game(pr.slug)
+        result.append({
+            "id": pr.id,
+            "slug": pr.slug,
+            "to_device_id": pr.to_device_id,
+            "destination_path": pr.destination_path,
+            "requested_at": pr.requested_at,
+            "console": game.console if game else "",
+            "game_name": game.name if game else pr.slug,
+        })
+    return result
+
+
+@app.put("/rom-pull-requests/{pull_request_id}")
+def update_pull_request(pull_request_id: str, request_body: dict, device_id: str = Depends(_auth)) -> dict:
+    """Mark a pull request as fulfilled or failed. Only the source device can update it."""
+    pr = _get_store().get_pull_request(pull_request_id)
+    if not pr:
+        raise HTTPException(status_code=404, detail="Pull request not found")
+    if pr.from_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    status = request_body.get("status", "fulfilled")
+    if status not in ("fulfilled", "failed"):
+        raise HTTPException(status_code=400, detail="status must be 'fulfilled' or 'failed'")
+    _get_store().update_pull_request_status(pull_request_id, status)
+    return {"ok": True}
+
+
 # ── SSE event stream ──────────────────────────────────────────────────────────
 
 @app.get("/events/stream")

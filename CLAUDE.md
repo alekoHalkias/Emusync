@@ -29,12 +29,12 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`, `push`, `sync-daemon`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import); `push` is an interactive ROM transfer wizard (multi-select games → pick target device → confirm path → stream upload); `sync-daemon` holds an SSE connection open and auto-receives incoming ROM transfers |
-| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/events/stream` (SSE), `/games/{slug}/devices`, `/game-devices`, `/devices/{id}/consoles`, `/games/{slug}/rom-transfer`, `/rom-transfers/pending`, `/rom-transfers/{id}/file`, `/rom-transfers/{id}`; `_auth` auto-registers devices on first request; `GET /devices` includes `is_online`; `init()` accepts optional `data_dir` for ROM staging; `_device_event_queues` maps device IDs to asyncio queues for SSE delivery |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`, `rom_transfers`; schema version 3; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; `rom_transfers` tracks pending ROM file deliveries with staged file path and status |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`, `push`, `pull`, `sync-daemon`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import); `push` is an interactive ROM transfer wizard (multi-select games → pick target device → confirm path → stream upload); `pull` mirrors push in reverse (pick source device → select games from that device → confirm local folder → server queues pull request → source device's sync-daemon fulfills it); `sync-daemon` holds an SSE connection open, auto-receives incoming ROM transfers, and fulfills pending pull requests |
+| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/events/stream` (SSE), `/games/{slug}/devices`, `/game-devices`, `/devices/{id}/consoles`, `/devices/{id}/game-devices`, `/games/{slug}/rom-transfer`, `/rom-transfers/pending`, `/rom-transfers/{id}/file`, `/rom-transfers/{id}`, `/games/{slug}/rom-pull-request`, `/rom-pull-requests/pending`, `/rom-pull-requests/{id}`; `_auth` auto-registers devices on first request; `GET /devices` includes `is_online`; `init()` accepts optional `data_dir` for ROM staging; `_device_event_queues` maps device IDs to asyncio queues for SSE delivery |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`, `rom_transfers`, `rom_pull_requests`; schema version 4; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; `rom_transfers` tracks pending ROM file deliveries; `rom_pull_requests` tracks pending pull requests (receiver asks source to send) |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
-| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`, `push`); sends PIN + device headers for auth; `GameDeviceConfig` holds `rom_path`, `save_path`, `launch_command`, `state_path`, `rom_folder_path`; `list_my_game_devices()`, `get_device_consoles()`, `create_rom_transfer()` support the push flow |
+| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`, `push`, `pull`); sends PIN + device headers for auth; `GameDeviceConfig` holds `rom_path`, `save_path`, `launch_command`, `state_path`, `rom_folder_path`; `list_my_game_devices()`, `list_device_games()`, `get_device_consoles()`, `create_rom_transfer()`, `create_pull_request()`, `list_pending_pull_requests()`, `complete_pull_request()` support the push/pull flow |
 | `gui/electron/main.ts` | IPC handlers; spawns/kills Python server; manages `serverProcess` PID file; `changePin` simplifies to restart without clearing devices |
 | `gui/electron/preload.ts` | `contextBridge` — everything in `window.emusync.*` is defined here |
 | `gui/renderer/src/api.ts` | Fetch wrapper for the Python REST API; holds `_base` URL + `_token` |
@@ -397,7 +397,9 @@ The path is extracted from the full ROM file path during import and returned by 
 
 ---
 
-## ROM Transfer (`emusync push`)
+## ROM Transfer (`emusync push` / `emusync pull`)
+
+### `emusync push` — send a ROM to another device
 
 `emusync push` is an interactive wizard that transfers ROM files from the current device to another via the central server:
 
@@ -411,16 +413,40 @@ The path is extracted from the full ROM file path during import and returned by 
 7. Server creates a `rom_transfers` record (status=pending); responds with `target_online` bool
 8. CLI shows "queued — device is online" or "⚠ offline — will be delivered when it comes online"
 
+### `emusync pull` — request a ROM from another device
+
+`emusync pull` is the reverse of push: the current device requests a ROM from a source device. The source's sync-daemon fulfills the request by uploading the ROM via the server.
+
+**Flow:**
+1. Lists other paired devices with online/offline status
+2. User selects the source device
+3. Lists games on the source device that have a `rom_path` (via `GET /devices/{id}/game-devices`)
+4. User multi-selects games to pull
+5. For each game: checks if this device has the console configured locally; if found, proposes the local ROM folder; user confirms or enters a custom path
+6. Sends `POST /games/{slug}/rom-pull-request` with `from_device_id` and `destination_path`
+7. Server creates a `rom_pull_requests` record and SSE-notifies the source device
+8. CLI shows "request sent — source is online" or "⚠ offline — ROM will be sent when it comes online"
+9. Source device's sync-daemon handles `rom_pull_requested` event: looks up local ROM path, calls `create_rom_transfer`, marks request fulfilled
+10. Requester's sync-daemon receives the resulting `rom_transfer_queued` event and downloads normally
+
 **API surface:**
-- `POST /games/{slug}/rom-transfer` — streams ROM bytes (body) with `X-To-Device-ID`, `X-Destination-Path`, `X-Filename` headers; stages file to `~/.emusync/rom_staging/{transfer_id}{ext}`; returns `{transfer_id, status, target_online}`
+- `POST /games/{slug}/rom-transfer` — streams ROM bytes (body) with `X-To-Device-ID`, `X-Destination-Path`, `X-Filename` headers; stages file to `~/.emusync/rom_staging/{transfer_id}/{filename}`; returns `{transfer_id, status, target_online}`
 - `GET /game-devices` — returns all games configured for the calling device (slug, name, console, rom_path, save_path, …)
+- `GET /devices/{id}/game-devices` — returns all games configured for any specific device
 - `GET /devices/{id}/consoles` — returns console configs (name, ROM folder, save folder, emulator) for any device
+- `POST /games/{slug}/rom-pull-request` — creates a pull request; body `{from_device_id, destination_path}`; SSE-notifies source; returns `{pull_request_id, status, source_online}`
+- `GET /rom-pull-requests/pending` — returns pending pull requests where calling device is the source (needs to fulfill)
+- `PUT /rom-pull-requests/{id}` — mark pull request as `fulfilled` or `failed` (source device only)
 
 **Staging dir:** `~/.emusync/rom_staging/{transfer_id}/{original_filename}` — subdirectory per transfer preserves the original filename with no modification.
 
-**Auto-delivery via `emusync sync-daemon`**: run this on the target device to receive transfers automatically. On startup it drains any already-pending transfers, then holds an SSE connection open (`GET /events/stream`). When the server pushes a `rom_transfer_queued` event, the daemon immediately downloads the file (`GET /rom-transfers/{id}/file`), saves it to `destination_path`, and marks it complete (`PUT /rom-transfers/{id}`). Reconnects automatically on connection loss.
+**Auto-delivery via `emusync sync-daemon`**: run this on any device to handle both sides automatically. On startup it drains pending transfers (incoming ROMs) and pending pull requests (ROMs this device needs to send). Then holds an SSE connection open. Handles two event types:
+- `rom_transfer_queued` → downloads ROM, registers game in game list
+- `rom_pull_requested` → looks up local ROM, uploads it via `create_rom_transfer`
 
-**`sync_client.py` delivery methods**: `list_pending_transfers()`, `download_transfer(id, dest)`, `complete_transfer(id)`, `stream_events()` (SSE generator).
+Reconnects automatically on connection loss. Built into `emusync server start` as a background thread for server devices.
+
+**`sync_client.py` delivery methods**: `list_pending_transfers()`, `download_transfer(id, dest)`, `complete_transfer(id)`, `list_pending_pull_requests()`, `complete_pull_request(id)`, `list_device_games(device_id)`, `create_pull_request(slug, from_device_id, destination_path)`, `stream_events()` (SSE generator).
 
 ---
 

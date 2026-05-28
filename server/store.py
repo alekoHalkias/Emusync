@@ -32,7 +32,7 @@ class _LockedConnection:
             return getattr(self._conn, name)
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 3
+_SCHEMA_VERSION = 4
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -110,6 +110,16 @@ CREATE TABLE IF NOT EXISTS rom_transfers (
     queued_at        TEXT NOT NULL,
     completed_at     TEXT
 );
+CREATE TABLE IF NOT EXISTS rom_pull_requests (
+    id               TEXT PRIMARY KEY,
+    slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    from_device_id   TEXT NOT NULL REFERENCES devices(id),
+    to_device_id     TEXT NOT NULL REFERENCES devices(id),
+    destination_path TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    requested_at     TEXT NOT NULL,
+    fulfilled_at     TEXT
+);
 """
 
 
@@ -146,6 +156,17 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
             status           TEXT NOT NULL DEFAULT 'pending',
             queued_at        TEXT NOT NULL,
             completed_at     TEXT
+        )""")
+    if from_version < 4:
+        _try(conn, """CREATE TABLE IF NOT EXISTS rom_pull_requests (
+            id               TEXT PRIMARY KEY,
+            slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+            from_device_id   TEXT NOT NULL REFERENCES devices(id),
+            to_device_id     TEXT NOT NULL REFERENCES devices(id),
+            destination_path TEXT NOT NULL DEFAULT '',
+            status           TEXT NOT NULL DEFAULT 'pending',
+            requested_at     TEXT NOT NULL,
+            fulfilled_at     TEXT
         )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
@@ -214,6 +235,18 @@ class RomTransfer:
     status: str
     queued_at: str
     completed_at: Optional[str] = None
+
+
+@dataclass
+class RomPullRequest:
+    id: str
+    slug: str
+    from_device_id: str
+    to_device_id: str
+    destination_path: str
+    status: str
+    requested_at: str
+    fulfilled_at: Optional[str] = None
 
 
 class Store:
@@ -582,5 +615,56 @@ class Store:
         self._conn.execute(
             "UPDATE rom_transfers SET status = ?, completed_at = ? WHERE id = ?",
             (status, completed_at, transfer_id),
+        )
+        self._conn.commit()
+
+    # ── rom pull requests ─────────────────────────────────────────────────────
+
+    def create_pull_request(
+        self,
+        id: str,
+        slug: str,
+        from_device_id: str,
+        to_device_id: str,
+        destination_path: str,
+    ) -> RomPullRequest:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO rom_pull_requests
+               (id, slug, from_device_id, to_device_id, destination_path, status, requested_at)
+               VALUES (?, ?, ?, ?, ?, 'pending', ?)""",
+            (id, slug, from_device_id, to_device_id, destination_path, now),
+        )
+        self._conn.commit()
+        return RomPullRequest(
+            id=id, slug=slug, from_device_id=from_device_id, to_device_id=to_device_id,
+            destination_path=destination_path, status="pending", requested_at=now,
+        )
+
+    def get_pull_request(self, pull_request_id: str) -> Optional[RomPullRequest]:
+        row = self._conn.execute(
+            """SELECT id, slug, from_device_id, to_device_id, destination_path,
+                      status, requested_at, fulfilled_at
+               FROM rom_pull_requests WHERE id = ?""",
+            (pull_request_id,),
+        ).fetchone()
+        return RomPullRequest(**dict(row)) if row else None
+
+    def list_pending_pull_requests_for_device(self, device_id: str) -> list[RomPullRequest]:
+        """Return pending pull requests where this device is the source (from_device_id)."""
+        rows = self._conn.execute(
+            """SELECT id, slug, from_device_id, to_device_id, destination_path,
+                      status, requested_at, fulfilled_at
+               FROM rom_pull_requests WHERE from_device_id = ? AND status = 'pending'
+               ORDER BY requested_at""",
+            (device_id,),
+        ).fetchall()
+        return [RomPullRequest(**dict(r)) for r in rows]
+
+    def update_pull_request_status(self, pull_request_id: str, status: str) -> None:
+        fulfilled_at = datetime.now(timezone.utc).isoformat() if status in ("fulfilled", "failed") else None
+        self._conn.execute(
+            "UPDATE rom_pull_requests SET status = ?, fulfilled_at = ? WHERE id = ?",
+            (status, fulfilled_at, pull_request_id),
         )
         self._conn.commit()

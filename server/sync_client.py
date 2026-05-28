@@ -263,6 +263,38 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def list_device_games(self, device_id: str) -> list[dict]:
+        """Return all games configured for a specific device."""
+        r = httpx.get(self._url(f"/devices/{device_id}/game-devices"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def create_pull_request(self, slug: str, from_device_id: str, destination_path: str) -> dict:
+        """Request the source device to push a ROM to this device via the server."""
+        r = httpx.post(
+            self._url(f"/games/{slug}/rom-pull-request"),
+            json={"from_device_id": from_device_id, "destination_path": destination_path},
+            headers=self._headers,
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def list_pending_pull_requests(self) -> list[dict]:
+        """Return pull requests pending for this device to fulfill (as the source)."""
+        r = httpx.get(self._url("/rom-pull-requests/pending"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def complete_pull_request(self, pull_request_id: str, status: str = "fulfilled") -> None:
+        r = httpx.put(
+            self._url(f"/rom-pull-requests/{pull_request_id}"),
+            json={"status": status},
+            headers=self._headers,
+            timeout=10,
+        )
+        r.raise_for_status()
+
     def get_save_meta(self, slug: str) -> Optional[dict]:
         r = httpx.get(self._url(f"/games/{slug}/save/meta"), headers=self._headers, timeout=10)
         if r.status_code == 204:
