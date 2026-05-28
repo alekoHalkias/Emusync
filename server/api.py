@@ -392,6 +392,7 @@ async def create_rom_transfer(
             "transfer_id": transfer_id,
             "slug": slug,
             "game_name": game.name,
+            "console": game.console,
             "destination_path": x_destination_path or "",
         })
 
@@ -406,16 +407,20 @@ async def create_rom_transfer(
 @app.get("/rom-transfers/pending")
 def list_pending_transfers(device_id: str = Depends(_auth)) -> list[dict]:
     """Return all pending ROM transfers queued for the calling device."""
-    transfers = _get_store().list_pending_transfers_for_device(device_id)
-    return [
-        {
+    store = _get_store()
+    transfers = store.list_pending_transfers_for_device(device_id)
+    result = []
+    for t in transfers:
+        game = store.get_game(t.slug)
+        result.append({
             "id": t.id,
             "slug": t.slug,
             "destination_path": t.destination_path,
             "queued_at": t.queued_at,
-        }
-        for t in transfers
-    ]
+            "console": game.console if game else "",
+            "game_name": game.name if game else t.slug,
+        })
+    return result
 
 
 @app.get("/rom-transfers/{transfer_id}/file")

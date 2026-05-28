@@ -242,6 +242,21 @@ def _do_start_server() -> None:
     mdns_thread = threading.Thread(target=_advertise_mdns, daemon=True)
     mdns_thread.start()
 
+    def _start_daemon_for_server() -> None:
+        """Wait for the server to be ready, then handle ROM transfers for this device."""
+        import time
+        client = _client(cfg)
+        for _ in range(60):
+            if client.health():
+                break
+            time.sleep(0.5)
+        else:
+            return
+        _run_transfer_daemon(client, cfg.device_name, log=lambda msg: print(msg, flush=True))
+
+    daemon_thread = threading.Thread(target=_start_daemon_for_server, daemon=True)
+    daemon_thread.start()
+
     try:
         uvicorn.run(api_module.app, host="0.0.0.0", port=cfg.server_port, log_level="warning")
     finally:
@@ -1424,50 +1439,81 @@ def push_rom() -> None:
 
 # ── sync-daemon ───────────────────────────────────────────────────────────────
 
-def _receive_transfer(client: "SyncClient", transfer_id: str, destination_path: str, label: str) -> bool:
-    """Download one pending transfer and mark it complete. Returns True on success."""
+def _receive_transfer(
+    client: "SyncClient",
+    transfer_id: str,
+    destination_path: str,
+    slug: str,
+    console: str,
+    game_name: str,
+    log=click.echo,
+) -> bool:
+    """Download one pending transfer, save it, register the game. Returns True on success."""
     try:
-        click.echo(f"  Receiving {label}...")
+        log(f"  Receiving {game_name}...")
         client.download_transfer(transfer_id, destination_path)
         client.complete_transfer(transfer_id)
-        click.echo(f"  Saved to {destination_path}")
-        return True
+        log(f"  Saved to {destination_path}")
     except Exception as e:
-        click.echo(f"  Failed to receive {label}: {e}", err=True)
+        log(f"  Failed to receive {game_name}: {e}")
         try:
             client.complete_transfer(transfer_id, status="failed")
         except Exception:
             pass
         return False
 
+    # Auto-register the game on this device
+    try:
+        rom_folder = os.path.dirname(destination_path)
+        save_path = ""
+        launch_command = ""
+        state_path = ""
 
-@cli.command("sync-daemon")
-def sync_daemon() -> None:
-    """Listen for incoming ROM transfers and receive them automatically."""
+        # Copy save/launch patterns from another game of the same console on this device
+        if console:
+            my_games = client.list_my_game_devices()
+            ref = next(
+                (g for g in my_games if g.get("console") == console and g.get("rom_path") and g["slug"] != slug),
+                None,
+            )
+            if ref and ref.get("save_path"):
+                old_stem = os.path.splitext(os.path.basename(ref["rom_path"]))[0]
+                new_stem = os.path.splitext(os.path.basename(destination_path))[0]
+                save_path = ref["save_path"].replace(old_stem, new_stem)
+                if ref.get("launch_command"):
+                    launch_command = ref["launch_command"].replace(ref["rom_path"], destination_path)
+                if ref.get("state_path"):
+                    state_path = ref["state_path"].replace(old_stem, new_stem)
+
+        client.set_game_device(slug, GameDeviceConfig(
+            rom_path=destination_path,
+            save_path=save_path,
+            launch_command=launch_command,
+            state_path=state_path,
+            rom_folder_path=rom_folder,
+        ))
+        log(f"  Registered '{game_name}' in game list")
+    except Exception as e:
+        log(f"  Warning: could not register game: {e}")
+
+    return True
+
+
+def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo) -> None:
+    """Core daemon loop: drain pending transfers then hold SSE connection open."""
     import time
 
-    cfg = cfg_module.load()
-    if not cfg.server_host and not cfg.is_server:
-        click.echo("EmuSync is not configured. Run 'emusync device connect' first.", err=True)
-        sys.exit(1)
-
-    client = _client(cfg)
-
-    if not client.health():
-        click.echo("Cannot reach EmuSync server. Is it running?", err=True)
-        sys.exit(1)
-
-    # Drain any transfers that were queued while daemon was offline
     try:
         pending = client.list_pending_transfers()
         if pending:
-            click.echo(f"Picking up {len(pending)} queued transfer(s)...")
+            log(f"Picking up {len(pending)} queued transfer(s)...")
             for t in pending:
-                _receive_transfer(client, t["id"], t["destination_path"], t["slug"])
+                _receive_transfer(client, t["id"], t["destination_path"],
+                                  t["slug"], t.get("console", ""), t.get("game_name", t["slug"]), log)
     except Exception as e:
-        click.echo(f"Warning: could not check pending transfers: {e}", err=True)
+        log(f"Warning: could not check pending transfers: {e}")
 
-    click.echo(f"Listening for ROM transfers on {cfg.device_name}... (Ctrl-C to stop)")
+    log(f"Listening for ROM transfers on {device_name}...")
 
     while True:
         try:
@@ -1477,14 +1523,35 @@ def sync_daemon() -> None:
                         client,
                         event["transfer_id"],
                         event["destination_path"],
+                        event.get("slug", ""),
+                        event.get("console", ""),
                         event.get("game_name", event.get("slug", event["transfer_id"])),
+                        log,
                     )
         except KeyboardInterrupt:
-            click.echo("\nStopped.")
-            break
+            raise
         except Exception as e:
-            click.echo(f"Connection lost ({e}). Reconnecting in 5s...", err=True)
+            log(f"Connection lost ({e}). Reconnecting in 5s...")
             time.sleep(5)
+
+
+@cli.command("sync-daemon")
+def sync_daemon() -> None:
+    """Listen for incoming ROM transfers and receive them automatically."""
+    cfg = cfg_module.load()
+    if not cfg.server_host and not cfg.is_server:
+        click.echo("EmuSync is not configured. Run 'emusync device connect' first.", err=True)
+        sys.exit(1)
+
+    client = _client(cfg)
+    if not client.health():
+        click.echo("Cannot reach EmuSync server. Is it running?", err=True)
+        sys.exit(1)
+
+    try:
+        _run_transfer_daemon(client, cfg.device_name)
+    except KeyboardInterrupt:
+        click.echo("\nStopped.")
 
 
 # ── run ───────────────────────────────────────────────────────────────────────
