@@ -265,6 +265,15 @@ def _do_start_server() -> None:
     daemon_thread = threading.Thread(target=_start_daemon_for_server, daemon=True)
     daemon_thread.start()
 
+    import logging
+
+    class _SuppressSSECancelFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            msg = record.getMessage() + str(record.exc_info or "")
+            return "CancelledError" not in msg
+
+    logging.getLogger("uvicorn.error").addFilter(_SuppressSSECancelFilter())
+
     try:
         uvicorn.run(api_module.app, host="0.0.0.0", port=cfg.server_port, log_level="warning")
     finally:
