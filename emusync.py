@@ -1516,7 +1516,7 @@ def pull_rom(game: str) -> None:
 
     if not dest_folder:
         default_folder = os.path.expanduser(f"~/Games/{console}/")
-        dest_folder = click.prompt(f"No console configured. Enter destination folder", default=default_folder)
+        dest_folder = click.prompt(f"Console not configured. Where should the ROM be saved?", default=default_folder)
         dest_folder = os.path.expanduser(dest_folder)
 
     # Get filename from server config

@@ -403,7 +403,7 @@ The path is extracted from the full ROM file path during import and returned by 
 **Pull**: `emusync pull [game]`
 - Downloads a ROM from the central server to the current device
 - Verifies game exists on server and ROM file is configured
-- Saves to device's console folder (or user-specified path)
+- Checks if console is configured on the device; if yes, uses that ROM folder; otherwise prompts user for a path
 - Auto-resolves game by slug or name substring
 - Progress bar shows MB/percentage during download
 
