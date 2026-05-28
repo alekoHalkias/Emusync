@@ -20,6 +20,7 @@ app.add_middleware(
 
 _store: Optional[Store] = None
 _master_pin: str = ""
+_server_device_id: str = ""
 _online_devices: set[str] = set()
 _device_names: dict[str, str] = {}
 _presence_lock = threading.Lock()
@@ -52,10 +53,11 @@ def _monitor_presence() -> None:
             pass
 
 
-def init(store: Store, master_pin: str) -> None:
-    global _store, _master_pin, _online_devices, _device_names
+def init(store: Store, master_pin: str, server_device_id: str = "") -> None:
+    global _store, _master_pin, _server_device_id, _online_devices, _device_names
     _store = store
     _master_pin = master_pin
+    _server_device_id = server_device_id
     _online_devices.clear()
     _device_names.clear()
     t = threading.Thread(target=_monitor_presence, daemon=True)
@@ -404,5 +406,79 @@ def get_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
     if not lock:
         return {"locked": False}
     return {"locked": True, "device_id": lock.device_id, "acquired_at": lock.acquired_at}
+
+
+# ── ROMs ──────────────────────────────────────────────────────────────────────
+
+@app.get("/games/{slug}/rom")
+def pull_rom(slug: str, device_id: str = Depends(_auth)) -> Response:
+    from pathlib import Path
+    store = _get_store()
+    gd = store.get_game_device(slug, _server_device_id)
+    if not gd or not gd.rom_path:
+        raise HTTPException(status_code=404, detail="ROM not configured for this device")
+    rom_path = Path(gd.rom_path)
+    if not rom_path.exists():
+        raise HTTPException(status_code=404, detail="ROM file not found on this device")
+    return Response(
+        content=rom_path.read_bytes(),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Length": str(rom_path.stat().st_size),
+            "X-Rom-Filename": rom_path.name,
+        },
+    )
+
+
+@app.post("/games/{slug}/rom")
+async def push_rom(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
+    import os
+    import uuid
+    from pathlib import Path
+    from .store import Console
+
+    data = await request.body()
+    filename = request.headers.get("X-Rom-Filename", f"{slug}.rom")
+    dest_folder = request.headers.get("X-Dest-Folder", "")
+
+    store = _get_store()
+    game = store.get_game(slug)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Determine destination folder
+    save_folder = ""
+    if dest_folder:
+        save_folder = dest_folder
+    else:
+        # Try to find console config for this game
+        consoles = store.list_consoles(device_id)
+        for c in consoles:
+            if c.console_name == game.console:
+                save_folder = c.device_game_folder
+                break
+
+    if not save_folder:
+        raise HTTPException(status_code=422, detail=f"Console '{game.console}' not configured on this device")
+
+    # Save ROM file
+    rom_path = Path(save_folder) / filename
+    rom_path.parent.mkdir(parents=True, exist_ok=True)
+    rom_path.write_bytes(data)
+
+    # Register game config
+    store.set_game_device(
+        GameDevice(
+            game_slug=slug,
+            device_id=device_id,
+            rom_path=str(rom_path),
+            save_path="",
+            launch_command="",
+            state_path="",
+            rom_folder_path=save_folder,
+        )
+    )
+
+    return {"saved_to": str(rom_path), "rom_path": str(rom_path)}
 
 

@@ -12,6 +12,8 @@ import random
 import uuid
 from pathlib import Path
 
+import httpx
+
 # Track the emulator child process so SIGTERM can kill it before exiting
 _child_proc: subprocess.Popen | None = None  # type: ignore[type-arg]
 
@@ -43,6 +45,38 @@ def _client(cfg=None) -> SyncClient:
 
 def _slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def _show_progress(downloaded: int, total: int) -> None:
+    """Display streaming progress bar: [████████░░] 67% 15.3 MB / 40.7 MB"""
+    if total <= 0:
+        return
+    pct = min(int(downloaded / total * 100), 100)
+    filled = int(pct * 30 / 100)
+    bar = "█" * filled + "░" * (30 - filled)
+    mb_done = downloaded / 1024 / 1024
+    mb_total = total / 1024 / 1024
+    sys.stdout.write(f"\r[{bar}] {pct}% {mb_done:.1f} MB / {mb_total:.1f} MB  ")
+    sys.stdout.flush()
+    if pct == 100:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+
+
+def _client_at(device: dict, cfg) -> SyncClient:
+    """Create a SyncClient connecting to a specific device's IP."""
+    return SyncClient(device["last_ip"], cfg.server_port, cfg.server_pin,
+                      cfg.device_id, cfg.device_name)
+
+
+def _device_online(device: dict, cfg) -> bool:
+    """Return True if device's server is reachable via HTTP."""
+    if not device.get("last_ip"):
+        return False
+    try:
+        return _client_at(device, cfg).health()
+    except Exception:
+        return False
 
 
 def _get_device_name(client: SyncClient, device_id: str) -> str:
@@ -213,7 +247,7 @@ def _do_start_server() -> None:
     pid_file = Path(cfg.data_dir) / ".server_pid"
     token_file.write_text(master_token)
     pid_file.write_text(str(os.getpid()))
-    api_module.init(store, master_token)
+    api_module.init(store, master_token, cfg.device_id)
     store.log_event("server_started")
 
     # Print token immediately so Electron can resolve server.start() without
@@ -1427,6 +1461,246 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         game_pid_file.unlink(missing_ok=True)
 
     sys.exit(exit_code if "exit_code" in dir() else 0)
+
+
+@cli.command("pull")
+@click.argument("game", required=False, default=None)
+def pull_rom(game: str) -> None:
+    """Download a ROM from another device."""
+    cfg = cfg_module.load()
+    client = _client(cfg)
+
+    if not client.health():
+        click.echo("Cannot reach EmuSync server. Is it running?", err=True)
+        sys.exit(1)
+
+    # Resolve game
+    all_games = client.list_games()
+    if not all_games:
+        click.echo("No games found.", err=True)
+        sys.exit(1)
+
+    matching_game = None
+    if game:
+        # Try exact slug match first
+        for g in all_games:
+            if g["slug"] == game:
+                matching_game = g
+                break
+        # Fall back to name substring match
+        if not matching_game:
+            matches = [g for g in all_games if game.lower() in g["name"].lower()]
+            if len(matches) == 1:
+                matching_game = matches[0]
+            elif len(matches) > 1:
+                click.echo(f"Multiple games match '{game}':")
+                for i, g in enumerate(matches, 1):
+                    click.echo(f"  {i}. {g['name']} ({g['slug']})")
+                choice = click.prompt("Choose game number", type=int)
+                if 1 <= choice <= len(matches):
+                    matching_game = matches[choice - 1]
+
+    if not matching_game:
+        click.echo(f"Game not found. Check 'emusync game list'.", err=True)
+        sys.exit(1)
+
+    slug = matching_game["slug"]
+
+    # Check if ROM already on this device
+    from server.store import Store
+    store = Store(cfg.data_dir)
+    local_gd = store.get_game_device(slug, cfg.device_id)
+    if local_gd and local_gd.rom_path and Path(local_gd.rom_path).exists():
+        click.echo(f"Game already on this device at {local_gd.rom_path}")
+        return
+
+    # Find source device
+    try:
+        devices_with_game = client.list_game_devices(slug)
+    except Exception as e:
+        click.echo(f"Error fetching device list: {e}", err=True)
+        sys.exit(1)
+
+    # Filter out this device and find first online one
+    source_device = None
+    all_devices = client.list_devices()
+    for gd in devices_with_game:
+        if gd["id"] != cfg.device_id:
+            # Check if online
+            full_device = next((d for d in all_devices if d["id"] == gd["id"]), None)
+            if full_device and _device_online(full_device, cfg):
+                source_device = full_device
+                break
+
+    if not source_device:
+        click.echo("Game not found on any online device.", err=True)
+        sys.exit(1)
+
+    # Print found message
+    console = matching_game.get("console", "Unknown")
+    click.echo(f"{console} {matching_game['name']} found on {source_device['name']}")
+
+    # Confirm
+    if not click.confirm("Copy to this device?", default=False):
+        return
+
+    # Check for existing save data
+    save_meta = client.get_save_meta(slug)
+    if save_meta:
+        response = click.prompt("Save data exists for this game. Keep or delete?", type=click.Choice(["K", "d"], case_sensitive=False))
+        # TODO: implement delete logic when user selects 'd'
+
+    # Determine destination folder
+    consoles = store.list_consoles(cfg.device_id)
+    dest_folder = None
+    for c in consoles:
+        if c.console_name == console:
+            dest_folder = c.device_game_folder
+            break
+
+    if not dest_folder:
+        default_folder = os.path.expanduser(f"~/Games/{console}/")
+        dest_folder = click.prompt(f"No console configured. Enter destination folder", default=default_folder)
+        dest_folder = os.path.expanduser(dest_folder)
+
+    # Check if ROM already exists at destination
+    rom_filename = source_device.get("rom_path", "").split("/")[-1] or f"{slug}.rom"
+    dest_path = os.path.join(dest_folder, rom_filename)
+    if Path(dest_path).exists():
+        click.echo(f"ROM already exists at {dest_path}, skipping.")
+        return
+
+    # Download from source
+    source_client = _client_at(source_device, cfg)
+    click.echo(f"Downloading to {dest_path}...")
+    try:
+        source_client.pull_rom(slug, dest_path, _show_progress)
+    except Exception as e:
+        click.echo(f"Download failed: {e}", err=True)
+        Path(dest_path).unlink(missing_ok=True)
+        sys.exit(1)
+
+    # Register game config
+    try:
+        client.set_game_device(slug, GameDeviceConfig(
+            rom_path=dest_path,
+            save_path="",
+            launch_command="",
+            state_path="",
+            rom_folder_path=dest_folder,
+        ))
+    except Exception as e:
+        click.echo(f"Warning: could not register game config: {e}", err=True)
+
+    click.echo(f"Game saved to {dest_path}")
+
+
+@cli.command("push")
+@click.argument("game", required=False, default=None)
+def push_rom(game: str) -> None:
+    """Upload a ROM to another device."""
+    cfg = cfg_module.load()
+    client = _client(cfg)
+
+    if not client.health():
+        click.echo("Cannot reach EmuSync server. Is it running?", err=True)
+        sys.exit(1)
+
+    # Resolve game
+    all_games = client.list_games()
+    if not all_games:
+        click.echo("No games found.", err=True)
+        sys.exit(1)
+
+    matching_game = None
+    if game:
+        # Try exact slug match first
+        for g in all_games:
+            if g["slug"] == game:
+                matching_game = g
+                break
+        # Fall back to name substring match
+        if not matching_game:
+            matches = [g for g in all_games if game.lower() in g["name"].lower()]
+            if len(matches) == 1:
+                matching_game = matches[0]
+            elif len(matches) > 1:
+                click.echo(f"Multiple games match '{game}':")
+                for i, g in enumerate(matches, 1):
+                    click.echo(f"  {i}. {g['name']} ({g['slug']})")
+                choice = click.prompt("Choose game number", type=int)
+                if 1 <= choice <= len(matches):
+                    matching_game = matches[choice - 1]
+
+    if not matching_game:
+        click.echo(f"Game not found. Check 'emusync game list'.", err=True)
+        sys.exit(1)
+
+    slug = matching_game["slug"]
+
+    # Check if ROM is on this device
+    from server.store import Store
+    store = Store(cfg.data_dir)
+    local_gd = store.get_game_device(slug, cfg.device_id)
+    if not local_gd or not local_gd.rom_path or not Path(local_gd.rom_path).exists():
+        click.echo(f"ROM file not found at {local_gd.rom_path if local_gd else 'unknown path'}. Has it moved?", err=True)
+        sys.exit(1)
+
+    rom_path = local_gd.rom_path
+
+    # List other devices and check which are online
+    all_devices = client.list_devices()
+    other_devices = [d for d in all_devices if d["id"] != cfg.device_id]
+    online_devices = [d for d in other_devices if _device_online(d, cfg)]
+
+    if not online_devices:
+        click.echo("No online devices found.", err=True)
+        sys.exit(1)
+
+    # Let user choose target
+    if len(online_devices) == 1:
+        target_device = online_devices[0]
+        click.echo(f"Target device: {target_device['name']}")
+    else:
+        click.echo("Online devices:")
+        for i, d in enumerate(online_devices, 1):
+            click.echo(f"  {i}. {d['name']}")
+        choice = click.prompt("Choose target device number", type=int)
+        if not (1 <= choice <= len(online_devices)):
+            click.echo("Invalid choice.", err=True)
+            sys.exit(1)
+        target_device = online_devices[choice - 1]
+
+    # Re-verify target is online
+    if not _device_online(target_device, cfg):
+        click.echo(f"Device not online. Please turn on {target_device['name']} to push the game.", err=True)
+        sys.exit(1)
+
+    # Check if game already on target
+    target_client = _client_at(target_device, cfg)
+    try:
+        target_config = target_client.get_game_device(slug)
+        if target_config and target_config.rom_path and Path(target_config.rom_path).exists():
+            click.echo(f"Game already on {target_device['name']} at {target_config.rom_path}, skipping.")
+            return
+    except Exception:
+        pass  # Game not configured on target, proceed with upload
+
+    # Upload to target
+    click.echo(f"Uploading to {target_device['name']}...")
+    try:
+        result = target_client.push_rom(slug, rom_path, _show_progress)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 422:
+            click.echo(f"Console not configured on {target_device['name']}. Run 'emusync console import' on {target_device['name']} first.", err=True)
+        else:
+            click.echo(f"Upload failed: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Upload failed: {e}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Game pushed to {target_device['name']} at {result.get('rom_path', result.get('saved_to'))}")
 
 
 if __name__ == "__main__":

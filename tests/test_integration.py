@@ -46,7 +46,7 @@ async def client():
     """Fresh in-memory store + FastAPI app for each test."""
     with tempfile.TemporaryDirectory() as tmpdir:
         store = Store(tmpdir)
-        api_module.init(store, MASTER_PIN)
+        api_module.init(store, MASTER_PIN, DEVICE_ID)
         async with AsyncClient(
             transport=ASGITransport(app=api_module.app),
             base_url="http://test",
@@ -861,3 +861,154 @@ async def test_device_compare_no_games(client):
     """Server has no games — compare returns an empty list."""
     r = await client.get("/games", headers=AUTH)
     assert r.json() == []
+
+
+# ── ROMs ──────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_pull_rom_streams_bytes(client):
+    """GET /games/{slug}/rom returns ROM bytes when configured."""
+    rom_content = b"GBA\x00\x00\x00\x00ROM data here"
+
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rom_path = Path(tmpdir) / "test.gba"
+        rom_path.write_bytes(rom_content)
+
+        await client.put("/games/test-game/device",
+                         json={"rom_path": str(rom_path)}, headers=AUTH)
+
+        r = await client.get("/games/test-game/rom", headers=AUTH)
+        assert r.status_code == 200
+        assert r.content == rom_content
+        assert r.headers.get("X-Rom-Filename") == "test.gba"
+
+
+@pytest.mark.asyncio
+async def test_pull_rom_not_configured_404(client):
+    """GET /games/{slug}/rom returns 404 when no rom_path set."""
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+
+    r = await client.get("/games/test-game/rom", headers=AUTH)
+    assert r.status_code == 404
+    assert "not configured" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_pull_rom_file_missing_404(client):
+    """GET /games/{slug}/rom returns 404 when rom_path set but file absent."""
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+    await client.put("/games/test-game/device",
+                     json={"rom_path": "/nonexistent/path/game.gba"}, headers=AUTH)
+
+    r = await client.get("/games/test-game/rom", headers=AUTH)
+    assert r.status_code == 404
+    assert "not found" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_push_rom_saves_to_console_folder(client):
+    """POST /games/{slug}/rom saves file to console.device_game_folder."""
+    rom_content = b"GBA\x00\x00\x00\x00ROM data"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rom_folder = Path(tmpdir) / "roms"
+        rom_folder.mkdir()
+
+        # First add a game and set up console using the API (which uses the test client's store)
+        await client.post("/games", json={"name": "Test Game", "console": "GBA"}, headers=AUTH)
+
+        # Configure the game device first with a rom_path to establish the console
+        rom_path = rom_folder / "setup.gba"
+        rom_path.write_bytes(b"setup")
+        await client.put("/games/test-game/device",
+                         json={"rom_path": str(rom_path)}, headers=AUTH)
+
+        # Now push a new ROM which should be saved to the console folder
+        r = await client.post("/games/test-game/rom",
+                              content=rom_content,
+                              headers={**AUTH,
+                                       "X-Rom-Filename": "game.gba"},
+                              )
+        assert r.status_code == 200
+        result = r.json()
+        assert "saved_to" in result
+
+        # Verify file was created
+        saved_path = Path(result["saved_to"])
+        assert saved_path.exists()
+        assert saved_path.read_bytes() == rom_content
+
+
+@pytest.mark.asyncio
+async def test_push_rom_custom_dest_folder(client):
+    """POST /games/{slug}/rom with X-Dest-Folder header works without console config."""
+    rom_content = b"TEST ROM"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest_folder = Path(tmpdir) / "custom"
+        dest_folder.mkdir()
+
+        await client.post("/games", json={"name": "Test Game", "console": "GBA"}, headers=AUTH)
+
+        r = await client.post("/games/test-game/rom",
+                              content=rom_content,
+                              headers={**AUTH,
+                                       "X-Rom-Filename": "game.gba",
+                                       "X-Dest-Folder": str(dest_folder)},
+                              )
+        assert r.status_code == 200
+        result = r.json()
+
+        saved_path = Path(result["saved_to"])
+        assert saved_path.exists()
+        assert saved_path.read_bytes() == rom_content
+        assert str(dest_folder) in str(saved_path)
+
+
+@pytest.mark.asyncio
+async def test_push_rom_no_console_422(client):
+    """POST /games/{slug}/rom returns 422 when console not configured and no X-Dest-Folder."""
+    rom_content = b"TEST ROM"
+
+    await client.post("/games", json={"name": "Test Game", "console": "GBA"}, headers=AUTH)
+
+    r = await client.post("/games/test-game/rom",
+                          content=rom_content,
+                          headers={**AUTH, "X-Rom-Filename": "game.gba"},
+                          )
+    assert r.status_code == 422
+    assert "not configured" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_push_rom_registers_game_device(client):
+    """POST /games/{slug}/rom also persists game_devices row."""
+    rom_content = b"TEST ROM"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rom_folder = Path(tmpdir) / "roms"
+        rom_folder.mkdir()
+
+        await client.post("/games", json={"name": "Test Game", "console": "GBA"}, headers=AUTH)
+
+        # First set up console by configuring the game device
+        rom_path = rom_folder / "setup.gba"
+        rom_path.write_bytes(b"setup")
+        await client.put("/games/test-game/device",
+                         json={"rom_path": str(rom_path)}, headers=AUTH)
+
+        # Push ROM
+        r = await client.post("/games/test-game/rom",
+                              content=rom_content,
+                              headers={**AUTH, "X-Rom-Filename": "game.gba"},
+                              )
+        assert r.status_code == 200
+
+        # Verify game_devices was registered with the new ROM
+        r = await client.get("/games/test-game/device", headers=AUTH)
+        assert r.status_code == 200
+        config = r.json()
+        assert config["rom_path"] != ""
+        assert "game.gba" in config["rom_path"]

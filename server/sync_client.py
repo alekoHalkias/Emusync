@@ -162,3 +162,47 @@ class SyncClient:
             return None
         r.raise_for_status()
         return r.json()
+
+    def pull_rom(self, slug: str, dest_path: str, on_progress) -> str:
+        """Stream ROM from server to disk. Returns filename. Calls on_progress(downloaded, total)."""
+        with httpx.stream("GET", self._url(f"/games/{slug}/rom"),
+                          headers=self._headers, timeout=None) as r:
+            r.raise_for_status()
+            total = int(r.headers.get("content-length", 0))
+            filename = r.headers.get("X-Rom-Filename", Path(dest_path).name)
+            downloaded = 0
+            with open(dest_path, "wb") as f:
+                for chunk in r.iter_bytes(chunk_size=65536):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    on_progress(downloaded, total)
+        return filename
+
+    def push_rom(self, slug: str, rom_path: str, on_progress, dest_folder: str = "") -> dict:
+        """Stream ROM from disk to target server. Returns server's response dict."""
+        filename = Path(rom_path).name
+        total = Path(rom_path).stat().st_size
+        uploaded = [0]
+
+        def gen():
+            with open(rom_path, "rb") as f:
+                while chunk := f.read(65536):
+                    uploaded[0] += len(chunk)
+                    on_progress(uploaded[0], total)
+                    yield chunk
+
+        extra_headers = {"X-Rom-Filename": filename}
+        if dest_folder:
+            extra_headers["X-Dest-Folder"] = dest_folder
+
+        r = httpx.post(
+            self._url(f"/games/{slug}/rom"),
+            content=gen(),
+            headers={**self._headers,
+                     "Content-Type": "application/octet-stream",
+                     "Content-Length": str(total),
+                     **extra_headers},
+            timeout=None,
+        )
+        r.raise_for_status()
+        return r.json()

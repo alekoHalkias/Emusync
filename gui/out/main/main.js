@@ -12,6 +12,7 @@ const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
   return require("fs").existsSync(venv) ? venv : "python3";
 })();
 let serverProcess = null;
+let serverStartedByApp = false;
 let gameProcess = null;
 let mainWindow = null;
 function createWindow() {
@@ -97,6 +98,7 @@ function startServerProcess() {
       const line = chunk.toString();
       if (!resolved && line.includes("Pairing token:")) {
         resolved = true;
+        serverStartedByApp = true;
         resolve({ ok: true });
       }
     });
@@ -153,6 +155,7 @@ electron.ipcMain.handle("server:stop", async () => {
   }
   killServerByPid();
   await killOrphanServers();
+  serverStartedByApp = false;
   return true;
 });
 electron.ipcMain.handle("server:token", () => null);
@@ -883,7 +886,9 @@ electron.app.on("window-all-closed", () => {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
   }
-  killServerByPid();
-  void killOrphanServers();
+  if (serverStartedByApp) {
+    killServerByPid();
+    void killOrphanServers();
+  }
   if (process.platform !== "darwin") electron.app.quit();
 });

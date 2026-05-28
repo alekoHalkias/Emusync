@@ -5,3 +5,10 @@ make a new issue for a pr to make a cli function to push a game to the primary g
 make the syntax on the cli for pushing a game on the device would be "emusync push [game] [device]" when run. 
 make sure the other device is reachable and make sure there is a progress bar for the file transfer. 
 make sure there is proper error management for when the device is not reachable and for the file transfer
+
+corrections to the plan
+"each device running emusync server start exposes new ROM endpoints" 
+change this to each device paired to the host, and if the deivce is connected.
+
+
+
