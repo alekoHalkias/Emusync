@@ -20,6 +20,7 @@ app.add_middleware(
 
 _store: Optional[Store] = None
 _master_pin: str = ""
+_data_dir: str = ""
 _online_devices: set[str] = set()
 _device_names: dict[str, str] = {}
 _presence_lock = threading.Lock()
@@ -52,10 +53,11 @@ def _monitor_presence() -> None:
             pass
 
 
-def init(store: Store, master_pin: str) -> None:
-    global _store, _master_pin, _online_devices, _device_names
+def init(store: Store, master_pin: str, data_dir: str = "") -> None:
+    global _store, _master_pin, _data_dir, _online_devices, _device_names
     _store = store
     _master_pin = master_pin
+    _data_dir = data_dir
     _online_devices.clear()
     _device_names.clear()
     t = threading.Thread(target=_monitor_presence, daemon=True)
@@ -119,8 +121,10 @@ def health() -> dict:
 
 @app.get("/devices")
 def list_devices(device_id: str = Depends(_auth)) -> list[dict]:
+    with _presence_lock:
+        online_set = set(_online_devices)
     return [
-        {"id": d.id, "name": d.name, "last_ip": d.last_ip, "last_seen_at": d.last_seen_at}
+        {"id": d.id, "name": d.name, "last_ip": d.last_ip, "last_seen_at": d.last_seen_at, "is_online": d.id in online_set}
         for d in _get_store().list_devices()
     ]
 
@@ -298,6 +302,88 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
         device_name = _device_names.get(device_id, device_id)
         _print_activity(f"new {game.console} game added: {game.name} to {device_name} at the local path {req.rom_path}")
     return {"ok": True}
+
+
+# ── game-devices (current device) ────────────────────────────────────────────
+
+@app.get("/game-devices")
+def list_my_game_devices(device_id: str = Depends(_auth)) -> list[dict]:
+    """Return all games configured for the calling device."""
+    return _get_store().list_game_devices_for_device(device_id)
+
+
+# ── device consoles ───────────────────────────────────────────────────────────
+
+@app.get("/devices/{target_device_id}/consoles")
+def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) -> list[dict]:
+    consoles = _get_store().list_consoles(target_device_id)
+    return [
+        {
+            "console_name": c.console_name,
+            "device_game_folder": c.device_game_folder,
+            "device_save_folder": c.device_save_folder,
+            "device_emulator": c.device_emulator,
+        }
+        for c in consoles
+    ]
+
+
+# ── rom transfers ─────────────────────────────────────────────────────────────
+
+@app.post("/games/{slug}/rom-transfer")
+async def create_rom_transfer(
+    slug: str,
+    request: Request,
+    x_to_device_id: str = Header(None),
+    x_destination_path: str = Header(None),
+    x_filename: str = Header("rom"),
+    device_id: str = Depends(_auth),
+) -> dict:
+    import asyncio
+    import uuid
+    from pathlib import Path as _Path
+
+    store = _get_store()
+    game = store.get_game(slug)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    if not x_to_device_id:
+        raise HTTPException(status_code=400, detail="Missing X-To-Device-ID header")
+    if not _data_dir:
+        raise HTTPException(status_code=500, detail="Server data directory not configured")
+
+    devices = store.list_devices()
+    if not any(d.id == x_to_device_id for d in devices):
+        raise HTTPException(status_code=404, detail="Target device not found")
+
+    transfer_id = str(uuid.uuid4())
+    ext = _Path(x_filename or "rom").suffix
+    staging_dir = _Path(_data_dir) / "rom_staging"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    staged_path = staging_dir / f"{transfer_id}{ext}"
+
+    loop = asyncio.get_event_loop()
+    with open(staged_path, "wb") as f:
+        async for chunk in request.stream():
+            await loop.run_in_executor(None, f.write, chunk)
+
+    store.create_rom_transfer(
+        id=transfer_id,
+        slug=slug,
+        from_device_id=device_id,
+        to_device_id=x_to_device_id,
+        destination_path=x_destination_path or "",
+        staged_file=str(staged_path),
+    )
+
+    target_name = next((d.name for d in devices if d.id == x_to_device_id), x_to_device_id)
+    with _presence_lock:
+        is_online = x_to_device_id in _online_devices
+
+    store.log_event("rom_transfer_queued", slug, device_id)
+    _print_activity(f"ROM transfer queued: {game.name} → {target_name}")
+
+    return {"transfer_id": transfer_id, "status": "pending", "target_online": is_online}
 
 
 # ── saves ─────────────────────────────────────────────────────────────────────

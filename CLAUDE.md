@@ -29,12 +29,12 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import) |
-| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp; logs real-time device activity ("paired", "online", "offline", "unpaired") to stdout; background monitoring thread detects idle devices |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; events table includes `rom_path` field for game import logging (version 2+) |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`, `push`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import); `push` is an interactive ROM transfer wizard (multi-select games → pick target device → confirm path → stream upload) |
+| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`, `/game-devices`, `/devices/{id}/consoles`, `/games/{slug}/rom-transfer`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp; logs real-time device activity ("paired", "online", "offline", "unpaired") to stdout; background monitoring thread detects idle devices; `GET /devices` includes `is_online` bool; `init()` accepts optional `data_dir` for ROM staging |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`, `rom_transfers`; schema version 3; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; `rom_transfers` tracks pending ROM file deliveries with staged file path and status |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
-| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`); sends PIN + device headers for auth; `GameDeviceConfig` holds `rom_path`, `save_path`, `launch_command`, `state_path`, `rom_folder_path` — all 5 are sent to `PUT /games/{slug}/device` |
+| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`, `push`); sends PIN + device headers for auth; `GameDeviceConfig` holds `rom_path`, `save_path`, `launch_command`, `state_path`, `rom_folder_path`; `list_my_game_devices()`, `get_device_consoles()`, `create_rom_transfer()` support the push flow |
 | `gui/electron/main.ts` | IPC handlers; spawns/kills Python server; manages `serverProcess` PID file; `changePin` simplifies to restart without clearing devices |
 | `gui/electron/preload.ts` | `contextBridge` — everything in `window.emusync.*` is defined here |
 | `gui/renderer/src/api.ts` | Fetch wrapper for the Python REST API; holds `_base` URL + `_token` |
@@ -150,6 +150,7 @@ When adding a new IPC channel, add the handler to `main.ts` AND the bridge entry
 | `~/.emusync/emusync.db` | SQLite database (devices, games, saves, locks) |
 | `~/.emusync/.server_pid` | PID of the running server process (written on start, deleted on clean exit) |
 | `~/.emusync/.game_pid` | Two-line file: line 1 = emusync run PID, line 2 = emulator child PID (written by `emusync run`, deleted on exit) |
+| `~/.emusync/rom_staging/` | Staged ROM files for pending transfers (named `{transfer_id}{ext}`); created by `POST /games/{slug}/rom-transfer` |
 
 Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_name`, `is_server`, `server_pin` (optional — blank = open access), `recent_import_folders` (dict mapping console keys to lists of recent folder paths).
 
@@ -393,6 +394,31 @@ During console import, the `rom_folder_path` is extracted from each ROM file pat
 - Managing multiple games from the same directory
 
 The path is extracted from the full ROM file path during import and returned by `GET /games/{slug}/device` endpoint alongside `rom_path`, `save_path`, `state_path`, and `launch_command`.
+
+---
+
+## ROM Transfer (`emusync push`)
+
+`emusync push` is an interactive wizard that transfers ROM files from the current device to another via the central server:
+
+**Flow:**
+1. Lists all games on this device that have a `rom_path` configured
+2. User multi-selects games (e.g. `1`, `1,3`, `1-4`)
+3. Lists other paired devices with online/offline status
+4. User selects target device
+5. For each game: checks if the target device has the console configured (via `consoles` table or `game_devices`); if found, proposes the known ROM folder; user confirms or enters a custom path
+6. Streams each ROM to the server staging area via `POST /games/{slug}/rom-transfer`
+7. Server creates a `rom_transfers` record (status=pending); responds with `target_online` bool
+8. CLI shows "queued — device is online" or "⚠ offline — will be delivered when it comes online"
+
+**API surface:**
+- `POST /games/{slug}/rom-transfer` — streams ROM bytes (body) with `X-To-Device-ID`, `X-Destination-Path`, `X-Filename` headers; stages file to `~/.emusync/rom_staging/{transfer_id}{ext}`; returns `{transfer_id, status, target_online}`
+- `GET /game-devices` — returns all games configured for the calling device (slug, name, console, rom_path, save_path, …)
+- `GET /devices/{id}/consoles` — returns console configs (name, ROM folder, save folder, emulator) for any device
+
+**Staging dir:** `~/.emusync/rom_staging/` — one file per pending transfer, named by transfer UUID + original extension.
+
+**Pull side is not yet implemented.** Transfer records sit as `status=pending` in `rom_transfers` until a future `emusync pull` command picks them up.
 
 ---
 

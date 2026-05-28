@@ -93,6 +93,53 @@ class SyncClient:
         )
         r.raise_for_status()
 
+    def list_my_game_devices(self) -> list[dict]:
+        """Return all games configured for this device (slug, name, console, rom_path, …)."""
+        r = httpx.get(self._url("/game-devices"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_device_consoles(self, device_id: str) -> list[dict]:
+        """Return console configs for a specific device (to find its ROM folders)."""
+        r = httpx.get(self._url(f"/devices/{device_id}/consoles"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def create_rom_transfer(
+        self, slug: str, to_device_id: str, destination_path: str, rom_path: str
+    ) -> dict:
+        """Upload a ROM to the server and queue it for delivery to target device."""
+        path = Path(rom_path)
+        file_size = path.stat().st_size
+        mb_total = file_size / (1024 * 1024)
+        transferred = [0]
+
+        def _stream():
+            chunk_size = 64 * 1024
+            with open(rom_path, "rb") as f:
+                while chunk := f.read(chunk_size):
+                    transferred[0] += len(chunk)
+                    pct = transferred[0] * 100 // file_size
+                    mb = transferred[0] / (1024 * 1024)
+                    print(f"\r  {mb:.1f} / {mb_total:.1f} MB ({pct}%)", end="", flush=True)
+                    yield chunk
+            print(flush=True)
+
+        r = httpx.post(
+            self._url(f"/games/{slug}/rom-transfer"),
+            content=_stream(),
+            headers={
+                **self._headers,
+                "Content-Type": "application/octet-stream",
+                "X-To-Device-ID": to_device_id,
+                "X-Destination-Path": destination_path,
+                "X-Filename": path.name,
+            },
+            timeout=httpx.Timeout(None),
+        )
+        r.raise_for_status()
+        return r.json()
+
     def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
         """Write server save to disk. Returns (pulled, server_hash). pulled=False if no save exists."""
         r = httpx.get(self._url(f"/games/{slug}/save"), headers=self._headers, timeout=30)
