@@ -1,2 +1,3 @@
 #!/usr/bin/env bash
-exec "/home/Aleko/Documents/Scripts/Emusync/.venv/bin/python" "/home/Aleko/Documents/Scripts/Emusync/emusync.py" "$@"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/emusync.py" "$@"
