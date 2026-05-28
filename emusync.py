@@ -1526,6 +1526,16 @@ def pull_rom(game: str) -> None:
         click.echo("Game not found on any device.", err=True)
         sys.exit(1)
 
+    # Check if the game is configured on THIS server (the one we're pulling from)
+    server_has_game = any(d["id"] == cfg.device_id for d in devices_with_game)
+    if not server_has_game:
+        other_devices = ", ".join([d["name"] for d in devices_with_game])
+        click.echo(f"Game is on {other_devices}, but the central server doesn't have it configured.", err=True)
+        click.echo(f"In single-server architecture, you can only pull games that are on the server device.", err=True)
+        click.echo(f"Try: 1) Push the game from the other device to this one, or", err=True)
+        click.echo(f"     2) Configure the game here with 'emusync game add'", err=True)
+        sys.exit(1)
+
     console = matching_game.get("console", "Unknown")
     device_names = [d["name"] for d in devices_with_game if d["id"] != cfg.device_id]
     if device_names:
@@ -1654,10 +1664,23 @@ def push_rom(game: str) -> None:
     # List other devices and check which are online
     all_devices = client.list_devices()
     other_devices = [d for d in all_devices if d["id"] != cfg.device_id]
-    online_devices = [d for d in other_devices if _device_online(d, cfg)]
+
+    if not other_devices:
+        click.echo("No other devices registered.", err=True)
+        sys.exit(1)
+
+    online_devices = []
+    for d in other_devices:
+        if _device_online(d, cfg):
+            online_devices.append(d)
 
     if not online_devices:
-        click.echo("No online devices found.", err=True)
+        click.echo("No online devices found. Checking status of registered devices:", err=True)
+        for d in other_devices:
+            last_ip = d.get("last_ip", "unknown")
+            last_seen = d.get("last_seen_at", "never")
+            click.echo(f"  {d['name']}: last seen at {last_ip} on {last_seen}", err=True)
+        click.echo("Make sure the target device is online and has the server running.", err=True)
         sys.exit(1)
 
     # Let user choose target
