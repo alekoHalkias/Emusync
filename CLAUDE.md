@@ -29,12 +29,12 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `run`, `sync`); `device compare` shows game coverage across paired devices |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import) |
 | `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp; logs real-time device activity ("paired", "online", "offline", "unpaired") to stdout; background monitoring thread detects idle devices |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; events table includes `rom_path` field for game import logging (version 2+) |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
-| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`); sends PIN + device headers for auth |
+| `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`); sends PIN + device headers for auth; `GameDeviceConfig` holds `rom_path`, `save_path`, `launch_command`, `state_path`, `rom_folder_path` — all 5 are sent to `PUT /games/{slug}/device` |
 | `gui/electron/main.ts` | IPC handlers; spawns/kills Python server; manages `serverProcess` PID file; `changePin` simplifies to restart without clearing devices |
 | `gui/electron/preload.ts` | `contextBridge` — everything in `window.emusync.*` is defined here |
 | `gui/renderer/src/api.ts` | Fetch wrapper for the Python REST API; holds `_base` URL + `_token` |
