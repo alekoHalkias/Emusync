@@ -1514,31 +1514,24 @@ def pull_rom(game: str) -> None:
         click.echo(f"Game already on this device at {local_gd.rom_path}")
         return
 
-    # Find source device
+    # Verify game exists on central server
+    # (In single-server architecture, we can only pull from the central server)
     try:
         devices_with_game = client.list_game_devices(slug)
     except Exception as e:
         click.echo(f"Error fetching device list: {e}", err=True)
         sys.exit(1)
 
-    # Filter out this device and find first online one
-    source_device = None
-    all_devices = client.list_devices()
-    for gd in devices_with_game:
-        if gd["id"] != cfg.device_id:
-            # Check if online
-            full_device = next((d for d in all_devices if d["id"] == gd["id"]), None)
-            if full_device and _device_online(full_device, cfg):
-                source_device = full_device
-                break
-
-    if not source_device:
-        click.echo("Game not found on any online device.", err=True)
+    if not devices_with_game:
+        click.echo("Game not found on any device.", err=True)
         sys.exit(1)
 
-    # Print found message
     console = matching_game.get("console", "Unknown")
-    click.echo(f"{console} {matching_game['name']} found on {source_device['name']}")
+    device_names = [d["name"] for d in devices_with_game if d["id"] != cfg.device_id]
+    if device_names:
+        click.echo(f"{console} {matching_game['name']} found on {', '.join(device_names)}")
+    else:
+        click.echo(f"{console} {matching_game['name']} found on this device")
 
     # Confirm
     if not click.confirm("Copy to this device?", default=False):
@@ -1563,18 +1556,28 @@ def pull_rom(game: str) -> None:
         dest_folder = click.prompt(f"No console configured. Enter destination folder", default=default_folder)
         dest_folder = os.path.expanduser(dest_folder)
 
-    # Check if ROM already exists at destination
-    rom_filename = source_device.get("rom_path", "").split("/")[-1] or f"{slug}.rom"
+    # Get filename from server config if available, otherwise use game name
+    server_config = None
+    try:
+        server_config = client.get_game_device(slug)
+    except Exception:
+        pass
+
+    if server_config and server_config.rom_path:
+        rom_filename = Path(server_config.rom_path).name
+    else:
+        rom_filename = f"{matching_game['name'].lower().replace(' ', '_')}.rom"
+
     dest_path = os.path.join(dest_folder, rom_filename)
     if Path(dest_path).exists():
         click.echo(f"ROM already exists at {dest_path}, skipping.")
         return
 
-    # Download from source
-    source_client = _client_at(source_device, cfg)
+    # Download from central server (the device running emusync server start)
+    # In single-server architecture, only the server device exposes ROM endpoints
     click.echo(f"Downloading to {dest_path}...")
     try:
-        source_client.pull_rom(slug, dest_path, _show_progress)
+        client.pull_rom(slug, dest_path, _show_progress)
     except Exception as e:
         click.echo(f"Download failed: {e}", err=True)
         Path(dest_path).unlink(missing_ok=True)
