@@ -1397,18 +1397,15 @@ def push_rom() -> None:
                 f"  {console_label} found on {target['name']} — place '{rom_filename}' in {suggested_folder}?",
                 default=True,
             ):
-                destination_path = os.path.join(suggested_folder, rom_filename)
+                dest_folder = suggested_folder
             else:
-                destination_path = click.prompt("  Where should the ROM be installed on the device?")
+                dest_folder = click.prompt("  Which folder should the ROM go in?")
         else:
             label = console if console else "Console"
             click.echo(f"  {label} not yet set up on {target['name']}.")
-            destination_path = click.prompt("  Where should the ROM be installed on the device?")
+            dest_folder = click.prompt("  Which folder should the ROM go in?")
 
-        # If the user gave a folder path (no extension / trailing slash), append the filename
-        destination_path = destination_path.rstrip("/\\")
-        if not os.path.splitext(destination_path)[1]:
-            destination_path = os.path.join(destination_path, rom_filename)
+        destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
 
         # Upload
         file_mb = os.path.getsize(rom_path) / (1024 * 1024)
