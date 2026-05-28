@@ -861,3 +861,136 @@ async def test_device_compare_no_games(client):
     """Server has no games — compare returns an empty list."""
     r = await client.get("/games", headers=AUTH)
     assert r.json() == []
+
+
+# ── rom transfers ─────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_rom_transfer_queued(tmp_path):
+    """Push a ROM file to the server; record is created as pending."""
+    rom_file = tmp_path / "game.gba"
+    rom_file.write_bytes(b"ROMDATA" * 100)
+
+    data_dir = str(tmp_path)
+    with tempfile.TemporaryDirectory() as db_dir:
+        store = Store(db_dir)
+        api_module.init(store, MASTER_PIN, data_dir)
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app), base_url="http://test"
+        ) as c:
+            auth_src = _device_auth("dev-src", "PC")
+            auth_dst = _device_auth("dev-dst", "Steam Deck")
+
+            # Register both devices and create a game
+            await c.get("/health")
+            await c.get("/games", headers=auth_src)
+            await c.get("/games", headers=auth_dst)
+            await c.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=auth_src)
+
+            # Push ROM transfer
+            r = await c.post(
+                "/games/metroid/rom-transfer",
+                content=rom_file.read_bytes(),
+                headers={
+                    **auth_src,
+                    "Content-Type": "application/octet-stream",
+                    "X-To-Device-ID": "dev-dst",
+                    "X-Destination-Path": "/home/deck/Games/GBA/Metroid.gba",
+                    "X-Filename": "Metroid.gba",
+                },
+            )
+            assert r.status_code == 200
+            body = r.json()
+            assert body["status"] == "pending"
+            assert "transfer_id" in body
+
+            # Staged file exists on disk (nested under transfer_id subdir)
+            staging = tmp_path / "rom_staging"
+            staged = list(staging.rglob("*.gba"))
+            assert len(staged) == 1
+            assert staged[0].name == "Metroid.gba"
+            assert staged[0].read_bytes() == rom_file.read_bytes()
+
+
+@pytest.mark.asyncio
+async def test_rom_transfer_missing_game(tmp_path):
+    """Transfer for a non-existent game returns 404."""
+    with tempfile.TemporaryDirectory() as db_dir:
+        store = Store(db_dir)
+        api_module.init(store, MASTER_PIN, str(tmp_path))
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app), base_url="http://test"
+        ) as c:
+            auth_src = _device_auth("dev-src", "PC")
+            auth_dst = _device_auth("dev-dst", "Deck")
+            await c.get("/games", headers=auth_src)
+            await c.get("/games", headers=auth_dst)
+
+            r = await c.post(
+                "/games/no-such-game/rom-transfer",
+                content=b"data",
+                headers={
+                    **auth_src,
+                    "Content-Type": "application/octet-stream",
+                    "X-To-Device-ID": "dev-dst",
+                    "X-Destination-Path": "/tmp/game.gba",
+                    "X-Filename": "game.gba",
+                },
+            )
+            assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_rom_transfer_missing_target(tmp_path):
+    """Transfer to an unknown device ID returns 404."""
+    with tempfile.TemporaryDirectory() as db_dir:
+        store = Store(db_dir)
+        api_module.init(store, MASTER_PIN, str(tmp_path))
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app), base_url="http://test"
+        ) as c:
+            auth_src = _device_auth("dev-src", "PC")
+            await c.get("/games", headers=auth_src)
+            await c.post("/games", json={"name": "Game"}, headers=auth_src)
+
+            r = await c.post(
+                "/games/game/rom-transfer",
+                content=b"data",
+                headers={
+                    **auth_src,
+                    "Content-Type": "application/octet-stream",
+                    "X-To-Device-ID": "ghost-device",
+                    "X-Destination-Path": "/tmp/game.gba",
+                    "X-Filename": "game.gba",
+                },
+            )
+            assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_game_devices_for_device(client):
+    """GET /game-devices returns only games configured for the calling device."""
+    auth_a = _device_auth("dev-a", "PC")
+    auth_b = _device_auth("dev-b", "Deck")
+
+    await client.post("/games", json={"name": "Alpha"}, headers=auth_a)
+    await client.post("/games", json={"name": "Beta"},  headers=auth_a)
+    await client.put("/games/alpha/device", json={"rom_path": "/roms/Alpha.gba"}, headers=auth_a)
+    await client.put("/games/beta/device",  json={"rom_path": "/roms/Beta.gba"},  headers=auth_b)
+
+    r = await client.get("/game-devices", headers=auth_a)
+    assert r.status_code == 200
+    slugs = {g["slug"] for g in r.json()}
+    assert slugs == {"alpha"}  # dev-a only configured alpha
+
+
+@pytest.mark.asyncio
+async def test_devices_list_includes_is_online(client):
+    """GET /devices includes is_online bool for each device."""
+    r = await client.get("/devices", headers=AUTH)
+    assert r.status_code == 200
+    devices = r.json()
+    assert len(devices) >= 1
+    for d in devices:
+        assert "is_online" in d
+        assert isinstance(d["is_online"], bool)

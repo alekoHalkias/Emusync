@@ -32,7 +32,7 @@ class _LockedConnection:
             return getattr(self._conn, name)
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -99,6 +99,17 @@ CREATE TABLE IF NOT EXISTS events (
     rom_path    TEXT,
     occurred_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS rom_transfers (
+    id               TEXT PRIMARY KEY,
+    slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    from_device_id   TEXT NOT NULL REFERENCES devices(id),
+    to_device_id     TEXT NOT NULL REFERENCES devices(id),
+    destination_path TEXT NOT NULL DEFAULT '',
+    staged_file      TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    queued_at        TEXT NOT NULL,
+    completed_at     TEXT
+);
 """
 
 
@@ -124,6 +135,18 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
         _try(conn, "ALTER TABLE devices DROP COLUMN token")
     if from_version < 2:
         _try(conn, "ALTER TABLE events ADD COLUMN rom_path TEXT")
+    if from_version < 3:
+        _try(conn, """CREATE TABLE IF NOT EXISTS rom_transfers (
+            id               TEXT PRIMARY KEY,
+            slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+            from_device_id   TEXT NOT NULL REFERENCES devices(id),
+            to_device_id     TEXT NOT NULL REFERENCES devices(id),
+            destination_path TEXT NOT NULL DEFAULT '',
+            staged_file      TEXT NOT NULL DEFAULT '',
+            status           TEXT NOT NULL DEFAULT 'pending',
+            queued_at        TEXT NOT NULL,
+            completed_at     TEXT
+        )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
 
@@ -178,6 +201,19 @@ class Lock:
     game_slug: str
     device_id: str
     acquired_at: str
+
+
+@dataclass
+class RomTransfer:
+    id: str
+    slug: str
+    from_device_id: str
+    to_device_id: str
+    destination_path: str
+    staged_file: str
+    status: str
+    queued_at: str
+    completed_at: Optional[str] = None
 
 
 class Store:
@@ -333,7 +369,7 @@ class Store:
 
     def list_devices_for_game(self, game_slug: str) -> list[dict]:
         rows = self._conn.execute(
-            """SELECT d.id, d.name, gd.rom_path, gd.save_path, gd.state_path
+            """SELECT d.id, d.name, gd.rom_path, gd.save_path, gd.state_path, gd.rom_folder_path
                FROM game_devices gd
                JOIN devices d ON d.id = gd.device_id
                WHERE gd.game_slug = ?
@@ -347,9 +383,22 @@ class Store:
                 "rom_path": row["rom_path"],
                 "save_path": row["save_path"],
                 "state_path": row["state_path"],
+                "rom_folder_path": row["rom_folder_path"],
             }
             for row in rows
         ]
+
+    def list_game_devices_for_device(self, device_id: str) -> list[dict]:
+        rows = self._conn.execute(
+            """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
+                      gd.launch_command, gd.state_path, gd.rom_folder_path
+               FROM game_devices gd
+               JOIN games g ON g.slug = gd.game_slug
+               WHERE gd.device_id = ?
+               ORDER BY g.name""",
+            (device_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     # ── saves ─────────────────────────────────────────────────────────────────
 
@@ -483,3 +532,55 @@ class Store:
             (game_slug,),
         ).fetchone()
         return Lock(**dict(row)) if row else None
+
+    # ── rom_transfers ─────────────────────────────────────────────────────────
+
+    def create_rom_transfer(
+        self,
+        id: str,
+        slug: str,
+        from_device_id: str,
+        to_device_id: str,
+        destination_path: str,
+        staged_file: str,
+    ) -> RomTransfer:
+        now = datetime.now(timezone.utc).isoformat()
+        self._conn.execute(
+            """INSERT INTO rom_transfers
+               (id, slug, from_device_id, to_device_id, destination_path, staged_file, status, queued_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)""",
+            (id, slug, from_device_id, to_device_id, destination_path, staged_file, now),
+        )
+        self._conn.commit()
+        return RomTransfer(
+            id=id, slug=slug, from_device_id=from_device_id, to_device_id=to_device_id,
+            destination_path=destination_path, staged_file=staged_file,
+            status="pending", queued_at=now,
+        )
+
+    def get_rom_transfer(self, transfer_id: str) -> Optional[RomTransfer]:
+        row = self._conn.execute(
+            """SELECT id, slug, from_device_id, to_device_id, destination_path,
+                      staged_file, status, queued_at, completed_at
+               FROM rom_transfers WHERE id = ?""",
+            (transfer_id,),
+        ).fetchone()
+        return RomTransfer(**dict(row)) if row else None
+
+    def list_pending_transfers_for_device(self, device_id: str) -> list[RomTransfer]:
+        rows = self._conn.execute(
+            """SELECT id, slug, from_device_id, to_device_id, destination_path,
+                      staged_file, status, queued_at, completed_at
+               FROM rom_transfers WHERE to_device_id = ? AND status = 'pending'
+               ORDER BY queued_at""",
+            (device_id,),
+        ).fetchall()
+        return [RomTransfer(**dict(r)) for r in rows]
+
+    def update_transfer_status(self, transfer_id: str, status: str) -> None:
+        completed_at = datetime.now(timezone.utc).isoformat() if status in ("completed", "failed") else None
+        self._conn.execute(
+            "UPDATE rom_transfers SET status = ?, completed_at = ? WHERE id = ?",
+            (status, completed_at, transfer_id),
+        )
+        self._conn.commit()

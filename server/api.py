@@ -3,8 +3,11 @@ from __future__ import annotations
 import threading
 from typing import Optional
 
+import asyncio
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from .store import GameDevice, Store
@@ -20,9 +23,11 @@ app.add_middleware(
 
 _store: Optional[Store] = None
 _master_pin: str = ""
+_data_dir: str = ""
 _online_devices: set[str] = set()
 _device_names: dict[str, str] = {}
 _presence_lock = threading.Lock()
+_device_event_queues: dict[str, "asyncio.Queue"] = {}
 
 
 def _monitor_presence() -> None:
@@ -52,10 +57,11 @@ def _monitor_presence() -> None:
             pass
 
 
-def init(store: Store, master_pin: str) -> None:
-    global _store, _master_pin, _online_devices, _device_names
+def init(store: Store, master_pin: str, data_dir: str = "") -> None:
+    global _store, _master_pin, _data_dir, _online_devices, _device_names
     _store = store
     _master_pin = master_pin
+    _data_dir = data_dir
     _online_devices.clear()
     _device_names.clear()
     t = threading.Thread(target=_monitor_presence, daemon=True)
@@ -119,8 +125,10 @@ def health() -> dict:
 
 @app.get("/devices")
 def list_devices(device_id: str = Depends(_auth)) -> list[dict]:
+    with _presence_lock:
+        online_set = set(_online_devices)
     return [
-        {"id": d.id, "name": d.name, "last_ip": d.last_ip, "last_seen_at": d.last_seen_at}
+        {"id": d.id, "name": d.name, "last_ip": d.last_ip, "last_seen_at": d.last_seen_at, "is_online": d.id in online_set}
         for d in _get_store().list_devices()
     ]
 
@@ -298,6 +306,179 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
         device_name = _device_names.get(device_id, device_id)
         _print_activity(f"new {game.console} game added: {game.name} to {device_name} at the local path {req.rom_path}")
     return {"ok": True}
+
+
+# ── game-devices (current device) ────────────────────────────────────────────
+
+@app.get("/game-devices")
+def list_my_game_devices(device_id: str = Depends(_auth)) -> list[dict]:
+    """Return all games configured for the calling device."""
+    return _get_store().list_game_devices_for_device(device_id)
+
+
+# ── device consoles ───────────────────────────────────────────────────────────
+
+@app.get("/devices/{target_device_id}/consoles")
+def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) -> list[dict]:
+    consoles = _get_store().list_consoles(target_device_id)
+    return [
+        {
+            "console_name": c.console_name,
+            "device_game_folder": c.device_game_folder,
+            "device_save_folder": c.device_save_folder,
+            "device_emulator": c.device_emulator,
+        }
+        for c in consoles
+    ]
+
+
+# ── rom transfers ─────────────────────────────────────────────────────────────
+
+@app.post("/games/{slug}/rom-transfer")
+async def create_rom_transfer(
+    slug: str,
+    request: Request,
+    x_to_device_id: str = Header(None),
+    x_destination_path: str = Header(None),
+    x_filename: str = Header("rom"),
+    device_id: str = Depends(_auth),
+) -> dict:
+    import asyncio
+    import uuid
+    from pathlib import Path as _Path
+
+    store = _get_store()
+    game = store.get_game(slug)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    if not x_to_device_id:
+        raise HTTPException(status_code=400, detail="Missing X-To-Device-ID header")
+    if not _data_dir:
+        raise HTTPException(status_code=500, detail="Server data directory not configured")
+
+    devices = store.list_devices()
+    if not any(d.id == x_to_device_id for d in devices):
+        raise HTTPException(status_code=404, detail="Target device not found")
+
+    transfer_id = str(uuid.uuid4())
+    filename = x_filename or "rom"
+    transfer_subdir = _Path(_data_dir) / "rom_staging" / transfer_id
+    transfer_subdir.mkdir(parents=True, exist_ok=True)
+    staged_path = transfer_subdir / filename
+
+    loop = asyncio.get_event_loop()
+    with open(staged_path, "wb") as f:
+        async for chunk in request.stream():
+            await loop.run_in_executor(None, f.write, chunk)
+
+    store.create_rom_transfer(
+        id=transfer_id,
+        slug=slug,
+        from_device_id=device_id,
+        to_device_id=x_to_device_id,
+        destination_path=x_destination_path or "",
+        staged_file=str(staged_path),
+    )
+
+    target_name = next((d.name for d in devices if d.id == x_to_device_id), x_to_device_id)
+    with _presence_lock:
+        is_online = x_to_device_id in _online_devices
+
+    # Notify target device via SSE if it has a stream open
+    if x_to_device_id in _device_event_queues:
+        import json as _json
+        await _device_event_queues[x_to_device_id].put({
+            "type": "rom_transfer_queued",
+            "transfer_id": transfer_id,
+            "slug": slug,
+            "game_name": game.name,
+            "console": game.console,
+            "destination_path": x_destination_path or "",
+        })
+
+    store.log_event("rom_transfer_queued", slug, device_id)
+    _print_activity(f"ROM transfer queued: {game.name} → {target_name}")
+
+    return {"transfer_id": transfer_id, "status": "pending", "target_online": is_online}
+
+
+# ── rom transfer delivery ─────────────────────────────────────────────────────
+
+@app.get("/rom-transfers/pending")
+def list_pending_transfers(device_id: str = Depends(_auth)) -> list[dict]:
+    """Return all pending ROM transfers queued for the calling device."""
+    store = _get_store()
+    transfers = store.list_pending_transfers_for_device(device_id)
+    result = []
+    for t in transfers:
+        game = store.get_game(t.slug)
+        result.append({
+            "id": t.id,
+            "slug": t.slug,
+            "destination_path": t.destination_path,
+            "queued_at": t.queued_at,
+            "console": game.console if game else "",
+            "game_name": game.name if game else t.slug,
+        })
+    return result
+
+
+@app.get("/rom-transfers/{transfer_id}/file")
+def download_transfer_file(transfer_id: str, device_id: str = Depends(_auth)) -> FileResponse:
+    """Stream the staged ROM file for a pending transfer."""
+    from pathlib import Path as _Path
+    transfer = _get_store().get_rom_transfer(transfer_id)
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+    if transfer.to_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    staged = _Path(transfer.staged_file)
+    if not staged.exists():
+        raise HTTPException(status_code=410, detail="Staged file no longer exists")
+    return FileResponse(str(staged), filename=staged.name, media_type="application/octet-stream")
+
+
+@app.put("/rom-transfers/{transfer_id}")
+def update_transfer(transfer_id: str, request_body: dict, device_id: str = Depends(_auth)) -> dict:
+    """Mark a transfer as completed or failed."""
+    transfer = _get_store().get_rom_transfer(transfer_id)
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+    if transfer.to_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    status = request_body.get("status", "completed")
+    if status not in ("completed", "failed"):
+        raise HTTPException(status_code=400, detail="status must be 'completed' or 'failed'")
+    _get_store().update_transfer_status(transfer_id, status)
+    return {"ok": True}
+
+
+# ── SSE event stream ──────────────────────────────────────────────────────────
+
+@app.get("/events/stream")
+async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingResponse:
+    """Server-Sent Events stream — delivers real-time notifications to a device."""
+    import json as _json
+
+    queue: asyncio.Queue = asyncio.Queue()
+    _device_event_queues[device_id] = queue
+
+    async def generator():
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {_json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                except asyncio.CancelledError:
+                    return  # server shutting down — close the stream cleanly
+        except GeneratorExit:
+            pass
+        finally:
+            _device_event_queues.pop(device_id, None)
+
+    return StreamingResponse(generator(), media_type="text/event-stream")
 
 
 # ── saves ─────────────────────────────────────────────────────────────────────
