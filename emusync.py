@@ -1315,7 +1315,7 @@ def _find_target_rom_folder(
 def push_rom() -> None:
     """Push a ROM file to another device via the server."""
     cfg = cfg_module.load()
-    if not cfg.server_host:
+    if not cfg.server_host and not cfg.is_server:
         click.echo("EmuSync is not configured. Run 'emusync device connect' first.", err=True)
         sys.exit(1)
 
