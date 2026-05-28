@@ -140,6 +140,61 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def list_pending_transfers(self) -> list[dict]:
+        """Return transfers queued for this device that haven't been delivered yet."""
+        r = httpx.get(self._url("/rom-transfers/pending"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def download_transfer(self, transfer_id: str, destination_path: str) -> None:
+        """Stream a staged ROM file to disk at the given destination path."""
+        path = Path(destination_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with httpx.stream(
+            "GET",
+            self._url(f"/rom-transfers/{transfer_id}/file"),
+            headers=self._headers,
+            timeout=httpx.Timeout(None),
+        ) as r:
+            r.raise_for_status()
+            total = int(r.headers.get("content-length", 0))
+            received = 0
+            with open(destination_path, "wb") as f:
+                for chunk in r.iter_bytes(chunk_size=64 * 1024):
+                    f.write(chunk)
+                    received += len(chunk)
+                    if total:
+                        pct = received * 100 // total
+                        mb = received / (1024 * 1024)
+                        print(f"\r  {mb:.1f} / {total/(1024*1024):.1f} MB ({pct}%)", end="", flush=True)
+            print(flush=True)
+
+    def complete_transfer(self, transfer_id: str, status: str = "completed") -> None:
+        r = httpx.put(
+            self._url(f"/rom-transfers/{transfer_id}"),
+            json={"status": status},
+            headers=self._headers,
+            timeout=10,
+        )
+        r.raise_for_status()
+
+    def stream_events(self):
+        """Generator that yields parsed SSE event dicts. Blocks until disconnected."""
+        import json as _json
+        with httpx.stream(
+            "GET",
+            self._url("/events/stream"),
+            headers=self._headers,
+            timeout=httpx.Timeout(None),
+        ) as r:
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if line.startswith("data: "):
+                    try:
+                        yield _json.loads(line[6:])
+                    except (ValueError, KeyError):
+                        pass
+
     def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
         """Write server save to disk. Returns (pulled, server_hash). pulled=False if no save exists."""
         r = httpx.get(self._url(f"/games/{slug}/save"), headers=self._headers, timeout=30)

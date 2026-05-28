@@ -904,10 +904,11 @@ async def test_rom_transfer_queued(tmp_path):
             assert body["status"] == "pending"
             assert "transfer_id" in body
 
-            # Staged file exists on disk
+            # Staged file exists on disk (nested under transfer_id subdir)
             staging = tmp_path / "rom_staging"
-            staged = list(staging.glob("*.gba"))
+            staged = list(staging.rglob("*.gba"))
             assert len(staged) == 1
+            assert staged[0].name == "Metroid.gba"
             assert staged[0].read_bytes() == rom_file.read_bytes()
 
 

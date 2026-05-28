@@ -3,8 +3,11 @@ from __future__ import annotations
 import threading
 from typing import Optional
 
+import asyncio
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from .store import GameDevice, Store
@@ -24,6 +27,7 @@ _data_dir: str = ""
 _online_devices: set[str] = set()
 _device_names: dict[str, str] = {}
 _presence_lock = threading.Lock()
+_device_event_queues: dict[str, "asyncio.Queue"] = {}
 
 
 def _monitor_presence() -> None:
@@ -357,10 +361,10 @@ async def create_rom_transfer(
         raise HTTPException(status_code=404, detail="Target device not found")
 
     transfer_id = str(uuid.uuid4())
-    ext = _Path(x_filename or "rom").suffix
-    staging_dir = _Path(_data_dir) / "rom_staging"
-    staging_dir.mkdir(parents=True, exist_ok=True)
-    staged_path = staging_dir / f"{transfer_id}{ext}"
+    filename = x_filename or "rom"
+    transfer_subdir = _Path(_data_dir) / "rom_staging" / transfer_id
+    transfer_subdir.mkdir(parents=True, exist_ok=True)
+    staged_path = transfer_subdir / filename
 
     loop = asyncio.get_event_loop()
     with open(staged_path, "wb") as f:
@@ -380,10 +384,92 @@ async def create_rom_transfer(
     with _presence_lock:
         is_online = x_to_device_id in _online_devices
 
+    # Notify target device via SSE if it has a stream open
+    if x_to_device_id in _device_event_queues:
+        import json as _json
+        await _device_event_queues[x_to_device_id].put({
+            "type": "rom_transfer_queued",
+            "transfer_id": transfer_id,
+            "slug": slug,
+            "game_name": game.name,
+            "destination_path": x_destination_path or "",
+        })
+
     store.log_event("rom_transfer_queued", slug, device_id)
     _print_activity(f"ROM transfer queued: {game.name} → {target_name}")
 
     return {"transfer_id": transfer_id, "status": "pending", "target_online": is_online}
+
+
+# ── rom transfer delivery ─────────────────────────────────────────────────────
+
+@app.get("/rom-transfers/pending")
+def list_pending_transfers(device_id: str = Depends(_auth)) -> list[dict]:
+    """Return all pending ROM transfers queued for the calling device."""
+    transfers = _get_store().list_pending_transfers_for_device(device_id)
+    return [
+        {
+            "id": t.id,
+            "slug": t.slug,
+            "destination_path": t.destination_path,
+            "queued_at": t.queued_at,
+        }
+        for t in transfers
+    ]
+
+
+@app.get("/rom-transfers/{transfer_id}/file")
+def download_transfer_file(transfer_id: str, device_id: str = Depends(_auth)) -> FileResponse:
+    """Stream the staged ROM file for a pending transfer."""
+    from pathlib import Path as _Path
+    transfer = _get_store().get_rom_transfer(transfer_id)
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+    if transfer.to_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    staged = _Path(transfer.staged_file)
+    if not staged.exists():
+        raise HTTPException(status_code=410, detail="Staged file no longer exists")
+    return FileResponse(str(staged), filename=staged.name, media_type="application/octet-stream")
+
+
+@app.put("/rom-transfers/{transfer_id}")
+def update_transfer(transfer_id: str, request_body: dict, device_id: str = Depends(_auth)) -> dict:
+    """Mark a transfer as completed or failed."""
+    transfer = _get_store().get_rom_transfer(transfer_id)
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+    if transfer.to_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    status = request_body.get("status", "completed")
+    if status not in ("completed", "failed"):
+        raise HTTPException(status_code=400, detail="status must be 'completed' or 'failed'")
+    _get_store().update_transfer_status(transfer_id, status)
+    return {"ok": True}
+
+
+# ── SSE event stream ──────────────────────────────────────────────────────────
+
+@app.get("/events/stream")
+async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingResponse:
+    """Server-Sent Events stream — delivers real-time notifications to a device."""
+    import json as _json
+
+    queue: asyncio.Queue = asyncio.Queue()
+    _device_event_queues[device_id] = queue
+
+    async def generator():
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {_json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            _device_event_queues.pop(device_id, None)
+
+    return StreamingResponse(generator(), media_type="text/event-stream")
 
 
 # ── saves ─────────────────────────────────────────────────────────────────────

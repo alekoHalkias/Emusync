@@ -29,8 +29,8 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`, `push`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import); `push` is an interactive ROM transfer wizard (multi-select games → pick target device → confirm path → stream upload) |
-| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`, `/game-devices`, `/devices/{id}/consoles`, `/games/{slug}/rom-transfer`; `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp; logs real-time device activity ("paired", "online", "offline", "unpaired") to stdout; background monitoring thread detects idle devices; `GET /devices` includes `is_online` bool; `init()` accepts optional `data_dir` for ROM staging |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`, `push`, `sync-daemon`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import); `push` is an interactive ROM transfer wizard (multi-select games → pick target device → confirm path → stream upload); `sync-daemon` holds an SSE connection open and auto-receives incoming ROM transfers |
+| `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/events/stream` (SSE), `/games/{slug}/devices`, `/game-devices`, `/devices/{id}/consoles`, `/games/{slug}/rom-transfer`, `/rom-transfers/pending`, `/rom-transfers/{id}/file`, `/rom-transfers/{id}`; `_auth` auto-registers devices on first request; `GET /devices` includes `is_online`; `init()` accepts optional `data_dir` for ROM staging; `_device_event_queues` maps device IDs to asyncio queues for SSE delivery |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`, `rom_transfers`; schema version 3; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; `rom_transfers` tracks pending ROM file deliveries with staged file path and status |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
@@ -416,9 +416,11 @@ The path is extracted from the full ROM file path during import and returned by 
 - `GET /game-devices` — returns all games configured for the calling device (slug, name, console, rom_path, save_path, …)
 - `GET /devices/{id}/consoles` — returns console configs (name, ROM folder, save folder, emulator) for any device
 
-**Staging dir:** `~/.emusync/rom_staging/` — one file per pending transfer, named by transfer UUID + original extension.
+**Staging dir:** `~/.emusync/rom_staging/{transfer_id}/{original_filename}` — subdirectory per transfer preserves the original filename with no modification.
 
-**Pull side is not yet implemented.** Transfer records sit as `status=pending` in `rom_transfers` until a future `emusync pull` command picks them up.
+**Auto-delivery via `emusync sync-daemon`**: run this on the target device to receive transfers automatically. On startup it drains any already-pending transfers, then holds an SSE connection open (`GET /events/stream`). When the server pushes a `rom_transfer_queued` event, the daemon immediately downloads the file (`GET /rom-transfers/{id}/file`), saves it to `destination_path`, and marks it complete (`PUT /rom-transfers/{id}`). Reconnects automatically on connection loss.
+
+**`sync_client.py` delivery methods**: `list_pending_transfers()`, `download_transfer(id, dest)`, `complete_transfer(id)`, `stream_events()` (SSE generator).
 
 ---
 

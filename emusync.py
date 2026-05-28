@@ -1420,6 +1420,71 @@ def push_rom() -> None:
             click.echo(f"  Warning: {target['name']} is offline — transfer will be delivered when it comes online.")
 
 
+# ── sync-daemon ───────────────────────────────────────────────────────────────
+
+def _receive_transfer(client: "SyncClient", transfer_id: str, destination_path: str, label: str) -> bool:
+    """Download one pending transfer and mark it complete. Returns True on success."""
+    try:
+        click.echo(f"  Receiving {label}...")
+        client.download_transfer(transfer_id, destination_path)
+        client.complete_transfer(transfer_id)
+        click.echo(f"  Saved to {destination_path}")
+        return True
+    except Exception as e:
+        click.echo(f"  Failed to receive {label}: {e}", err=True)
+        try:
+            client.complete_transfer(transfer_id, status="failed")
+        except Exception:
+            pass
+        return False
+
+
+@cli.command("sync-daemon")
+def sync_daemon() -> None:
+    """Listen for incoming ROM transfers and receive them automatically."""
+    import time
+
+    cfg = cfg_module.load()
+    if not cfg.server_host and not cfg.is_server:
+        click.echo("EmuSync is not configured. Run 'emusync device connect' first.", err=True)
+        sys.exit(1)
+
+    client = _client(cfg)
+
+    if not client.health():
+        click.echo("Cannot reach EmuSync server. Is it running?", err=True)
+        sys.exit(1)
+
+    # Drain any transfers that were queued while daemon was offline
+    try:
+        pending = client.list_pending_transfers()
+        if pending:
+            click.echo(f"Picking up {len(pending)} queued transfer(s)...")
+            for t in pending:
+                _receive_transfer(client, t["id"], t["destination_path"], t["slug"])
+    except Exception as e:
+        click.echo(f"Warning: could not check pending transfers: {e}", err=True)
+
+    click.echo(f"Listening for ROM transfers on {cfg.device_name}... (Ctrl-C to stop)")
+
+    while True:
+        try:
+            for event in client.stream_events():
+                if event.get("type") == "rom_transfer_queued":
+                    _receive_transfer(
+                        client,
+                        event["transfer_id"],
+                        event["destination_path"],
+                        event.get("game_name", event.get("slug", event["transfer_id"])),
+                    )
+        except KeyboardInterrupt:
+            click.echo("\nStopped.")
+            break
+        except Exception as e:
+            click.echo(f"Connection lost ({e}). Reconnecting in 5s...", err=True)
+            time.sleep(5)
+
+
 # ── run ───────────────────────────────────────────────────────────────────────
 
 def _find_save_or_state_file(configured_path: str) -> str | None:
