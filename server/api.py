@@ -414,12 +414,25 @@ def get_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
 def pull_rom(slug: str, device_id: str = Depends(_auth)) -> Response:
     from pathlib import Path
     store = _get_store()
+
+    # Check if game is configured locally on this device
     gd = store.get_game_device(slug, _server_device_id)
+
+    # If not found locally, check if this is a device without the central server
+    # In that case, the central server might have the rom_path info
     if not gd or not gd.rom_path:
-        raise HTTPException(status_code=404, detail="ROM not configured for this device")
+        # As a fallback, try to find the rom_path in the game_devices for THIS device
+        # across all device databases (this device might not be the central server)
+        # For now, just return 404 with helpful message
+        raise HTTPException(
+            status_code=404,
+            detail="ROM not configured on this device. Run 'emusync game add' to register it locally."
+        )
+
     rom_path = Path(gd.rom_path)
     if not rom_path.exists():
-        raise HTTPException(status_code=404, detail="ROM file not found on this device")
+        raise HTTPException(status_code=404, detail="ROM file not found at configured path")
+
     return Response(
         content=rom_path.read_bytes(),
         media_type="application/octet-stream",

@@ -29,7 +29,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `pull`, `push`, `sync`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow; `pull`/`push` transfer ROMs between devices via HTTP streaming with progress bar |
+| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `pull`, `push`, `sync`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow; `pull` downloads ROMs from the central server; `push` uploads ROMs to the central server with streaming and progress bar |
 | `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/games/{slug}/devices`, `/games/{slug}/rom` (GET/POST); `_auth` auto-registers devices on first request and calls `touch_device()` to record client IP + timestamp; logs real-time device activity ("paired", "online", "offline", "unpaired") to stdout; background monitoring thread detects idle devices |
 | `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`; uses schema versioning (PRAGMA user_version) for migrations; `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; events table includes `rom_path` field for game import logging (version 2+) |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
@@ -393,6 +393,34 @@ During console import, the `rom_folder_path` is extracted from each ROM file pat
 - Managing multiple games from the same directory
 
 The path is extracted from the full ROM file path during import and returned by `GET /games/{slug}/device` endpoint alongside `rom_path`, `save_path`, `state_path`, and `launch_command`.
+
+---
+
+## ROM Transfer (`pull` / `push`)
+
+`emusync pull` and `emusync push` enable ROM file transfers via the central server (no P2P/device-to-device):
+
+**Pull**: `emusync pull [game]`
+- Downloads a ROM from the central server to the current device
+- Verifies game exists on server and ROM file is configured
+- Saves to device's console folder (or user-specified path)
+- Auto-resolves game by slug or name substring
+- Progress bar shows MB/percentage during download
+
+**Push**: `emusync push [game]`
+- Uploads a ROM from the current device to the central server
+- Verifies ROM file exists on this device
+- **Auto-creates game on server if it doesn't exist yet** — calls `add_game(name, console)`
+- Updates server's `game_devices` entry with rom_path after upload
+- Progress bar shows MB/percentage during upload
+
+Both commands use `SyncClient.pull_rom()` / `push_rom()` which stream via `httpx` with 64KB chunks and invoke a progress callback. API endpoints `/games/{slug}/rom` (GET/POST) handle byte streaming with `Content-Length` and filename headers.
+
+**Error handling:**
+- Game not found: `"Game not found. Check 'emusync game list'."`
+- ROM not on device (push): `"ROM file not found on this device. Has it moved?"`
+- Server unreachable: `"Cannot reach EmuSync server. Is it running?"`
+- Transfer interrupted: downloads are cleaned up (partial files deleted); uploads fail with HTTP error
 
 ---
 
