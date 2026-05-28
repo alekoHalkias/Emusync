@@ -1405,6 +1405,11 @@ def push_rom() -> None:
             click.echo(f"  {label} not yet set up on {target['name']}.")
             destination_path = click.prompt("  Where should the ROM be installed on the device?")
 
+        # If the user gave a folder path (no extension / trailing slash), append the filename
+        destination_path = destination_path.rstrip("/\\")
+        if not os.path.splitext(destination_path)[1]:
+            destination_path = os.path.join(destination_path, rom_filename)
+
         # Upload
         file_mb = os.path.getsize(rom_path) / (1024 * 1024)
         click.echo(f"  Uploading {rom_filename} ({file_mb:.1f} MB)...")

@@ -149,6 +149,11 @@ class SyncClient:
     def download_transfer(self, transfer_id: str, destination_path: str) -> None:
         """Stream a staged ROM file to disk at the given destination path."""
         path = Path(destination_path)
+        # If destination_path is a directory, we can't write to it directly
+        if path.is_dir() or not path.suffix:
+            raise ValueError(
+                f"destination_path must be a full file path, not a directory: {destination_path}"
+            )
         path.parent.mkdir(parents=True, exist_ok=True)
         with httpx.stream(
             "GET",
