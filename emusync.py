@@ -242,17 +242,25 @@ def _do_start_server() -> None:
     mdns_thread = threading.Thread(target=_advertise_mdns, daemon=True)
     mdns_thread.start()
 
+    _daemon_shutdown = threading.Event()
+
     def _start_daemon_for_server() -> None:
         """Wait for the server to be ready, then handle ROM transfers for this device."""
         import time
         client = _client(cfg)
         for _ in range(60):
+            if _daemon_shutdown.is_set():
+                return
             if client.health():
                 break
             time.sleep(0.5)
         else:
             return
-        _run_transfer_daemon(client, cfg.device_name, log=lambda msg: print(msg, flush=True))
+        _run_transfer_daemon(
+            client, cfg.device_name,
+            log=lambda msg: print(msg, flush=True),
+            shutdown_event=_daemon_shutdown,
+        )
 
     daemon_thread = threading.Thread(target=_start_daemon_for_server, daemon=True)
     daemon_thread.start()
@@ -260,6 +268,7 @@ def _do_start_server() -> None:
     try:
         uvicorn.run(api_module.app, host="0.0.0.0", port=cfg.server_port, log_level="warning")
     finally:
+        _daemon_shutdown.set()
         mdns_thread.join(timeout=2)
         with _mdns_lock:
             if zc and info:
@@ -1499,15 +1508,20 @@ def _receive_transfer(
     return True
 
 
-def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo) -> None:
+def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo, shutdown_event=None) -> None:
     """Core daemon loop: drain pending transfers then hold SSE connection open."""
     import time
+
+    def _stopping() -> bool:
+        return shutdown_event is not None and shutdown_event.is_set()
 
     try:
         pending = client.list_pending_transfers()
         if pending:
             log(f"Picking up {len(pending)} queued transfer(s)...")
             for t in pending:
+                if _stopping():
+                    return
                 _receive_transfer(client, t["id"], t["destination_path"],
                                   t["slug"], t.get("console", ""), t.get("game_name", t["slug"]), log)
     except Exception as e:
@@ -1515,9 +1529,11 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo)
 
     log(f"Listening for ROM transfers on {device_name}...")
 
-    while True:
+    while not _stopping():
         try:
             for event in client.stream_events():
+                if _stopping():
+                    return
                 if event.get("type") == "rom_transfer_queued":
                     _receive_transfer(
                         client,
@@ -1531,6 +1547,8 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo)
         except KeyboardInterrupt:
             raise
         except Exception as e:
+            if _stopping():
+                return
             log(f"Connection lost ({e}). Reconnecting in 5s...")
             time.sleep(5)
 

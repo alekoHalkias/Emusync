@@ -471,6 +471,10 @@ async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingRespons
                     yield f"data: {_json.dumps(event)}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
+                except asyncio.CancelledError:
+                    return  # server shutting down — close the stream cleanly
+        except GeneratorExit:
+            pass
         finally:
             _device_event_queues.pop(device_id, None)
 
