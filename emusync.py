@@ -1514,8 +1514,7 @@ def pull_rom(game: str) -> None:
         click.echo(f"Game already on this device at {local_gd.rom_path}")
         return
 
-    # Verify game exists on central server
-    # (In single-server architecture, we can only pull from the central server)
+    # Find which device has the game
     try:
         devices_with_game = client.list_game_devices(slug)
     except Exception as e:
@@ -1526,22 +1525,28 @@ def pull_rom(game: str) -> None:
         click.echo("Game not found on any device.", err=True)
         sys.exit(1)
 
-    # Check if the game is configured on THIS server (the one we're pulling from)
-    server_has_game = any(d["id"] == cfg.device_id for d in devices_with_game)
-    if not server_has_game:
-        other_devices = ", ".join([d["name"] for d in devices_with_game])
-        click.echo(f"Game is on {other_devices}, but the central server doesn't have it configured.", err=True)
-        click.echo(f"In single-server architecture, you can only pull games that are on the server device.", err=True)
-        click.echo(f"Try: 1) Push the game from the other device to this one, or", err=True)
-        click.echo(f"     2) Configure the game here with 'emusync game add'", err=True)
+    console = matching_game.get("console", "Unknown")
+
+    # If game is on this device, skip
+    if any(d["id"] == cfg.device_id for d in devices_with_game):
+        click.echo(f"Game already on this device at {[d for d in devices_with_game if d['id'] == cfg.device_id][0].get('rom_path', '?')}")
+        return
+
+    # Find a device with the game
+    all_devices = client.list_devices()
+    source_device = None
+    for game_dev in devices_with_game:
+        # Find the full device info
+        full_device = next((d for d in all_devices if d["id"] == game_dev["id"]), None)
+        if full_device and _device_online(full_device, cfg):
+            source_device = full_device
+            break
+
+    if not source_device:
+        click.echo("Game not found on any online device.", err=True)
         sys.exit(1)
 
-    console = matching_game.get("console", "Unknown")
-    device_names = [d["name"] for d in devices_with_game if d["id"] != cfg.device_id]
-    if device_names:
-        click.echo(f"{console} {matching_game['name']} found on {', '.join(device_names)}")
-    else:
-        click.echo(f"{console} {matching_game['name']} found on this device")
+    click.echo(f"{console} {matching_game['name']} found on {source_device['name']}")
 
     # Confirm
     if not click.confirm("Copy to this device?", default=False):
@@ -1566,15 +1571,16 @@ def pull_rom(game: str) -> None:
         dest_folder = click.prompt(f"No console configured. Enter destination folder", default=default_folder)
         dest_folder = os.path.expanduser(dest_folder)
 
-    # Get filename from server config if available, otherwise use game name
-    server_config = None
+    # Get filename from source device config
+    source_config = None
     try:
-        server_config = client.get_game_device(slug)
+        source_client = _client_at(source_device, cfg)
+        source_config = source_client.get_game_device(slug)
     except Exception:
         pass
 
-    if server_config and server_config.rom_path:
-        rom_filename = Path(server_config.rom_path).name
+    if source_config and source_config.rom_path:
+        rom_filename = Path(source_config.rom_path).name
     else:
         rom_filename = f"{matching_game['name'].lower().replace(' ', '_')}.rom"
 
@@ -1583,11 +1589,10 @@ def pull_rom(game: str) -> None:
         click.echo(f"ROM already exists at {dest_path}, skipping.")
         return
 
-    # Download from central server (the device running emusync server start)
-    # In single-server architecture, only the server device exposes ROM endpoints
-    click.echo(f"Downloading to {dest_path}...")
+    # Download from source device (P2P transfer)
+    click.echo(f"Downloading from {source_device['name']} to {dest_path}...")
     try:
-        client.pull_rom(slug, dest_path, _show_progress)
+        source_client.pull_rom(slug, dest_path, _show_progress)
     except Exception as e:
         click.echo(f"Download failed: {e}", err=True)
         Path(dest_path).unlink(missing_ok=True)
