@@ -994,3 +994,142 @@ async def test_devices_list_includes_is_online(client):
     for d in devices:
         assert "is_online" in d
         assert isinstance(d["is_online"], bool)
+
+
+# ── rom pull request tests ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_pull_request_queued(tmp_path):
+    """POST /games/{slug}/rom-pull-request creates a pending request; source device can fetch it."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, MASTER_PIN, tmpdir)
+        async with AsyncClient(transport=ASGITransport(app=api_module.app), base_url="http://test") as c:
+            auth_src = _device_auth("src-device", "PC")
+            auth_dst = _device_auth("dst-device", "Deck")
+
+            await c.post("/games", json={"name": "Castlevania", "console": "GBA"}, headers=auth_src)
+            await c.put("/games/castlevania/device", json={"rom_path": "/roms/Castlevania.gba"}, headers=auth_src)
+
+            # Destination device sends a pull request
+            r = await c.post(
+                "/games/castlevania/rom-pull-request",
+                json={"from_device_id": "src-device", "destination_path": "/home/deck/roms/Castlevania.gba"},
+                headers=auth_dst,
+            )
+            assert r.status_code == 200
+            body = r.json()
+            assert body["status"] == "pending"
+            assert "pull_request_id" in body
+            assert "source_online" in body
+
+            # Source device sees it in pending list
+            r2 = await c.get("/rom-pull-requests/pending", headers=auth_src)
+            assert r2.status_code == 200
+            pending = r2.json()
+            assert len(pending) == 1
+            assert pending[0]["slug"] == "castlevania"
+            assert pending[0]["to_device_id"] == "dst-device"
+            assert pending[0]["destination_path"] == "/home/deck/roms/Castlevania.gba"
+            assert pending[0]["game_name"] == "Castlevania"
+            assert pending[0]["console"] == "GBA"
+
+
+@pytest.mark.asyncio
+async def test_pull_request_missing_game(client):
+    """POST /games/{slug}/rom-pull-request returns 404 for unknown game."""
+    auth_b = _device_auth("src-b", "PC")
+    await client.post("/games", json={"name": "Temp"}, headers=AUTH)  # register src-b as device
+    await client.get("/devices", headers=auth_b)
+
+    r = await client.post(
+        "/games/ghost-game/rom-pull-request",
+        json={"from_device_id": "src-b", "destination_path": "/tmp/ghost.gba"},
+        headers=AUTH,
+    )
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_pull_request_missing_source_device(client):
+    """POST /games/{slug}/rom-pull-request returns 404 for unknown source device."""
+    await client.post("/games", json={"name": "Metroid"}, headers=AUTH)
+
+    r = await client.post(
+        "/games/metroid/rom-pull-request",
+        json={"from_device_id": "ghost-device-999", "destination_path": "/tmp/metroid.gba"},
+        headers=AUTH,
+    )
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_pull_request_mark_fulfilled(tmp_path):
+    """Source device can mark a pull request as fulfilled."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, MASTER_PIN, tmpdir)
+        async with AsyncClient(transport=ASGITransport(app=api_module.app), base_url="http://test") as c:
+            auth_src = _device_auth("src-ff", "PC")
+            auth_dst = _device_auth("dst-ff", "Deck")
+
+            await c.post("/games", json={"name": "Zelda", "console": "SNES"}, headers=auth_src)
+
+            r = await c.post(
+                "/games/zelda/rom-pull-request",
+                json={"from_device_id": "src-ff", "destination_path": "/roms/Zelda.sfc"},
+                headers=auth_dst,
+            )
+            pr_id = r.json()["pull_request_id"]
+
+            # Source marks it fulfilled
+            r2 = await c.put(f"/rom-pull-requests/{pr_id}", json={"status": "fulfilled"}, headers=auth_src)
+            assert r2.status_code == 200
+
+            # No longer shows as pending for source
+            r3 = await c.get("/rom-pull-requests/pending", headers=auth_src)
+            assert r3.json() == []
+
+
+@pytest.mark.asyncio
+async def test_pull_request_wrong_device_cannot_update(tmp_path):
+    """A device that is not the source cannot mark a pull request as fulfilled."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, MASTER_PIN, tmpdir)
+        async with AsyncClient(transport=ASGITransport(app=api_module.app), base_url="http://test") as c:
+            auth_src = _device_auth("src-ww", "PC")
+            auth_dst = _device_auth("dst-ww", "Deck")
+            auth_third = _device_auth("third-ww", "Other")
+
+            await c.post("/games", json={"name": "Mario"}, headers=auth_src)
+
+            r = await c.post(
+                "/games/mario/rom-pull-request",
+                json={"from_device_id": "src-ww", "destination_path": "/roms/Mario.sfc"},
+                headers=auth_dst,
+            )
+            pr_id = r.json()["pull_request_id"]
+
+            # Third party cannot update it
+            r2 = await c.put(f"/rom-pull-requests/{pr_id}", json={"status": "fulfilled"}, headers=auth_third)
+            assert r2.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_device_game_devices_endpoint(client):
+    """GET /devices/{id}/game-devices returns games for that specific device."""
+    auth_a = _device_auth("gd-dev-a", "PC")
+    auth_b = _device_auth("gd-dev-b", "Deck")
+
+    await client.post("/games", json={"name": "Halo"}, headers=auth_a)
+    await client.post("/games", json={"name": "Doom"}, headers=auth_b)
+    await client.put("/games/halo/device", json={"rom_path": "/roms/Halo.iso"}, headers=auth_a)
+    await client.put("/games/doom/device", json={"rom_path": "/roms/Doom.wad"}, headers=auth_b)
+
+    # Calling device (auth_a) fetches games on auth_b's device
+    r = await client.get("/devices/gd-dev-b/game-devices", headers=auth_a)
+    assert r.status_code == 200
+    slugs = {g["slug"] for g in r.json()}
+    assert slugs == {"doom"}
+    assert "halo" not in slugs
