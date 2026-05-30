@@ -103,6 +103,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [deviceModal, setDeviceModal] = useState<DeviceModal>(null);
   const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150 });
   const [sortBy, setSortBy] = useState<'default' | 'game' | 'lastSave' | 'synced'>('default');
@@ -425,27 +426,45 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
               });
             }
 
+            const localCollapsed  = collapsedSections.has("local");
+            const otherCollapsed  = collapsedSections.has("other");
+            const toggleSection   = (key: string) => setCollapsedSections(prev => {
+              const next = new Set(prev);
+              next.has(key) ? next.delete(key) : next.add(key);
+              return next;
+            });
+
             return (
               <>
                 {/* ── On this device ── */}
-                <div className="device-section-header" style={{ gridColumn: "1 / -1" }}>
+                <div
+                  className="device-section-header"
+                  style={{ gridColumn: "1 / -1", cursor: "pointer" }}
+                  onClick={() => toggleSection("local")}
+                >
+                  <span style={{ marginRight: 6, fontSize: 11 }}>{localCollapsed ? "▶" : "▼"}</span>
                   On this device
                   <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 400, marginLeft: 8 }}>{localGames.length} game{localGames.length !== 1 ? "s" : ""}</span>
                 </div>
-                {localGames.length === 0 ? (
+                {!localCollapsed && (localGames.length === 0 ? (
                   <div style={{ gridColumn: "1 / -1", padding: "16px 12px", color: "var(--text-muted)", fontSize: 13 }}>
                     No games configured on this device yet. Use Bulk import or Add game.
                   </div>
-                ) : renderConsoleGroups(localGames, "", true)}
+                ) : renderConsoleGroups(localGames, "", true))}
 
                 {/* ── On other devices ── */}
                 {otherGames.length > 0 && (
                   <>
-                    <div className="device-section-header" style={{ gridColumn: "1 / -1", marginTop: 8 }}>
+                    <div
+                      className="device-section-header"
+                      style={{ gridColumn: "1 / -1", marginTop: 8, cursor: "pointer" }}
+                      onClick={() => toggleSection("other")}
+                    >
+                      <span style={{ marginRight: 6, fontSize: 11 }}>{otherCollapsed ? "▶" : "▼"}</span>
                       On other devices
                       <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 400, marginLeft: 8 }}>{otherGames.length} game{otherGames.length !== 1 ? "s" : ""}</span>
                     </div>
-                    {renderConsoleGroups(otherGames, "other:", false)}
+                    {!otherCollapsed && renderConsoleGroups(otherGames, "other:", false)}
                   </>
                 )}
               </>
