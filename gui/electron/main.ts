@@ -115,7 +115,7 @@ function startServerProcess(): Promise<{ ok: boolean }> {
     // Resolve as soon as the server prints its startup line (before uvicorn binds)
     proc.stdout?.on("data", (chunk: Buffer) => {
       const line = chunk.toString();
-      if (!resolved && line.includes("Pairing token:")) {
+      if (!resolved && line.includes("EmuSync server ready")) {
         resolved = true;
         serverStartedByApp = true; // Server actually started; only kill it on close if we started it
         resolve({ ok: true });
