@@ -218,7 +218,7 @@ def _do_start_server() -> None:
 
     # Print token immediately so Electron can resolve server.start() without
     # waiting for mDNS registration (which can take several hundred ms).
-    click.echo(f"Pairing token: {master_token}")
+    click.echo("EmuSync server ready")
     sys.stdout.flush()
     click.echo(f"EmuSync server running on :{cfg.server_port}")
 
@@ -1458,9 +1458,9 @@ def pull_rom() -> None:
             continue
 
         if result.get("source_online"):
-            click.echo(f"  Request sent — {source['name']} is online and will send it shortly.")
+            click.echo(f"  {game_name} pulled from {source['name']} and will be available on this device shortly.")
         else:
-            click.echo(f"  Warning: {source['name']} is offline — ROM will be sent when it comes online.")
+            click.echo(f"  Warning: {source['name']} is offline — {game_name} will be sent when it comes online.")
 
 
 @cli.command("push")
@@ -1569,9 +1569,9 @@ def push_rom() -> None:
             continue
 
         if result.get("target_online"):
-            click.echo(f"  Queued — {target['name']} is online and will receive it shortly.")
+            click.echo(f"  {game_name} pushed to {target['name']} and will be available on it shortly.")
         else:
-            click.echo(f"  Warning: {target['name']} is offline — transfer will be delivered when it comes online.")
+            click.echo(f"  Warning: {target['name']} is offline — {game_name} will be delivered when it comes online.")
 
 
 # ── sync-daemon ───────────────────────────────────────────────────────────────
