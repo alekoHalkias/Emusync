@@ -13,6 +13,7 @@ type GameRow = Game & {
   lastPush?: string;
   lastSave?: string | null;
   locked?: boolean;
+  isLocal: boolean;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -118,6 +119,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
           const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
+          const isLocal = config.status === "fulfilled" && !!config.value?.rom_path;
           let lastSave: string | null = undefined;
           if (config.status === "fulfilled" && config.value?.save_path) {
             lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
@@ -127,6 +129,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
             lastSave,
             locked: lock.status === "fulfilled" ? lock.value.locked : false,
+            isLocal,
           };
         })
       );
@@ -336,86 +339,117 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
           <div className="col-header">Actions</div>
 
           {(() => {
-            const grouped = games.reduce<Record<string, GameRow[]>>((acc, g) => {
-              const key = g.console || "Other";
-              (acc[key] ??= []).push(g);
-              return acc;
-            }, {});
-            let consoleKeys = Object.keys(grouped).sort();
+            const localGames = games.filter(g => g.isLocal);
+            const otherGames = games.filter(g => !g.isLocal);
 
-            // If sorting by game, also sort console headers in the same direction
-            if (sortBy === 'game' && sortDir === 'desc') {
-              consoleKeys = consoleKeys.reverse();
+            function groupByConsole(list: GameRow[]): [string, GameRow[]][] {
+              const grouped = list.reduce<Record<string, GameRow[]>>((acc, g) => {
+                const key = g.console || "Other";
+                (acc[key] ??= []).push(g);
+                return acc;
+              }, {});
+              let keys = Object.keys(grouped).sort();
+              if (sortBy === "game" && sortDir === "desc") keys = keys.reverse();
+              return keys.map(k => [k, grouped[k]]);
             }
 
-            return consoleKeys.map(key => (
-              <React.Fragment key={key}>
-                {/* Console section header spans all columns */}
-                <div className="console-section-header" style={{ gridColumn: "1 / -1" }} onClick={() => toggleConsole(key)}>
-                  <ConsoleCheckbox
-                    games={grouped[key]}
-                    selectedSlugs={selectedSlugs}
-                    onToggle={() => toggleConsoleSelection(key, grouped[key])}
-                  />
-                  <span>{collapsedConsoles.has(key) ? "▶" : "▼"}</span>
-                  <span style={{ flex: 1 }}>{key}</span>
-                  <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{grouped[key].length} game{grouped[key].length !== 1 ? "s" : ""}</span>
-                </div>
-
-                {/* Game rows — each game is 5 grid cells */}
-                {!collapsedConsoles.has(key) && getSortedGamesInConsole(grouped[key]).map((g) => (
-                  <React.Fragment key={g.slug}>
-                    <div className="game-cell">
-                      <input
-                        type="checkbox"
-                        checked={selectedSlugs.has(g.slug)}
-                        onChange={() => toggleSelection(g.slug)}
-                        style={{ cursor: "pointer" }}
+            function renderConsoleGroups(list: GameRow[], keyPrefix: string, canPlay: boolean) {
+              return groupByConsole(list).map(([key, consoleGames]) => {
+                const colKey = keyPrefix + key;
+                return (
+                  <React.Fragment key={colKey}>
+                    <div className="console-section-header" style={{ gridColumn: "1 / -1" }} onClick={() => toggleConsole(colKey)}>
+                      <ConsoleCheckbox
+                        games={consoleGames}
+                        selectedSlugs={selectedSlugs}
+                        onToggle={() => toggleConsoleSelection(colKey, consoleGames)}
                       />
+                      <span>{collapsedConsoles.has(colKey) ? "▶" : "▼"}</span>
+                      <span style={{ flex: 1 }}>{key}</span>
+                      <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{consoleGames.length} game{consoleGames.length !== 1 ? "s" : ""}</span>
                     </div>
-                    <div className="game-cell game-cell-name">{g.name}</div>
-                    <div className="game-cell game-cell-muted">
-                      {g.lastSave ? g.lastSave : "No save locally"}
-                    </div>
-                    <div className="game-cell game-cell-muted">
-                      {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
-                      <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
-                    </div>
-                    <div className="game-cell game-cell-actions">
-                      <button
-                        className="btn btn-icon"
-                        title="Show devices with this game"
-                        onClick={() => handleOpenDeviceModal(g.slug, g.name)}
-                      >
-                        🖥
-                      </button>
-                      <button
-                        className="btn btn-icon"
-                        title="Play"
-                        disabled={g.locked}
-                        onClick={() => onPlay(g.slug, g.name)}
-                      >
-                        ▶
-                      </button>
-                      <button
-                        className="btn btn-icon"
-                        title="Settings"
-                        onClick={() => onEdit(g)}
-                      >
-                        ⚙
-                      </button>
-                      <button
-                        className="btn btn-icon"
-                        title="Remove from EmuSync"
-                        onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
-                      >
-                        🗑
-                      </button>
-                    </div>
+
+                    {!collapsedConsoles.has(colKey) && getSortedGamesInConsole(consoleGames).map((g) => (
+                      <React.Fragment key={g.slug}>
+                        <div className="game-cell">
+                          <input
+                            type="checkbox"
+                            checked={selectedSlugs.has(g.slug)}
+                            onChange={() => toggleSelection(g.slug)}
+                            style={{ cursor: "pointer" }}
+                          />
+                        </div>
+                        <div className="game-cell game-cell-name">{g.name}</div>
+                        <div className="game-cell game-cell-muted">
+                          {canPlay ? (g.lastSave ? g.lastSave : "No save locally") : "—"}
+                        </div>
+                        <div className="game-cell game-cell-muted">
+                          {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
+                          <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
+                        </div>
+                        <div className="game-cell game-cell-actions">
+                          <button
+                            className="btn btn-icon"
+                            title="Show devices with this game"
+                            onClick={() => handleOpenDeviceModal(g.slug, g.name)}
+                          >
+                            🖥
+                          </button>
+                          <button
+                            className="btn btn-icon"
+                            title="Play"
+                            disabled={g.locked || !canPlay}
+                            onClick={() => canPlay && onPlay(g.slug, g.name)}
+                          >
+                            ▶
+                          </button>
+                          <button
+                            className="btn btn-icon"
+                            title="Settings"
+                            onClick={() => onEdit(g)}
+                          >
+                            ⚙
+                          </button>
+                          <button
+                            className="btn btn-icon"
+                            title="Remove from EmuSync"
+                            onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </React.Fragment>
+                    ))}
                   </React.Fragment>
-                ))}
-              </React.Fragment>
-            ));
+                );
+              });
+            }
+
+            return (
+              <>
+                {/* ── On this device ── */}
+                <div className="device-section-header" style={{ gridColumn: "1 / -1" }}>
+                  On this device
+                  <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 400, marginLeft: 8 }}>{localGames.length} game{localGames.length !== 1 ? "s" : ""}</span>
+                </div>
+                {localGames.length === 0 ? (
+                  <div style={{ gridColumn: "1 / -1", padding: "16px 12px", color: "var(--text-muted)", fontSize: 13 }}>
+                    No games configured on this device yet. Use Bulk import or Add game.
+                  </div>
+                ) : renderConsoleGroups(localGames, "", true)}
+
+                {/* ── On other devices ── */}
+                {otherGames.length > 0 && (
+                  <>
+                    <div className="device-section-header" style={{ gridColumn: "1 / -1", marginTop: 8 }}>
+                      On other devices
+                      <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 400, marginLeft: 8 }}>{otherGames.length} game{otherGames.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    {renderConsoleGroups(otherGames, "other:", false)}
+                  </>
+                )}
+              </>
+            );
           })()}
         </div>
       )}
