@@ -26,6 +26,8 @@ type RomEntry = {
   stateExists?: boolean;
   existingGameSlug?: string;
   romFolderPath?: string;
+  linkedSlug?: string;
+  linkedName?: string;
 };
 
 type Phase =
@@ -155,29 +157,46 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
         };
       });
 
-      // Dedup: try to filter out already-imported ROMs.
+      // Dedup: filter already-imported ROMs; detect cross-device links.
       let newRoms = annotated;
       try {
         const existingGames = await listGames();
-        const gameConfigs: Array<{ slug: string; romPath: string }> = [];
 
+        // Collect this-device configs (404 = game exists on server but not this device)
+        const thisDeviceConfigs: Array<{ slug: string; romPath: string }> = [];
         for (const g of existingGames) {
           try {
             const config = await getGameDevice(g.slug);
             if (config.rom_path) {
-              gameConfigs.push({ slug: g.slug, romPath: config.rom_path });
+              thisDeviceConfigs.push({ slug: g.slug, romPath: config.rom_path });
             }
           } catch {
-            // Skip games we can't load config for
+            // 404 = game known to server but not configured on this device — candidate for linking
           }
         }
 
+        // Build slug→name map for all server games (for cross-device badge label)
+        const allGamesBySlug: Record<string, string> = {};
+        for (const g of existingGames) allGamesBySlug[g.slug] = g.name;
+
         const withMatches = annotated.map((rom: RomEntry) => {
-          const match = gameConfigs.find(cfg => {
-            // Match by exact path or by filename
-            return cfg.romPath === rom.romPath || getRomFileName(cfg.romPath) === rom.romFileName;
+          // 1. Already on this device → skip
+          const thisMatch = thisDeviceConfigs.find(cfg =>
+            cfg.romPath === rom.romPath || getRomFileName(cfg.romPath) === rom.romFileName
+          );
+          if (thisMatch) return { ...rom, existingGameSlug: thisMatch.slug };
+
+          // 2. Exists on another device → link candidate (match by slug or name)
+          const slugified = rom.romFileName.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          const crossMatch = existingGames.find(g => {
+            if (allGamesBySlug[g.slug] === undefined) return false;
+            const nameSlug = g.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            return g.slug === slugified || nameSlug === slugified ||
+              g.name.toLowerCase() === rom.name.toLowerCase();
           });
-          return { ...rom, existingGameSlug: match?.slug };
+          if (crossMatch) return { ...rom, linkedSlug: crossMatch.slug, linkedName: crossMatch.name };
+
+          return rom;
         });
 
         newRoms = withMatches.filter((rom: RomEntry) => !rom.existingGameSlug);
@@ -252,8 +271,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
-        const game = await addGame(displayName, consoleAbbr);
-        await setGameDevice(game.slug, {
+        const slug = rom.linkedSlug ?? (await addGame(displayName, consoleAbbr)).slug;
+        await setGameDevice(slug, {
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
@@ -469,6 +488,22 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
               ))}
             </div>
 
+            {/* ROM list header with bulk select */}
+            {roms.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                  {selectedCount} of {roms.length} selected
+                </span>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: "2px 10px" }}
+                  onClick={() => toggleAll(roms.map(r => r.romPath))}
+                >
+                  {selectedCount === roms.length ? "Deselect all" : "Select all"}
+                </button>
+              </div>
+            )}
+
             {/* ROM list */}
             <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6 }}>
               {roms.length === 0 ? (
@@ -511,6 +546,9 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                             )}
                             {rom.statePath && rom.stateExists && (
                               <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
+                            )}
+                            {rom.linkedSlug && (
+                              <span style={{ color: "var(--accent, #7c8cf8)" }}>→ Links to {rom.linkedName}</span>
                             )}
                           </div>
                         </div>
