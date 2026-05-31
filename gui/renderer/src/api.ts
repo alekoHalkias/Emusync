@@ -99,3 +99,13 @@ export const listEvents = (): Promise<ActivityEvent[]> => _fetch("GET", "/events
 
 
 export const listGameDevices = (slug: string): Promise<Device[]> => _fetch("GET", `/games/${slug}/devices`);
+
+export type DeviceConsole = { console_name: string; device_game_folder: string; device_save_folder: string; device_emulator: string };
+export type DeviceGameDevice = { slug: string; name: string; console?: string; rom_path: string; save_path: string };
+
+export const getDeviceConsoles = (deviceId: string): Promise<DeviceConsole[]> =>
+  _fetch("GET", `/devices/${deviceId}/consoles`);
+export const getDeviceGameDevices = (deviceId: string): Promise<DeviceGameDevice[]> =>
+  _fetch("GET", `/devices/${deviceId}/game-devices`);
+export const createPullRequest = (slug: string, fromDeviceId: string, destinationPath: string): Promise<{ pull_request_id: string; status: string; source_online: boolean }> =>
+  _fetch("POST", `/games/${slug}/rom-pull-request`, { from_device_id: fromDeviceId, destination_path: destinationPath });

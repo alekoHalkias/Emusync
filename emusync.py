@@ -116,6 +116,36 @@ def server() -> None:
     """Manage the EmuSync server."""
 
 
+def _find_pid_by_port(port: int) -> int | None:
+    """Return the PID of the process listening on *port*, or None if not found.
+
+    Tries ss (iproute2) first, then lsof as a fallback.
+    """
+    import subprocess
+    import re
+    try:
+        out = subprocess.check_output(
+            ["ss", "-Hlntp", f"sport = :{port}"],
+            text=True, timeout=3, stderr=subprocess.DEVNULL,
+        )
+        m = re.search(r"pid=(\d+)", out)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        pass
+    try:
+        out = subprocess.check_output(
+            ["lsof", f"-ti:{port}", "-sTCP:LISTEN"],
+            text=True, timeout=3, stderr=subprocess.DEVNULL,
+        )
+        pids = out.strip().split()
+        if pids:
+            return int(pids[0])
+    except Exception:
+        pass
+    return None
+
+
 def _is_server_running(data_dir: str) -> tuple[bool, int | None]:
     """Check if a server is already running on this device.
 
@@ -200,12 +230,21 @@ def _do_start_server() -> None:
             sys.exit(0)
         cfg = _initialize_server_interactive(cfg)
 
-    # Check if server is already running
+    # Check if server is already running via PID file
     is_running, running_pid = _is_server_running(cfg.data_dir)
     if is_running:
         click.echo(f"EmuSync server is already running (PID: {running_pid})")
         click.echo(f"  on :{cfg.server_port}")
         sys.exit(0)
+
+    # Fallback: port probe catches the case where the PID file was cleaned up
+    # externally (e.g. SIGKILL skipped the finally block) but the server is still bound.
+    import socket as _socket
+    with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as _s:
+        _s.settimeout(0.5)
+        if _s.connect_ex(("localhost", cfg.server_port)) == 0:
+            click.echo(f"EmuSync server is already running on :{cfg.server_port}")
+            sys.exit(0)
 
     store = Store(cfg.data_dir)
     master_token = cfg.server_pin
@@ -299,8 +338,11 @@ def _do_stop_server() -> None:
     is_running, pid = _is_server_running(cfg.data_dir)
 
     if not is_running:
-        click.echo("server not running")
-        return
+        # PID file missing or stale — try to find the process by port
+        pid = _find_pid_by_port(cfg.server_port)
+        if pid is None:
+            click.echo("server not running")
+            return
 
     try:
         os.kill(pid, signal.SIGKILL)

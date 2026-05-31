@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, getGameDevice, listGameDevices, type Game, type Device } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, getGameDevice, listGameDevices, getDeviceGameDevices, getDeviceConsoles, createPullRequest, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import { useDevices } from "../DeviceContext";
 
@@ -17,11 +17,16 @@ type GameRow = Game & {
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
+type TransferState = { status: "idle" | "loading" | "success" | "error"; message: string };
+
 type DeviceModal = {
   slug: string;
   name: string;
+  gameConsole: string;
+  gameIsLocal: boolean;          // true = current device has rom_path for this game
   installed: Device[] | null;   // devices that have the game
   missing: Device[] | null;     // paired devices that don't
+  transfers: Record<string, TransferState>;
 } | null;
 
 /**
@@ -168,18 +173,76 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     }
   }
 
-  async function handleOpenDeviceModal(slug: string, name: string): Promise<void> {
-    setDeviceModal({ slug, name, installed: null, missing: null });
+  async function handleOpenDeviceModal(g: GameRow): Promise<void> {
+    const { slug, name, console: gameConsole = "", isLocal: gameIsLocal } = g;
+    const blank = { slug, name, gameConsole, gameIsLocal, installed: null, missing: null, transfers: {} };
+    setDeviceModal(blank);
     try {
-      // Use the already-fetched context device list — no extra listDevices() call.
-      // listGameDevices only returns id+name; enrich with last_ip/last_seen_at from context.
       const partial = await listGameDevices(slug);
       const installedIds = new Set(partial.map(d => d.id));
       const installed = partial.map(d => allDevices.find(a => a.id === d.id) ?? d);
       const missing = allDevices.filter(d => !installedIds.has(d.id));
-      setDeviceModal({ slug, name, installed, missing });
+      setDeviceModal({ ...blank, installed, missing });
     } catch {
-      setDeviceModal({ slug, name, installed: [], missing: [] });
+      setDeviceModal({ ...blank, installed: [], missing: [] });
+    }
+  }
+
+  function setTransfer(deviceId: string, state: TransferState): void {
+    setDeviceModal(prev => prev ? { ...prev, transfers: { ...prev.transfers, [deviceId]: state } } : prev);
+  }
+
+  async function handlePush(toDevice: Device): Promise<void> {
+    if (!deviceModal) return;
+    setTransfer(toDevice.id, { status: "loading", message: "" });
+    const result = await (window as any).emusync.rom.push(deviceModal.slug, toDevice.id, deviceModal.gameConsole);
+    if (result.ok) {
+      setTransfer(toDevice.id, {
+        status: "success",
+        message: result.targetOnline
+          ? `${deviceModal.name} queued — ${toDevice.name} will receive it shortly`
+          : `Queued — will deliver when ${toDevice.name} comes online`,
+      });
+    } else {
+      setTransfer(toDevice.id, { status: "error", message: result.error || "Push failed" });
+    }
+  }
+
+  async function handlePull(fromDevice: Device): Promise<void> {
+    if (!deviceModal) return;
+
+    // Try to auto-resolve the local ROM folder from this device's console config
+    let folder: string | null = null;
+    if (currentDeviceId && deviceModal.gameConsole) {
+      try {
+        const consoles = await getDeviceConsoles(currentDeviceId);
+        const match = consoles.find(c => c.console_name === deviceModal.gameConsole);
+        if (match?.device_game_folder) folder = match.device_game_folder;
+      } catch { /* fall through to picker */ }
+    }
+
+    // Fall back to folder picker if no console config found
+    if (!folder) {
+      folder = await (window as any).emusync.dialog.openFolder();
+      if (!folder) return;
+    }
+
+    setTransfer(fromDevice.id, { status: "loading", message: "" });
+    try {
+      const sourceGames = await getDeviceGameDevices(fromDevice.id);
+      const sourceGame = sourceGames.find(g => g.slug === deviceModal.slug);
+      if (!sourceGame?.rom_path) throw new Error("Source device has no ROM path for this game");
+      const romFilename = sourceGame.rom_path.split("/").pop() ?? sourceGame.rom_path.split("\\").pop() ?? "rom";
+      const destinationPath = folder.replace(/[\\/]$/, "") + "/" + romFilename;
+      const result = await createPullRequest(deviceModal.slug, fromDevice.id, destinationPath);
+      setTransfer(fromDevice.id, {
+        status: "success",
+        message: result.source_online
+          ? `Pull requested — ${fromDevice.name} will send it shortly`
+          : `Queued — will send when ${fromDevice.name} comes online`,
+      });
+    } catch (e: any) {
+      setTransfer(fromDevice.id, { status: "error", message: e.message || "Pull request failed" });
     }
   }
 
@@ -392,7 +455,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                           <button
                             className="btn btn-icon"
                             title="Show devices with this game"
-                            onClick={() => handleOpenDeviceModal(g.slug, g.name)}
+                            onClick={() => handleOpenDeviceModal(g)}
                           >
                             🖥
                           </button>
@@ -502,7 +565,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
 
       {deviceModal && (
         <div className="modal-overlay" onClick={() => setDeviceModal(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
             <h3>Devices — {deviceModal.name}</h3>
             {deviceModal.installed === null ? (
               <div style={{ textAlign: "center", padding: "16px 0" }}>
@@ -514,7 +577,28 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 12px" }}>
-                      {deviceModal.installed.map(d => <DeviceRow key={d.id} d={d} dim={false} displayIp={d.id === currentDeviceId ? localIp : undefined} />)}
+                      {deviceModal.installed.map(d => {
+                        const ts = deviceModal.transfers[d.id];
+                        const canPull = !deviceModal.gameIsLocal && d.id !== currentDeviceId;
+                        return (
+                          <li key={d.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <DeviceRow d={d} dim={false} displayIp={d.id === currentDeviceId ? localIp : undefined} />
+                            {canPull && (
+                              <div style={{ padding: "4px 0 8px 28px" }}>
+                                {!ts || ts.status === "idle" ? (
+                                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px" }} onClick={() => handlePull(d)}>
+                                    ← Pull from {d.name}
+                                  </button>
+                                ) : ts.status === "loading" ? (
+                                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Requesting…</span>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: ts.status === "success" ? "var(--green)" : "var(--red)" }}>{ts.message}</span>
+                                )}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </>
                 )}
@@ -522,7 +606,28 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                   <>
                     <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "12px 0 4px" }}>Not installed</p>
                     <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                      {deviceModal.missing.map(d => <DeviceRow key={d.id} d={d} dim={true} displayIp={d.id === currentDeviceId ? localIp : undefined} />)}
+                      {deviceModal.missing.map(d => {
+                        const ts = deviceModal.transfers[d.id];
+                        const canPush = deviceModal.gameIsLocal && d.id !== currentDeviceId;
+                        return (
+                          <li key={d.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <DeviceRow d={d} dim={true} displayIp={d.id === currentDeviceId ? localIp : undefined} />
+                            {canPush && (
+                              <div style={{ padding: "4px 0 8px 28px" }}>
+                                {!ts || ts.status === "idle" ? (
+                                  <button className="btn btn-ghost" style={{ fontSize: 12, padding: "3px 10px" }} onClick={() => handlePush(d)}>
+                                    Push to {d.name} →
+                                  </button>
+                                ) : ts.status === "loading" ? (
+                                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Uploading…</span>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: ts.status === "success" ? "var(--green)" : "var(--red)" }}>{ts.message}</span>
+                                )}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </>
                 )}

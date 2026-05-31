@@ -64,6 +64,10 @@ contextBridge.exposeInMainWorld("emusync", {
     probe: (ip: string, port: number): Promise<boolean> =>
       ipcRenderer.invoke("device:probe", ip, port),
   },
+  rom: {
+    push: (slug: string, toDeviceId: string, consoleName: string): Promise<{ ok: boolean; targetOnline?: boolean; error?: string }> =>
+      ipcRenderer.invoke("rom:push", slug, toDeviceId, consoleName),
+  },
   game: {
     launch: (slug: string, command: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke("game:launch", slug, command),
