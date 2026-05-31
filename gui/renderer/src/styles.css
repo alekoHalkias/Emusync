@@ -218,6 +218,15 @@ input.error { border-color: var(--red); }
 }
 .console-section-header:hover { filter: brightness(1.15); }
 
+.device-section-header {
+  display: flex; align-items: center;
+  padding: 10px 16px 6px; border-bottom: 2px solid var(--border);
+  font-weight: 700; font-size: 12px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted);
+  user-select: none; transition: color 0.15s;
+}
+.device-section-header:hover { color: var(--text); }
+
 .empty-state {
   text-align: center; padding: 60px 20px; color: var(--text-muted);
 }
