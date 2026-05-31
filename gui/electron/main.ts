@@ -973,6 +973,148 @@ ipcMain.handle("device:probe", (_event, ip: string, port: number): Promise<boole
   });
 });
 
+// ── server config helper ──────────────────────────────────────────────────────
+
+function loadServerCfg(): { host: string; port: number; authHeaders: Record<string, string> } {
+  let cfg: Record<string, any> = {};
+  if (existsSync(CONFIG_PATH)) {
+    cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, any>;
+  }
+  const host = (cfg.server_host as string) || "localhost";
+  const port = Number(cfg.server_port) || 8765;
+  const pin  = (cfg.server_pin as string) || "";
+  const deviceId   = (cfg.device_id as string) || "";
+  const deviceName = (cfg.device_name as string) || "";
+  const authHeaders: Record<string, string> = {
+    "Authorization": `Bearer ${pin}`,
+    "X-Device-ID": deviceId,
+    "X-Device-Name": deviceName,
+  };
+  return { host, port, authHeaders };
+}
+
+// ── file utils ────────────────────────────────────────────────────────────────
+
+function findLatestFileInDir(dirPath: string): { path: string; time: string } | null {
+  try {
+    if (!existsSync(dirPath)) return null;
+    let latestMs = 0;
+    let latest: { path: string; time: string } | null = null;
+    for (const e of readdirSync(dirPath, { withFileTypes: true })) {
+      if (!e.isFile()) continue;
+      try {
+        const fullPath = join(dirPath, e.name);
+        const ms = statSync(fullPath).mtimeMs;
+        if (ms > latestMs) {
+          latestMs = ms;
+          latest = { path: fullPath, time: new Date(ms).toISOString().slice(0, 19) };
+        }
+      } catch {}
+    }
+    return latest;
+  } catch { return null; }
+}
+
+ipcMain.handle("files:get-latest-in-folder", (_event, dirPath: string) =>
+  findLatestFileInDir(dirPath)
+);
+
+// ── save sync ─────────────────────────────────────────────────────────────────
+
+ipcMain.handle("save:push", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    if (!existsSync(savePath)) return { ok: false, error: "Save file not found" };
+    const { host, port, authHeaders } = loadServerCfg();
+    const data = readFileSync(savePath);
+    const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
+      body: data,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, error: (body as any).detail ?? res.statusText };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || "Push failed" };
+  }
+});
+
+ipcMain.handle("save:pull", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> => {
+  try {
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
+      headers: authHeaders,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (res.status === 204) return { ok: true, pulled: false };
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (existsSync(savePath)) {
+      writeFileSync(`${savePath}.bak`, readFileSync(savePath));
+    }
+    mkdirSync(dirname(savePath), { recursive: true });
+    writeFileSync(savePath, buf);
+    return { ok: true, pulled: true };
+  } catch (e: any) {
+    return { ok: false, pulled: false, error: e.message || "Pull failed" };
+  }
+});
+
+// ── state sync ────────────────────────────────────────────────────────────────
+
+ipcMain.handle("state:push", async (_event, slug: string, statePath: string): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    const stateDir = dirname(statePath);
+    const latest = findLatestFileInDir(stateDir);
+    if (!latest) return { ok: false, error: "No state files found in folder" };
+    const { host, port, authHeaders } = loadServerCfg();
+    const data = readFileSync(latest.path);
+    const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
+      body: data,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, error: (body as any).detail ?? res.statusText };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || "Push failed" };
+  }
+});
+
+ipcMain.handle("state:pull", async (_event, slug: string, statePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> => {
+  try {
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
+      headers: authHeaders,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (res.status === 204) return { ok: true, pulled: false };
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (existsSync(statePath)) {
+      writeFileSync(`${statePath}.bak`, readFileSync(statePath));
+    }
+    mkdirSync(dirname(statePath), { recursive: true });
+    writeFileSync(statePath, buf);
+    return { ok: true, pulled: true };
+  } catch (e: any) {
+    return { ok: false, pulled: false, error: e.message || "Pull failed" };
+  }
+});
+
 // ── rom push ──────────────────────────────────────────────────────────────────
 
 ipcMain.handle(

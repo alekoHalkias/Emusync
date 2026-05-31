@@ -124,6 +124,13 @@ window.emusync.emulator.detect(consoleKey)  // scans for installed emulators for
 window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; uses emulatorOption.saveDir (already resolved to core subfolder); returns { emulators, romDirs, roms[] } with consoleName+coreName on each entry
 window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
 window.emusync.files.getSaveTime(path)      // returns last modified time of save file as ISO string (YYYY-MM-DDTHH:MM:SS), or null if file doesn't exist
+window.emusync.files.getLatestInFolder(dir) // returns {path, time} for the newest file in dir, or null if dir is empty/missing
+
+window.emusync.save.push(slug, savePath)   // reads local save file, POSTs bytes to /games/{slug}/save; returns {ok, error?}
+window.emusync.save.pull(slug, savePath)   // GETs /games/{slug}/save, backs up existing file to .bak, writes new bytes; returns {ok, pulled, error?}
+
+window.emusync.state.push(slug, statePath) // finds newest file in dirname(statePath), POSTs bytes to /games/{slug}/state; returns {ok, error?}
+window.emusync.state.pull(slug, statePath) // GETs /games/{slug}/state, backs up existing statePath to .bak, writes new bytes; returns {ok, pulled, error?}
 
 window.emusync.device.probe(ip, port)      // TCP probe: resolves true if ip:port reachable within 2 s
 

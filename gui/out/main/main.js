@@ -2,6 +2,7 @@
 const electron = require("electron");
 const child_process = require("child_process");
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 const os = require("os");
 const smolToml = require("smol-toml");
@@ -875,6 +876,218 @@ electron.ipcMain.handle("device:probe", (_event, ip, port) => {
     socket.on("timeout", () => finish(false));
   });
 });
+function loadServerCfg() {
+  let cfg = {};
+  if (fs.existsSync(CONFIG_PATH)) {
+    cfg = smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  }
+  const host = cfg.server_host || "localhost";
+  const port = Number(cfg.server_port) || 8765;
+  const pin = cfg.server_pin || "";
+  const deviceId = cfg.device_id || "";
+  const deviceName = cfg.device_name || "";
+  const authHeaders = {
+    "Authorization": `Bearer ${pin}`,
+    "X-Device-ID": deviceId,
+    "X-Device-Name": deviceName
+  };
+  return { host, port, authHeaders };
+}
+function findLatestFileInDir(dirPath) {
+  try {
+    if (!fs.existsSync(dirPath)) return null;
+    let latestMs = 0;
+    let latest = null;
+    for (const e of fs.readdirSync(dirPath, { withFileTypes: true })) {
+      if (!e.isFile()) continue;
+      try {
+        const fullPath = path.join(dirPath, e.name);
+        const ms = fs.statSync(fullPath).mtimeMs;
+        if (ms > latestMs) {
+          latestMs = ms;
+          latest = { path: fullPath, time: new Date(ms).toISOString().slice(0, 19) };
+        }
+      } catch {
+      }
+    }
+    return latest;
+  } catch {
+    return null;
+  }
+}
+electron.ipcMain.handle(
+  "files:get-latest-in-folder",
+  (_event, dirPath) => findLatestFileInDir(dirPath)
+);
+electron.ipcMain.handle("save:push", async (_event, slug, savePath) => {
+  try {
+    if (!fs.existsSync(savePath)) return { ok: false, error: "Save file not found" };
+    const { host, port, authHeaders } = loadServerCfg();
+    const data = fs.readFileSync(savePath);
+    const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
+      body: data,
+      signal: AbortSignal.timeout(3e4)
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, error: body.detail ?? res.statusText };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message || "Push failed" };
+  }
+});
+electron.ipcMain.handle("save:pull", async (_event, slug, savePath) => {
+  try {
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
+      headers: authHeaders,
+      signal: AbortSignal.timeout(3e4)
+    });
+    if (res.status === 204) return { ok: true, pulled: false };
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, pulled: false, error: body.detail ?? res.statusText };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (fs.existsSync(savePath)) {
+      fs.writeFileSync(`${savePath}.bak`, fs.readFileSync(savePath));
+    }
+    fs.mkdirSync(path.dirname(savePath), { recursive: true });
+    fs.writeFileSync(savePath, buf);
+    return { ok: true, pulled: true };
+  } catch (e) {
+    return { ok: false, pulled: false, error: e.message || "Pull failed" };
+  }
+});
+electron.ipcMain.handle("state:push", async (_event, slug, statePath) => {
+  try {
+    const stateDir = path.dirname(statePath);
+    const latest = findLatestFileInDir(stateDir);
+    if (!latest) return { ok: false, error: "No state files found in folder" };
+    const { host, port, authHeaders } = loadServerCfg();
+    const data = fs.readFileSync(latest.path);
+    const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
+      body: data,
+      signal: AbortSignal.timeout(3e4)
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, error: body.detail ?? res.statusText };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message || "Push failed" };
+  }
+});
+electron.ipcMain.handle("state:pull", async (_event, slug, statePath) => {
+  try {
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
+      headers: authHeaders,
+      signal: AbortSignal.timeout(3e4)
+    });
+    if (res.status === 204) return { ok: true, pulled: false };
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, pulled: false, error: body.detail ?? res.statusText };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (fs.existsSync(statePath)) {
+      fs.writeFileSync(`${statePath}.bak`, fs.readFileSync(statePath));
+    }
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, buf);
+    return { ok: true, pulled: true };
+  } catch (e) {
+    return { ok: false, pulled: false, error: e.message || "Pull failed" };
+  }
+});
+electron.ipcMain.handle(
+  "rom:push",
+  async (_event, slug, toDeviceId, consoleName) => {
+    try {
+      let cfg = {};
+      if (fs.existsSync(CONFIG_PATH)) {
+        cfg = smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+      }
+      const host = cfg.server_host || "localhost";
+      const port = Number(cfg.server_port) || 8765;
+      const pin = cfg.server_pin || "";
+      const deviceId = cfg.device_id || "";
+      const deviceName = cfg.device_name || "";
+      const authHeaders = {
+        "Authorization": `Bearer ${pin}`,
+        "X-Device-ID": deviceId,
+        "X-Device-Name": deviceName
+      };
+      const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5e3) });
+      if (!gdRes.ok) return { ok: false, error: "This game is not configured on this device" };
+      const gd = await gdRes.json();
+      if (!gd.rom_path) return { ok: false, error: "No ROM path configured for this game" };
+      if (!fs.existsSync(gd.rom_path)) return { ok: false, error: `ROM file not found: ${gd.rom_path}` };
+      const consolesRes = await fetch(`http://${host}:${port}/devices/${toDeviceId}/consoles`, { headers: authHeaders, signal: AbortSignal.timeout(5e3) });
+      if (!consolesRes.ok) return { ok: false, error: "Could not read target device configuration" };
+      const consoles = await consolesRes.json();
+      const match = consoles.find((c) => c.console_name === consoleName);
+      if (!match?.device_game_folder) {
+        return { ok: false, error: `${consoleName} is not configured on the target device yet` };
+      }
+      const romFilename = path.basename(gd.rom_path);
+      const destinationPath = path.join(match.device_game_folder, romFilename);
+      const fileSize = fs.statSync(gd.rom_path).size;
+      const result = await new Promise((resolve, reject) => {
+        const req = http.request(
+          {
+            method: "POST",
+            host,
+            port,
+            path: `/games/${slug}/rom-transfer`,
+            headers: {
+              ...authHeaders,
+              "Content-Type": "application/octet-stream",
+              "Content-Length": fileSize,
+              "X-To-Device-ID": toDeviceId,
+              "X-Destination-Path": destinationPath,
+              "X-Filename": romFilename
+            }
+          },
+          (res) => {
+            let body = "";
+            res.on("data", (chunk) => {
+              body += chunk.toString();
+            });
+            res.on("end", () => {
+              if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                try {
+                  resolve(JSON.parse(body));
+                } catch {
+                  resolve({});
+                }
+              } else {
+                try {
+                  const msg = JSON.parse(body);
+                  reject(new Error(msg.detail || `Server error ${res.statusCode}`));
+                } catch {
+                  reject(new Error(`Server error ${res.statusCode}`));
+                }
+              }
+            });
+          }
+        );
+        req.on("error", reject);
+        fs.createReadStream(gd.rom_path).pipe(req);
+      });
+      return { ok: true, targetOnline: result.target_online };
+    } catch (e) {
+      return { ok: false, error: e.message || "Push failed" };
+    }
+  }
+);
 electron.app.whenReady().then(() => {
   createWindow();
   electron.app.on("activate", () => {
