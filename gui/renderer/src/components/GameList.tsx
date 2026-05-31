@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, getGameDevice, listGameDevices, getDeviceGameDevices, createPullRequest, type Game, type Device } from "../api";
+import { listGames, removeGame, getSaveMeta, getLock, getGameDevice, listGameDevices, getDeviceGameDevices, getDeviceConsoles, createPullRequest, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import { useDevices } from "../DeviceContext";
 
@@ -210,8 +210,23 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
 
   async function handlePull(fromDevice: Device): Promise<void> {
     if (!deviceModal) return;
-    const folder = await (window as any).emusync.dialog.openFolder();
-    if (!folder) return;
+
+    // Try to auto-resolve the local ROM folder from this device's console config
+    let folder: string | null = null;
+    if (currentDeviceId && deviceModal.gameConsole) {
+      try {
+        const consoles = await getDeviceConsoles(currentDeviceId);
+        const match = consoles.find(c => c.console_name === deviceModal.gameConsole);
+        if (match?.device_game_folder) folder = match.device_game_folder;
+      } catch { /* fall through to picker */ }
+    }
+
+    // Fall back to folder picker if no console config found
+    if (!folder) {
+      folder = await (window as any).emusync.dialog.openFolder();
+      if (!folder) return;
+    }
+
     setTransfer(fromDevice.id, { status: "loading", message: "" });
     try {
       const sourceGames = await getDeviceGameDevices(fromDevice.id);
