@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, execSync, ChildProcess } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, createReadStream } from "fs";
+import { request as httpRequest } from "http";
 import { join, dirname, basename, extname } from "path";
 import { homedir, networkInterfaces } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
@@ -971,6 +972,94 @@ ipcMain.handle("device:probe", (_event, ip: string, port: number): Promise<boole
     socket.on("timeout", () => finish(false));
   });
 });
+
+// ── rom push ──────────────────────────────────────────────────────────────────
+
+ipcMain.handle(
+  "rom:push",
+  async (_event, slug: string, toDeviceId: string, consoleName: string): Promise<{ ok: boolean; targetOnline?: boolean; error?: string }> => {
+    try {
+      // Read server config from TOML
+      let cfg: Record<string, any> = {};
+      if (existsSync(CONFIG_PATH)) {
+        cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, any>;
+      }
+      const host = (cfg.server_host as string) || "localhost";
+      const port = Number(cfg.server_port) || 8765;
+      const pin  = (cfg.server_pin as string) || "";
+      const deviceId   = (cfg.device_id as string) || "";
+      const deviceName = (cfg.device_name as string) || "";
+      const authHeaders: Record<string, string> = {
+        "Authorization": `Bearer ${pin}`,
+        "X-Device-ID": deviceId,
+        "X-Device-Name": deviceName,
+      };
+
+      // 1. Get local game device config to find rom_path
+      const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+      if (!gdRes.ok) return { ok: false, error: "This game is not configured on this device" };
+      const gd = await gdRes.json() as any;
+      if (!gd.rom_path) return { ok: false, error: "No ROM path configured for this game" };
+      if (!existsSync(gd.rom_path)) return { ok: false, error: `ROM file not found: ${gd.rom_path}` };
+
+      // 2. Get target device consoles to find its ROM folder for this console
+      const consolesRes = await fetch(`http://${host}:${port}/devices/${toDeviceId}/consoles`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+      if (!consolesRes.ok) return { ok: false, error: "Could not read target device configuration" };
+      const consoles = await consolesRes.json() as Array<{ console_name: string; device_game_folder: string }>;
+
+      const match = consoles.find(c => c.console_name === consoleName);
+      if (!match?.device_game_folder) {
+        return { ok: false, error: `${consoleName} is not configured on the target device yet` };
+      }
+
+      const romFilename = basename(gd.rom_path);
+      const destinationPath = join(match.device_game_folder, romFilename);
+      const fileSize = statSync(gd.rom_path).size;
+
+      // 3. Stream ROM file to server via http.request (fetch can't stream a local file reliably)
+      const result = await new Promise<any>((resolve, reject) => {
+        const req = httpRequest(
+          {
+            method: "POST",
+            host,
+            port,
+            path: `/games/${slug}/rom-transfer`,
+            headers: {
+              ...authHeaders,
+              "Content-Type": "application/octet-stream",
+              "Content-Length": fileSize,
+              "X-To-Device-ID": toDeviceId,
+              "X-Destination-Path": destinationPath,
+              "X-Filename": romFilename,
+            },
+          },
+          (res) => {
+            let body = "";
+            res.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+            res.on("end", () => {
+              if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                try { resolve(JSON.parse(body)); } catch { resolve({}); }
+              } else {
+                try {
+                  const msg = JSON.parse(body);
+                  reject(new Error(msg.detail || `Server error ${res.statusCode}`));
+                } catch {
+                  reject(new Error(`Server error ${res.statusCode}`));
+                }
+              }
+            });
+          }
+        );
+        req.on("error", reject);
+        createReadStream(gd.rom_path).pipe(req);
+      });
+
+      return { ok: true, targetOnline: result.target_online };
+    } catch (e: any) {
+      return { ok: false, error: e.message || "Push failed" };
+    }
+  }
+);
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 
