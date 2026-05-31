@@ -116,6 +116,36 @@ def server() -> None:
     """Manage the EmuSync server."""
 
 
+def _find_pid_by_port(port: int) -> int | None:
+    """Return the PID of the process listening on *port*, or None if not found.
+
+    Tries ss (iproute2) first, then lsof as a fallback.
+    """
+    import subprocess
+    import re
+    try:
+        out = subprocess.check_output(
+            ["ss", "-Hlntp", f"sport = :{port}"],
+            text=True, timeout=3, stderr=subprocess.DEVNULL,
+        )
+        m = re.search(r"pid=(\d+)", out)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        pass
+    try:
+        out = subprocess.check_output(
+            ["lsof", f"-ti:{port}", "-sTCP:LISTEN"],
+            text=True, timeout=3, stderr=subprocess.DEVNULL,
+        )
+        pids = out.strip().split()
+        if pids:
+            return int(pids[0])
+    except Exception:
+        pass
+    return None
+
+
 def _is_server_running(data_dir: str) -> tuple[bool, int | None]:
     """Check if a server is already running on this device.
 
@@ -308,8 +338,11 @@ def _do_stop_server() -> None:
     is_running, pid = _is_server_running(cfg.data_dir)
 
     if not is_running:
-        click.echo("server not running")
-        return
+        # PID file missing or stale — try to find the process by port
+        pid = _find_pid_by_port(cfg.server_port)
+        if pid is None:
+            click.echo("server not running")
+            return
 
     try:
         os.kill(pid, signal.SIGKILL)
