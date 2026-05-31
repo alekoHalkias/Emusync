@@ -81,6 +81,8 @@ class SyncClient:
             rom_path=d.get("rom_path", ""),
             save_path=d.get("save_path", ""),
             launch_command=d.get("launch_command", ""),
+            state_path=d.get("state_path", ""),
+            rom_folder_path=d.get("rom_folder_path", ""),
         )
 
     def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:

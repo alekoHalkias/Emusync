@@ -123,12 +123,26 @@ CREATE TABLE IF NOT EXISTS rom_pull_requests (
 """
 
 
+_HARMLESS_MIGRATION_MSGS = (
+    "duplicate column name",
+    "table",  # "table X already exists"
+    "no such column",  # DROP COLUMN on already-removed column
+    "column",  # catch-all for other column-already-exists variants
+)
+
+
 def _try(conn: sqlite3.Connection, sql: str) -> None:
-    """Execute a DDL statement, silently ignoring OperationalError (already exists / column missing)."""
+    """Execute a DDL statement, suppressing only known-harmless OperationalErrors.
+
+    Harmless: duplicate column, table already exists, column not found.
+    Any other OperationalError (e.g., SQL syntax) propagates so it isn't hidden.
+    """
     try:
         conn.execute(sql)
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.OperationalError as exc:
+        msg = str(exc).lower()
+        if not any(token in msg for token in _HARMLESS_MIGRATION_MSGS):
+            raise
 
 
 def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
@@ -433,22 +447,22 @@ class Store:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    # ── saves ─────────────────────────────────────────────────────────────────
+    # ── saves / states (shared private helpers) ───────────────────────────────
 
-    def push_save(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
+    def _push_blob(self, table: str, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
         h = hashlib.sha256(data).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
-        self._conn.execute("DELETE FROM saves WHERE game_slug = ?", (game_slug,))
+        self._conn.execute(f"DELETE FROM {table} WHERE game_slug = ?", (game_slug,))
         self._conn.execute(
-            "INSERT INTO saves (id, game_slug, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
+            f"INSERT INTO {table} (id, game_slug, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
             (str(uuid.uuid4()), game_slug, device_id, data, h, now),
         )
         self._conn.commit()
         return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now)
 
-    def pull_save(self, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
+    def _pull_blob(self, table: str, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
         row = self._conn.execute(
-            "SELECT data, game_slug, device_id, hash, pushed_at FROM saves WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            f"SELECT data, game_slug, device_id, hash, pushed_at FROM {table} WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
             (game_slug,),
         ).fetchone()
         if not row:
@@ -461,47 +475,34 @@ class Store:
         )
         return bytes(row["data"]), meta
 
-    def get_save_meta(self, game_slug: str) -> Optional[SaveMeta]:
+    def _get_blob_meta(self, table: str, game_slug: str) -> Optional[SaveMeta]:
         row = self._conn.execute(
-            "SELECT game_slug, device_id, hash, pushed_at FROM saves WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            f"SELECT game_slug, device_id, hash, pushed_at FROM {table} WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
             (game_slug,),
         ).fetchone()
         return SaveMeta(**dict(row)) if row else None
+
+    # ── saves ─────────────────────────────────────────────────────────────────
+
+    def push_save(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
+        return self._push_blob("saves", game_slug, device_id, data)
+
+    def pull_save(self, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
+        return self._pull_blob("saves", game_slug)
+
+    def get_save_meta(self, game_slug: str) -> Optional[SaveMeta]:
+        return self._get_blob_meta("saves", game_slug)
 
     # ── states ─────────────────────────────────────────────────────────────────
 
     def push_state(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
-        h = hashlib.sha256(data).hexdigest()
-        now = datetime.now(timezone.utc).isoformat()
-        self._conn.execute("DELETE FROM states WHERE game_slug = ?", (game_slug,))
-        self._conn.execute(
-            "INSERT INTO states (id, game_slug, device_id, data, hash, pushed_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), game_slug, device_id, data, h, now),
-        )
-        self._conn.commit()
-        return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now)
+        return self._push_blob("states", game_slug, device_id, data)
 
     def pull_state(self, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
-        row = self._conn.execute(
-            "SELECT data, game_slug, device_id, hash, pushed_at FROM states WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
-            (game_slug,),
-        ).fetchone()
-        if not row:
-            return None, None
-        meta = SaveMeta(
-            game_slug=row["game_slug"],
-            device_id=row["device_id"],
-            hash=row["hash"],
-            pushed_at=row["pushed_at"],
-        )
-        return bytes(row["data"]), meta
+        return self._pull_blob("states", game_slug)
 
     def get_state_meta(self, game_slug: str) -> Optional[SaveMeta]:
-        row = self._conn.execute(
-            "SELECT game_slug, device_id, hash, pushed_at FROM states WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
-            (game_slug,),
-        ).fetchone()
-        return SaveMeta(**dict(row)) if row else None
+        return self._get_blob_meta("states", game_slug)
 
     # ── locks ─────────────────────────────────────────────────────────────────
 
@@ -668,3 +669,58 @@ class Store:
             (status, fulfilled_at, pull_request_id),
         )
         self._conn.commit()
+
+
+def upsert_console_for_game(
+    store: "Store",
+    device_id: str,
+    console_name: str,
+    rom_path: str,
+    save_path: str,
+    rom_folder_path: str,
+) -> None:
+    """Infer console folders/emulator from game paths and create-or-update the Console row.
+
+    Called identically from the API (set_game_device) and the CLI (game add) so the
+    logic lives in one place.
+    """
+    emulator = ""
+    game_folder = ""
+    save_folder = ""
+    state_folder = ""
+
+    if save_path:
+        save_dir = str(Path(save_path).parent)
+        save_folder = save_dir
+        emulator = Path(save_dir).name
+
+    if rom_folder_path:
+        game_folder = rom_folder_path
+    elif rom_path:
+        game_folder = str(Path(rom_path).parent.parent)
+
+    if save_folder:
+        state_folder = save_folder.replace("saves", "states")
+
+    existing_consoles = store.list_consoles(device_id)
+    existing = next(
+        (c for c in existing_consoles if c.console_name == console_name and c.device_game_folder == game_folder),
+        None,
+    )
+
+    if existing:
+        existing.device_save_folder = save_folder
+        existing.device_state_folder = state_folder
+        existing.device_emulator = emulator
+        store.set_console(existing)
+    else:
+        store.set_console(Console(
+            id=str(uuid.uuid4()),
+            device_id=device_id,
+            console_name=console_name,
+            shortform_name=console_name.lower()[:4],
+            device_game_folder=game_folder,
+            device_save_folder=save_folder,
+            device_state_folder=state_folder,
+            device_emulator=emulator,
+        ))
