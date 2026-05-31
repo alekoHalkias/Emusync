@@ -534,8 +534,7 @@ def game() -> None:
 @click.option("--console", "console_name", default="", help="Console name")
 def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_command: str, console_name: str) -> None:
     """Add a game to EmuSync management."""
-    from server.store import Store, Console
-    import uuid
+    from server.store import Store, upsert_console_for_game
 
     client = _client()
     cfg = cfg_module.load()
@@ -551,58 +550,8 @@ def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_
     if rom_path or save_path or launch_command:
         client.set_game_device(actual_slug, GameDeviceConfig(rom_path=rom_path, save_path=save_path, launch_command=launch_command))
 
-    # Auto-configure console if game has console and paths
     if console_name and (rom_path or save_path):
-        device_id = cfg.device_id
-        # Extract emulator/core from save path (e.g., mGBA from /path/saves/mGBA/)
-        emulator = ""
-        game_folder = ""
-        save_folder = ""
-        state_folder = ""
-
-        if save_path:
-            save_dir = os.path.dirname(save_path)
-            save_folder = save_dir
-            # Try to infer emulator from save folder structure
-            emulator = os.path.basename(save_dir)
-
-        if rom_path:
-            # Extract console folder by going up 2 levels from ROM file
-            # /path/Console/GameFolder/game.rom -> /path/Console/
-            rom_file_dir = os.path.dirname(rom_path)
-            game_folder = os.path.dirname(rom_file_dir)
-
-        if save_folder:
-            # Infer state folder by replacing 'saves' with 'states'
-            state_folder = save_folder.replace('saves', 'states')
-
-        # Check if console entry with this exact ROM folder exists
-        existing_consoles = store.list_consoles(device_id)
-        existing_console = None
-        for c in existing_consoles:
-            if c.console_name == console_name and c.device_game_folder == game_folder:
-                existing_console = c
-                break
-
-        if existing_console:
-            # Update existing console entry for this ROM folder
-            existing_console.device_save_folder = save_folder
-            existing_console.device_state_folder = state_folder
-            existing_console.device_emulator = emulator
-            store.set_console(existing_console)
-        else:
-            # Create new console entry for this ROM folder
-            console_obj = Console(
-                id=str(uuid.uuid4()),
-                device_id=device_id,
-                console_name=console_name,
-                shortform_name=console_name.lower()[:4],
-                device_game_folder=game_folder,
-                device_save_folder=save_folder,
-                device_state_folder=state_folder,
-                device_emulator=emulator,
-            )
-            store.set_console(console_obj)
+        upsert_console_for_game(store, cfg.device_id, console_name, rom_path, save_path, "")
 
     click.echo(f"Added: {name} (slug: {actual_slug})")
 
@@ -657,13 +606,7 @@ def game_list() -> None:
                         parent_dir = parent_dir.replace('saves/', 'states/', 1)
 
                 if parent_dir and parent_dir != '-':
-                    state_folder_path = os.path.join(parent_dir, g['name'])
-                    try:
-                        os.makedirs(state_folder_path, exist_ok=True)
-                        state_folder = state_folder_path + os.sep
-                    except (OSError, Exception) as e:
-                        # If creation fails, still show the intended path for the user to see
-                        state_folder = state_folder_path + os.sep
+                    state_folder = os.path.join(parent_dir, g['name']) + os.sep
 
                 rows.append([
                     name,
@@ -1807,20 +1750,19 @@ def sync_daemon() -> None:
 # ── run ───────────────────────────────────────────────────────────────────────
 
 def _find_save_or_state_file(configured_path: str) -> str | None:
-  """Look for save/state files with different extensions. Return path if found, None if not."""
-  if not configured_path:
+    """Look for save/state files with different extensions. Return path if found, None if not."""
+    if not configured_path:
+        return None
+    p = Path(configured_path)
+    if p.exists():
+        return configured_path
+    dir_path = p.parent
+    base_name = p.stem
+    if dir_path.exists():
+        for f in dir_path.iterdir():
+            if f.is_file() and f.stem == base_name:
+                return str(f)
     return None
-  p = Path(configured_path)
-  if p.exists():
-    return configured_path
-  # Look for files with same name but different extension in the same directory
-  dir_path = p.parent
-  base_name = p.stem  # filename without extension
-  if dir_path.exists():
-    for f in dir_path.iterdir():
-      if f.is_file() and f.stem == base_name:
-        return str(f)
-  return None
 
 
 @cli.command("run")
@@ -1893,6 +1835,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             click.echo(f"Warning: failed to release lock: {exc}", err=True)
         lock_released = True
 
+    exit_code = 0
     game_pid_file.write_text(str(os.getpid()))
     try:
         pulled, server_hash = client.pull_save(game_slug, save_path)
@@ -1923,22 +1866,22 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         actual_state_path = _find_save_or_state_file(state_path) if state_path else None
 
         if (actual_save_path and actual_save_path != save_path) or (actual_state_path and actual_state_path != state_path):
-          try:
-            updated_gd = GameDeviceConfig(
-              rom_path=gd.rom_path,
-              save_path=actual_save_path or save_path,
-              launch_command=gd.launch_command,
-              state_path=actual_state_path or state_path,
-            )
-            client.set_game_device(game_slug, updated_gd)
-            if actual_save_path and actual_save_path != save_path:
-              save_path = actual_save_path
-              click.echo(f"Updated save path to {save_path}")
-            if actual_state_path and actual_state_path != state_path:
-              state_path = actual_state_path
-              click.echo(f"Updated state path to {state_path}")
-          except Exception as exc:
-            click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
+            try:
+                updated_gd = GameDeviceConfig(
+                    rom_path=gd.rom_path,
+                    save_path=actual_save_path or save_path,
+                    launch_command=gd.launch_command,
+                    state_path=actual_state_path or state_path,
+                )
+                client.set_game_device(game_slug, updated_gd)
+                if actual_save_path and actual_save_path != save_path:
+                    save_path = actual_save_path
+                    click.echo(f"Updated save path to {save_path}")
+                if actual_state_path and actual_state_path != state_path:
+                    state_path = actual_state_path
+                    click.echo(f"Updated state path to {state_path}")
+            except Exception as exc:
+                click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
 
         if Path(save_path).exists():
             local_hash = hashlib.sha256(Path(save_path).read_bytes()).hexdigest()
@@ -1962,7 +1905,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         _release()
         game_pid_file.unlink(missing_ok=True)
 
-    sys.exit(exit_code if "exit_code" in dir() else 0)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

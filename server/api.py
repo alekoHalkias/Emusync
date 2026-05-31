@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import re
 import threading
+import uuid
 from typing import Optional
 
 import asyncio
@@ -10,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from .store import GameDevice, Store
+from .store import GameDevice, Store, upsert_console_for_game
 
 app = FastAPI(title="EmuSync")
 
@@ -166,7 +169,6 @@ def list_games(device_id: str = Depends(_auth)) -> list[dict]:
 
 @app.post("/games")
 def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
-    import re
     slug = re.sub(r"[^a-z0-9]+", "-", req.name.lower()).strip("-")
     game = _get_store().add_game(slug, req.name, req.console)
     return {"slug": game.slug, "name": game.name, "console": game.console}
@@ -182,12 +184,13 @@ def get_game(slug: str, device_id: str = Depends(_auth)) -> dict:
 
 @app.put("/games/{slug}")
 def update_game(slug: str, req: GameRequest, device_id: str = Depends(_auth)) -> dict:
-    if not _get_store().get_game(slug):
+    store = _get_store()
+    if not store.get_game(slug):
         raise HTTPException(status_code=404, detail="Game not found")
-    _get_store().update_game_name(slug, req.name)
+    store.update_game_name(slug, req.name)
     if req.console:
-        _get_store().update_game_console(slug, req.console)
-    game = _get_store().get_game(slug)
+        store.update_game_console(slug, req.console)
+    game = store.get_game(slug)
     return {"slug": slug, "name": game.name, "console": game.console}
 
 
@@ -226,10 +229,6 @@ def list_game_devices(slug: str, device_id: str = Depends(_auth)) -> list[dict]:
 
 @app.put("/games/{slug}/device")
 def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(_auth)) -> dict:
-    import os
-    import uuid
-    from .store import Console
-
     store = _get_store()
     game = store.get_game(slug)
     if not game:
@@ -248,58 +247,10 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
 
     # Auto-configure console if game has console and paths
     if game.console and (req.rom_path or req.save_path):
-        # Extract emulator/core from save path (e.g., mGBA from /path/saves/mGBA/)
-        emulator = ""
-        game_folder = ""
-        save_folder = ""
-        state_folder = ""
-
-        if req.save_path:
-            save_dir = os.path.dirname(req.save_path)
-            save_folder = save_dir
-            # Try to infer emulator from save folder structure
-            emulator = os.path.basename(save_dir)
-
-        if req.rom_folder_path:
-            # Use the folder path provided by GUI (the user-selected folder)
-            game_folder = req.rom_folder_path
-        elif req.rom_path:
-            # Fall back to extracting from ROM path
-            # /path/Console/GameFolder/game.rom -> /path/Console/
-            rom_file_dir = os.path.dirname(req.rom_path)
-            game_folder = os.path.dirname(rom_file_dir)
-
-        if save_folder:
-            # Infer state folder by replacing 'saves' with 'states'
-            state_folder = save_folder.replace('saves', 'states')
-
-        # Check if console entry with this exact ROM folder exists
-        existing_consoles = store.list_consoles(device_id)
-        existing_console = None
-        for c in existing_consoles:
-            if c.console_name == game.console and c.device_game_folder == game_folder:
-                existing_console = c
-                break
-
-        if existing_console:
-            # Update existing console entry for this ROM folder
-            existing_console.device_save_folder = save_folder
-            existing_console.device_state_folder = state_folder
-            existing_console.device_emulator = emulator
-            store.set_console(existing_console)
-        else:
-            # Create new console entry for this ROM folder
-            console_obj = Console(
-                id=str(uuid.uuid4()),
-                device_id=device_id,
-                console_name=game.console,
-                shortform_name=game.console.lower()[:4],
-                device_game_folder=game_folder,
-                device_save_folder=save_folder,
-                device_state_folder=state_folder,
-                device_emulator=emulator,
-            )
-            store.set_console(console_obj)
+        upsert_console_for_game(
+            store, device_id, game.console,
+            req.rom_path, req.save_path, req.rom_folder_path,
+        )
 
     if req.rom_path:
         store.log_event("game_added", slug, device_id, rom_path=req.rom_path)
@@ -343,8 +294,6 @@ async def create_rom_transfer(
     x_filename: str = Header("rom"),
     device_id: str = Depends(_auth),
 ) -> dict:
-    import asyncio
-    import uuid
     from pathlib import Path as _Path
 
     store = _get_store()
@@ -386,7 +335,6 @@ async def create_rom_transfer(
 
     # Notify target device via SSE if it has a stream open
     if x_to_device_id in _device_event_queues:
-        import json as _json
         await _device_event_queues[x_to_device_id].put({
             "type": "rom_transfer_queued",
             "transfer_id": transfer_id,
@@ -470,8 +418,6 @@ async def create_pull_request(
     device_id: str = Depends(_auth),
 ) -> dict:
     """Request a ROM from another device. The source device uploads it when online."""
-    import uuid as _uuid
-
     store = _get_store()
     game = store.get_game(slug)
     if not game:
@@ -486,7 +432,7 @@ async def create_pull_request(
     if not any(d.id == from_device_id for d in devices):
         raise HTTPException(status_code=404, detail="Source device not found")
 
-    pull_request_id = str(_uuid.uuid4())
+    pull_request_id = str(uuid.uuid4())
     store.create_pull_request(
         id=pull_request_id,
         slug=slug,
@@ -556,8 +502,6 @@ def update_pull_request(pull_request_id: str, request_body: dict, device_id: str
 @app.get("/events/stream")
 async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingResponse:
     """Server-Sent Events stream — delivers real-time notifications to a device."""
-    import json as _json
-
     queue: asyncio.Queue = asyncio.Queue()
     _device_event_queues[device_id] = queue
 
@@ -566,7 +510,7 @@ async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingRespons
             while True:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    yield f"data: {_json.dumps(event)}\n\n"
+                    yield f"data: {json.dumps(event)}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
                 except asyncio.CancelledError:
@@ -611,7 +555,7 @@ def get_save_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     if not meta:
         return Response(status_code=204)
     return Response(
-        content=f'{{"hash":"{meta.hash}","pushed_at":"{meta.pushed_at}","device_id":"{meta.device_id}"}}',
+        content=json.dumps({"hash": meta.hash, "pushed_at": meta.pushed_at, "device_id": meta.device_id}),
         media_type="application/json",
     )
 
@@ -648,7 +592,7 @@ def get_state_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     if not meta:
         return Response(status_code=204)
     return Response(
-        content=f'{{"hash":"{meta.hash}","pushed_at":"{meta.pushed_at}","device_id":"{meta.device_id}"}}',
+        content=json.dumps({"hash": meta.hash, "pushed_at": meta.pushed_at, "device_id": meta.device_id}),
         media_type="application/json",
     )
 
