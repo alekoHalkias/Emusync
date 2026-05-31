@@ -243,6 +243,24 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
 
         <div className="input-group">
+          <label>State file <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+          <div className="input-row">
+            <input
+              type="text"
+              value={statePath}
+              onChange={(e) => setStatePath(e.target.value)}
+              placeholder="/path/to/states/CoreName/game.state"
+            />
+            <button className="btn btn-icon" title="Browse" onClick={() => pickFile(setStatePath, "Select state file")}>
+              📁
+            </button>
+          </div>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
+            Whole folder is checked for sync — set to any state file in the emulator's state directory.
+          </span>
+        </div>
+
+        <div className="input-group">
           <label>Launch command <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
           <input
             type="text"
@@ -280,27 +298,34 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             opColor={opColor(saveOp)}
           />
 
-          {/* ── State sync (only when state_path is configured) ── */}
-          {statePath && (
-            <>
-              <div style={{ borderTop: "1px solid var(--border)", margin: "16px -16px 0" }} />
-              <div style={{ paddingTop: 16 }}>
-                <SyncSection
-                  label="Save state"
-                  pathLine={parentDir(statePath) + "/"}
-                  localLabel="Local (latest)"
-                  localTime={latestStateFile?.time ?? null}
-                  serverTime={serverStateMeta?.pushed_at ?? null}
-                  op={stateOp}
-                  onPush={handlePushState}
-                  onPull={handlePullState}
-                  pushDisabled={!latestStateFile}
-                  pullDisabled={!serverStateMeta}
-                  opColor={opColor(stateOp)}
-                />
+          {/* ── State sync ── */}
+          <div style={{ borderTop: "1px solid var(--border)", margin: "16px -16px 0" }} />
+          <div style={{ paddingTop: 16 }}>
+            {statePath ? (
+              <SyncSection
+                label="Save state"
+                pathLine={parentDir(statePath) + "/"}
+                localLabel="Local (latest)"
+                localTime={latestStateFile?.time ?? null}
+                serverTime={serverStateMeta?.pushed_at ?? null}
+                op={stateOp}
+                onPush={handlePushState}
+                onPull={handlePullState}
+                pushDisabled={!latestStateFile}
+                pullDisabled={!serverStateMeta}
+                opColor={opColor(stateOp)}
+              />
+            ) : (
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Save state
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                  No state file configured — set one above to enable state sync.
+                </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
