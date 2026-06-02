@@ -284,13 +284,15 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
         const romParent  = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
         if (scanRoot && romParent === scanRoot) {
           const moved = await (window as any).emusync.files.moveToSubfolder({
-            romPath, subfolderName: rom.name, savePath, statePath,
+            romPath, subfolderName: rom.name,
+            newSavePath: savePath,        // scan already returned the canonical target path
+            newStateFolder: statePath,    // scan already returned the canonical state folder
           });
           if (moved.ok) {
             launchCmd  = launchCmd.replaceAll(romPath, moved.newRomPath);
             romPath    = moved.newRomPath;
             savePath   = moved.newSavePath;
-            statePath  = moved.newStatePath;
+            statePath  = moved.newStateFolder;
           }
         }
 

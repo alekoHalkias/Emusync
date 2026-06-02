@@ -897,53 +897,41 @@ ipcMain.handle("emulator:scan", (_event, params: {
         const contentSubfolder = romParentDir !== dir ? basename(romParentDir) : null;
         const saveRoot  = emulatorOption.coreFolderName ? dirname(emulatorOption.saveDir)  : emulatorOption.saveDir;
 
-        // ── Save file lookup (priority: core+content → content-only → core-only → root) ──
-        let m = matchSaveFile(emulatorOption.saveDir, base, saveExts);
-        if (!m.exists && contentSubfolder) {
+        // ── Save file lookup (single file) ────────────────────────────────────
+        // Priority: content-dir path first, then legacy core-subfolder / flat root.
+        // Target path: savesRoot/GameName/GameName.ext  (no core-name layer)
+        const gameFolderName = contentSubfolder ?? base;
+        let m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
+        if (!m.exists) {
           // saves/mGBA/GameName/base.ext  (core + content-dir)
-          const mCC = matchSaveFile(join(emulatorOption.saveDir, contentSubfolder), base, saveExts);
+          const mCC = matchSaveFile(join(emulatorOption.saveDir, gameFolderName), base, saveExts);
           if (mCC.exists) m = mCC;
         }
-        if (!m.exists && contentSubfolder) {
-          // saves/GameName/base.ext  (content-dir only — RetroArch without "sort by core")
-          const mC = matchSaveFile(join(saveRoot, contentSubfolder), base, saveExts);
-          if (mC.exists) m = mC;
+        if (!m.exists) {
+          // saves/mGBA/base.ext  (core only, legacy flat)
+          const mFlat = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+          if (mFlat.exists) m = mFlat;
         }
         if (!m.exists && emulatorOption.coreFolderName) {
           // saves/base.ext  (legacy flat root)
           const mRoot = matchSaveFile(saveRoot, base, saveExts);
           if (mRoot.exists) m = mRoot;
         }
-        // Default for ROMs in a content subfolder: use the content-dir path so the
-        // registered path matches where RetroArch will write the save.
-        if (!m.exists && contentSubfolder) {
-          m = { path: join(saveRoot, contentSubfolder, `${base}.${saveExts[0]}`), exists: false };
+        // Always register the canonical target path (savesRoot/GameName/base.ext)
+        // so the path is correct even before RetroArch creates the file.
+        if (!m.exists) {
+          m = { path: join(saveRoot, gameFolderName, `${base}.${saveExts[0]}`), exists: false };
         }
 
-        // ── State file lookup (same priority order) ────────────────────────────
+        // ── State folder lookup ────────────────────────────────────────────────
+        // state_path stores the FOLDER (statesRoot/GameName/) because multiple
+        // state slots coexist there. We check whether it already has any files.
         let sm: { path: string; exists: boolean } | undefined;
         if (emulatorOption.stateDir) {
           const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
-          sm = matchSaveFile(emulatorOption.stateDir, base, DEFAULT_STATE_EXTS);
-          if (!sm.exists && contentSubfolder) {
-            // states/mGBA/GameName/base.state  (core + content-dir)
-            const smCC = matchSaveFile(join(emulatorOption.stateDir, contentSubfolder), base, DEFAULT_STATE_EXTS);
-            if (smCC.exists) sm = smCC;
-          }
-          if (!sm.exists && contentSubfolder) {
-            // states/GameName/base.state  (content-dir only — user's case)
-            const smC = matchSaveFile(join(stateRoot, contentSubfolder), base, DEFAULT_STATE_EXTS);
-            if (smC.exists) sm = smC;
-          }
-          if (!sm.exists && emulatorOption.coreFolderName) {
-            // states/base.state  (legacy flat root)
-            const smRoot = matchSaveFile(stateRoot, base, DEFAULT_STATE_EXTS);
-            if (smRoot.exists) sm = smRoot;
-          }
-          // Default for ROMs in a content subfolder: use the content-dir path.
-          if ((!sm || !sm.exists) && contentSubfolder) {
-            sm = { path: join(stateRoot, contentSubfolder, `${base}.state`), exists: false };
-          }
+          const stateFolder = join(stateRoot, gameFolderName);
+          const hasStateFiles = !!findLatestFileInDir(stateFolder);
+          sm = { path: stateFolder, exists: hasStateFiles };
         }
 
         const launchCommand = emulatorOption.corePath
@@ -1061,39 +1049,72 @@ ipcMain.handle("files:get-latest-in-folder", (_event, dirPath: string) =>
 
 ipcMain.handle("files:move-to-subfolder", (
   _event,
-  { romPath, subfolderName, savePath, statePath }: {
-    romPath: string; subfolderName: string; savePath: string; statePath: string;
+  { romPath, subfolderName, newSavePath, newStateFolder }: {
+    romPath: string;
+    subfolderName: string;
+    newSavePath: string;     // canonical target: savesRoot/GameName/base.ext
+    newStateFolder: string;  // canonical target folder: statesRoot/GameName/
   }
-): { ok: boolean; newRomPath: string; newSavePath: string; newStatePath: string; error?: string } => {
+): { ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; error?: string } => {
   try {
     // ── ROM ───────────────────────────────────────────────────────────────────
-    const romDir    = dirname(romPath);
-    const newRomDir = join(romDir, subfolderName);
+    const newRomDir = join(dirname(romPath), subfolderName);
     mkdirSync(newRomDir, { recursive: true });
     const newRomPath = join(newRomDir, basename(romPath));
     renameSync(romPath, newRomPath);
 
-    // ── Save file (move if it already exists on disk) ─────────────────────────
-    let newSavePath = savePath;
-    if (savePath) {
-      const newSaveDir = join(dirname(savePath), subfolderName);
-      mkdirSync(newSaveDir, { recursive: true });
-      newSavePath = join(newSaveDir, basename(savePath));
-      if (existsSync(savePath)) renameSync(savePath, newSavePath);
+    // ── Save file ─────────────────────────────────────────────────────────────
+    // Target: savesRoot/GameName/base.ext.
+    // If not already there, search common legacy locations and migrate.
+    if (newSavePath && !existsSync(newSavePath)) {
+      mkdirSync(dirname(newSavePath), { recursive: true });
+      const base     = basename(newSavePath, extname(newSavePath));
+      const ext      = extname(newSavePath).slice(1);
+      // savesRoot = two levels up from the file (…/GameName/base.ext → …/)
+      const savesRoot = dirname(dirname(newSavePath));
+      // Check legacy patterns: flat root, then any immediate subdir (core folders)
+      const flatLegacy = join(savesRoot, `${base}.${ext}`);
+      if (existsSync(flatLegacy)) {
+        renameSync(flatLegacy, newSavePath);
+      } else {
+        try {
+          for (const e of readdirSync(savesRoot, { withFileTypes: true })) {
+            if (!e.isDirectory()) continue;
+            const candidate = join(savesRoot, e.name, `${base}.${ext}`);
+            if (existsSync(candidate)) { renameSync(candidate, newSavePath); break; }
+          }
+        } catch {}
+      }
     }
 
-    // ── State file (move if it already exists on disk) ────────────────────────
-    let newStatePath = statePath;
-    if (statePath) {
-      const newStateDir = join(dirname(statePath), subfolderName);
-      mkdirSync(newStateDir, { recursive: true });
-      newStatePath = join(newStateDir, basename(statePath));
-      if (existsSync(statePath)) renameSync(statePath, newStatePath);
+    // ── State folder ──────────────────────────────────────────────────────────
+    // Target: statesRoot/GameName/ (folder, not a file).
+    // Create it and migrate any existing state files from legacy locations.
+    if (newStateFolder) {
+      mkdirSync(newStateFolder, { recursive: true });
+      const base        = basename(newStateFolder);  // = subfolderName = game base name
+      const statesRoot  = dirname(newStateFolder);
+      const stateExts   = ["state", "state.auto", "state1", "state2", "state3", "state4", "state5"];
+      // Migrate flat root files: statesRoot/base.stateN
+      for (const ext of stateExts) {
+        const src = join(statesRoot, `${base}.${ext}`);
+        if (existsSync(src)) renameSync(src, join(newStateFolder, `${base}.${ext}`));
+      }
+      // Migrate from any core-subfolder: statesRoot/mGBA/base.stateN
+      try {
+        for (const e of readdirSync(statesRoot, { withFileTypes: true })) {
+          if (!e.isDirectory() || e.name === base) continue;
+          for (const ext of stateExts) {
+            const src = join(statesRoot, e.name, `${base}.${ext}`);
+            if (existsSync(src)) renameSync(src, join(newStateFolder, `${base}.${ext}`));
+          }
+        }
+      } catch {}
     }
 
-    return { ok: true, newRomPath, newSavePath, newStatePath };
+    return { ok: true, newRomPath, newSavePath, newStateFolder };
   } catch (e: any) {
-    return { ok: false, newRomPath: romPath, newSavePath: savePath, newStatePath: statePath, error: e.message };
+    return { ok: false, newRomPath: romPath, newSavePath, newStateFolder, error: e.message };
   }
 });
 
@@ -1148,8 +1169,8 @@ ipcMain.handle("save:pull", async (_event, slug: string, savePath: string): Prom
 
 ipcMain.handle("state:push", async (_event, slug: string, statePath: string): Promise<{ ok: boolean; error?: string }> => {
   try {
-    const stateDir = dirname(statePath);
-    const latest = findLatestFileInDir(stateDir);
+    // statePath is the state FOLDER (statesRoot/GameName/); find the newest file inside it
+    const latest = findLatestFileInDir(statePath);
     if (!latest) return { ok: false, error: "No state files found in folder" };
     const { host, port, authHeaders } = loadServerCfg();
     const data = readFileSync(latest.path);
@@ -1182,11 +1203,15 @@ ipcMain.handle("state:pull", async (_event, slug: string, statePath: string): Pr
       return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
     }
     const buf = Buffer.from(await res.arrayBuffer());
-    if (existsSync(statePath)) {
-      writeFileSync(`${statePath}.bak`, readFileSync(statePath));
+    // statePath is the state FOLDER; write the pulled state as GameName.state inside it.
+    // Back up the current latest file in the folder first (if any).
+    mkdirSync(statePath, { recursive: true });
+    const existing = findLatestFileInDir(statePath);
+    if (existing) {
+      writeFileSync(`${existing.path}.bak`, readFileSync(existing.path));
     }
-    mkdirSync(dirname(statePath), { recursive: true });
-    writeFileSync(statePath, buf);
+    const destFile = join(statePath, `${basename(statePath)}.state`);
+    writeFileSync(destFile, buf);
     return { ok: true, pulled: true };
   } catch (e: any) {
     return { ok: false, pulled: false, error: e.message || "Pull failed" };

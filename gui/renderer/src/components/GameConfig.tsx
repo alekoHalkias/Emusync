@@ -17,10 +17,6 @@ function fmtTime(t: string | null | undefined): string {
   return t.replace("T", " ").slice(0, 19);
 }
 
-function parentDir(filePath: string): string {
-  const idx = filePath.lastIndexOf("/");
-  return idx > 0 ? filePath.slice(0, idx) : filePath;
-}
 
 export default function GameConfig({ slug, name: initialName, onBack, onSaved, onPlay }: Props): React.ReactElement {
   const isNew = slug === null;
@@ -67,8 +63,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
   useEffect(() => {
     if (!statePath) return;
-    const dir = parentDir(statePath);
-    (window as any).emusync.files.getLatestInFolder(dir).then(setLatestStateFile).catch(() => {});
+    // statePath is now the state FOLDER itself
+    (window as any).emusync.files.getLatestInFolder(statePath).then(setLatestStateFile).catch(() => {});
   }, [statePath]);
 
   useEffect(() => { loadSyncInfo(); }, [loadSyncInfo]);
@@ -150,8 +146,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     if (result.ok) {
       setStateOp({ status: "ok", action: "push", msg: "Pushed to server" });
       await loadSyncInfo();
-      const dir = parentDir(statePath);
-      const latest = await (window as any).emusync.files.getLatestInFolder(dir).catch(() => null);
+      const latest = await (window as any).emusync.files.getLatestInFolder(statePath).catch(() => null);
       setLatestStateFile(latest);
     } else {
       setStateOp({ status: "error", action: "push", msg: result.error || "Push failed" });
@@ -165,8 +160,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     if (result.ok) {
       if (result.pulled) {
         setStateOp({ status: "ok", action: "pull", msg: "Pulled — previous state backed up to .bak" });
-        const dir = parentDir(statePath);
-        const latest = await (window as any).emusync.files.getLatestInFolder(dir).catch(() => null);
+        const latest = await (window as any).emusync.files.getLatestInFolder(statePath).catch(() => null);
         setLatestStateFile(latest);
       } else {
         setStateOp({ status: "ok", action: "pull", msg: "No server state yet" });
@@ -243,20 +237,23 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
 
         <div className="input-group">
-          <label>State file <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+          <label>States folder <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
           <div className="input-row">
             <input
               type="text"
               value={statePath}
               onChange={(e) => setStatePath(e.target.value)}
-              placeholder="/path/to/states/CoreName/game.state"
+              placeholder="/home/user/.config/retroarch/states/GameName"
             />
-            <button className="btn btn-icon" title="Browse" onClick={() => pickFile(setStatePath, "Select state file")}>
+            <button className="btn btn-icon" title="Browse folder" onClick={async () => {
+              const folder = await (window as any).emusync.dialog.openFolder();
+              if (folder) setStatePath(folder);
+            }}>
               📁
             </button>
           </div>
           <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-            Whole folder is checked for sync — set to any state file in the emulator's state directory.
+            The folder where RetroArch stores all save states for this game. All files in the folder are synced.
           </span>
         </div>
 
@@ -304,7 +301,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             {statePath ? (
               <SyncSection
                 label="Save state"
-                pathLine={parentDir(statePath) + "/"}
+                pathLine={statePath.endsWith("/") ? statePath : statePath + "/"}
                 localLabel="Local (latest)"
                 localTime={latestStateFile?.time ?? null}
                 serverTime={serverStateMeta?.pushed_at ?? null}
