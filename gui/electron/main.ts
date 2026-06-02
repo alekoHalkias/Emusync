@@ -887,25 +887,65 @@ ipcMain.handle("emulator:scan", (_event, params: {
         const base   = basename(romPath, extname(romPath));
         const system = SYSTEMS[romExt];
         const saveExts = system?.saveExts ?? defaultSaveExts;
+
+        // When a ROM lives in a per-game subfolder (e.g. roms/GBA/GameName/game.gba)
+        // RetroArch's "Sort saves/states by content directory" option mirrors that
+        // subfolder name into saves/ and states/ WITHOUT the core name subfolder:
+        //   saves/GameName/game.srm  or  states/GameName/game.state
+        // We must check those paths in addition to the core-subfolder patterns.
+        const romParentDir    = dirname(romPath);
+        const contentSubfolder = romParentDir !== dir ? basename(romParentDir) : null;
+        const saveRoot  = emulatorOption.coreFolderName ? dirname(emulatorOption.saveDir)  : emulatorOption.saveDir;
+
+        // ── Save file lookup (priority: core+content → content-only → core-only → root) ──
         let m = matchSaveFile(emulatorOption.saveDir, base, saveExts);
-        // If the per-core subfolder has no save yet, also check the root saves dir
-        // for saves written before per-core organization (e.g. saves/game.sav vs saves/mGBA/game.sav)
+        if (!m.exists && contentSubfolder) {
+          // saves/mGBA/GameName/base.ext  (core + content-dir)
+          const mCC = matchSaveFile(join(emulatorOption.saveDir, contentSubfolder), base, saveExts);
+          if (mCC.exists) m = mCC;
+        }
+        if (!m.exists && contentSubfolder) {
+          // saves/GameName/base.ext  (content-dir only — RetroArch without "sort by core")
+          const mC = matchSaveFile(join(saveRoot, contentSubfolder), base, saveExts);
+          if (mC.exists) m = mC;
+        }
         if (!m.exists && emulatorOption.coreFolderName) {
-          const rootSaveDir = dirname(emulatorOption.saveDir);
-          const mRoot = matchSaveFile(rootSaveDir, base, saveExts);
+          // saves/base.ext  (legacy flat root)
+          const mRoot = matchSaveFile(saveRoot, base, saveExts);
           if (mRoot.exists) m = mRoot;
         }
-        // Detect state files if stateDir is available
+        // Default for ROMs in a content subfolder: use the content-dir path so the
+        // registered path matches where RetroArch will write the save.
+        if (!m.exists && contentSubfolder) {
+          m = { path: join(saveRoot, contentSubfolder, `${base}.${saveExts[0]}`), exists: false };
+        }
+
+        // ── State file lookup (same priority order) ────────────────────────────
         let sm: { path: string; exists: boolean } | undefined;
         if (emulatorOption.stateDir) {
+          const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
           sm = matchSaveFile(emulatorOption.stateDir, base, DEFAULT_STATE_EXTS);
-          // Fallback: check root states dir for states written before per-core organization
+          if (!sm.exists && contentSubfolder) {
+            // states/mGBA/GameName/base.state  (core + content-dir)
+            const smCC = matchSaveFile(join(emulatorOption.stateDir, contentSubfolder), base, DEFAULT_STATE_EXTS);
+            if (smCC.exists) sm = smCC;
+          }
+          if (!sm.exists && contentSubfolder) {
+            // states/GameName/base.state  (content-dir only — user's case)
+            const smC = matchSaveFile(join(stateRoot, contentSubfolder), base, DEFAULT_STATE_EXTS);
+            if (smC.exists) sm = smC;
+          }
           if (!sm.exists && emulatorOption.coreFolderName) {
-            const rootStateDir = dirname(emulatorOption.stateDir);
-            const smRoot = matchSaveFile(rootStateDir, base, DEFAULT_STATE_EXTS);
+            // states/base.state  (legacy flat root)
+            const smRoot = matchSaveFile(stateRoot, base, DEFAULT_STATE_EXTS);
             if (smRoot.exists) sm = smRoot;
           }
+          // Default for ROMs in a content subfolder: use the content-dir path.
+          if ((!sm || !sm.exists) && contentSubfolder) {
+            sm = { path: join(stateRoot, contentSubfolder, `${base}.state`), exists: false };
+          }
         }
+
         const launchCommand = emulatorOption.corePath
           ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
           : `${emulatorOption.execPath} "${romPath}"`;
