@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import { spawn, execSync, ChildProcess } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, createReadStream } from "fs";
+import { spawn, execSync, spawnSync, ChildProcess } from "child_process";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, createReadStream, renameSync } from "fs";
 import { request as httpRequest } from "http";
 import { join, dirname, basename, extname } from "path";
 import { homedir, networkInterfaces } from "os";
@@ -887,25 +887,53 @@ ipcMain.handle("emulator:scan", (_event, params: {
         const base   = basename(romPath, extname(romPath));
         const system = SYSTEMS[romExt];
         const saveExts = system?.saveExts ?? defaultSaveExts;
-        let m = matchSaveFile(emulatorOption.saveDir, base, saveExts);
-        // If the per-core subfolder has no save yet, also check the root saves dir
-        // for saves written before per-core organization (e.g. saves/game.sav vs saves/mGBA/game.sav)
+
+        // When a ROM lives in a per-game subfolder (e.g. roms/GBA/GameName/game.gba)
+        // RetroArch's "Sort saves/states by content directory" option mirrors that
+        // subfolder name into saves/ and states/ WITHOUT the core name subfolder:
+        //   saves/GameName/game.srm  or  states/GameName/game.state
+        // We must check those paths in addition to the core-subfolder patterns.
+        const romParentDir    = dirname(romPath);
+        const contentSubfolder = romParentDir !== dir ? basename(romParentDir) : null;
+        const saveRoot  = emulatorOption.coreFolderName ? dirname(emulatorOption.saveDir)  : emulatorOption.saveDir;
+
+        // ── Save file lookup (single file) ────────────────────────────────────
+        // Priority: content-dir path first, then legacy core-subfolder / flat root.
+        // Target path: savesRoot/GameName/GameName.ext  (no core-name layer)
+        const gameFolderName = contentSubfolder ?? base;
+        let m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
+        if (!m.exists) {
+          // saves/mGBA/GameName/base.ext  (core + content-dir)
+          const mCC = matchSaveFile(join(emulatorOption.saveDir, gameFolderName), base, saveExts);
+          if (mCC.exists) m = mCC;
+        }
+        if (!m.exists) {
+          // saves/mGBA/base.ext  (core only, legacy flat)
+          const mFlat = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+          if (mFlat.exists) m = mFlat;
+        }
         if (!m.exists && emulatorOption.coreFolderName) {
-          const rootSaveDir = dirname(emulatorOption.saveDir);
-          const mRoot = matchSaveFile(rootSaveDir, base, saveExts);
+          // saves/base.ext  (legacy flat root)
+          const mRoot = matchSaveFile(saveRoot, base, saveExts);
           if (mRoot.exists) m = mRoot;
         }
-        // Detect state files if stateDir is available
+        // Always register the canonical target path (savesRoot/GameName/base.ext)
+        // so the path is correct even before RetroArch creates the file.
+        if (!m.exists) {
+          m = { path: join(saveRoot, gameFolderName, `${base}.${saveExts[0]}`), exists: false };
+        }
+
+        // ── State folder lookup ────────────────────────────────────────────────
+        // state_path stores the FOLDER (statesRoot/GameName/) because multiple
+        // state slots coexist there. We check whether it already has any files.
         let sm: { path: string; exists: boolean } | undefined;
         if (emulatorOption.stateDir) {
-          sm = matchSaveFile(emulatorOption.stateDir, base, DEFAULT_STATE_EXTS);
-          // Fallback: check root states dir for states written before per-core organization
-          if (!sm.exists && emulatorOption.coreFolderName) {
-            const rootStateDir = dirname(emulatorOption.stateDir);
-            const smRoot = matchSaveFile(rootStateDir, base, DEFAULT_STATE_EXTS);
-            if (smRoot.exists) sm = smRoot;
-          }
+          const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
+          const stateFolder = join(stateRoot, gameFolderName);
+          const hasStateFiles = !!findLatestFileInDir(stateFolder);
+          sm = { path: stateFolder, exists: hasStateFiles };
         }
+
         const launchCommand = emulatorOption.corePath
           ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
           : `${emulatorOption.execPath} "${romPath}"`;
@@ -971,6 +999,245 @@ ipcMain.handle("device:probe", (_event, ip: string, port: number): Promise<boole
     socket.on("error", () => finish(false));
     socket.on("timeout", () => finish(false));
   });
+});
+
+// ── server config helper ──────────────────────────────────────────────────────
+
+function loadServerCfg(): { host: string; port: number; authHeaders: Record<string, string> } {
+  let cfg: Record<string, any> = {};
+  if (existsSync(CONFIG_PATH)) {
+    cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, any>;
+  }
+  const host = (cfg.server_host as string) || "localhost";
+  const port = Number(cfg.server_port) || 8765;
+  const pin  = (cfg.server_pin as string) || "";
+  const deviceId   = (cfg.device_id as string) || "";
+  const deviceName = (cfg.device_name as string) || "";
+  const authHeaders: Record<string, string> = {
+    "Authorization": `Bearer ${pin}`,
+    "X-Device-ID": deviceId,
+    "X-Device-Name": deviceName,
+  };
+  return { host, port, authHeaders };
+}
+
+// ── file utils ────────────────────────────────────────────────────────────────
+
+function findLatestFileInDir(dirPath: string): { path: string; time: string } | null {
+  try {
+    if (!existsSync(dirPath)) return null;
+    let latestMs = 0;
+    let latest: { path: string; time: string } | null = null;
+    for (const e of readdirSync(dirPath, { withFileTypes: true })) {
+      if (!e.isFile()) continue;
+      try {
+        const fullPath = join(dirPath, e.name);
+        const ms = statSync(fullPath).mtimeMs;
+        if (ms > latestMs) {
+          latestMs = ms;
+          latest = { path: fullPath, time: new Date(ms).toISOString().slice(0, 19) };
+        }
+      } catch {}
+    }
+    return latest;
+  } catch { return null; }
+}
+
+ipcMain.handle("files:get-latest-in-folder", (_event, dirPath: string) =>
+  findLatestFileInDir(dirPath)
+);
+
+ipcMain.handle("files:move-to-subfolder", (
+  _event,
+  { romPath, subfolderName, newSavePath, newStateFolder }: {
+    romPath: string;
+    subfolderName: string;
+    newSavePath: string;     // canonical target: savesRoot/GameName/base.ext
+    newStateFolder: string;  // canonical target folder: statesRoot/GameName/
+  }
+): { ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; error?: string } => {
+  try {
+    // ── ROM ───────────────────────────────────────────────────────────────────
+    const newRomDir = join(dirname(romPath), subfolderName);
+    mkdirSync(newRomDir, { recursive: true });
+    const newRomPath = join(newRomDir, basename(romPath));
+    renameSync(romPath, newRomPath);
+
+    // ── Save file ─────────────────────────────────────────────────────────────
+    // Target: savesRoot/GameName/base.ext.
+    // If not already there, search common legacy locations and migrate.
+    if (newSavePath && !existsSync(newSavePath)) {
+      mkdirSync(dirname(newSavePath), { recursive: true });
+      const base     = basename(newSavePath, extname(newSavePath));
+      const ext      = extname(newSavePath).slice(1);
+      // savesRoot = two levels up from the file (…/GameName/base.ext → …/)
+      const savesRoot = dirname(dirname(newSavePath));
+      // Check legacy patterns: flat root, then any immediate subdir (core folders)
+      const flatLegacy = join(savesRoot, `${base}.${ext}`);
+      if (existsSync(flatLegacy)) {
+        renameSync(flatLegacy, newSavePath);
+      } else {
+        try {
+          for (const e of readdirSync(savesRoot, { withFileTypes: true })) {
+            if (!e.isDirectory()) continue;
+            const candidate = join(savesRoot, e.name, `${base}.${ext}`);
+            if (existsSync(candidate)) { renameSync(candidate, newSavePath); break; }
+          }
+        } catch {}
+      }
+    }
+
+    // ── State folder ──────────────────────────────────────────────────────────
+    // Target: statesRoot/GameName/ (folder, not a file).
+    // Create it and migrate any existing state files from legacy locations.
+    if (newStateFolder) {
+      mkdirSync(newStateFolder, { recursive: true });
+      const base        = basename(newStateFolder);  // = subfolderName = game base name
+      const statesRoot  = dirname(newStateFolder);
+      const stateExts   = ["state", "state.auto", "state1", "state2", "state3", "state4", "state5"];
+      // Migrate flat root files: statesRoot/base.stateN
+      for (const ext of stateExts) {
+        const src = join(statesRoot, `${base}.${ext}`);
+        if (existsSync(src)) renameSync(src, join(newStateFolder, `${base}.${ext}`));
+      }
+      // Migrate from any core-subfolder: statesRoot/mGBA/base.stateN
+      try {
+        for (const e of readdirSync(statesRoot, { withFileTypes: true })) {
+          if (!e.isDirectory() || e.name === base) continue;
+          for (const ext of stateExts) {
+            const src = join(statesRoot, e.name, `${base}.${ext}`);
+            if (existsSync(src)) renameSync(src, join(newStateFolder, `${base}.${ext}`));
+          }
+        }
+      } catch {}
+    }
+
+    return { ok: true, newRomPath, newSavePath, newStateFolder };
+  } catch (e: any) {
+    return { ok: false, newRomPath: romPath, newSavePath, newStateFolder, error: e.message };
+  }
+});
+
+// ── save sync ─────────────────────────────────────────────────────────────────
+
+ipcMain.handle("save:push", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    if (!existsSync(savePath)) return { ok: false, error: "Save file not found" };
+    const { host, port, authHeaders } = loadServerCfg();
+    const data = readFileSync(savePath);
+    const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
+      body: data,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, error: (body as any).detail ?? res.statusText };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || "Push failed" };
+  }
+});
+
+ipcMain.handle("save:pull", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> => {
+  try {
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
+      headers: authHeaders,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (res.status === 204) return { ok: true, pulled: false };
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (existsSync(savePath)) {
+      writeFileSync(`${savePath}.bak`, readFileSync(savePath));
+    }
+    mkdirSync(dirname(savePath), { recursive: true });
+    writeFileSync(savePath, buf);
+    return { ok: true, pulled: true };
+  } catch (e: any) {
+    return { ok: false, pulled: false, error: e.message || "Pull failed" };
+  }
+});
+
+// ── state sync ────────────────────────────────────────────────────────────────
+
+ipcMain.handle("state:push", async (_event, slug: string, statePath: string): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    // statePath is the state FOLDER. Pack all files inside it into a tar.gz
+    // archive so that every state slot (game.state, game.state1, …) is synced.
+    if (!existsSync(statePath)) return { ok: false, error: "State folder not found" };
+    const tarResult = spawnSync("tar", ["-czf", "-", "-C", statePath, "."], {
+      maxBuffer: 200 * 1024 * 1024,
+    });
+    if (tarResult.error || tarResult.status !== 0) {
+      return { ok: false, error: `Failed to compress state folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
+    }
+    const data = tarResult.stdout as Buffer;
+    if (!data || data.length === 0) return { ok: false, error: "No state files to push" };
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
+      method: "POST",
+      headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
+      body: data,
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, error: (body as any).detail ?? res.statusText };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message || "Push failed" };
+  }
+});
+
+ipcMain.handle("state:pull", async (_event, slug: string, statePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> => {
+  try {
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
+      headers: authHeaders,
+      signal: AbortSignal.timeout(60000),
+    });
+    if (res.status === 204) return { ok: true, pulled: false };
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: res.statusText }));
+      return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Ensure the state folder exists and back up any existing files
+    mkdirSync(statePath, { recursive: true });
+    const existing = readdirSync(statePath).filter(f => !f.endsWith(".bak"));
+    for (const f of existing) {
+      try { renameSync(join(statePath, f), join(statePath, f + ".bak")); } catch {}
+    }
+    // Extract the tar.gz archive into the state folder
+    const extractResult = spawnSync("tar", ["-xzf", "-", "-C", statePath], {
+      input: buf,
+      maxBuffer: 200 * 1024 * 1024,
+    });
+    if (extractResult.error || extractResult.status !== 0) {
+      // Restore backups on failure
+      for (const f of existing) {
+        const bak = join(statePath, f + ".bak");
+        if (existsSync(bak)) try { renameSync(bak, join(statePath, f)); } catch {}
+      }
+      return { ok: false, pulled: false, error: "Failed to extract state archive" };
+    }
+    // Remove backup files on success
+    for (const f of existing) {
+      const bak = join(statePath, f + ".bak");
+      if (existsSync(bak)) try { unlinkSync(bak); } catch {}
+    }
+    return { ok: true, pulled: true };
+  } catch (e: any) {
+    return { ok: false, pulled: false, error: e.message || "Pull failed" };
+  }
 });
 
 // ── rom push ──────────────────────────────────────────────────────────────────

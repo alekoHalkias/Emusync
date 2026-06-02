@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import shutil
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -232,15 +234,41 @@ class SyncClient:
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
-        state = Path(state_path)
-        if state.exists():
-            shutil.copy2(state, state.with_suffix(state.suffix + ".bak"))
-        state.parent.mkdir(parents=True, exist_ok=True)
-        state.write_bytes(r.content)
+        p = Path(state_path)
+        if p.is_dir() or not p.suffix:
+            # state_path is the states FOLDER — extract the tar.gz archive into it.
+            p.mkdir(parents=True, exist_ok=True)
+            for existing in list(p.iterdir()):
+                if existing.is_file() and not existing.name.endswith(".bak"):
+                    existing.rename(str(existing) + ".bak")
+            try:
+                with tarfile.open(fileobj=io.BytesIO(r.content), mode="r:gz") as tar:
+                    tar.extractall(path=str(p))
+                for bak in p.glob("*.bak"):
+                    bak.unlink(missing_ok=True)
+            except tarfile.TarError:
+                # Legacy: server stored a raw state file; write it as GameName.state
+                dest = p / f"{p.name}.state"
+                dest.write_bytes(r.content)
+        else:
+            if p.exists():
+                shutil.copy2(p, p.with_suffix(p.suffix + ".bak"))
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(r.content)
         return True, r.headers.get("X-State-Hash")
 
     def push_state(self, slug: str, state_path: str) -> str:
-        data = Path(state_path).read_bytes()
+        p = Path(state_path)
+        if p.is_dir():
+            # Pack all files in the states folder as a tar.gz archive.
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+                for f in sorted(p.iterdir()):
+                    if f.is_file():
+                        tar.add(str(f), arcname=f.name)
+            data = buf.getvalue()
+        else:
+            data = p.read_bytes()
         r = httpx.post(
             self._url(f"/games/{slug}/state"),
             content=data,

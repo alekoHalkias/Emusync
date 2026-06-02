@@ -124,6 +124,14 @@ window.emusync.emulator.detect(consoleKey)  // scans for installed emulators for
 window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; uses emulatorOption.saveDir (already resolved to core subfolder); returns { emulators, romDirs, roms[] } with consoleName+coreName on each entry
 window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
 window.emusync.files.getSaveTime(path)      // returns last modified time of save file as ISO string (YYYY-MM-DDTHH:MM:SS), or null if file doesn't exist
+window.emusync.files.getLatestInFolder(dir) // returns {path, time} for the newest file in dir, or null if dir is empty/missing
+window.emusync.files.moveToSubfolder({romPath, subfolderName, newSavePath, newStateFolder}) // moves ROM into subfolderName/, migrates existing save from legacy locations to newSavePath, creates newStateFolder and migrates any legacy state files; returns {ok, newRomPath, newSavePath, newStateFolder, error?}
+
+window.emusync.save.push(slug, savePath)   // reads local save file, POSTs bytes to /games/{slug}/save; returns {ok, error?}
+window.emusync.save.pull(slug, savePath)   // GETs /games/{slug}/save, backs up existing file to .bak, writes new bytes; returns {ok, pulled, error?}
+
+window.emusync.state.push(slug, stateFolder) // tar.gz all files in stateFolder, POSTs archive to /games/{slug}/state; returns {ok, error?}
+window.emusync.state.pull(slug, stateFolder) // GETs /games/{slug}/state archive, backs up existing files to .bak, extracts all files into stateFolder; restores backups on failure; returns {ok, pulled, error?}
 
 window.emusync.device.probe(ip, port)      // TCP probe: resolves true if ip:port reachable within 2 s
 
@@ -480,6 +488,8 @@ dev mode — visible in the `make dev-gui` terminal.
 **RetroArch config paths use `~` which Node.js does not expand** — `retroarch.cfg` commonly stores paths like `savefile_directory = "~/.config/retroarch/saves"`. `parseRetroArchCfg` in `main.ts` expands leading `~/` to the real home directory so that `existsSync`, `mkdirSync`, and `join` work correctly. Do not call `parseRetroArchCfg` without passing `home` and do not use raw config values as filesystem paths without checking for tilde. Also, `rgui_browser_directory = "default"` is RetroArch's placeholder for "not configured" — it is filtered out and never passed as a ROM directory.
 
 **RetroArch per-core save directory is always `saves/<CoreName>/`** — `detectEmulatorsForConsole` uses `join(ra.saveDir, core.folderName)` unconditionally. The old `resolveCoreSaveDir` fell back to the root saves dir if the subfolder did not exist yet, causing saves to land in the wrong place on fresh installs. The scan handler additionally checks the root saves dir as a fallback when looking for *existing* saves written before per-core organisation was set up.
+
+**RetroArch "Sort saves/states by content directory"** — The canonical path model is: saves at `savesRoot/GameName/GameName.srm` and states as a FOLDER at `statesRoot/GameName/` (all slots live there). `state_path` in `game_devices` stores the FOLDER path, not a single file. Both the GUI IPC handlers (`state:push` / `state:pull`) and `sync_client.py` (`push_state` / `pull_state`) detect whether `state_path` is a directory: if so, they pack/extract all files as a **tar.gz archive** so every state slot (`.state`, `.state1`, `.state.auto`, …) is synced. `emusync run` always pushes the whole folder after the game exits (no hash comparison for folders). `pull_state` falls back to writing raw bytes as `GameName.state` if the server blob is not a valid tar archive (legacy compatibility). The `emulator:scan` handler computes the target save/state paths using the content-dir pattern (`savesRoot/GameName/` and `statesRoot/GameName/`) and checks legacy core-subfolder and flat-root paths only as fallbacks for detecting already-existing files. The default registered path always uses the content-dir pattern even when the file/folder doesn't exist yet.
 
 **`store.add_game` is INSERT OR IGNORE, not INSERT OR REPLACE** — `add_game` only inserts new rows; it never overwrites. Use `update_game_name(slug, name)` to rename an existing game. The original `INSERT OR REPLACE` bug cascade-deleted `game_devices`, `saves`, and `locks` every time a game was renamed, causing the game list to appear empty after a config save.
 

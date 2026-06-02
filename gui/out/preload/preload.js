@@ -33,10 +33,22 @@ electron.contextBridge.exposeInMainWorld("emusync", {
   },
   files: {
     ensureSave: (savePath) => electron.ipcRenderer.invoke("files:ensure-save", savePath),
-    getSaveTime: (savePath) => electron.ipcRenderer.invoke("files:get-save-time", savePath)
+    getSaveTime: (savePath) => electron.ipcRenderer.invoke("files:get-save-time", savePath),
+    getLatestInFolder: (dirPath) => electron.ipcRenderer.invoke("files:get-latest-in-folder", dirPath)
+  },
+  save: {
+    push: (slug, savePath) => electron.ipcRenderer.invoke("save:push", slug, savePath),
+    pull: (slug, savePath) => electron.ipcRenderer.invoke("save:pull", slug, savePath)
+  },
+  state: {
+    push: (slug, statePath) => electron.ipcRenderer.invoke("state:push", slug, statePath),
+    pull: (slug, statePath) => electron.ipcRenderer.invoke("state:pull", slug, statePath)
   },
   device: {
     probe: (ip, port) => electron.ipcRenderer.invoke("device:probe", ip, port)
+  },
+  rom: {
+    push: (slug, toDeviceId, consoleName) => electron.ipcRenderer.invoke("rom:push", slug, toDeviceId, consoleName)
   },
   game: {
     launch: (slug, command) => electron.ipcRenderer.invoke("game:launch", slug, command),

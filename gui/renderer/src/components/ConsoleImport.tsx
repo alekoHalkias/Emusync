@@ -74,6 +74,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [emuSel, setEmuSel]       = useState<EmulatorOption | null>(null);
   const [extraPaths, setExtraPaths] = useState<string[]>([]);
   const [romDirs, setRomDirs]     = useState<string[]>([]);
+  const [removedDirs, setRemovedDirs] = useState<Set<string>>(new Set());
   const [roms, setRoms]           = useState<RomEntry[]>([]);
   const [selected, setSelected]   = useState<Set<string>>(new Set());
   const [names, setNames]         = useState<Record<string, string>>({});
@@ -231,16 +232,20 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
 
   async function removeExtraPath(path: string): Promise<void> {
     const updated = extraPaths.filter(p => p !== path);
-    // For now, we'll just update UI. To truly persist, we'd need a removeFolder IPC handler
-    // but since we're storing entire list, we can re-add the new list
     setSavedFolders(updated);
     setExtraPaths(updated);
-    // Update the saved list in config
     const cfg = await (window as any).emusync.config.load();
     if (!cfg.recent_import_folders) cfg.recent_import_folders = {};
     cfg.recent_import_folders[consoleSel] = updated;
     await (window as any).emusync.config.save(cfg);
     scanRoms(updated);
+  }
+
+  function removeRomDir(path: string): void {
+    setRemovedDirs(prev => new Set([...prev, path]));
+    const remainingPaths = extraPaths.filter(p => p !== path);
+    setExtraPaths(remainingPaths);
+    scanRoms(remainingPaths);
   }
 
   function toggleRom(romPath: string): void {
@@ -271,13 +276,38 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
+
+        // ── Organise ROM into a per-game subfolder if it sits directly in
+        //    the scan root.  RetroArch mirrors the folder structure into
+        //    saves/states, so moving the ROM first ensures saves land in
+        //    the correct per-game subfolder automatically.
+        let romPath      = rom.romPath;
+        let savePath     = rom.savePath;
+        let statePath    = rom.statePath ?? "";
+        let launchCmd    = rom.launchCommand;
+        const scanRoot   = (rom.romFolderPath ?? "").replace(/\/$/, "");
+        const romParent  = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
+        if (scanRoot && romParent === scanRoot) {
+          const moved = await (window as any).emusync.files.moveToSubfolder({
+            romPath, subfolderName: rom.name,
+            newSavePath: savePath,        // scan already returned the canonical target path
+            newStateFolder: statePath,    // scan already returned the canonical state folder
+          });
+          if (moved.ok) {
+            launchCmd  = launchCmd.replaceAll(romPath, moved.newRomPath);
+            romPath    = moved.newRomPath;
+            savePath   = moved.newSavePath;
+            statePath  = moved.newStateFolder;
+          }
+        }
+
         const slug = rom.linkedSlug ?? (await addGame(displayName, consoleAbbr)).slug;
         await setGameDevice(slug, {
-          rom_path: rom.romPath,
-          save_path: rom.savePath,
-          launch_command: rom.launchCommand,
-          state_path: rom.stateExists ? (rom.statePath ?? "") : "",
-          rom_folder_path: rom.romFolderPath ?? "",
+          rom_path: romPath,
+          save_path: savePath,
+          launch_command: launchCmd,
+          state_path: statePath,
+          rom_folder_path: scanRoot || rom.romFolderPath || "",
         });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
@@ -298,7 +328,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const showStepper   = phase !== "importing" && phase !== "done";
 
   // Merge auto-detected dirs + extra dirs for display (no dupes, extras marked removable)
-  const allRomDirs = [...new Set([...romDirs, ...extraPaths])];
+  // Filter out any directories the user has removed
+  const allRomDirs = [...new Set([...romDirs, ...extraPaths])].filter(p => !removedDirs.has(p));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -476,12 +507,18 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
               {allRomDirs.map(p => (
                 <div key={p} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 4 }}>
                   <span style={{ flex: 1, color: "var(--text-muted)", overflow: "hidden",
-                    textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
-                  {extraPaths.includes(p) && (
+                    textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p}
+                    {!extraPaths.includes(p) && !removedDirs.has(p) && (
+                      <span style={{ fontSize: 11, color: "var(--text-muted)" }}> (detected)</span>
+                    )}
+                  </span>
+                  {!removedDirs.has(p) && (
                     <button
                       className="btn btn-ghost"
                       style={{ fontSize: 11, padding: "1px 6px" }}
-                      onClick={() => removeExtraPath(p)}
+                      onClick={() => extraPaths.includes(p) ? removeExtraPath(p) : removeRomDir(p)}
+                      title={extraPaths.includes(p) ? "Remove folder" : "Ignore this folder"}
                     >✕</button>
                   )}
                 </div>
@@ -560,7 +597,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
 
             <div className="modal-actions" style={{ marginTop: 16 }}>
               <button className="btn btn-ghost" onClick={() => {
-                setRoms([]); setExtraPaths(savedFolders); setRomDirs([]); setPhase("emulator");
+                setRoms([]); setExtraPaths(savedFolders); setRomDirs([]); setRemovedDirs(new Set()); setPhase("emulator");
               }}>← Back</button>
               <button
                 className="btn btn-primary"

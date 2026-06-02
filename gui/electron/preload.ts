@@ -59,6 +59,22 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("files:ensure-save", savePath),
     getSaveTime: (savePath: string): Promise<string | null> =>
       ipcRenderer.invoke("files:get-save-time", savePath),
+    getLatestInFolder: (dirPath: string): Promise<{ path: string; time: string } | null> =>
+      ipcRenderer.invoke("files:get-latest-in-folder", dirPath),
+    moveToSubfolder: (args: { romPath: string; subfolderName: string; newSavePath: string; newStateFolder: string }): Promise<{ ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; error?: string }> =>
+      ipcRenderer.invoke("files:move-to-subfolder", args),
+  },
+  save: {
+    push: (slug: string, savePath: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("save:push", slug, savePath),
+    pull: (slug: string, savePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> =>
+      ipcRenderer.invoke("save:pull", slug, savePath),
+  },
+  state: {
+    push: (slug: string, statePath: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("state:push", slug, statePath),
+    pull: (slug: string, statePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> =>
+      ipcRenderer.invoke("state:pull", slug, statePath),
   },
   device: {
     probe: (ip: string, port: number): Promise<boolean> =>
