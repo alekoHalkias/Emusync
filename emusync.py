@@ -1905,13 +1905,23 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
         # Push state if configured
         if state_path and Path(state_path).exists():
-            local_state_hash = hashlib.sha256(Path(state_path).read_bytes()).hexdigest()
-            if local_state_hash != server_state_hash:
+            sp = Path(state_path)
+            if sp.is_dir():
+                # For folder-based states, always push after the game exits so
+                # all slots (game.state, game.state1, …) are synced.
                 try:
                     client.push_state(game_slug, state_path)
                     click.echo(f"Pushed state for {game_slug}.")
                 except Exception as exc:
                     click.echo(f"Warning: failed to push state: {exc}", err=True)
+            else:
+                local_state_hash = hashlib.sha256(sp.read_bytes()).hexdigest()
+                if local_state_hash != server_state_hash:
+                    try:
+                        client.push_state(game_slug, state_path)
+                        click.echo(f"Pushed state for {game_slug}.")
+                    except Exception as exc:
+                        click.echo(f"Warning: failed to push state: {exc}", err=True)
     finally:
         _release()
         game_pid_file.unlink(missing_ok=True)
