@@ -91,6 +91,8 @@ contextBridge.exposeInMainWorld("emusync", {
     isRunning: (): Promise<boolean> => ipcRenderer.invoke("game:isRunning"),
     stopExternal: (): Promise<{ ok: boolean }> => ipcRenderer.invoke("game:stop-external"),
     hasPidFile: (): Promise<boolean> => ipcRenderer.invoke("game:hasPidFile"),
+    pushToServer: (slug: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke("game:pushToServer", slug),
     onExited: (cb: () => void): void => { ipcRenderer.on("game:exited", cb); },
     offExited: (cb: () => void): void => { ipcRenderer.removeListener("game:exited", cb); },
   },

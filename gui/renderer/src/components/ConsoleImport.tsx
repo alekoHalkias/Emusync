@@ -271,6 +271,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setImportErrors([]);
     setPhase("importing");
     const errs: string[] = [];
+    const importedSlugs: string[] = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel);
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
@@ -309,11 +310,40 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           state_path: statePath,
           rom_folder_path: scanRoot || rom.romFolderPath || "",
         });
+        importedSlugs.push(slug);
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
     }
+
+    // Auto-push imported games to server if they don't exist there
+    if (importedSlugs.length > 0) {
+      await autoPushToServer(importedSlugs);
+    }
+
     setImportErrors(errs);
     setPhase("done");
+  }
+
+  async function autoPushToServer(slugs: string[]): Promise<void> {
+    try {
+      // Check which games are missing from server
+      const allGames = await listGames();
+      const serverSlugs = new Set(allGames.map(g => g.slug));
+      const missingOnServer = slugs.filter(slug => !serverSlugs.has(slug));
+
+      if (missingOnServer.length === 0) return;
+
+      // Push missing games to server
+      for (const slug of missingOnServer) {
+        try {
+          await (window as any).emusync.game.pushToServer?.(slug);
+        } catch (e) {
+          console.warn(`Failed to push ${slug} to server:`, e);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to auto-push games to server:", e);
+    }
   }
 
   // Group ROMs by parent directory

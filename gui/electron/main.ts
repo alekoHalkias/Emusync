@@ -305,6 +305,16 @@ ipcMain.handle("game:hasPidFile", () => {
   } catch { return false; }
 });
 
+ipcMain.handle("game:pushToServer", (_event, slug: string) => {
+  const proc = spawn(PYTHON, [SCRIPT, "push", slug], {
+    stdio: "ignore",
+    detached: true,
+    env: { ...process.env },
+  });
+  proc.unref();
+  return { ok: true };
+});
+
 // ── emulator scanning ─────────────────────────────────────────────────────────
 
 const ROM_EXTENSIONS = new Set([
