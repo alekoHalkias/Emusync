@@ -117,16 +117,20 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const resizingCol = useRef<keyof typeof colWidths | null>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+  const loadIdRef = useRef(0);
 
   const load = useCallback(async (silent = false) => {
+    const thisId = ++loadIdRef.current;
     if (!silent) setLoading(true);
     try {
       const raw = await listGames();
       const enriched = await Promise.all(
         raw.map(async (g): Promise<GameRow> => {
           const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
-          const isLocal = config.status === "fulfilled" && !!config.value?.rom_path;
-          let lastSave: string | null = undefined;
+          // A game is local if this device has ANY config row for it (save path, rom path, etc.).
+          // Requiring rom_path would incorrectly hide games added with only a save path.
+          const isLocal = config.status === "fulfilled";
+          let lastSave: string | null = null;
           if (config.status === "fulfilled" && config.value?.save_path) {
             lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
           }
@@ -139,11 +143,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
           };
         })
       );
+      // Discard results from a superseded load (a newer call started while this was in flight)
+      if (loadIdRef.current !== thisId) return;
       setGames(enriched);
     } catch {
+      if (loadIdRef.current !== thisId) return;
       // Server offline — show empty list, StatusBadge shows the offline indicator
       if (!silent) setGames([]);
     } finally {
+      if (loadIdRef.current !== thisId) return;
       if (!silent) setLoading(false);
     }
   }, []);
