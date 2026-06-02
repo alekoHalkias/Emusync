@@ -276,7 +276,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           rom_path: rom.romPath,
           save_path: rom.savePath,
           launch_command: rom.launchCommand,
-          state_path: rom.stateExists ? (rom.statePath ?? "") : "",
+          state_path: rom.statePath ?? "",
           rom_folder_path: rom.romFolderPath ?? "",
         });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
