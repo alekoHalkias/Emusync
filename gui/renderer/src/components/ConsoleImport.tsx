@@ -271,13 +271,36 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
+
+        // ── Organise ROM into a per-game subfolder if it sits directly in
+        //    the scan root.  RetroArch mirrors the folder structure into
+        //    saves/states, so moving the ROM first ensures saves land in
+        //    the correct per-game subfolder automatically.
+        let romPath      = rom.romPath;
+        let savePath     = rom.savePath;
+        let statePath    = rom.statePath ?? "";
+        let launchCmd    = rom.launchCommand;
+        const scanRoot   = (rom.romFolderPath ?? "").replace(/\/$/, "");
+        const romParent  = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
+        if (scanRoot && romParent === scanRoot) {
+          const moved = await (window as any).emusync.files.moveToSubfolder({
+            romPath, subfolderName: rom.name, savePath, statePath,
+          });
+          if (moved.ok) {
+            launchCmd  = launchCmd.replaceAll(romPath, moved.newRomPath);
+            romPath    = moved.newRomPath;
+            savePath   = moved.newSavePath;
+            statePath  = moved.newStatePath;
+          }
+        }
+
         const slug = rom.linkedSlug ?? (await addGame(displayName, consoleAbbr)).slug;
         await setGameDevice(slug, {
-          rom_path: rom.romPath,
-          save_path: rom.savePath,
-          launch_command: rom.launchCommand,
-          state_path: rom.statePath ?? "",
-          rom_folder_path: rom.romFolderPath ?? "",
+          rom_path: romPath,
+          save_path: savePath,
+          launch_command: launchCmd,
+          state_path: statePath,
+          rom_folder_path: scanRoot || rom.romFolderPath || "",
         });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });

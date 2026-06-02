@@ -125,6 +125,7 @@ window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans
 window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
 window.emusync.files.getSaveTime(path)      // returns last modified time of save file as ISO string (YYYY-MM-DDTHH:MM:SS), or null if file doesn't exist
 window.emusync.files.getLatestInFolder(dir) // returns {path, time} for the newest file in dir, or null if dir is empty/missing
+window.emusync.files.moveToSubfolder({romPath, subfolderName, savePath, statePath}) // creates subfolderName/ under each file's parent dir, moves ROM (always) and save/state files (if they exist on disk); returns {ok, newRomPath, newSavePath, newStatePath, error?}
 
 window.emusync.save.push(slug, savePath)   // reads local save file, POSTs bytes to /games/{slug}/save; returns {ok, error?}
 window.emusync.save.pull(slug, savePath)   // GETs /games/{slug}/save, backs up existing file to .bak, writes new bytes; returns {ok, pulled, error?}

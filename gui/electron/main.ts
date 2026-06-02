@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, execSync, ChildProcess } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, createReadStream } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, createReadStream, renameSync } from "fs";
 import { request as httpRequest } from "http";
 import { join, dirname, basename, extname } from "path";
 import { homedir, networkInterfaces } from "os";
@@ -1018,6 +1018,44 @@ function findLatestFileInDir(dirPath: string): { path: string; time: string } | 
 ipcMain.handle("files:get-latest-in-folder", (_event, dirPath: string) =>
   findLatestFileInDir(dirPath)
 );
+
+ipcMain.handle("files:move-to-subfolder", (
+  _event,
+  { romPath, subfolderName, savePath, statePath }: {
+    romPath: string; subfolderName: string; savePath: string; statePath: string;
+  }
+): { ok: boolean; newRomPath: string; newSavePath: string; newStatePath: string; error?: string } => {
+  try {
+    // ── ROM ───────────────────────────────────────────────────────────────────
+    const romDir    = dirname(romPath);
+    const newRomDir = join(romDir, subfolderName);
+    mkdirSync(newRomDir, { recursive: true });
+    const newRomPath = join(newRomDir, basename(romPath));
+    renameSync(romPath, newRomPath);
+
+    // ── Save file (move if it already exists on disk) ─────────────────────────
+    let newSavePath = savePath;
+    if (savePath) {
+      const newSaveDir = join(dirname(savePath), subfolderName);
+      mkdirSync(newSaveDir, { recursive: true });
+      newSavePath = join(newSaveDir, basename(savePath));
+      if (existsSync(savePath)) renameSync(savePath, newSavePath);
+    }
+
+    // ── State file (move if it already exists on disk) ────────────────────────
+    let newStatePath = statePath;
+    if (statePath) {
+      const newStateDir = join(dirname(statePath), subfolderName);
+      mkdirSync(newStateDir, { recursive: true });
+      newStatePath = join(newStateDir, basename(statePath));
+      if (existsSync(statePath)) renameSync(statePath, newStatePath);
+    }
+
+    return { ok: true, newRomPath, newSavePath, newStatePath };
+  } catch (e: any) {
+    return { ok: false, newRomPath: romPath, newSavePath: savePath, newStatePath: statePath, error: e.message };
+  }
+});
 
 // ── save sync ─────────────────────────────────────────────────────────────────
 
