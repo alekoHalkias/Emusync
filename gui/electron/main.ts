@@ -16,8 +16,23 @@ const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
 let serverProcess: ChildProcess | null = null;
 let serverStartedByApp = false;
 let gameProcess: ChildProcess | null = null;
+let syncDaemonProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 
+
+function startSyncDaemon(): void {
+  if (syncDaemonProcess) return; // Already running
+  try {
+    syncDaemonProcess = spawn(PYTHON, [SCRIPT, "sync-daemon"], {
+      stdio: "ignore",
+      detached: true,
+      env: { ...process.env },
+    });
+    syncDaemonProcess.unref();
+  } catch (err) {
+    console.error("Failed to start sync daemon:", err);
+  }
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -44,6 +59,9 @@ function createWindow(): void {
     shell.openExternal(url);
     return { action: "deny" };
   });
+
+  // Start sync daemon when GUI opens
+  startSyncDaemon();
 }
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────
@@ -1338,6 +1356,10 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  if (syncDaemonProcess) {
+    try { process.kill(-syncDaemonProcess.pid!, "SIGTERM"); } catch { syncDaemonProcess?.kill("SIGTERM"); }
+    syncDaemonProcess = null;
+  }
   if (serverProcess) {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
