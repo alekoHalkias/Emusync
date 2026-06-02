@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
-import { spawn, execSync, ChildProcess } from "child_process";
+import { spawn, execSync, spawnSync, ChildProcess } from "child_process";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, createReadStream, renameSync } from "fs";
 import { request as httpRequest } from "http";
 import { join, dirname, basename, extname } from "path";
@@ -1169,16 +1169,23 @@ ipcMain.handle("save:pull", async (_event, slug: string, savePath: string): Prom
 
 ipcMain.handle("state:push", async (_event, slug: string, statePath: string): Promise<{ ok: boolean; error?: string }> => {
   try {
-    // statePath is the state FOLDER (statesRoot/GameName/); find the newest file inside it
-    const latest = findLatestFileInDir(statePath);
-    if (!latest) return { ok: false, error: "No state files found in folder" };
+    // statePath is the state FOLDER. Pack all files inside it into a tar.gz
+    // archive so that every state slot (game.state, game.state1, …) is synced.
+    if (!existsSync(statePath)) return { ok: false, error: "State folder not found" };
+    const tarResult = spawnSync("tar", ["-czf", "-", "-C", statePath, "."], {
+      maxBuffer: 200 * 1024 * 1024,
+    });
+    if (tarResult.error || tarResult.status !== 0) {
+      return { ok: false, error: `Failed to compress state folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
+    }
+    const data = tarResult.stdout as Buffer;
+    if (!data || data.length === 0) return { ok: false, error: "No state files to push" };
     const { host, port, authHeaders } = loadServerCfg();
-    const data = readFileSync(latest.path);
     const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
       body: data,
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(60000),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({ detail: res.statusText }));
@@ -1195,7 +1202,7 @@ ipcMain.handle("state:pull", async (_event, slug: string, statePath: string): Pr
     const { host, port, authHeaders } = loadServerCfg();
     const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
       headers: authHeaders,
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(60000),
     });
     if (res.status === 204) return { ok: true, pulled: false };
     if (!res.ok) {
@@ -1203,15 +1210,30 @@ ipcMain.handle("state:pull", async (_event, slug: string, statePath: string): Pr
       return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
     }
     const buf = Buffer.from(await res.arrayBuffer());
-    // statePath is the state FOLDER; write the pulled state as GameName.state inside it.
-    // Back up the current latest file in the folder first (if any).
+    // Ensure the state folder exists and back up any existing files
     mkdirSync(statePath, { recursive: true });
-    const existing = findLatestFileInDir(statePath);
-    if (existing) {
-      writeFileSync(`${existing.path}.bak`, readFileSync(existing.path));
+    const existing = readdirSync(statePath).filter(f => !f.endsWith(".bak"));
+    for (const f of existing) {
+      try { renameSync(join(statePath, f), join(statePath, f + ".bak")); } catch {}
     }
-    const destFile = join(statePath, `${basename(statePath)}.state`);
-    writeFileSync(destFile, buf);
+    // Extract the tar.gz archive into the state folder
+    const extractResult = spawnSync("tar", ["-xzf", "-", "-C", statePath], {
+      input: buf,
+      maxBuffer: 200 * 1024 * 1024,
+    });
+    if (extractResult.error || extractResult.status !== 0) {
+      // Restore backups on failure
+      for (const f of existing) {
+        const bak = join(statePath, f + ".bak");
+        if (existsSync(bak)) try { renameSync(bak, join(statePath, f)); } catch {}
+      }
+      return { ok: false, pulled: false, error: "Failed to extract state archive" };
+    }
+    // Remove backup files on success
+    for (const f of existing) {
+      const bak = join(statePath, f + ".bak");
+      if (existsSync(bak)) try { unlinkSync(bak); } catch {}
+    }
     return { ok: true, pulled: true };
   } catch (e: any) {
     return { ok: false, pulled: false, error: e.message || "Pull failed" };

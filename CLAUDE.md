@@ -130,8 +130,8 @@ window.emusync.files.moveToSubfolder({romPath, subfolderName, newSavePath, newSt
 window.emusync.save.push(slug, savePath)   // reads local save file, POSTs bytes to /games/{slug}/save; returns {ok, error?}
 window.emusync.save.pull(slug, savePath)   // GETs /games/{slug}/save, backs up existing file to .bak, writes new bytes; returns {ok, pulled, error?}
 
-window.emusync.state.push(slug, stateFolder) // finds newest file in stateFolder (which is the states FOLDER, not a file), POSTs bytes to /games/{slug}/state; returns {ok, error?}
-window.emusync.state.pull(slug, stateFolder) // GETs /games/{slug}/state, backs up newest existing state to .bak, writes pulled bytes as GameName.state inside stateFolder; returns {ok, pulled, error?}
+window.emusync.state.push(slug, stateFolder) // tar.gz all files in stateFolder, POSTs archive to /games/{slug}/state; returns {ok, error?}
+window.emusync.state.pull(slug, stateFolder) // GETs /games/{slug}/state archive, backs up existing files to .bak, extracts all files into stateFolder; restores backups on failure; returns {ok, pulled, error?}
 
 window.emusync.device.probe(ip, port)      // TCP probe: resolves true if ip:port reachable within 2 s
 

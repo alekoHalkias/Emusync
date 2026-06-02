@@ -1584,14 +1584,25 @@ def _receive_transfer(
             pass
         return False
 
+    # Organise ROM into a per-game subfolder if it sits directly in the
+    # destination folder.  Convention: roms/GameName/GameName.gba
+    scan_root = os.path.dirname(destination_path)
+    rom_stem = os.path.splitext(os.path.basename(destination_path))[0]
+    if os.path.basename(scan_root) != rom_stem:
+        subfolder = os.path.join(scan_root, rom_stem)
+        os.makedirs(subfolder, exist_ok=True)
+        new_path = os.path.join(subfolder, os.path.basename(destination_path))
+        os.rename(destination_path, new_path)
+        destination_path = new_path
+        log(f"  Organised into {subfolder}/")
+
     # Auto-register the game on this device
     try:
-        rom_folder = os.path.dirname(destination_path)
         save_path = ""
         launch_command = ""
         state_path = ""
 
-        # Copy save/launch patterns from another game of the same console on this device
+        # Copy save/launch/state patterns from another game of the same console on this device
         if console:
             my_games = client.list_my_game_devices()
             ref = next(
@@ -1612,7 +1623,7 @@ def _receive_transfer(
             save_path=save_path,
             launch_command=launch_command,
             state_path=state_path,
-            rom_folder_path=rom_folder,
+            rom_folder_path=scan_root,
         ))
         log(f"  Registered '{game_name}' in game list")
     except Exception as e:
