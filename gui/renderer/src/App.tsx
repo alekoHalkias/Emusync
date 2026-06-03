@@ -201,6 +201,9 @@ export default function App(): React.ReactElement {
           if (await health()) break;
           await new Promise<void>((r) => setTimeout(r, 100));
         }
+      } else {
+        // Client devices: start sync daemon to receive incoming ROM transfers
+        window.emusync.daemon.start();
       }
       // Show games immediately; release stale locks in the background.
       setScreen({ name: "games" });
@@ -219,6 +222,7 @@ export default function App(): React.ReactElement {
       );
       configureDevice((cfg.device_id as string) || "", (cfg.device_name as string) || "");
       setIsServer(!!(cfg.is_server as boolean));
+      if (!cfg.is_server) window.emusync.daemon.start();
       setScreen({ name: "games" });
     });
   }

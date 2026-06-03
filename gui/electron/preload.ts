@@ -84,6 +84,10 @@ contextBridge.exposeInMainWorld("emusync", {
     push: (slug: string, toDeviceId: string, consoleName: string): Promise<{ ok: boolean; targetOnline?: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:push", slug, toDeviceId, consoleName),
   },
+  daemon: {
+    start: (): Promise<void> => ipcRenderer.invoke("daemon:start"),
+    stop:  (): Promise<void> => ipcRenderer.invoke("daemon:stop"),
+  },
   game: {
     launch: (slug: string, command: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke("game:launch", slug, command),
