@@ -17,20 +17,56 @@ let serverProcess: ChildProcess | null = null;
 let serverStartedByApp = false;
 let gameProcess: ChildProcess | null = null;
 let syncDaemonProcess: ChildProcess | null = null;
+let syncDaemonRestartTimer: ReturnType<typeof setTimeout> | null = null;
 let mainWindow: BrowserWindow | null = null;
 
 
 function startSyncDaemon(): void {
-  if (syncDaemonProcess) return; // Already running
+  if (syncDaemonProcess) return;
+
+  // Only start for client devices (server devices run it embedded in the server process)
+  if (existsSync(CONFIG_PATH)) {
+    try {
+      const cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, unknown>;
+      if (cfg.is_server) return;
+    } catch { return; }
+  } else {
+    return; // No config yet (fresh install showing setup screen)
+  }
+
   try {
-    syncDaemonProcess = spawn(PYTHON, [SCRIPT, "sync-daemon"], {
+    const proc = spawn(PYTHON, [SCRIPT, "sync-daemon"], {
       stdio: "ignore",
-      detached: true,
-      env: { ...process.env },
+      env: { ...process.env, PYTHONUNBUFFERED: "1" },
     });
-    syncDaemonProcess.unref();
+    syncDaemonProcess = proc;
+
+    proc.on("exit", () => {
+      syncDaemonProcess = null;
+      // Restart after 10 s — server may have been temporarily unreachable
+      syncDaemonRestartTimer = setTimeout(() => {
+        syncDaemonRestartTimer = null;
+        startSyncDaemon();
+      }, 10_000);
+    });
+
+    proc.on("error", (err) => {
+      console.error("Sync daemon error:", err);
+      syncDaemonProcess = null;
+    });
   } catch (err) {
     console.error("Failed to start sync daemon:", err);
+  }
+}
+
+function stopSyncDaemon(): void {
+  if (syncDaemonRestartTimer) {
+    clearTimeout(syncDaemonRestartTimer);
+    syncDaemonRestartTimer = null;
+  }
+  if (syncDaemonProcess) {
+    syncDaemonProcess.kill("SIGKILL");
+    syncDaemonProcess = null;
   }
 }
 
@@ -59,9 +95,6 @@ function createWindow(): void {
     shell.openExternal(url);
     return { action: "deny" };
   });
-
-  // Start sync daemon when GUI opens
-  startSyncDaemon();
 }
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────
@@ -159,6 +192,9 @@ function startServerProcess(): Promise<{ ok: boolean }> {
 }
 
 ipcMain.handle("server:start", () => startServerProcess());
+
+ipcMain.handle("daemon:start", () => { startSyncDaemon(); });
+ipcMain.handle("daemon:stop",  () => { stopSyncDaemon(); });
 
 function killServerByPid(): void {
   const pidFile = join(homedir(), ".emusync", ".server_pid");
@@ -1356,10 +1392,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (syncDaemonProcess) {
-    try { process.kill(-syncDaemonProcess.pid!, "SIGTERM"); } catch { syncDaemonProcess?.kill("SIGTERM"); }
-    syncDaemonProcess = null;
-  }
+  stopSyncDaemon();
   if (serverProcess) {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
