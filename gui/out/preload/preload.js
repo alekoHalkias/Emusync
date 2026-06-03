@@ -34,7 +34,8 @@ electron.contextBridge.exposeInMainWorld("emusync", {
   files: {
     ensureSave: (savePath) => electron.ipcRenderer.invoke("files:ensure-save", savePath),
     getSaveTime: (savePath) => electron.ipcRenderer.invoke("files:get-save-time", savePath),
-    getLatestInFolder: (dirPath) => electron.ipcRenderer.invoke("files:get-latest-in-folder", dirPath)
+    getLatestInFolder: (dirPath) => electron.ipcRenderer.invoke("files:get-latest-in-folder", dirPath),
+    moveToSubfolder: (args) => electron.ipcRenderer.invoke("files:move-to-subfolder", args)
   },
   save: {
     push: (slug, savePath) => electron.ipcRenderer.invoke("save:push", slug, savePath),
@@ -56,6 +57,7 @@ electron.contextBridge.exposeInMainWorld("emusync", {
     isRunning: () => electron.ipcRenderer.invoke("game:isRunning"),
     stopExternal: () => electron.ipcRenderer.invoke("game:stop-external"),
     hasPidFile: () => electron.ipcRenderer.invoke("game:hasPidFile"),
+    pushToServer: (slug) => electron.ipcRenderer.invoke("game:pushToServer", slug),
     onExited: (cb) => {
       electron.ipcRenderer.on("game:exited", cb);
     },

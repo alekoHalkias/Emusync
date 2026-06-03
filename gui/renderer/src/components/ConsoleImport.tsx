@@ -31,13 +31,15 @@ type RomEntry = {
 };
 
 type Phase =
-  | "console"    // select console
-  | "detecting"  // scanning for installed emulators
-  | "emulator"   // pick emulator (or no-emulator message)
-  | "scanning"   // scanning ROMs + saves
-  | "results"    // ROM list with checkboxes
-  | "importing"  // import in progress
-  | "done";      // finished
+  | "console"         // select console
+  | "detecting"       // scanning for installed emulators
+  | "emulator"        // pick emulator (or no-emulator message)
+  | "scanning"        // scanning ROMs + saves
+  | "results"         // ROM list with checkboxes
+  | "importing"       // import in progress
+  | "push-confirm"    // confirm push to server
+  | "pushing"         // push in progress
+  | "done";           // finished
 
 type Props = { onClose: () => void; onImported: () => void };
 
@@ -82,6 +84,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [progress, setProgress]   = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [savedFolders, setSavedFolders] = useState<string[]>([]);
+  const [importedGameNames, setImportedGameNames] = useState<Record<string, string>>({});
+  const [gamesToPush, setGamesToPush] = useState<string[]>([]);
 
   useEffect(() => {
     (window as any).emusync.emulator.consoles().then(setConsoles);
@@ -272,6 +276,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setPhase("importing");
     const errs: string[] = [];
     const importedSlugs: string[] = [];
+    const gameNames: Record<string, string> = {};
     const consoleAbbr = getConsoleAbbreviation(consoleSel);
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
@@ -311,39 +316,52 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           rom_folder_path: scanRoot || rom.romFolderPath || "",
         });
         importedSlugs.push(slug);
+        gameNames[slug] = displayName;
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
     }
 
-    // Auto-push imported games to server if they don't exist there
-    if (importedSlugs.length > 0) {
-      await autoPushToServer(importedSlugs);
-    }
-
     setImportErrors(errs);
-    setPhase("done");
+
+    // Check which games need to be pushed to server
+    if (importedSlugs.length > 0) {
+      const gamesMissingOnServer = await getGamesMissingOnServer(importedSlugs);
+      if (gamesMissingOnServer.length > 0) {
+        setImportedGameNames(gameNames);
+        setGamesToPush(gamesMissingOnServer);
+        setPhase("push-confirm");
+      } else {
+        setPhase("done");
+      }
+    } else {
+      setPhase("done");
+    }
   }
 
-  async function autoPushToServer(slugs: string[]): Promise<void> {
+  async function getGamesMissingOnServer(slugs: string[]): Promise<string[]> {
     try {
-      // Check which games are missing from server
       const allGames = await listGames();
       const serverSlugs = new Set(allGames.map(g => g.slug));
-      const missingOnServer = slugs.filter(slug => !serverSlugs.has(slug));
-
-      if (missingOnServer.length === 0) return;
-
-      // Push missing games to server
-      for (const slug of missingOnServer) {
-        try {
-          await (window as any).emusync.game.pushToServer?.(slug);
-        } catch (e) {
-          console.warn(`Failed to push ${slug} to server:`, e);
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to auto-push games to server:", e);
+      return slugs.filter(slug => !serverSlugs.has(slug));
+    } catch {
+      return [];
     }
+  }
+
+  async function doPush(): Promise<void> {
+    setProgress({ done: 0, total: gamesToPush.length });
+    setPhase("pushing");
+    let pushed = 0;
+    for (const slug of gamesToPush) {
+      try {
+        await (window as any).emusync.game.pushToServer?.(slug);
+        pushed++;
+      } catch (e) {
+        console.warn(`Failed to push ${slug} to server:`, e);
+      }
+      setProgress({ done: pushed, total: gamesToPush.length });
+    }
+    setPhase("done");
   }
 
   // Group ROMs by parent directory
@@ -650,6 +668,59 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           </div>
         )}
 
+        {/* ── push-confirm ─────────────────────────────────────────────────── */}
+        {phase === "push-confirm" && (
+          <>
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ fontSize: 13, marginBottom: 12 }}>
+                Push {gamesToPush.length} imported game{gamesToPush.length !== 1 ? "s" : ""} to the server device?
+              </p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+                This will upload ROMs, saves, and states to the central device.
+              </p>
+              <div style={{
+                maxHeight: 200,
+                overflowY: "auto",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                padding: 12,
+                backgroundColor: "rgba(0,0,0,0.05)"
+              }}>
+                {gamesToPush.map(slug => (
+                  <div key={slug} style={{
+                    fontSize: 13,
+                    padding: "6px 0",
+                    borderBottom: "1px solid var(--border)",
+                    color: "var(--text)"
+                  }}>
+                    • {importedGameNames[slug] || slug}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => {
+                setGamesToPush([]);
+                setImportedGameNames({});
+                setPhase("done");
+              }}>Skip</button>
+              <button className="btn btn-primary" onClick={doPush}>
+                Push to server
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── pushing ──────────────────────────────────────────────────────── */}
+        {phase === "pushing" && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <span className="spinner" style={{ width: 28, height: 28 }} />
+            <p style={{ marginTop: 16 }}>
+              Pushing {progress.done} / {progress.total}…
+            </p>
+          </div>
+        )}
+
         {/* ── done ─────────────────────────────────────────────────────────── */}
         {phase === "done" && (
           <>
@@ -658,6 +729,11 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
               <p style={{ fontWeight: 600 }}>
                 {progress.total - importErrors.length} of {progress.total} games imported
               </p>
+              {gamesToPush.length > 0 && (
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+                  {progress.done} of {gamesToPush.length} games pushed to server
+                </p>
+              )}
               {importErrors.length > 0 && (
                 <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
                   Failed: {importErrors.join(", ")}
