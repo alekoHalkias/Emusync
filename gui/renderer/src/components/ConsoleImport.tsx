@@ -85,7 +85,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [savedFolders, setSavedFolders] = useState<string[]>([]);
   const [importedGameNames, setImportedGameNames] = useState<Record<string, string>>({});
-  const [gamesToPush, setGamesToPush] = useState<string[]>([]);
+  const [gamesToPush, setGamesToPush] = useState<Array<{ slug: string; savePath: string; statePath: string }>>([]);
 
   useEffect(() => {
     (window as any).emusync.emulator.consoles().then(setConsoles);
@@ -275,8 +275,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setImportErrors([]);
     setPhase("importing");
     const errs: string[] = [];
-    const importedSlugs: string[] = [];
-    const gameNames: Record<string, string> = {};
+    const imported: Array<{ slug: string; name: string; savePath: string; statePath: string }> = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel);
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
@@ -296,8 +295,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
         if (scanRoot && romParent === scanRoot) {
           const moved = await (window as any).emusync.files.moveToSubfolder({
             romPath, subfolderName: rom.name,
-            newSavePath: savePath,        // scan already returned the canonical target path
-            newStateFolder: statePath,    // scan already returned the canonical state folder
+            newSavePath: savePath,
+            newStateFolder: statePath,
           });
           if (moved.ok) {
             launchCmd  = launchCmd.replaceAll(romPath, moved.newRomPath);
@@ -315,36 +314,22 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           state_path: statePath,
           rom_folder_path: scanRoot || rom.romFolderPath || "",
         });
-        importedSlugs.push(slug);
-        gameNames[slug] = displayName;
+        imported.push({ slug, name: displayName, savePath, statePath });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
     }
 
     setImportErrors(errs);
 
-    // Check which games need to be pushed to server
-    if (importedSlugs.length > 0) {
-      const gamesMissingOnServer = await getGamesMissingOnServer(importedSlugs);
-      if (gamesMissingOnServer.length > 0) {
-        setImportedGameNames(gameNames);
-        setGamesToPush(gamesMissingOnServer);
-        setPhase("push-confirm");
-      } else {
-        setPhase("done");
-      }
+    // Offer to push saves + states to the server for all successfully imported games
+    if (imported.length > 0) {
+      const names_: Record<string, string> = {};
+      imported.forEach(g => { names_[g.slug] = g.name; });
+      setImportedGameNames(names_);
+      setGamesToPush(imported.map(g => ({ slug: g.slug, savePath: g.savePath, statePath: g.statePath })));
+      setPhase("push-confirm");
     } else {
       setPhase("done");
-    }
-  }
-
-  async function getGamesMissingOnServer(slugs: string[]): Promise<string[]> {
-    try {
-      const allGames = await listGames();
-      const serverSlugs = new Set(allGames.map(g => g.slug));
-      return slugs.filter(slug => !serverSlugs.has(slug));
-    } catch {
-      return [];
     }
   }
 
@@ -352,12 +337,17 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     setProgress({ done: 0, total: gamesToPush.length });
     setPhase("pushing");
     let pushed = 0;
-    for (const slug of gamesToPush) {
+    for (const game of gamesToPush) {
       try {
-        await (window as any).emusync.game.pushToServer?.(slug);
+        if (game.savePath) {
+          await (window as any).emusync.save.push(game.slug, game.savePath);
+        }
+        if (game.statePath) {
+          await (window as any).emusync.state.push(game.slug, game.statePath);
+        }
         pushed++;
       } catch (e) {
-        console.warn(`Failed to push ${slug} to server:`, e);
+        console.warn(`Failed to push ${game.slug}:`, e);
       }
       setProgress({ done: pushed, total: gamesToPush.length });
     }
@@ -673,10 +663,10 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           <>
             <div style={{ marginBottom: 24 }}>
               <p style={{ fontSize: 13, marginBottom: 12 }}>
-                Push {gamesToPush.length} imported game{gamesToPush.length !== 1 ? "s" : ""} to the server device?
+                Push saves and states for {gamesToPush.length} imported game{gamesToPush.length !== 1 ? "s" : ""} to the server?
               </p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-                This will upload ROMs, saves, and states to the central device.
+                This uploads your local saves and states so other devices can sync them.
               </p>
               <div style={{
                 maxHeight: 200,
@@ -686,14 +676,14 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                 padding: 12,
                 backgroundColor: "rgba(0,0,0,0.05)"
               }}>
-                {gamesToPush.map(slug => (
-                  <div key={slug} style={{
+                {gamesToPush.map(g => (
+                  <div key={g.slug} style={{
                     fontSize: 13,
                     padding: "6px 0",
                     borderBottom: "1px solid var(--border)",
                     color: "var(--text)"
                   }}>
-                    • {importedGameNames[slug] || slug}
+                    • {importedGameNames[g.slug] || g.slug}
                   </div>
                 ))}
               </div>
