@@ -245,6 +245,9 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     // Find which ROMs to remove
     const romsToRemove = roms.filter(r => r.romFolderPath === path);
 
+    // Mark folder as removed (hides it from the folder list)
+    setRemovedDirs(prev => new Set([...prev, path]));
+
     // Remove ROMs from this folder
     setRoms(prev => prev.filter(r => r.romFolderPath !== path));
     setSelected(prev => {
