@@ -242,10 +242,15 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   }
 
   function removeRomDir(path: string): void {
-    setRemovedDirs(prev => new Set([...prev, path]));
-    const remainingPaths = extraPaths.filter(p => p !== path);
-    setExtraPaths(remainingPaths);
-    scanRoms(remainingPaths);
+    // Remove ROMs from this folder
+    setRoms(prev => prev.filter(r => r.romFolderPath !== path));
+    setSelected(prev => {
+      const next = new Set(prev);
+      roms.forEach(r => {
+        if (r.romFolderPath === path) next.delete(r.romPath);
+      });
+      return next;
+    });
   }
 
   function toggleRom(romPath: string): void {

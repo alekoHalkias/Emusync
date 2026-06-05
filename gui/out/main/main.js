@@ -15,7 +15,52 @@ const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
 let serverProcess = null;
 let serverStartedByApp = false;
 let gameProcess = null;
+let syncDaemonProcess = null;
+let syncDaemonRestartTimer = null;
 let mainWindow = null;
+function startSyncDaemon() {
+  if (syncDaemonProcess) return;
+  if (fs.existsSync(CONFIG_PATH)) {
+    try {
+      const cfg = smolToml.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+      if (cfg.is_server) return;
+    } catch {
+      return;
+    }
+  } else {
+    return;
+  }
+  try {
+    const proc = child_process.spawn(PYTHON, [SCRIPT, "sync-daemon"], {
+      stdio: "ignore",
+      env: { ...process.env, PYTHONUNBUFFERED: "1" }
+    });
+    syncDaemonProcess = proc;
+    proc.on("exit", () => {
+      syncDaemonProcess = null;
+      syncDaemonRestartTimer = setTimeout(() => {
+        syncDaemonRestartTimer = null;
+        startSyncDaemon();
+      }, 1e4);
+    });
+    proc.on("error", (err) => {
+      console.error("Sync daemon error:", err);
+      syncDaemonProcess = null;
+    });
+  } catch (err) {
+    console.error("Failed to start sync daemon:", err);
+  }
+}
+function stopSyncDaemon() {
+  if (syncDaemonRestartTimer) {
+    clearTimeout(syncDaemonRestartTimer);
+    syncDaemonRestartTimer = null;
+  }
+  if (syncDaemonProcess) {
+    syncDaemonProcess.kill("SIGKILL");
+    syncDaemonProcess = null;
+  }
+}
 function createWindow() {
   mainWindow = new electron.BrowserWindow({
     width: 900,
@@ -123,6 +168,12 @@ function startServerProcess() {
   });
 }
 electron.ipcMain.handle("server:start", () => startServerProcess());
+electron.ipcMain.handle("daemon:start", () => {
+  startSyncDaemon();
+});
+electron.ipcMain.handle("daemon:stop", () => {
+  stopSyncDaemon();
+});
 function killServerByPid() {
   const pidFile = path.join(os.homedir(), ".emusync", ".server_pid");
   try {
@@ -327,7 +378,6 @@ const ROM_EXTENSIONS = /* @__PURE__ */ new Set([
   // Disc-based (PSX, Dreamcast, PSP…)
 ]);
 const DEFAULT_SAVE_EXTS = ["srm", "sav", "save"];
-const DEFAULT_STATE_EXTS = ["state", "state.auto"];
 const SYSTEMS = {
   // ── Game Boy family ────────────────────────────────────────────────────────
   gba: {
@@ -793,20 +843,32 @@ electron.ipcMain.handle("emulator:scan", (_event, params) => {
       const base = path.basename(romPath, path.extname(romPath));
       const system = SYSTEMS[romExt];
       const saveExts = system?.saveExts ?? defaultSaveExts;
-      let m = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+      const romParentDir = path.dirname(romPath);
+      const contentSubfolder = romParentDir !== dir ? path.basename(romParentDir) : null;
+      const saveRoot = emulatorOption.coreFolderName ? path.dirname(emulatorOption.saveDir) : emulatorOption.saveDir;
+      const gameFolderName = contentSubfolder ?? base;
+      let m = matchSaveFile(path.join(saveRoot, gameFolderName), base, saveExts);
+      if (!m.exists) {
+        const mCC = matchSaveFile(path.join(emulatorOption.saveDir, gameFolderName), base, saveExts);
+        if (mCC.exists) m = mCC;
+      }
+      if (!m.exists) {
+        const mFlat = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+        if (mFlat.exists) m = mFlat;
+      }
       if (!m.exists && emulatorOption.coreFolderName) {
-        const rootSaveDir = path.dirname(emulatorOption.saveDir);
-        const mRoot = matchSaveFile(rootSaveDir, base, saveExts);
+        const mRoot = matchSaveFile(saveRoot, base, saveExts);
         if (mRoot.exists) m = mRoot;
+      }
+      if (!m.exists) {
+        m = { path: path.join(saveRoot, gameFolderName, `${base}.${saveExts[0]}`), exists: false };
       }
       let sm;
       if (emulatorOption.stateDir) {
-        sm = matchSaveFile(emulatorOption.stateDir, base, DEFAULT_STATE_EXTS);
-        if (!sm.exists && emulatorOption.coreFolderName) {
-          const rootStateDir = path.dirname(emulatorOption.stateDir);
-          const smRoot = matchSaveFile(rootStateDir, base, DEFAULT_STATE_EXTS);
-          if (smRoot.exists) sm = smRoot;
-        }
+        const stateRoot = emulatorOption.coreFolderName ? path.dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
+        const stateFolder = path.join(stateRoot, gameFolderName);
+        const hasStateFiles = !!findLatestFileInDir(stateFolder);
+        sm = { path: stateFolder, exists: hasStateFiles };
       }
       const launchCommand = emulatorOption.corePath ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"` : `${emulatorOption.execPath} "${romPath}"`;
       return {
@@ -919,6 +981,59 @@ electron.ipcMain.handle(
   "files:get-latest-in-folder",
   (_event, dirPath) => findLatestFileInDir(dirPath)
 );
+electron.ipcMain.handle("files:move-to-subfolder", (_event, { romPath, subfolderName, newSavePath, newStateFolder }) => {
+  try {
+    const newRomDir = path.join(path.dirname(romPath), subfolderName);
+    fs.mkdirSync(newRomDir, { recursive: true });
+    const newRomPath = path.join(newRomDir, path.basename(romPath));
+    fs.renameSync(romPath, newRomPath);
+    if (newSavePath && !fs.existsSync(newSavePath)) {
+      fs.mkdirSync(path.dirname(newSavePath), { recursive: true });
+      const base = path.basename(newSavePath, path.extname(newSavePath));
+      const ext = path.extname(newSavePath).slice(1);
+      const savesRoot = path.dirname(path.dirname(newSavePath));
+      const flatLegacy = path.join(savesRoot, `${base}.${ext}`);
+      if (fs.existsSync(flatLegacy)) {
+        fs.renameSync(flatLegacy, newSavePath);
+      } else {
+        try {
+          for (const e of fs.readdirSync(savesRoot, { withFileTypes: true })) {
+            if (!e.isDirectory()) continue;
+            const candidate = path.join(savesRoot, e.name, `${base}.${ext}`);
+            if (fs.existsSync(candidate)) {
+              fs.renameSync(candidate, newSavePath);
+              break;
+            }
+          }
+        } catch {
+        }
+      }
+    }
+    if (newStateFolder) {
+      fs.mkdirSync(newStateFolder, { recursive: true });
+      const base = path.basename(newStateFolder);
+      const statesRoot = path.dirname(newStateFolder);
+      const stateExts = ["state", "state.auto", "state1", "state2", "state3", "state4", "state5"];
+      for (const ext of stateExts) {
+        const src = path.join(statesRoot, `${base}.${ext}`);
+        if (fs.existsSync(src)) fs.renameSync(src, path.join(newStateFolder, `${base}.${ext}`));
+      }
+      try {
+        for (const e of fs.readdirSync(statesRoot, { withFileTypes: true })) {
+          if (!e.isDirectory() || e.name === base) continue;
+          for (const ext of stateExts) {
+            const src = path.join(statesRoot, e.name, `${base}.${ext}`);
+            if (fs.existsSync(src)) fs.renameSync(src, path.join(newStateFolder, `${base}.${ext}`));
+          }
+        }
+      } catch {
+      }
+    }
+    return { ok: true, newRomPath, newSavePath, newStateFolder };
+  } catch (e) {
+    return { ok: false, newRomPath: romPath, newSavePath, newStateFolder, error: e.message };
+  }
+});
 electron.ipcMain.handle("save:push", async (_event, slug, savePath) => {
   try {
     if (!fs.existsSync(savePath)) return { ok: false, error: "Save file not found" };
@@ -964,16 +1079,21 @@ electron.ipcMain.handle("save:pull", async (_event, slug, savePath) => {
 });
 electron.ipcMain.handle("state:push", async (_event, slug, statePath) => {
   try {
-    const stateDir = path.dirname(statePath);
-    const latest = findLatestFileInDir(stateDir);
-    if (!latest) return { ok: false, error: "No state files found in folder" };
+    if (!fs.existsSync(statePath)) return { ok: false, error: "State folder not found" };
+    const tarResult = child_process.spawnSync("tar", ["-czf", "-", "-C", statePath, "."], {
+      maxBuffer: 200 * 1024 * 1024
+    });
+    if (tarResult.error || tarResult.status !== 0) {
+      return { ok: false, error: `Failed to compress state folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
+    }
+    const data = tarResult.stdout;
+    if (!data || data.length === 0) return { ok: false, error: "No state files to push" };
     const { host, port, authHeaders } = loadServerCfg();
-    const data = fs.readFileSync(latest.path);
     const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
       method: "POST",
       headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
       body: data,
-      signal: AbortSignal.timeout(3e4)
+      signal: AbortSignal.timeout(6e4)
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({ detail: res.statusText }));
@@ -989,7 +1109,7 @@ electron.ipcMain.handle("state:pull", async (_event, slug, statePath) => {
     const { host, port, authHeaders } = loadServerCfg();
     const res = await fetch(`http://${host}:${port}/games/${slug}/state`, {
       headers: authHeaders,
-      signal: AbortSignal.timeout(3e4)
+      signal: AbortSignal.timeout(6e4)
     });
     if (res.status === 204) return { ok: true, pulled: false };
     if (!res.ok) {
@@ -997,11 +1117,35 @@ electron.ipcMain.handle("state:pull", async (_event, slug, statePath) => {
       return { ok: false, pulled: false, error: body.detail ?? res.statusText };
     }
     const buf = Buffer.from(await res.arrayBuffer());
-    if (fs.existsSync(statePath)) {
-      fs.writeFileSync(`${statePath}.bak`, fs.readFileSync(statePath));
+    fs.mkdirSync(statePath, { recursive: true });
+    const existing = fs.readdirSync(statePath).filter((f) => !f.endsWith(".bak"));
+    for (const f of existing) {
+      try {
+        fs.renameSync(path.join(statePath, f), path.join(statePath, f + ".bak"));
+      } catch {
+      }
     }
-    fs.mkdirSync(path.dirname(statePath), { recursive: true });
-    fs.writeFileSync(statePath, buf);
+    const extractResult = child_process.spawnSync("tar", ["-xzf", "-", "-C", statePath], {
+      input: buf,
+      maxBuffer: 200 * 1024 * 1024
+    });
+    if (extractResult.error || extractResult.status !== 0) {
+      for (const f of existing) {
+        const bak = path.join(statePath, f + ".bak");
+        if (fs.existsSync(bak)) try {
+          fs.renameSync(bak, path.join(statePath, f));
+        } catch {
+        }
+      }
+      return { ok: false, pulled: false, error: "Failed to extract state archive" };
+    }
+    for (const f of existing) {
+      const bak = path.join(statePath, f + ".bak");
+      if (fs.existsSync(bak)) try {
+        fs.unlinkSync(bak);
+      } catch {
+      }
+    }
     return { ok: true, pulled: true };
   } catch (e) {
     return { ok: false, pulled: false, error: e.message || "Pull failed" };
@@ -1095,6 +1239,7 @@ electron.app.whenReady().then(() => {
   });
 });
 electron.app.on("window-all-closed", () => {
+  stopSyncDaemon();
   if (serverProcess) {
     serverProcess.kill("SIGKILL");
     serverProcess = null;
