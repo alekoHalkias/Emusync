@@ -746,6 +746,38 @@ const CONSOLES = [
     suggestions: ["RetroArch with PCSX-ReARMed or Beetle PSX core"]
   }
 ];
+function findConsoleRomDirs(baseDir, consoleKey) {
+  if (!baseDir || !fs.existsSync(baseDir)) return [];
+  const consoleFolderNames = {
+    gba: ["GBA", "GameBoyAdvance", "Game Boy Advance"],
+    gb: ["GB", "GameBoy", "Game Boy", "GBC"],
+    snes: ["SNES", "SuperNintendo", "Super Nintendo", "SFC"],
+    nes: ["NES", "Famicom"],
+    n64: ["N64", "Nintendo64", "Nintendo 64"],
+    nds: ["NDS", "Nintendo DS"],
+    genesis: ["Genesis", "Mega Drive", "MD"],
+    sms: ["SMS", "MasterSystem", "Master System"],
+    pce: ["PCE", "TurboGrafx", "TurboGrafx-16"],
+    psx: ["PSX", "PlayStation", "PS1"]
+  };
+  const folderNames = consoleFolderNames[consoleKey] ?? [consoleKey.toUpperCase()];
+  const results = [];
+  try {
+    const entries = fs.readdirSync(baseDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const entryLower = entry.name.toLowerCase();
+      for (const pattern of folderNames) {
+        if (entryLower === pattern.toLowerCase()) {
+          results.push(path.join(baseDir, entry.name));
+          break;
+        }
+      }
+    }
+  } catch {
+  }
+  return results;
+}
 function detectEmulatorsForConsole(home, consoleKey) {
   const consoleDef = CONSOLES.find((c) => c.key === consoleKey);
   if (!consoleDef) return [];
@@ -760,6 +792,13 @@ function detectEmulatorsForConsole(home, consoleKey) {
       seenCores.add(core.lib);
       const saveDir = path.join(ra.saveDir, core.folderName);
       const stateDir = path.join(ra.statesDir, core.folderName);
+      let romDirs = ra.romDirs;
+      if (ra.romDirs.length > 0) {
+        const consoleDirs = findConsoleRomDirs(ra.romDirs[0], consoleKey);
+        if (consoleDirs.length > 0) {
+          romDirs = consoleDirs;
+        }
+      }
       options.push({
         id: `${ra.type}-${core.folderName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
         label: `${ra.label} · ${core.folderName}`,
@@ -768,7 +807,7 @@ function detectEmulatorsForConsole(home, consoleKey) {
         stateDir,
         corePath: core.lib,
         coreFolderName: core.folderName,
-        romDirs: ra.romDirs
+        romDirs
       });
     }
   }
