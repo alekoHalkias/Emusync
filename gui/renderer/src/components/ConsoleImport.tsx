@@ -242,10 +242,36 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   }
 
   function removeRomDir(path: string): void {
+    // Normalize the path for matching
+    const normalizedPath = path.replace(/\/$/, "");
+
+    // Find which ROMs to remove (match exact folder or any subfolder)
+    const romsToRemove = roms.filter(r => {
+      const normalizedRomPath = r.romFolderPath.replace(/\/$/, "");
+      return normalizedRomPath === normalizedPath ||
+             normalizedRomPath.startsWith(normalizedPath + "/");
+    });
+
+    // Mark folder as removed (hides it from the folder list)
     setRemovedDirs(prev => new Set([...prev, path]));
-    const remainingPaths = extraPaths.filter(p => p !== path);
-    setExtraPaths(remainingPaths);
-    scanRoms(remainingPaths);
+
+    // Also remove from romDirs to prevent re-detection on next scan
+    setRomDirs(prev => prev.filter(dir => dir !== path));
+
+    // Remove ROMs from this folder and all subfolders
+    setRoms(prev => {
+      return prev.filter(r => {
+        const normalizedRomPath = r.romFolderPath.replace(/\/$/, "");
+        return !(normalizedRomPath === normalizedPath ||
+                 normalizedRomPath.startsWith(normalizedPath + "/"));
+      });
+    });
+
+    setSelected(prev => {
+      const next = new Set(prev);
+      romsToRemove.forEach(r => next.delete(r.romPath));
+      return next;
+    });
   }
 
   function toggleRom(romPath: string): void {

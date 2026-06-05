@@ -832,6 +832,42 @@ const CONSOLES: ConsoleDef[] = [
   },
 ];
 
+function findConsoleRomDirs(baseDir: string, consoleKey: string): string[] {
+  if (!baseDir || !existsSync(baseDir)) return [];
+
+  const consoleFolderNames: Record<string, string[]> = {
+    gba: ["GBA", "GameBoyAdvance", "Game Boy Advance"],
+    gb: ["GB", "GameBoy", "Game Boy", "GBC"],
+    snes: ["SNES", "SuperNintendo", "Super Nintendo", "SFC"],
+    nes: ["NES", "Famicom"],
+    n64: ["N64", "Nintendo64", "Nintendo 64"],
+    nds: ["NDS", "Nintendo DS"],
+    genesis: ["Genesis", "Mega Drive", "MD"],
+    sms: ["SMS", "MasterSystem", "Master System"],
+    pce: ["PCE", "TurboGrafx", "TurboGrafx-16"],
+    psx: ["PSX", "PlayStation", "PS1"],
+  };
+
+  const folderNames = consoleFolderNames[consoleKey] ?? [consoleKey.toUpperCase()];
+  const results: string[] = [];
+
+  try {
+    const entries = readdirSync(baseDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const entryLower = entry.name.toLowerCase();
+      for (const pattern of folderNames) {
+        if (entryLower === pattern.toLowerCase()) {
+          results.push(join(baseDir, entry.name));
+          break;
+        }
+      }
+    }
+  } catch { /* ignore read errors */ }
+
+  return results;
+}
+
 function detectEmulatorsForConsole(home: string, consoleKey: string): DetectedEmulatorOption[] {
   const consoleDef = CONSOLES.find(c => c.key === consoleKey);
   if (!consoleDef) return [];
@@ -848,6 +884,16 @@ function detectEmulatorsForConsole(home: string, consoleKey: string): DetectedEm
       seenCores.add(core.lib);
       const saveDir = join(ra.saveDir, core.folderName);
       const stateDir = join(ra.statesDir, core.folderName);
+
+      // Try to find console-specific ROM subfolders first
+      let romDirs = ra.romDirs;
+      if (ra.romDirs.length > 0) {
+        const consoleDirs = findConsoleRomDirs(ra.romDirs[0], consoleKey);
+        if (consoleDirs.length > 0) {
+          romDirs = consoleDirs;
+        }
+      }
+
       options.push({
         id: `${ra.type}-${core.folderName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
         label: `${ra.label} · ${core.folderName}`,
@@ -856,7 +902,7 @@ function detectEmulatorsForConsole(home: string, consoleKey: string): DetectedEm
         stateDir,
         corePath: core.lib,
         coreFolderName: core.folderName,
-        romDirs: ra.romDirs,
+        romDirs,
       });
     }
   }
