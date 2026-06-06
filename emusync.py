@@ -121,8 +121,6 @@ def _find_pid_by_port(port: int) -> int | None:
 
     Tries ss (iproute2) first, then lsof as a fallback.
     """
-    import subprocess
-    import re
     try:
         out = subprocess.check_output(
             ["ss", "-Hlntp", f"sport = :{port}"],
@@ -583,6 +581,16 @@ def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_
     click.echo(f"Added: {name} (slug: {actual_slug})")
 
 
+def _print_table(headers: list[str], rows: list[list]) -> None:
+    """Print a left-aligned text table with a header separator."""
+    n = len(headers)
+    col_widths = [max(len(headers[i]), max((len(str(row[i])) for row in rows), default=0)) for i in range(n)]
+    click.echo("  ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers)))
+    click.echo("  ".join("-" * w for w in col_widths))
+    for row in rows:
+        click.echo("  ".join(str(row[i]).ljust(col_widths[i]) for i in range(n)))
+
+
 @game.command("list")
 def game_list() -> None:
     """List all managed games with device installations."""
@@ -648,15 +656,7 @@ def game_list() -> None:
         return
 
     headers = ["Game Name", "Device", "ROM Path", "Save Path", "State Folder"]
-    col_widths = [max(len(headers[i]), max(len(str(row[i])) for row in rows)) for i in range(5)]
-
-    header_line = "  ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
-    separator = "  ".join("-" * w for w in col_widths)
-
-    click.echo(header_line)
-    click.echo(separator)
-    for row in rows:
-        click.echo("  ".join(str(row[i]).ljust(col_widths[i]) for i in range(5)))
+    _print_table(headers, rows)
 
 
 @game.command("edit")
@@ -746,15 +746,7 @@ def console_list() -> None:
         return
 
     headers = ["Console", "Device", "Emulator/Core", "ROM Path", "Save Path", "State Path"]
-    col_widths = [max(len(headers[i]), max(len(str(row[i])) for row in rows)) for i in range(6)]
-
-    header_line = "  ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
-    separator = "  ".join("-" * w for w in col_widths)
-
-    click.echo(header_line)
-    click.echo(separator)
-    for row in rows:
-        click.echo("  ".join(str(row[i]).ljust(col_widths[i]) for i in range(6)))
+    _print_table(headers, rows)
 
 
 # ── Console import helpers ────────────────────────────────────────────────────
@@ -1081,8 +1073,6 @@ def _match_save_file(save_dir: str, base_name: str, exts: list[str]) -> dict:
 @console.command("import")
 def console_import() -> None:
     """Interactive wizard to bulk-import ROMs for a console (mirrors the GUI Add Console wizard)."""
-    import httpx
-
     # ── Step 1: select console ────────────────────────────────────────────────
     click.echo("\nAvailable consoles:")
     for i, c in enumerate(_IMPORT_CONSOLES, 1):
@@ -1263,7 +1253,7 @@ def console_import() -> None:
                 rom_folder_path=entry["rom_folder_path"],
             ))
             click.echo("ok")
-        except (httpx.HTTPStatusError, httpx.RequestError, Exception) as exc:
+        except Exception as exc:
             click.echo(f"error ({exc})")
             errors.append(entry["name"])
 
