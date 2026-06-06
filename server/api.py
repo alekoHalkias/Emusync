@@ -31,6 +31,7 @@ _online_devices: set[str] = set()
 _device_names: dict[str, str] = {}
 _presence_lock = threading.Lock()
 _device_event_queues: dict[str, "asyncio.Queue"] = {}
+_monitor_started: bool = False
 
 
 def _monitor_presence() -> None:
@@ -61,14 +62,16 @@ def _monitor_presence() -> None:
 
 
 def init(store: Store, master_pin: str, data_dir: str = "") -> None:
-    global _store, _master_pin, _data_dir, _online_devices, _device_names
+    global _store, _master_pin, _data_dir, _online_devices, _device_names, _monitor_started
     _store = store
     _master_pin = master_pin
     _data_dir = data_dir
     _online_devices.clear()
     _device_names.clear()
-    t = threading.Thread(target=_monitor_presence, daemon=True)
-    t.start()
+    if not _monitor_started:
+        _monitor_started = True
+        t = threading.Thread(target=_monitor_presence, daemon=True)
+        t.start()
 
 
 def _get_store() -> Store:
