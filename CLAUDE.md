@@ -9,7 +9,8 @@ EmuSync is a LAN save-file sync tool for emulators. One machine (gaming PC) runs
 ## Architecture
 
 ```
-emusync.py          ← Click CLI entry point; all subcommands live here
+emusync.py          ← Thin CLI entry-point shim (kept at this path for install.sh/Makefile/Electron spawn/pkill); delegates to the cli/ package
+cli/                ← Click CLI implementation; one module per command group
 server/             ← Python backend (FastAPI + SQLite + mDNS)
 gui/electron/       ← Electron main process; spawns Python, bridges IPC
 gui/renderer/src/   ← React renderer; talks to Python API via fetch + IPC
@@ -29,9 +30,10 @@ tests/              ← Integration tests (real SQLite, no mocks)
 
 | File | Owns |
 |------|------|
-| `emusync.py` | All CLI subcommands (`server`, `device`, `game`, `console`, `run`, `sync`, `push`, `pull`, `sync-daemon`); `device compare` shows game coverage across paired devices; `console import` is an interactive wizard that mirrors the GUI Add Console flow (detect RetroArch/cores/standalones → scan ROM folder → bulk import); `push` is an interactive ROM transfer wizard (multi-select games → pick target device → confirm path → stream upload); `pull` mirrors push in reverse (pick source device → select games from that device → confirm local folder → server queues pull request → source device's sync-daemon fulfills it); `sync-daemon` holds an SSE connection open, auto-receives incoming ROM transfers, and fulfills pending pull requests |
+| `emusync.py` | Thin entry-point shim: bootstraps `sys.path` and calls `cli()` from the `cli/` package. Must stay at this path/filename — `install.sh`, the `Makefile`, the Electron `spawn` in `main.ts`, and `pkill -f "emusync.py server start"` all invoke it by path. No command logic lives here |
+| `cli/` | Click CLI implementation, one module per command group. `cli/root.py` defines the root `cli` group; `cli/__init__.py` imports every command module (registering subcommands) and re-exports `cli`. `cli/common.py` = shared helpers (`_client`, `_print_table`, `_get_device_name`, `_show_game_running_popup`); `cli/consoles_data.py` = hardcoded `_IMPORT_CONSOLES`/`_IMPORT_SYSTEMS`/extension sets + `_prepare_console_seed_data` (seeds the server's global console defs); `cli/detect.py` = RetroArch/core/ROM detection + scan helpers (mirrors `main.ts`); `cli/server.py` = `server` group (start/stop/restart/clear-devices/discover-json) + lifecycle helpers + embedded transfer daemon; `cli/device.py` = `device` group (`connect`/`list`/`compare`, where `compare` shows game coverage across paired devices); `cli/game.py` = `game` group (`add`/`list`/`edit`/`remove`); `cli/console.py` = `console` group (`list` + `import`, the interactive wizard mirroring the GUI Add Console flow: detect RetroArch/cores/standalones → scan ROM folder → bulk import); `cli/sync.py` = `sync status`; `cli/transfer.py` = top-level `push`/`pull`/`sync-daemon` + the transfer daemon loop (`push` streams a ROM to a target device; `pull` requests a ROM from a source device via a pull request the source's sync-daemon fulfills; `sync-daemon` holds an SSE connection open, auto-receives incoming transfers, and fulfills pending pull requests); `cli/run.py` = `run` command + the SIGTERM handler that kills the emulator child (registered at import time) |
 | `server/api.py` | FastAPI routes; auth via `Authorization: Bearer {PIN}` + `X-Device-ID`/`X-Device-Name` headers; `/health`, `/games`, `/devices`, `/whoami`, `/saves`, `/states`, `/locks`, `/events`, `/events/stream` (SSE), `/games/{slug}/devices`, `/game-devices`, `/devices/{id}/consoles`, `/devices/{id}/game-devices`, `/games/{slug}/rom-transfer`, `/rom-transfers/pending`, `/rom-transfers/{id}/file`, `/rom-transfers/{id}`, `/games/{slug}/rom-pull-request`, `/rom-pull-requests/pending`, `/rom-pull-requests/{id}`, `/console-defs`, `/system-defs`, `/console-folder-names`, `/standalones/{console_key}`; `_auth` auto-registers devices on first request; `GET /devices` includes `is_online`; `init()` accepts optional `data_dir` for ROM staging; `_device_event_queues` maps device IDs to asyncio queues for SSE delivery |
-| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`, `rom_transfers`, `rom_pull_requests`, `console_defs`, `system_defs`, `core_defs`, `console_folder_names`, `standalone_emulators`; schema version 6 (latest migration adds `console_key` to `core_defs`); `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; `rom_transfers` tracks pending ROM file deliveries; `rom_pull_requests` tracks pending pull requests (receiver asks source to send); `console_defs`/`system_defs`/`core_defs`/etc. store global emulator/console definitions seeded from emusync.py on startup; `upsert_console_for_game(store, device_id, console_name, rom_path, save_path, rom_folder_path)` is a module-level helper (called by both `api.py` and `emusync.py`) that infers emulator/folder paths from game paths and creates-or-updates the `Console` row |
+| `server/store.py` | SQLite via stdlib `sqlite3`; tables: `devices`, `consoles`, `games`, `game_devices`, `saves`, `states`, `locks`, `events`, `rom_transfers`, `rom_pull_requests`, `console_defs`, `system_defs`, `core_defs`, `console_folder_names`, `standalone_emulators`; schema version 6 (latest migration adds `console_key` to `core_defs`); `ensure_device()` returns `(device, is_new)` tuple to signal first-time registrations; `rom_transfers` tracks pending ROM file deliveries; `rom_pull_requests` tracks pending pull requests (receiver asks source to send); `console_defs`/`system_defs`/`core_defs`/etc. store global emulator/console definitions seeded by `cli/server.py` on startup (data from `cli/consoles_data.py`); `upsert_console_for_game(store, device_id, console_name, rom_path, save_path, rom_folder_path)` is a module-level helper (called by both `api.py` and `cli/game.py`) that infers emulator/folder paths from game paths and creates-or-updates the `Console` row |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
 | `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`, `push`, `pull`); uses a persistent `httpx.Client` for connection pooling (keep-alive); sends PIN + device headers for auth; `GameDeviceConfig` holds `rom_path`, `save_path`, `launch_command`, `state_path`, `rom_folder_path`; `list_my_game_devices()`, `list_device_games()`, `get_device_consoles()`, `create_rom_transfer()`, `create_pull_request()`, `list_pending_pull_requests()`, `complete_pull_request()` support the push/pull flow |
@@ -231,7 +233,7 @@ When adding or changing code, write tests if any of the following are true:
 
 - You added a new API route (`server/api.py`) → add an integration test for the happy path and the main error case (404, 403, 409, etc.)
 - You added a new `Store` method (`server/store.py`) → test it directly via `Store(tmpdir)` or through the API
-- You added a CLI subcommand (`emusync.py`) → note it in the PR; CLI-level tests are optional but preferred for logic-heavy commands
+- You added a CLI subcommand (in the `cli/` package — add it to the relevant command-group module) → note it in the PR; CLI-level tests are optional but preferred for logic-heavy commands
 - You fixed a bug → add a regression test that would have caught it
 
 **How to write a test** — follow the pattern in `tests/test_integration.py`:
@@ -520,7 +522,7 @@ dev mode — visible in the `make dev-gui` terminal.
 
 Update this file when any of the following change:
 
-- CLI subcommands added or removed (`emusync.py`)
+- CLI subcommands added or removed (the `cli/` package)
 - IPC channels added or removed (`main.ts` / `preload.ts`)
 - New React components added to `gui/renderer/src/components/`
 - Config fields added or removed (`server/config.py`)
