@@ -1,0 +1,237 @@
+"""Database schema, version, and incremental migrations.
+
+When adding a migration: (1) add a new `if from_version < N:` block in `_migrate`,
+(2) bump `_SCHEMA_VERSION` to N, (3) add the new table/column to `_SCHEMA` so fresh
+DBs get it without running migrations. Do not add bare try/except ALTERs outside
+`_migrate` — warm-start DBs skip `_migrate` entirely via the version check.
+"""
+from __future__ import annotations
+
+import sqlite3
+
+# Bump whenever a new migration block is added below.
+_SCHEMA_VERSION = 6
+
+# Full current schema — used for fresh databases only.  Columns added via
+# ALTER TABLE migrations are included here so new installs never run migrations.
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS devices (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    last_ip      TEXT,
+    last_seen_at TEXT
+);
+CREATE TABLE IF NOT EXISTS games (
+    slug    TEXT PRIMARY KEY,
+    name    TEXT NOT NULL,
+    console TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS consoles (
+    id                    TEXT PRIMARY KEY,
+    device_id             TEXT NOT NULL REFERENCES devices(id),
+    console_name          TEXT NOT NULL,
+    shortform_name        TEXT NOT NULL,
+    device_game_folder    TEXT NOT NULL DEFAULT '',
+    device_save_folder    TEXT NOT NULL DEFAULT '',
+    device_state_folder   TEXT NOT NULL DEFAULT '',
+    device_emulator       TEXT NOT NULL DEFAULT '',
+    UNIQUE(device_id, console_name, device_game_folder)
+);
+CREATE TABLE IF NOT EXISTS game_devices (
+    game_slug       TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id       TEXT NOT NULL REFERENCES devices(id),
+    rom_path        TEXT NOT NULL DEFAULT '',
+    save_path       TEXT NOT NULL DEFAULT '',
+    launch_command  TEXT NOT NULL DEFAULT '',
+    state_path      TEXT NOT NULL DEFAULT '',
+    rom_folder_path TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (game_slug, device_id)
+);
+CREATE TABLE IF NOT EXISTS saves (
+    id         TEXT PRIMARY KEY,
+    game_slug  TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id  TEXT NOT NULL REFERENCES devices(id),
+    data       BLOB NOT NULL,
+    hash       TEXT NOT NULL,
+    pushed_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS states (
+    id         TEXT PRIMARY KEY,
+    game_slug  TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    device_id  TEXT NOT NULL REFERENCES devices(id),
+    data       BLOB NOT NULL,
+    hash       TEXT NOT NULL,
+    pushed_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS locks (
+    game_slug   TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE,
+    device_id   TEXT NOT NULL REFERENCES devices(id),
+    acquired_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    type        TEXT NOT NULL,
+    game_slug   TEXT,
+    device_id   TEXT,
+    device_name TEXT,
+    rom_path    TEXT,
+    occurred_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS rom_transfers (
+    id               TEXT PRIMARY KEY,
+    slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    from_device_id   TEXT NOT NULL REFERENCES devices(id),
+    to_device_id     TEXT NOT NULL REFERENCES devices(id),
+    destination_path TEXT NOT NULL DEFAULT '',
+    staged_file      TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    queued_at        TEXT NOT NULL,
+    completed_at     TEXT
+);
+CREATE TABLE IF NOT EXISTS rom_pull_requests (
+    id               TEXT PRIMARY KEY,
+    slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    from_device_id   TEXT NOT NULL REFERENCES devices(id),
+    to_device_id     TEXT NOT NULL REFERENCES devices(id),
+    destination_path TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    requested_at     TEXT NOT NULL,
+    fulfilled_at     TEXT
+);
+CREATE TABLE IF NOT EXISTS console_defs (
+    key              TEXT PRIMARY KEY,
+    label            TEXT NOT NULL,
+    abbr             TEXT NOT NULL,
+    suggestions      TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS system_defs (
+    extension        TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    save_exts        TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS core_defs (
+    id               TEXT PRIMARY KEY,
+    console_key      TEXT NOT NULL REFERENCES console_defs(key),
+    system_extension TEXT NOT NULL REFERENCES system_defs(extension),
+    lib_name         TEXT NOT NULL,
+    folder_name      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS console_folder_names (
+    console_key      TEXT NOT NULL REFERENCES console_defs(key),
+    folder_name      TEXT NOT NULL,
+    PRIMARY KEY (console_key, folder_name)
+);
+CREATE TABLE IF NOT EXISTS standalone_emulators (
+    id               TEXT PRIMARY KEY,
+    console_key      TEXT NOT NULL REFERENCES console_defs(key),
+    label            TEXT NOT NULL,
+    native_bins      TEXT NOT NULL DEFAULT '',
+    flatpak_id       TEXT,
+    flatpak_exec     TEXT,
+    save_dir_template TEXT NOT NULL
+);
+"""
+
+
+_HARMLESS_MIGRATION_MSGS = (
+    "duplicate column name",
+    "table",  # "table X already exists"
+    "no such column",  # DROP COLUMN on already-removed column
+    "column",  # catch-all for other column-already-exists variants
+)
+
+
+def _try(conn: sqlite3.Connection, sql: str) -> None:
+    """Execute a DDL statement, suppressing only known-harmless OperationalErrors.
+
+    Harmless: duplicate column, table already exists, column not found.
+    Any other OperationalError (e.g., SQL syntax) propagates so it isn't hidden.
+    """
+    try:
+        conn.execute(sql)
+    except sqlite3.OperationalError as exc:
+        msg = str(exc).lower()
+        if not any(token in msg for token in _HARMLESS_MIGRATION_MSGS):
+            raise
+
+
+def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
+    """Apply incremental migrations for databases older than _SCHEMA_VERSION."""
+    if from_version < 1:
+        # Add columns that may not exist on pre-versioned databases
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_folder_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE games ADD COLUMN console TEXT DEFAULT ''")
+        _try(conn, "ALTER TABLE devices ADD COLUMN last_ip TEXT")
+        _try(conn, "ALTER TABLE devices ADD COLUMN last_seen_at TEXT")
+        # Drop the per-device UUID token — auth is now PIN-based (see api.py _auth).
+        # SQLite 3.35+ supports DROP COLUMN; the constraint is on 'token' not 'id' so FKs are safe.
+        _try(conn, "ALTER TABLE devices DROP COLUMN token")
+    if from_version < 2:
+        _try(conn, "ALTER TABLE events ADD COLUMN rom_path TEXT")
+    if from_version < 3:
+        _try(conn, """CREATE TABLE IF NOT EXISTS rom_transfers (
+            id               TEXT PRIMARY KEY,
+            slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+            from_device_id   TEXT NOT NULL REFERENCES devices(id),
+            to_device_id     TEXT NOT NULL REFERENCES devices(id),
+            destination_path TEXT NOT NULL DEFAULT '',
+            staged_file      TEXT NOT NULL DEFAULT '',
+            status           TEXT NOT NULL DEFAULT 'pending',
+            queued_at        TEXT NOT NULL,
+            completed_at     TEXT
+        )""")
+    if from_version < 4:
+        _try(conn, """CREATE TABLE IF NOT EXISTS rom_pull_requests (
+            id               TEXT PRIMARY KEY,
+            slug             TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+            from_device_id   TEXT NOT NULL REFERENCES devices(id),
+            to_device_id     TEXT NOT NULL REFERENCES devices(id),
+            destination_path TEXT NOT NULL DEFAULT '',
+            status           TEXT NOT NULL DEFAULT 'pending',
+            requested_at     TEXT NOT NULL,
+            fulfilled_at     TEXT
+        )""")
+    if from_version < 5:
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_defs (
+            key              TEXT PRIMARY KEY,
+            label            TEXT NOT NULL,
+            abbr             TEXT NOT NULL,
+            suggestions      TEXT NOT NULL DEFAULT ''
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS system_defs (
+            extension        TEXT PRIMARY KEY,
+            name             TEXT NOT NULL,
+            save_exts        TEXT NOT NULL
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS core_defs (
+            id               TEXT PRIMARY KEY,
+            console_key      TEXT NOT NULL REFERENCES console_defs(key),
+            system_extension TEXT NOT NULL REFERENCES system_defs(extension),
+            lib_name         TEXT NOT NULL,
+            folder_name      TEXT NOT NULL
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_folder_names (
+            console_key      TEXT NOT NULL REFERENCES console_defs(key),
+            folder_name      TEXT NOT NULL,
+            PRIMARY KEY (console_key, folder_name)
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS standalone_emulators (
+            id               TEXT PRIMARY KEY,
+            console_key      TEXT NOT NULL REFERENCES console_defs(key),
+            label            TEXT NOT NULL,
+            native_bins      TEXT NOT NULL DEFAULT '',
+            flatpak_id       TEXT,
+            flatpak_exec     TEXT,
+            save_dir_template TEXT NOT NULL
+        )""")
+    if from_version < 6:
+        # Add console_key column to core_defs if it doesn't exist
+        try:
+            conn.execute("SELECT console_key FROM core_defs LIMIT 1")
+        except sqlite3.OperationalError:
+            # Column doesn't exist, add it
+            _try(conn, "ALTER TABLE core_defs ADD COLUMN console_key TEXT REFERENCES console_defs(key)")
+            # Clear old core_defs rows without console_key so they'll be re-seeded
+            conn.execute("DELETE FROM core_defs WHERE console_key IS NULL")
+    conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
