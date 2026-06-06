@@ -20,3 +20,4 @@ roms/
 # Release artifacts
 *.zip
 *.AppImage
+~/
