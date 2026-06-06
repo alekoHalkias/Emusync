@@ -1,0 +1,160 @@
+"""Hardcoded console/system/core definitions used by the import wizard and
+seeded into the server's global definition tables on startup."""
+from __future__ import annotations
+
+from pathlib import Path
+
+_IMPORT_CONSOLES = [
+    {"key": "gba",     "label": "Game Boy Advance",          "abbr": "GBA",
+     "system_keys": ["gba"],
+     "standalones": [{"id": "mgba", "label": "mGBA",
+                      "native_bins": ["/usr/bin/mgba-qt", "/usr/bin/mgba",
+                                      str(Path.home() / ".local/bin/mgba-qt")],
+                      "flatpak_id": "io.mgba.mGBA",
+                      "flatpak_exec": "flatpak run io.mgba.mGBA",
+                      "save_dir": str(Path.home() / ".local/share/mGBA/saves")}],
+     "suggestions": ["RetroArch with mGBA core", "mGBA standalone"]},
+    {"key": "gb",      "label": "Game Boy / Game Boy Color", "abbr": "GB",
+     "system_keys": ["gb", "gbc"],
+     "standalones": [{"id": "mgba", "label": "mGBA",
+                      "native_bins": ["/usr/bin/mgba-qt", "/usr/bin/mgba"],
+                      "flatpak_id": "io.mgba.mGBA",
+                      "flatpak_exec": "flatpak run io.mgba.mGBA",
+                      "save_dir": str(Path.home() / ".local/share/mGBA/saves")}],
+     "suggestions": ["RetroArch with Gambatte or mGBA core", "mGBA standalone"]},
+    {"key": "snes",    "label": "Super Nintendo (SNES)",      "abbr": "SNES",
+     "system_keys": ["sfc", "smc"],
+     "standalones": [], "suggestions": ["RetroArch with Snes9x core"]},
+    {"key": "nes",     "label": "NES / Famicom",              "abbr": "NES",
+     "system_keys": ["nes", "fds"],
+     "standalones": [], "suggestions": ["RetroArch with Nestopia UE or FCEUmm core"]},
+    {"key": "n64",     "label": "Nintendo 64",                "abbr": "N64",
+     "system_keys": ["n64", "z64", "v64"],
+     "standalones": [], "suggestions": ["RetroArch with Mupen64Plus-Next core"]},
+    {"key": "nds",     "label": "Nintendo DS",                "abbr": "NDS",
+     "system_keys": ["nds"],
+     "standalones": [], "suggestions": ["RetroArch with melonDS or DeSmuME core"]},
+    {"key": "genesis", "label": "Sega Genesis / Mega Drive",  "abbr": "Genesis",
+     "system_keys": ["md", "smd", "gen"],
+     "standalones": [], "suggestions": ["RetroArch with Genesis Plus GX core"]},
+    {"key": "sms",     "label": "Master System / Game Gear",  "abbr": "SMS",
+     "system_keys": ["sms", "gg"],
+     "standalones": [], "suggestions": ["RetroArch with Genesis Plus GX core"]},
+    {"key": "pce",     "label": "PC Engine",                  "abbr": "PCE",
+     "system_keys": ["pce"],
+     "standalones": [], "suggestions": ["RetroArch with Beetle PCE core"]},
+    {"key": "psx",     "label": "PlayStation",                "abbr": "PSX",
+     "system_keys": ["iso", "bin", "cue", "chd", "pbp"],
+     "standalones": [], "suggestions": ["RetroArch with PCSX-ReARMed or Beetle PSX core"]},
+]
+
+_IMPORT_SYSTEMS: dict[str, dict] = {
+    "gba": {"name": "Game Boy Advance", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "mgba_libretro", "folder": "mGBA"},
+                      {"lib": "vba_next_libretro", "folder": "VBA Next"},
+                      {"lib": "vbam_libretro", "folder": "VBA-M"}]},
+    "gb":  {"name": "Game Boy", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "gambatte_libretro", "folder": "Gambatte"},
+                      {"lib": "mgba_libretro", "folder": "mGBA"},
+                      {"lib": "gearboy_libretro", "folder": "Gearboy"}]},
+    "gbc": {"name": "Game Boy Color", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "gambatte_libretro", "folder": "Gambatte"},
+                      {"lib": "mgba_libretro", "folder": "mGBA"},
+                      {"lib": "gearboy_libretro", "folder": "Gearboy"}]},
+    "sfc": {"name": "SNES", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "snes9x_libretro", "folder": "Snes9x"},
+                      {"lib": "bsnes_libretro", "folder": "bsnes"},
+                      {"lib": "snes9x2010_libretro", "folder": "Snes9x 2010"}]},
+    "smc": {"name": "SNES", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "snes9x_libretro", "folder": "Snes9x"},
+                      {"lib": "bsnes_libretro", "folder": "bsnes"},
+                      {"lib": "snes9x2010_libretro", "folder": "Snes9x 2010"}]},
+    "nes": {"name": "NES", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "nestopia_libretro", "folder": "Nestopia UE"},
+                      {"lib": "fceumm_libretro", "folder": "FCEUmm"},
+                      {"lib": "mesen_libretro", "folder": "Mesen"}]},
+    "fds": {"name": "Famicom Disk System", "save_exts": ["sav", "srm"],
+            "cores": [{"lib": "nestopia_libretro", "folder": "Nestopia UE"},
+                      {"lib": "fceumm_libretro", "folder": "FCEUmm"}]},
+    "n64": {"name": "Nintendo 64", "save_exts": ["srm", "sav", "eep", "mpk"],
+            "cores": [{"lib": "mupen64plus_next_libretro", "folder": "Mupen64Plus-Next"},
+                      {"lib": "parallel_n64_libretro", "folder": "ParaLLEl N64"}]},
+    "z64": {"name": "Nintendo 64", "save_exts": ["srm", "sav", "eep", "mpk"],
+            "cores": [{"lib": "mupen64plus_next_libretro", "folder": "Mupen64Plus-Next"},
+                      {"lib": "parallel_n64_libretro", "folder": "ParaLLEl N64"}]},
+    "v64": {"name": "Nintendo 64", "save_exts": ["srm", "sav", "eep", "mpk"],
+            "cores": [{"lib": "mupen64plus_next_libretro", "folder": "Mupen64Plus-Next"},
+                      {"lib": "parallel_n64_libretro", "folder": "ParaLLEl N64"}]},
+    "nds": {"name": "Nintendo DS", "save_exts": ["sav", "dsv", "srm"],
+            "cores": [{"lib": "melonds_libretro", "folder": "melonDS"},
+                      {"lib": "desmume_libretro", "folder": "DeSmuME"},
+                      {"lib": "desmume2015_libretro", "folder": "DeSmuME 2015"}]},
+    "md":  {"name": "Sega Genesis", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "smd": {"name": "Sega Genesis", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "gen": {"name": "Sega Genesis", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "sms": {"name": "Sega Master System", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"},
+                      {"lib": "picodrive_libretro", "folder": "PicoDrive"}]},
+    "gg":  {"name": "Game Gear", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "genesis_plus_gx_libretro", "folder": "Genesis Plus GX"}]},
+    "pce": {"name": "PC Engine", "save_exts": ["srm", "sav"],
+            "cores": [{"lib": "mednafen_pce_libretro", "folder": "Beetle PCE"},
+                      {"lib": "mednafen_pce_fast_libretro", "folder": "Beetle PCE Fast"}]},
+    "iso": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"},
+                      {"lib": "flycast_libretro", "folder": "Flycast"}]},
+    "bin": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"}]},
+    "cue": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"}]},
+    "chd": {"name": "Disc (CHD)", "save_exts": ["mcr", "srm", "sav"],
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"},
+                      {"lib": "flycast_libretro", "folder": "Flycast"}]},
+    "pbp": {"name": "PSP / PS1", "save_exts": ["srm", "sav", "mcr"],
+            "cores": [{"lib": "ppsspp_libretro", "folder": "PPSSPP"},
+                      {"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"}]},
+}
+
+_DEFAULT_SAVE_EXTS = ["srm", "sav", "save"]
+_DEFAULT_STATE_EXTS = ["state", "state.auto"]
+
+_ROM_EXTENSIONS = {
+    "sfc", "smc", "gb", "gbc", "gba", "nes", "fds",
+    "n64", "z64", "v64", "nds", "md", "smd", "gen",
+    "sms", "gg", "pce", "iso", "cue", "bin", "chd", "pbp",
+}
+
+
+def _prepare_console_seed_data() -> list[dict]:
+    """Convert hardcoded _IMPORT_CONSOLES and _IMPORT_SYSTEMS into seed format for Store.seed_console_defs()."""
+    result = []
+    for console_def in _IMPORT_CONSOLES:
+        entry = {
+            "key": console_def["key"],
+            "label": console_def["label"],
+            "abbr": console_def.get("abbr", console_def["key"].upper()),
+            "suggestions": console_def.get("suggestions", []),
+            "system_keys": console_def.get("system_keys", []),
+            "systems": {},
+            "folder_names": [],
+            "standalones": [],
+        }
+        for sys_key in console_def.get("system_keys", []):
+            if sys_key in _IMPORT_SYSTEMS:
+                entry["systems"][sys_key] = {
+                    "name": _IMPORT_SYSTEMS[sys_key]["name"],
+                    "save_exts": _IMPORT_SYSTEMS[sys_key]["save_exts"],
+                    "cores": [{"lib": c["lib"], "folder": c["folder"]} for c in _IMPORT_SYSTEMS[sys_key].get("cores", [])],
+                }
+        result.append(entry)
+    return result

@@ -16,7 +16,7 @@ build-gui:
 	cd gui && npm run build
 
 lint:
-	$(VENV)/bin/python -m py_compile server/config.py server/store.py server/mdns.py server/api.py server/sync_client.py emusync.py
+	$(VENV)/bin/python -m py_compile server/config.py server/store.py server/mdns.py server/api.py server/sync_client.py emusync.py cli/*.py
 	@echo "Python syntax OK"
 
 test:
