@@ -27,54 +27,65 @@ class SyncClient:
             "X-Device-ID": device_id,
             "X-Device-Name": device_name,
         }
+        # Persistent HTTP client with connection pooling (keep-alive)
+        self._client = httpx.Client(headers=self._headers)
+
+    def __del__(self) -> None:
+        """Close the HTTP client when the SyncClient is garbage collected."""
+        if hasattr(self, "_client"):
+            self._client.close()
+
+    def close(self) -> None:
+        """Explicitly close the HTTP client. Can be used with context managers."""
+        self._client.close()
 
     def _url(self, path: str) -> str:
         return f"{self._base}{path}"
 
     def health(self) -> bool:
         try:
-            r = httpx.get(self._url("/health"), timeout=5)
+            r = self._client.get(self._url("/health"), timeout=5)
             return r.status_code == 200
         except Exception:
             return False
 
     def list_devices(self) -> list[dict]:
-        r = httpx.get(self._url("/devices"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/devices"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def list_games(self) -> list[dict]:
-        r = httpx.get(self._url("/games"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/games"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def add_game(self, name: str, console: str = "") -> dict:
-        r = httpx.post(self._url("/games"), json={"name": name, "console": console}, headers=self._headers, timeout=10)
+        r = self._client.post(self._url("/games"), json={"name": name, "console": console}, timeout=10)
         r.raise_for_status()
         return r.json()
 
     def get_game(self, slug: str) -> Optional[dict]:
-        r = httpx.get(self._url(f"/games/{slug}"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/games/{slug}"), timeout=10)
         if r.status_code == 404:
             return None
         r.raise_for_status()
         return r.json()
 
     def update_game(self, slug: str, name: str) -> None:
-        r = httpx.put(self._url(f"/games/{slug}"), json={"name": name}, headers=self._headers, timeout=10)
+        r = self._client.put(self._url(f"/games/{slug}"), json={"name": name}, timeout=10)
         r.raise_for_status()
 
     def remove_game(self, slug: str) -> None:
-        r = httpx.delete(self._url(f"/games/{slug}"), headers=self._headers, timeout=10)
+        r = self._client.delete(self._url(f"/games/{slug}"), timeout=10)
         r.raise_for_status()
 
     def list_game_devices(self, slug: str) -> list[dict]:
-        r = httpx.get(self._url(f"/games/{slug}/devices"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/games/{slug}/devices"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def get_game_device(self, slug: str) -> Optional[GameDeviceConfig]:
-        r = httpx.get(self._url(f"/games/{slug}/device"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/games/{slug}/device"), timeout=10)
         if r.status_code == 404:
             return None
         r.raise_for_status()
@@ -88,24 +99,23 @@ class SyncClient:
         )
 
     def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:
-        r = httpx.put(
+        r = self._client.put(
             self._url(f"/games/{slug}/device"),
             json={"rom_path": cfg.rom_path, "save_path": cfg.save_path, "launch_command": cfg.launch_command,
                   "state_path": cfg.state_path, "rom_folder_path": cfg.rom_folder_path},
-            headers=self._headers,
             timeout=10,
         )
         r.raise_for_status()
 
     def list_my_game_devices(self) -> list[dict]:
         """Return all games configured for this device (slug, name, console, rom_path, …)."""
-        r = httpx.get(self._url("/game-devices"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/game-devices"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def get_device_consoles(self, device_id: str) -> list[dict]:
         """Return console configs for a specific device (to find its ROM folders)."""
-        r = httpx.get(self._url(f"/devices/{device_id}/consoles"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/devices/{device_id}/consoles"), timeout=10)
         r.raise_for_status()
         return r.json()
 
@@ -129,11 +139,10 @@ class SyncClient:
                     yield chunk
             print(flush=True)
 
-        r = httpx.post(
+        r = self._client.post(
             self._url(f"/games/{slug}/rom-transfer"),
             content=_stream(),
             headers={
-                **self._headers,
                 "Content-Type": "application/octet-stream",
                 "X-To-Device-ID": to_device_id,
                 "X-Destination-Path": destination_path,
@@ -146,7 +155,7 @@ class SyncClient:
 
     def list_pending_transfers(self) -> list[dict]:
         """Return transfers queued for this device that haven't been delivered yet."""
-        r = httpx.get(self._url("/rom-transfers/pending"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/rom-transfers/pending"), timeout=10)
         r.raise_for_status()
         return r.json()
 
@@ -159,10 +168,9 @@ class SyncClient:
                 f"destination_path must be a full file path, not a directory: {destination_path}"
             )
         path.parent.mkdir(parents=True, exist_ok=True)
-        with httpx.stream(
+        with self._client.stream(
             "GET",
             self._url(f"/rom-transfers/{transfer_id}/file"),
-            headers=self._headers,
             timeout=httpx.Timeout(None),
         ) as r:
             r.raise_for_status()
@@ -179,10 +187,9 @@ class SyncClient:
             print(flush=True)
 
     def complete_transfer(self, transfer_id: str, status: str = "completed") -> None:
-        r = httpx.put(
+        r = self._client.put(
             self._url(f"/rom-transfers/{transfer_id}"),
             json={"status": status},
-            headers=self._headers,
             timeout=10,
         )
         r.raise_for_status()
@@ -190,10 +197,9 @@ class SyncClient:
     def stream_events(self):
         """Generator that yields parsed SSE event dicts. Blocks until disconnected."""
         import json as _json
-        with httpx.stream(
+        with self._client.stream(
             "GET",
             self._url("/events/stream"),
-            headers=self._headers,
             timeout=httpx.Timeout(None),
         ) as r:
             r.raise_for_status()
@@ -206,7 +212,7 @@ class SyncClient:
 
     def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
         """Write server save to disk. Returns (pulled, server_hash). pulled=False if no save exists."""
-        r = httpx.get(self._url(f"/games/{slug}/save"), headers=self._headers, timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -219,10 +225,10 @@ class SyncClient:
 
     def push_save(self, slug: str, save_path: str) -> str:
         data = Path(save_path).read_bytes()
-        r = httpx.post(
+        r = self._client.post(
             self._url(f"/games/{slug}/save"),
             content=data,
-            headers={**self._headers, "Content-Type": "application/octet-stream"},
+            headers={"Content-Type": "application/octet-stream"},
             timeout=30,
         )
         r.raise_for_status()
@@ -230,7 +236,7 @@ class SyncClient:
 
     def pull_state(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
         """Write server state to disk. Returns (pulled, server_hash). pulled=False if no state exists."""
-        r = httpx.get(self._url(f"/games/{slug}/state"), headers=self._headers, timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -269,42 +275,41 @@ class SyncClient:
             data = buf.getvalue()
         else:
             data = p.read_bytes()
-        r = httpx.post(
+        r = self._client.post(
             self._url(f"/games/{slug}/state"),
             content=data,
-            headers={**self._headers, "Content-Type": "application/octet-stream"},
+            headers={"Content-Type": "application/octet-stream"},
             timeout=30,
         )
         r.raise_for_status()
         return r.json()["hash"]
 
     def acquire_lock(self, slug: str) -> None:
-        r = httpx.post(self._url(f"/games/{slug}/lock"), headers=self._headers, timeout=10)
+        r = self._client.post(self._url(f"/games/{slug}/lock"), timeout=10)
         if r.status_code == 409:
             raise ValueError(r.json().get("detail", "Game is locked by another device"))
         r.raise_for_status()
 
     def release_lock(self, slug: str) -> None:
-        r = httpx.delete(self._url(f"/games/{slug}/lock"), headers=self._headers, timeout=10)
+        r = self._client.delete(self._url(f"/games/{slug}/lock"), timeout=10)
         r.raise_for_status()
 
     def get_lock(self, slug: str) -> dict:
-        r = httpx.get(self._url(f"/games/{slug}/lock"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/games/{slug}/lock"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def list_device_games(self, device_id: str) -> list[dict]:
         """Return all games configured for a specific device."""
-        r = httpx.get(self._url(f"/devices/{device_id}/game-devices"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/devices/{device_id}/game-devices"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def create_pull_request(self, slug: str, from_device_id: str, destination_path: str) -> dict:
         """Request the source device to push a ROM to this device via the server."""
-        r = httpx.post(
+        r = self._client.post(
             self._url(f"/games/{slug}/rom-pull-request"),
             json={"from_device_id": from_device_id, "destination_path": destination_path},
-            headers=self._headers,
             timeout=10,
         )
         r.raise_for_status()
@@ -312,21 +317,20 @@ class SyncClient:
 
     def list_pending_pull_requests(self) -> list[dict]:
         """Return pull requests pending for this device to fulfill (as the source)."""
-        r = httpx.get(self._url("/rom-pull-requests/pending"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/rom-pull-requests/pending"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def complete_pull_request(self, pull_request_id: str, status: str = "fulfilled") -> None:
-        r = httpx.put(
+        r = self._client.put(
             self._url(f"/rom-pull-requests/{pull_request_id}"),
             json={"status": status},
-            headers=self._headers,
             timeout=10,
         )
         r.raise_for_status()
 
     def get_save_meta(self, slug: str) -> Optional[dict]:
-        r = httpx.get(self._url(f"/games/{slug}/save/meta"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/games/{slug}/save/meta"), timeout=10)
         if r.status_code == 204:
             return None
         r.raise_for_status()
@@ -334,24 +338,24 @@ class SyncClient:
 
     def get_console_defs(self) -> list[dict]:
         """Return all console definitions from server."""
-        r = httpx.get(self._url("/console-defs"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/console-defs"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def get_system_defs(self) -> dict:
         """Return all system definitions from server."""
-        r = httpx.get(self._url("/system-defs"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/system-defs"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def get_console_folder_names(self) -> dict:
         """Return console key → folder name patterns from server."""
-        r = httpx.get(self._url("/console-folder-names"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url("/console-folder-names"), timeout=10)
         r.raise_for_status()
         return r.json()
 
     def get_standalones(self, console_key: str) -> list[dict]:
         """Return standalone emulators for a console from server."""
-        r = httpx.get(self._url(f"/standalones/{console_key}"), headers=self._headers, timeout=10)
+        r = self._client.get(self._url(f"/standalones/{console_key}"), timeout=10)
         r.raise_for_status()
         return r.json()
