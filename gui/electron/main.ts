@@ -151,9 +151,10 @@ async function loadConsoleDefinitionsIfNeeded(): Promise<void> {
 
   try {
     const cfg = existsSync(CONFIG_PATH) ? parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, unknown> : null;
-    if (!cfg?.server_host || !cfg?.server_port) return;
+    if (!cfg?.server_port) return;
+    const host = (cfg.server_host as string) || "localhost";
 
-    const base = `http://${cfg.server_host}:${cfg.server_port}`;
+    const base = `http://${host}:${cfg.server_port}`;
     const headers = {
       "Authorization": `Bearer ${cfg.server_pin || ""}`,
       "X-Device-ID": String(cfg.device_id || "electron"),

@@ -512,6 +512,8 @@ dev mode — visible in the `make dev-gui` terminal.
 
 **Electron main process must use http.get, not fetch** — The Electron main process is Node.js, not a browser. The browser `fetch()` API doesn't work correctly in that context. Use Node.js `http.get()` (from the `http` module) with a helper wrapper that returns `Promise<{ status, body?, error? }>`. The renderer process can use normal `fetch()` — only the main process (`main.ts`) is affected.
 
+**`server_host` is empty string on server devices** — Server devices store `server_host = ""` in `emusync.toml` because they connect to themselves. Any code in `main.ts` that reads `cfg.server_host` must fall back to `"localhost"` when the value is empty: `const host = (cfg.server_host as string) || "localhost"`. Never use `!cfg.server_host` as a "not configured" guard — check `!cfg.server_port` instead.
+
 ---
 
 ## Keeping this file updated
