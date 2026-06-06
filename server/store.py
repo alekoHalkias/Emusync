@@ -28,8 +28,15 @@ class _LockedConnection:
             return self._conn.commit()
 
     def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._conn, name)
+        if callable(attr):
+            lock = self._lock
+            def _locked(*args: Any, **kwargs: Any) -> Any:
+                with lock:
+                    return attr(*args, **kwargs)
+            return _locked
         with self._lock:
-            return getattr(self._conn, name)
+            return attr
 
 # Bump whenever a new migration block is added below.
 _SCHEMA_VERSION = 6
