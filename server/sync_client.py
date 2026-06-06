@@ -143,6 +143,7 @@ class SyncClient:
             self._url(f"/games/{slug}/rom-transfer"),
             content=_stream(),
             headers={
+                **self._headers,
                 "Content-Type": "application/octet-stream",
                 "X-To-Device-ID": to_device_id,
                 "X-Destination-Path": destination_path,
@@ -228,7 +229,7 @@ class SyncClient:
         r = self._client.post(
             self._url(f"/games/{slug}/save"),
             content=data,
-            headers={"Content-Type": "application/octet-stream"},
+            headers={**self._headers, "Content-Type": "application/octet-stream"},
             timeout=30,
         )
         r.raise_for_status()
@@ -278,7 +279,7 @@ class SyncClient:
         r = self._client.post(
             self._url(f"/games/{slug}/state"),
             content=data,
-            headers={"Content-Type": "application/octet-stream"},
+            headers={**self._headers, "Content-Type": "application/octet-stream"},
             timeout=30,
         )
         r.raise_for_status()
@@ -310,6 +311,7 @@ class SyncClient:
         r = self._client.post(
             self._url(f"/games/{slug}/rom-pull-request"),
             json={"from_device_id": from_device_id, "destination_path": destination_path},
+            headers=self._headers,
             timeout=10,
         )
         r.raise_for_status()
