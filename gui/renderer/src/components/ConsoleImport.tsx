@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { addGame, setGameDevice, listGames, getGameDevice, type Game } from "../api";
+import { addGame, setGameDevice, listGames, getGameDevice, listDevices, listGameDevices, type Game, type Device } from "../api";
 
 type ConsoleOption = { key: string; label: string };
 
@@ -40,6 +40,10 @@ type Phase =
   | "done";      // finished
 
 type Props = { onClose: () => void; onImported: () => void };
+
+type ImportedEntry = { slug: string; savePath: string; statePath: string };
+type PushStatus = "pushing" | "ok" | "offline" | "error";
+type PushResult = { deviceName: string; status: PushStatus; error?: string };
 
 const STEP_LABELS = ["Console", "Emulator", "ROMs"];
 
@@ -82,6 +86,9 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   const [progress, setProgress]   = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [savedFolders, setSavedFolders] = useState<string[]>([]);
+  const [pushResults, setPushResults]   = useState<PushResult[]>([]);
+  const [pushSaves, setPushSaves]       = useState(true);
+  const [pushStates, setPushStates]     = useState(true);
 
   useEffect(() => {
     (window as any).emusync.emulator.consoles().then(setConsoles);
@@ -295,8 +302,10 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     const toImport = roms.filter(r => selected.has(r.romPath));
     setProgress({ done: 0, total: toImport.length });
     setImportErrors([]);
+    setPushResults([]);
     setPhase("importing");
     const errs: string[] = [];
+    const imported: ImportedEntry[] = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel);
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
@@ -335,11 +344,67 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           state_path: statePath,
           rom_folder_path: scanRoot || rom.romFolderPath || "",
         });
+        imported.push({ slug, savePath, statePath });
       } catch { errs.push(names[rom.romPath] ?? rom.name); }
       setProgress({ done: i + 1, total: toImport.length });
     }
     setImportErrors(errs);
     setPhase("done");
+    // Fire auto-push without blocking the done screen from rendering
+    if (imported.length > 0) autoPush(imported, consoleAbbr);
+  }
+
+  async function autoPush(entries: ImportedEntry[], consoleAbbr: string): Promise<void> {
+    try {
+      const cfg = await (window as any).emusync.config.load();
+      const myDeviceId: string = cfg?.device_id ?? "";
+      const allDevices: Device[] = await listDevices();
+      const others = allDevices.filter(d => d.id !== myDeviceId);
+      if (others.length === 0) return;
+
+      for (const device of others) {
+        setPushResults(prev => [...prev, { deviceName: device.name, status: "pushing" }]);
+        let ok = true;
+        let offline = false;
+        let errMsg = "";
+
+        for (const entry of entries) {
+          // Skip if this device already has the game
+          const peers = await listGameDevices(entry.slug);
+          if (peers.some(p => p.id === device.id)) continue;
+
+          // Push ROM
+          const romResult: { ok: boolean; targetOnline?: boolean; error?: string } =
+            await (window as any).emusync.rom.push(entry.slug, device.id, consoleAbbr);
+          if (!romResult.ok) { ok = false; errMsg = romResult.error ?? "Push failed"; break; }
+          if (romResult.targetOnline === false) offline = true;
+
+          // Push save if user opted in and save file exists
+          if (pushSaves) {
+            const saveTime = await (window as any).emusync.files.getSaveTime(entry.savePath);
+            if (saveTime) {
+              try { await (window as any).emusync.save.push(entry.slug, entry.savePath); } catch { /* non-fatal */ }
+            }
+          }
+
+          // Push state if user opted in and state folder has files
+          if (pushStates && entry.statePath) {
+            const latest = await (window as any).emusync.files.getLatestInFolder(entry.statePath);
+            if (latest) {
+              try { await (window as any).emusync.state.push(entry.slug, entry.statePath); } catch { /* non-fatal */ }
+            }
+          }
+        }
+
+        setPushResults(prev => prev.map(r =>
+          r.deviceName === device.name
+            ? { ...r, status: ok ? (offline ? "offline" : "ok") : "error", error: errMsg }
+            : r
+        ));
+      }
+    } catch {
+      // Server unreachable — silently skip auto-push
+    }
   }
 
   // Group ROMs by parent directory
@@ -621,7 +686,18 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
               ))}
             </div>
 
-            <div className="modal-actions" style={{ marginTop: 16 }}>
+            <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input type="checkbox" checked={pushSaves} onChange={e => setPushSaves(e.target.checked)} />
+                Push saves to other devices
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input type="checkbox" checked={pushStates} onChange={e => setPushStates(e.target.checked)} />
+                Push states to other devices
+              </label>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: 12 }}>
               <button className="btn btn-ghost" onClick={() => {
                 setRoms([]); setExtraPaths(savedFolders); setRomDirs([]); setRemovedDirs(new Set()); setPhase("emulator");
               }}>← Back</button>
@@ -649,7 +725,7 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
         {/* ── done ─────────────────────────────────────────────────────────── */}
         {phase === "done" && (
           <>
-            <div style={{ padding: "24px 0", textAlign: "center" }}>
+            <div style={{ padding: "24px 0 12px", textAlign: "center" }}>
               <div style={{ fontSize: 36, marginBottom: 8 }}>✓</div>
               <p style={{ fontWeight: 600 }}>
                 {progress.total - importErrors.length} of {progress.total} games imported
@@ -660,6 +736,29 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
                 </p>
               )}
             </div>
+
+            {pushResults.length > 0 && (
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginBottom: 8 }}>
+                <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 8, color: "var(--text-muted)" }}>
+                  Syncing to other devices
+                </p>
+                {pushResults.map(r => (
+                  <div key={r.deviceName} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 6 }}>
+                    {r.status === "pushing" && <span className="spinner" style={{ width: 12, height: 12, flexShrink: 0 }} />}
+                    {r.status === "ok"      && <span style={{ color: "var(--green, #4caf50)" }}>✓</span>}
+                    {r.status === "offline" && <span>📤</span>}
+                    {r.status === "error"   && <span style={{ color: "var(--red, #f44336)" }}>✗</span>}
+                    <span>
+                      {r.deviceName}
+                      {r.status === "pushing" && <span style={{ color: "var(--text-muted)" }}> — sending…</span>}
+                      {r.status === "offline" && <span style={{ color: "var(--text-muted)" }}> — queued, will sync when online</span>}
+                      {r.status === "error"   && <span style={{ color: "var(--text-muted)" }}> — {r.error}</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="modal-actions">
               <button className="btn btn-primary" onClick={() => { onImported(); onClose(); }}>
                 Done
