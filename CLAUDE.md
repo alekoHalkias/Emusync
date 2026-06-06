@@ -35,7 +35,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
 | `server/sync_client.py` | HTTP client wrapping all server endpoints (used by `emusync run`, `push`, `pull`); sends PIN + device headers for auth; `GameDeviceConfig` holds `rom_path`, `save_path`, `launch_command`, `state_path`, `rom_folder_path`; `list_my_game_devices()`, `list_device_games()`, `get_device_consoles()`, `create_rom_transfer()`, `create_pull_request()`, `list_pending_pull_requests()`, `complete_pull_request()` support the push/pull flow |
-| `gui/electron/main.ts` | IPC handlers; spawns/kills Python server; manages `serverProcess` PID file; `changePin` simplifies to restart without clearing devices |
+| `gui/electron/main.ts` | IPC handlers; spawns/kills Python server; manages `serverProcess` PID file; `changePin` simplifies to restart without clearing devices; emulator IPC handlers (`emulator:consoles`, `emulator:detect`, `emulator:scan`) lazily fetch console definitions from Python API instead of using hardcoded data |
 | `gui/electron/preload.ts` | `contextBridge` — everything in `window.emusync.*` is defined here |
 | `gui/renderer/src/api.ts` | Fetch wrapper for the Python REST API; holds `_base` URL + `_token` |
 | `gui/renderer/src/App.tsx` | Root component; screen router; auto-starts server if `is_server=true` |
