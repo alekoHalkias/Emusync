@@ -783,9 +783,34 @@ class Store:
         self._conn.commit()
 
     def get_console_defs(self) -> list[dict]:
-        """Return all console definitions."""
+        """Return all console definitions with system keys and standalones."""
         rows = self._conn.execute("SELECT key, label, abbr, suggestions FROM console_defs ORDER BY key").fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for row in rows:
+            console_key = row["key"]
+            # Get system keys (ROM extensions) for this console
+            sys_rows = self._conn.execute(
+                "SELECT DISTINCT system_extension FROM core_defs WHERE console_key = ? ORDER BY system_extension",
+                (console_key,)
+            ).fetchall()
+            system_keys = [r["system_extension"] for r in sys_rows]
+
+            # Get standalone emulators for this console
+            stand_rows = self._conn.execute(
+                "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template FROM standalone_emulators WHERE console_key = ?",
+                (console_key,)
+            ).fetchall()
+            standalones = [dict(r) for r in stand_rows]
+
+            result.append({
+                "key": console_key,
+                "label": row["label"],
+                "abbr": row["abbr"],
+                "suggestions": row["suggestions"],
+                "systemKeys": system_keys,
+                "standalones": standalones,
+            })
+        return result
 
     def get_system_defs(self) -> dict[str, dict]:
         """Return all system definitions keyed by extension."""
