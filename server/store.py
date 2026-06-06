@@ -542,8 +542,9 @@ class Store:
         return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now)
 
     def _pull_blob(self, table: str, game_slug: str) -> tuple[Optional[bytes], Optional[SaveMeta]]:
+        # _push_blob deletes-then-inserts, so a slug has at most one row.
         row = self._conn.execute(
-            f"SELECT data, game_slug, device_id, hash, pushed_at FROM {table} WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            f"SELECT data, game_slug, device_id, hash, pushed_at FROM {table} WHERE game_slug = ? LIMIT 1",
             (game_slug,),
         ).fetchone()
         if not row:
@@ -557,8 +558,9 @@ class Store:
         return bytes(row["data"]), meta
 
     def _get_blob_meta(self, table: str, game_slug: str) -> Optional[SaveMeta]:
+        # _push_blob deletes-then-inserts, so a slug has at most one row.
         row = self._conn.execute(
-            f"SELECT game_slug, device_id, hash, pushed_at FROM {table} WHERE game_slug = ? ORDER BY pushed_at DESC LIMIT 1",
+            f"SELECT game_slug, device_id, hash, pushed_at FROM {table} WHERE game_slug = ? LIMIT 1",
             (game_slug,),
         ).fetchone()
         return SaveMeta(**dict(row)) if row else None
