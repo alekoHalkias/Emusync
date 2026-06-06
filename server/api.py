@@ -629,3 +629,29 @@ def get_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
     return {"locked": True, "device_id": lock.device_id, "acquired_at": lock.acquired_at}
 
 
+# ── console definitions ───────────────────────────────────────────────────────
+
+@app.get("/console-defs")
+def get_console_defs(device_id: str = Depends(_auth)) -> list[dict]:
+    """Return all console definitions."""
+    return _get_store().get_console_defs()
+
+
+@app.get("/system-defs")
+def get_system_defs(device_id: str = Depends(_auth)) -> dict:
+    """Return all system definitions (keyed by ROM extension)."""
+    return _get_store().get_system_defs()
+
+
+@app.get("/console-folder-names")
+def get_console_folder_names(device_id: str = Depends(_auth)) -> dict:
+    """Return console key → folder name patterns."""
+    return _get_store().get_console_folder_names()
+
+
+@app.get("/standalones/{console_key}")
+def get_standalones(console_key: str, device_id: str = Depends(_auth)) -> list[dict]:
+    """Return standalone emulators for a console."""
+    return _get_store().get_standalones_for_console(console_key)
+
+

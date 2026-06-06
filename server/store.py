@@ -32,7 +32,7 @@ class _LockedConnection:
             return getattr(self._conn, name)
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 4
+_SCHEMA_VERSION = 5
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -120,6 +120,37 @@ CREATE TABLE IF NOT EXISTS rom_pull_requests (
     requested_at     TEXT NOT NULL,
     fulfilled_at     TEXT
 );
+CREATE TABLE IF NOT EXISTS console_defs (
+    key              TEXT PRIMARY KEY,
+    label            TEXT NOT NULL,
+    abbr             TEXT NOT NULL,
+    suggestions      TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS system_defs (
+    extension        TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    save_exts        TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS core_defs (
+    id               TEXT PRIMARY KEY,
+    system_extension TEXT NOT NULL REFERENCES system_defs(extension),
+    lib_name         TEXT NOT NULL,
+    folder_name      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS console_folder_names (
+    console_key      TEXT NOT NULL REFERENCES console_defs(key),
+    folder_name      TEXT NOT NULL,
+    PRIMARY KEY (console_key, folder_name)
+);
+CREATE TABLE IF NOT EXISTS standalone_emulators (
+    id               TEXT PRIMARY KEY,
+    console_key      TEXT NOT NULL REFERENCES console_defs(key),
+    label            TEXT NOT NULL,
+    native_bins      TEXT NOT NULL DEFAULT '',
+    flatpak_id       TEXT,
+    flatpak_exec     TEXT,
+    save_dir_template TEXT NOT NULL
+);
 """
 
 
@@ -181,6 +212,38 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
             status           TEXT NOT NULL DEFAULT 'pending',
             requested_at     TEXT NOT NULL,
             fulfilled_at     TEXT
+        )""")
+    if from_version < 5:
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_defs (
+            key              TEXT PRIMARY KEY,
+            label            TEXT NOT NULL,
+            abbr             TEXT NOT NULL,
+            suggestions      TEXT NOT NULL DEFAULT ''
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS system_defs (
+            extension        TEXT PRIMARY KEY,
+            name             TEXT NOT NULL,
+            save_exts        TEXT NOT NULL
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS core_defs (
+            id               TEXT PRIMARY KEY,
+            system_extension TEXT NOT NULL REFERENCES system_defs(extension),
+            lib_name         TEXT NOT NULL,
+            folder_name      TEXT NOT NULL
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_folder_names (
+            console_key      TEXT NOT NULL REFERENCES console_defs(key),
+            folder_name      TEXT NOT NULL,
+            PRIMARY KEY (console_key, folder_name)
+        )""")
+        _try(conn, """CREATE TABLE IF NOT EXISTS standalone_emulators (
+            id               TEXT PRIMARY KEY,
+            console_key      TEXT NOT NULL REFERENCES console_defs(key),
+            label            TEXT NOT NULL,
+            native_bins      TEXT NOT NULL DEFAULT '',
+            flatpak_id       TEXT,
+            flatpak_exec     TEXT,
+            save_dir_template TEXT NOT NULL
         )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
@@ -669,6 +732,95 @@ class Store:
             (status, fulfilled_at, pull_request_id),
         )
         self._conn.commit()
+
+    # ── console definitions (source of truth) ──────────────────────────────────
+
+    def seed_console_defs(self, consoles_data: list[dict]) -> None:
+        """Populate console definition tables from structured data. Idempotent."""
+        for console in consoles_data:
+            key = console["key"]
+            existing = self._conn.execute(
+                "SELECT key FROM console_defs WHERE key = ?", (key,)
+            ).fetchone()
+            if existing:
+                continue
+            self._conn.execute(
+                "INSERT INTO console_defs (key, label, abbr, suggestions) VALUES (?, ?, ?, ?)",
+                (key, console["label"], console.get("abbr", key.upper()),
+                 ";".join(console.get("suggestions", [])))
+            )
+            for sys_key in console["system_keys"]:
+                sys_info = console["systems"].get(sys_key)
+                if not sys_info:
+                    continue
+                sys_existing = self._conn.execute(
+                    "SELECT extension FROM system_defs WHERE extension = ?", (sys_key,)
+                ).fetchone()
+                if not sys_existing:
+                    self._conn.execute(
+                        "INSERT INTO system_defs (extension, name, save_exts) VALUES (?, ?, ?)",
+                        (sys_key, sys_info["name"], ";".join(sys_info["save_exts"]))
+                    )
+                    for core in sys_info.get("cores", []):
+                        self._conn.execute(
+                            "INSERT INTO core_defs (id, system_extension, lib_name, folder_name) VALUES (?, ?, ?, ?)",
+                            (f"{sys_key}-{core['lib']}", sys_key, core["lib"], core["folder"])
+                        )
+            for folder_name in console.get("folder_names", []):
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO console_folder_names (console_key, folder_name) VALUES (?, ?)",
+                    (key, folder_name)
+                )
+            for standalone in console.get("standalones", []):
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO standalone_emulators (id, console_key, label, native_bins, flatpak_id, flatpak_exec, save_dir_template) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (f"{key}-{standalone['id']}", key, standalone["label"],
+                     ";".join(standalone.get("native_bins", [])),
+                     standalone.get("flatpak_id", ""),
+                     standalone.get("flatpak_exec", ""),
+                     standalone.get("save_dir_template", ""))
+                )
+        self._conn.commit()
+
+    def get_console_defs(self) -> list[dict]:
+        """Return all console definitions."""
+        rows = self._conn.execute("SELECT key, label, abbr, suggestions FROM console_defs ORDER BY key").fetchall()
+        return [dict(r) for r in rows]
+
+    def get_system_defs(self) -> dict[str, dict]:
+        """Return all system definitions keyed by extension."""
+        rows = self._conn.execute("SELECT extension, name, save_exts FROM system_defs").fetchall()
+        result = {}
+        for row in rows:
+            ext = row["extension"]
+            cores = self._conn.execute(
+                "SELECT lib_name, folder_name FROM core_defs WHERE system_extension = ? ORDER BY lib_name",
+                (ext,)
+            ).fetchall()
+            result[ext] = {
+                "name": row["name"],
+                "save_exts": row["save_exts"].split(";"),
+                "cores": [{"lib": c["lib_name"], "folder": c["folder_name"]} for c in cores]
+            }
+        return result
+
+    def get_console_folder_names(self) -> dict[str, list[str]]:
+        """Return console key → folder name patterns."""
+        rows = self._conn.execute("SELECT console_key, folder_name FROM console_folder_names").fetchall()
+        result = {}
+        for row in rows:
+            if row["console_key"] not in result:
+                result[row["console_key"]] = []
+            result[row["console_key"]].append(row["folder_name"])
+        return result
+
+    def get_standalones_for_console(self, console_key: str) -> list[dict]:
+        """Return standalone emulator defs for a console."""
+        rows = self._conn.execute(
+            "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template FROM standalone_emulators WHERE console_key = ?",
+            (console_key,)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def upsert_console_for_game(

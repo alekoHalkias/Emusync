@@ -331,3 +331,27 @@ class SyncClient:
             return None
         r.raise_for_status()
         return r.json()
+
+    def get_console_defs(self) -> list[dict]:
+        """Return all console definitions from server."""
+        r = httpx.get(self._url("/console-defs"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_system_defs(self) -> dict:
+        """Return all system definitions from server."""
+        r = httpx.get(self._url("/system-defs"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_console_folder_names(self) -> dict:
+        """Return console key → folder name patterns from server."""
+        r = httpx.get(self._url("/console-folder-names"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_standalones(self, console_key: str) -> list[dict]:
+        """Return standalone emulators for a console from server."""
+        r = httpx.get(self._url(f"/standalones/{console_key}"), headers=self._headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
