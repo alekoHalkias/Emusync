@@ -13,6 +13,7 @@ gui/out/
 
 # Local test ROMs and saves (never commit)
 roms/
+tests/test_rom_folders/
 
 # Config
 .emusync/
@@ -20,3 +21,4 @@ roms/
 # Release artifacts
 *.zip
 *.AppImage
+~/
