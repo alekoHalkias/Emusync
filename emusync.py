@@ -207,6 +207,31 @@ def _initialize_server_interactive(cfg: cfg_module.Config) -> cfg_module.Config:
     return cfg
 
 
+def _prepare_console_seed_data() -> list[dict]:
+    """Convert hardcoded _IMPORT_CONSOLES and _IMPORT_SYSTEMS into seed format for Store.seed_console_defs()."""
+    result = []
+    for console_def in _IMPORT_CONSOLES:
+        entry = {
+            "key": console_def["key"],
+            "label": console_def["label"],
+            "abbr": console_def.get("abbr", console_def["key"].upper()),
+            "suggestions": console_def.get("suggestions", []),
+            "system_keys": console_def.get("system_keys", []),
+            "systems": {},
+            "folder_names": [],
+            "standalones": [],
+        }
+        for sys_key in console_def.get("system_keys", []):
+            if sys_key in _IMPORT_SYSTEMS:
+                entry["systems"][sys_key] = {
+                    "name": _IMPORT_SYSTEMS[sys_key]["name"],
+                    "save_exts": _IMPORT_SYSTEMS[sys_key]["save_exts"],
+                    "cores": [{"lib": c["lib"], "folder": c["folder"]} for c in _IMPORT_SYSTEMS[sys_key].get("cores", [])],
+                }
+        result.append(entry)
+    return result
+
+
 def _do_start_server() -> None:
     """Core logic to start the EmuSync server.
 
@@ -247,6 +272,8 @@ def _do_start_server() -> None:
             sys.exit(0)
 
     store = Store(cfg.data_dir)
+    seed_data = _prepare_console_seed_data()
+    store.seed_console_defs(seed_data)
     master_token = cfg.server_pin
     token_file = Path(cfg.data_dir) / ".server_token"
     pid_file = Path(cfg.data_dir) / ".server_pid"
