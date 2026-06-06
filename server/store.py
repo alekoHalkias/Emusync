@@ -32,7 +32,7 @@ class _LockedConnection:
             return getattr(self._conn, name)
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 5
+_SCHEMA_VERSION = 6
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS system_defs (
 );
 CREATE TABLE IF NOT EXISTS core_defs (
     id               TEXT PRIMARY KEY,
+    console_key      TEXT NOT NULL REFERENCES console_defs(key),
     system_extension TEXT NOT NULL REFERENCES system_defs(extension),
     lib_name         TEXT NOT NULL,
     folder_name      TEXT NOT NULL
@@ -227,6 +228,7 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
         )""")
         _try(conn, """CREATE TABLE IF NOT EXISTS core_defs (
             id               TEXT PRIMARY KEY,
+            console_key      TEXT NOT NULL REFERENCES console_defs(key),
             system_extension TEXT NOT NULL REFERENCES system_defs(extension),
             lib_name         TEXT NOT NULL,
             folder_name      TEXT NOT NULL
@@ -245,6 +247,15 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
             flatpak_exec     TEXT,
             save_dir_template TEXT NOT NULL
         )""")
+    if from_version < 6:
+        # Add console_key column to core_defs if it doesn't exist
+        try:
+            conn.execute("SELECT console_key FROM core_defs LIMIT 1")
+        except sqlite3.OperationalError:
+            # Column doesn't exist, add it
+            _try(conn, "ALTER TABLE core_defs ADD COLUMN console_key TEXT REFERENCES console_defs(key)")
+            # Clear old core_defs rows without console_key so they'll be re-seeded
+            conn.execute("DELETE FROM core_defs WHERE console_key IS NULL")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
 
@@ -763,8 +774,8 @@ class Store:
                     )
                     for core in sys_info.get("cores", []):
                         self._conn.execute(
-                            "INSERT INTO core_defs (id, system_extension, lib_name, folder_name) VALUES (?, ?, ?, ?)",
-                            (f"{sys_key}-{core['lib']}", sys_key, core["lib"], core["folder"])
+                            "INSERT INTO core_defs (id, console_key, system_extension, lib_name, folder_name) VALUES (?, ?, ?, ?, ?)",
+                            (f"{sys_key}-{core['lib']}", key, sys_key, core["lib"], core["folder"])
                         )
             for folder_name in console.get("folder_names", []):
                 self._conn.execute(
@@ -783,9 +794,43 @@ class Store:
         self._conn.commit()
 
     def get_console_defs(self) -> list[dict]:
-        """Return all console definitions."""
+        """Return all console definitions with systemKeys and standalones."""
         rows = self._conn.execute("SELECT key, label, abbr, suggestions FROM console_defs ORDER BY key").fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        for row in rows:
+            console_key = row["key"]
+            # Get system extensions (keys) for this console
+            system_rows = self._conn.execute(
+                "SELECT DISTINCT system_extension FROM core_defs WHERE console_key = ? ORDER BY system_extension",
+                (console_key,)
+            ).fetchall()
+            system_keys = [r["system_extension"] for r in system_rows]
+
+            # Get standalone emulators for this console
+            standalone_rows = self._conn.execute(
+                "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template FROM standalone_emulators WHERE console_key = ? ORDER BY label",
+                (console_key,)
+            ).fetchall()
+            standalones = []
+            for sr in standalone_rows:
+                standalones.append({
+                    "id": sr["id"],
+                    "label": sr["label"],
+                    "native_bins": sr["native_bins"].split(";") if sr["native_bins"] else [],
+                    "flatpak_id": sr["flatpak_id"],
+                    "flatpak_exec": sr["flatpak_exec"],
+                    "save_dir_template": sr["save_dir_template"],
+                })
+
+            result.append({
+                "key": console_key,
+                "label": row["label"],
+                "abbr": row["abbr"],
+                "suggestions": row["suggestions"],
+                "systemKeys": system_keys,
+                "standalones": standalones,
+            })
+        return result
 
     def get_system_defs(self) -> dict[str, dict]:
         """Return all system definitions keyed by extension."""

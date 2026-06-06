@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { spawn, execSync, spawnSync, ChildProcess } from "child_process";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync, statSync, createReadStream, renameSync } from "fs";
 import { request as httpRequest } from "http";
+import { URL } from "url";
 import { join, dirname, basename, extname } from "path";
 import { homedir, networkInterfaces } from "os";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
@@ -24,6 +25,47 @@ let mainWindow: BrowserWindow | null = null;
 let cachedConsoleDefs: Record<string, any> | null = null;
 let cachedSystemDefs: Record<string, any> | null = null;
 let cachedConsoleFolderNames: Record<string, string[]> | null = null;
+
+
+function httpGetJSON(urlStr: string, headers: Record<string, string>): Promise<{ status: number; body?: any; error?: string }> {
+  return new Promise((resolve) => {
+    try {
+      const urlObj = new URL(urlStr);
+
+      const req = httpRequest({
+        hostname: urlObj.hostname,
+        port: urlObj.port || 80,
+        path: urlObj.pathname + urlObj.search,
+        method: "GET",
+        headers,
+      }, (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          try {
+            const body = data ? JSON.parse(data) : undefined;
+            resolve({ status: res.statusCode || 500, body });
+          } catch (e) {
+            resolve({ status: res.statusCode || 500, error: data });
+          }
+        });
+      });
+
+      req.on("error", (e) => {
+        resolve({ status: 0, error: (e as Error).message });
+      });
+
+      req.setTimeout(5000, () => {
+        req.destroy();
+        resolve({ status: 0, error: "Timeout" });
+      });
+
+      req.end();
+    } catch (e) {
+      resolve({ status: 0, error: (e as Error).message });
+    }
+  });
+}
 
 
 function startSyncDaemon(): void {
@@ -105,11 +147,11 @@ function createWindow(): void {
 // ── load console definitions from Python API ──────────────────────────────────
 
 async function loadConsoleDefinitionsIfNeeded(): Promise<void> {
-  if (cachedConsoleDefs && cachedSystemDefs && cachedConsoleFolderNames) return; // Already loaded
+  if (cachedConsoleDefs && cachedSystemDefs && cachedConsoleFolderNames) return;
 
   try {
     const cfg = existsSync(CONFIG_PATH) ? parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, unknown> : null;
-    if (!cfg?.server_host || !cfg?.server_port) return; // Not configured yet
+    if (!cfg?.server_host || !cfg?.server_port) return;
 
     const base = `http://${cfg.server_host}:${cfg.server_port}`;
     const headers = {
@@ -118,32 +160,26 @@ async function loadConsoleDefinitionsIfNeeded(): Promise<void> {
       "X-Device-Name": String(cfg.device_name || "GUI"),
     };
 
-    // Fetch console, system, and folder name definitions from Python API
-    try {
-      const consoleRes = await fetch(`${base}/console-defs`, { headers });
-      if (consoleRes.ok) {
-        const defs = await consoleRes.json();
-        // Convert to a Record for quick lookup
-        cachedConsoleDefs = {};
-        for (const def of defs) {
-          cachedConsoleDefs[def.key] = def;
-        }
+    // Load console, system, and folder name definitions from Python API
+    const consoleRes = await httpGetJSON(`${base}/console-defs`, headers);
+    if (consoleRes.status === 200 && consoleRes.body) {
+      cachedConsoleDefs = {};
+      for (const def of consoleRes.body) {
+        cachedConsoleDefs[def.key] = def;
       }
+    }
 
-      const systemRes = await fetch(`${base}/system-defs`, { headers });
-      if (systemRes.ok) {
-        cachedSystemDefs = await systemRes.json();
-      }
+    const systemRes = await httpGetJSON(`${base}/system-defs`, headers);
+    if (systemRes.status === 200 && systemRes.body) {
+      cachedSystemDefs = systemRes.body;
+    }
 
-      const folderRes = await fetch(`${base}/console-folder-names`, { headers });
-      if (folderRes.ok) {
-        cachedConsoleFolderNames = await folderRes.json();
-      }
-    } catch (e) {
-      console.error("Failed to load console definitions from API:", e);
+    const folderRes = await httpGetJSON(`${base}/console-folder-names`, headers);
+    if (folderRes.status === 200 && folderRes.body) {
+      cachedConsoleFolderNames = folderRes.body;
     }
   } catch (e) {
-    console.error("Failed to prepare console definitions fetch:", e);
+    console.error("Failed to load console definitions:", e);
   }
 }
 
