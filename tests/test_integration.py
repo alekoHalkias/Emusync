@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
 import pytest
@@ -1133,3 +1135,73 @@ async def test_device_game_devices_endpoint(client):
     slugs = {g["slug"] for g in r.json()}
     assert slugs == {"doom"}
     assert "halo" not in slugs
+
+
+# ── thread safety (issue #200) ──────────────────────────────────────────────
+
+
+def test_store_concurrent_access_no_misuse():
+    """Hammering the store from many threads must not raise sqlite3 errors.
+
+    Regression for `sqlite3.InterfaceError: bad parameter or other API misuse`,
+    caused when a single connection was shared across threads: another thread's
+    execute()/commit() between an execute() and its fetch() corrupted the
+    in-flight statement. Per-thread connections eliminate the shared cursor state.
+    """
+    from server.store import GameDevice
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("dev-1", "PC")
+        store.add_game("zelda", "Zelda")
+        store.set_game_device(GameDevice("zelda", "dev-1", "/roms/z.sfc", "/saves/z.srm", "ra"))
+
+        errors: list[Exception] = []
+
+        def worker(n: int) -> None:
+            try:
+                for i in range(150):
+                    # interleave reads (execute + fetch) and writes (execute + commit)
+                    store.get_game_device("zelda", "dev-1")
+                    store.list_devices()
+                    store.push_save("zelda", "dev-1", f"save-{n}-{i}".encode())
+                    store.pull_save("zelda")
+                    store.set_game_device(
+                        GameDevice("zelda", "dev-1", "/roms/z.sfc", "/saves/z.srm", f"ra-{n}-{i}")
+                    )
+            except Exception as exc:  # noqa: BLE001 — capture for assertion
+                errors.append(exc)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(worker, range(8)))
+
+        assert not errors, f"concurrent store access raised: {errors[:3]}"
+
+
+def test_foreign_keys_enforced_on_worker_thread():
+    """Cascade deletes must work from a non-main thread.
+
+    PRAGMA foreign_keys is per-connection, so every thread's connection must set
+    it — otherwise a delete issued off the main thread would orphan child rows.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("dev-1", "PC")
+
+        result: dict = {}
+
+        def worker() -> None:
+            store.add_game("metroid", "Metroid")
+            store.push_save("metroid", "dev-1", b"data")
+            store.acquire_lock("metroid", "dev-1")
+            store.remove_game("metroid")  # cascade should drop the save + lock
+            data, _ = store.pull_save("metroid")
+            result["save_after_delete"] = data
+            result["lock_after_delete"] = store.get_lock("metroid")
+
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join()
+
+        assert result["save_after_delete"] is None
+        assert result["lock_after_delete"] is None
