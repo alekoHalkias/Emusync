@@ -10,7 +10,7 @@ from __future__ import annotations
 from server.store._base import StoreBase
 from server.store.blobs import SaveStateMixin
 from server.store.console_defs import ConsoleDefMixin
-from server.store.consoles import ConsoleMixin, upsert_console_for_game
+from server.store.consoles import ConsoleMixin, saves_path_to_states, upsert_console_for_game
 from server.store.devices import DeviceMixin
 from server.store.events import EventMixin
 from server.store.games import GameDeviceMixin, GameMixin
@@ -48,6 +48,7 @@ __all__ = [
     "Store",
     "LOCK_TTL_HOURS",
     "upsert_console_for_game",
+    "saves_path_to_states",
     "Device",
     "Game",
     "Console",

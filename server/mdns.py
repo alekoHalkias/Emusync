@@ -16,14 +16,34 @@ class ServiceEntry:
     port: int
 
 
+def _primary_lan_ip() -> str:
+    """Return this machine's primary outbound LAN IPv4.
+
+    `socket.gethostbyname(gethostname())` is unreliable: on many Linux distros
+    (Steam Deck, Arch, Debian) the hostname maps to 127.0.0.1/127.0.1.1 in
+    /etc/hosts, so it advertises a loopback address no other device can reach.
+    Opening a UDP socket toward a public IP (no packets are actually sent) lets
+    the kernel pick the interface/address it would route through. Falls back to
+    loopback only when there is genuinely no route.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        s.close()
+    return "127.0.0.1"
+
+
 def advertise(device_name: str, port: int) -> tuple[Zeroconf, ServiceInfo]:
     """Register an mDNS service. Returns (zc, info) — call zc.unregister_service(info) to stop."""
     zc = Zeroconf(ip_version=IPVersion.V4Only)
     hostname = socket.gethostname()
-    try:
-        host_ip = socket.gethostbyname(hostname)
-    except socket.gaierror:
-        host_ip = "127.0.0.1"
+    host_ip = _primary_lan_ip()
     info = ServiceInfo(
         SERVICE_TYPE,
         f"EmuSync-{device_name}.{SERVICE_TYPE}",

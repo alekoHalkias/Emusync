@@ -86,6 +86,47 @@ class GameDeviceMixin:
             for row in rows
         ]
 
+    def games_overview(self, device_id: str) -> list[dict]:
+        """Everything the game list needs for one device, in a single query.
+
+        Collapses the renderer's old per-game fan-out (getSaveMeta + getLock +
+        getGameDevice for every game) into one round-trip. Each referenced table
+        has at most one matching row per game — locks PK is game_slug, saves is
+        delete-then-insert (one row/slug), game_devices PK is (slug, device_id) —
+        so the LEFT JOINs never fan out.
+        """
+        rows = self._conn.execute(
+            """SELECT g.slug, g.name, g.console,
+                      l.device_id      AS lock_device_id,
+                      s.pushed_at      AS last_push,
+                      gd.rom_path, gd.save_path, gd.state_path,
+                      gd.launch_command, gd.rom_folder_path,
+                      (gd.game_slug IS NOT NULL) AS is_local
+               FROM games g
+               LEFT JOIN locks l        ON l.game_slug = g.slug
+               LEFT JOIN saves s        ON s.game_slug = g.slug
+               LEFT JOIN game_devices gd ON gd.game_slug = g.slug AND gd.device_id = ?
+               ORDER BY g.name""",
+            (device_id,),
+        ).fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "slug": r["slug"],
+                "name": r["name"],
+                "console": r["console"],
+                "locked": r["lock_device_id"] is not None,
+                "lock_device_id": r["lock_device_id"],
+                "last_push": r["last_push"],
+                "is_local": bool(r["is_local"]),
+                "rom_path": r["rom_path"] or "",
+                "save_path": r["save_path"] or "",
+                "state_path": r["state_path"] or "",
+                "launch_command": r["launch_command"] or "",
+                "rom_folder_path": r["rom_folder_path"] or "",
+            })
+        return result
+
     def list_game_devices_for_device(self, device_id: str) -> list[dict]:
         rows = self._conn.execute(
             """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,

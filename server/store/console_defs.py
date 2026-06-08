@@ -10,16 +10,18 @@ class ConsoleDefMixin:
     """Operates on `self._conn`; mixed into Store."""
 
     def seed_console_defs(self, consoles_data: list[dict]) -> None:
-        """Populate console definition tables from structured data. Idempotent."""
+        """Populate console definition tables from structured data.
+
+        Idempotent *and* additive: every insert is INSERT OR IGNORE, so adding a
+        new core/system/standalone to an already-seeded console in
+        cli/consoles_data.py gets picked up on the next startup without wiping the
+        DB. (The old early-out `continue` skipped existing consoles entirely, so
+        additions were silently ignored.)
+        """
         for console in consoles_data:
             key = console["key"]
-            existing = self._conn.execute(
-                "SELECT key FROM console_defs WHERE key = ?", (key,)
-            ).fetchone()
-            if existing:
-                continue
             self._conn.execute(
-                "INSERT INTO console_defs (key, label, abbr, suggestions) VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO console_defs (key, label, abbr, suggestions) VALUES (?, ?, ?, ?)",
                 (key, console["label"], console.get("abbr", key.upper()),
                  ";".join(console.get("suggestions", [])))
             )
@@ -27,19 +29,15 @@ class ConsoleDefMixin:
                 sys_info = console["systems"].get(sys_key)
                 if not sys_info:
                     continue
-                sys_existing = self._conn.execute(
-                    "SELECT extension FROM system_defs WHERE extension = ?", (sys_key,)
-                ).fetchone()
-                if not sys_existing:
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO system_defs (extension, name, save_exts) VALUES (?, ?, ?)",
+                    (sys_key, sys_info["name"], ";".join(sys_info["save_exts"]))
+                )
+                for core in sys_info.get("cores", []):
                     self._conn.execute(
-                        "INSERT INTO system_defs (extension, name, save_exts) VALUES (?, ?, ?)",
-                        (sys_key, sys_info["name"], ";".join(sys_info["save_exts"]))
+                        "INSERT OR IGNORE INTO core_defs (id, console_key, system_extension, lib_name, folder_name) VALUES (?, ?, ?, ?, ?)",
+                        (f"{sys_key}-{core['lib']}", key, sys_key, core["lib"], core["folder"])
                     )
-                    for core in sys_info.get("cores", []):
-                        self._conn.execute(
-                            "INSERT INTO core_defs (id, console_key, system_extension, lib_name, folder_name) VALUES (?, ?, ?, ?, ?)",
-                            (f"{sys_key}-{core['lib']}", key, sys_key, core["lib"], core["folder"])
-                        )
             for folder_name in console.get("folder_names", []):
                 self._conn.execute(
                     "INSERT OR IGNORE INTO console_folder_names (console_key, folder_name) VALUES (?, ?)",

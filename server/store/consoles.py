@@ -11,6 +11,20 @@ if TYPE_CHECKING:
     from server.store import Store
 
 
+def saves_path_to_states(path: str) -> str:
+    """Swap the RetroArch ``saves`` path segment for ``states``.
+
+    Only whole path components named exactly ``saves`` are replaced, so a path
+    like ``/home/saves_backup/SNES`` is left untouched. RetroArch stores these
+    paths with forward slashes, so we split on ``/``. Replaces the old blind
+    ``.replace("saves", "states")`` calls that were duplicated (and disagreed)
+    between the store and the CLI.
+    """
+    if not path:
+        return path
+    return "/".join("states" if seg == "saves" else seg for seg in path.split("/"))
+
+
 class ConsoleMixin:
     """Operates on `self._conn`; mixed into Store."""
 
@@ -74,7 +88,7 @@ def upsert_console_for_game(
         game_folder = str(Path(rom_path).parent.parent)
 
     if save_folder:
-        state_folder = save_folder.replace("saves", "states")
+        state_folder = saves_path_to_states(save_folder)
 
     existing_consoles = store.list_consoles(device_id)
     existing = next(

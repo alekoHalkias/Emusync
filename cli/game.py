@@ -6,7 +6,7 @@ import sys
 
 import click
 
-import server.config as cfg_module
+from server.store import saves_path_to_states
 from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _print_table
@@ -27,24 +27,25 @@ def game() -> None:
 @click.option("--console", "console_name", default="", help="Console name")
 def game_add(slug: str | None, name: str, rom_path: str, save_path: str, launch_command: str, console_name: str) -> None:
     """Add a game to EmuSync management."""
-    from server.store import Store, upsert_console_for_game
-
     client = _client()
-    cfg = cfg_module.load()
-    store = Store(cfg.data_dir)
 
-    result = client.add_game(name)
+    # Everything goes through the server API. Registering the game *with* its
+    # console means the server's set_game_device auto-configures the Console row
+    # (api.upsert_console_for_game) — so the CLI must not touch a local Store,
+    # which on a client device is a different database than the server's.
+    result = client.add_game(name, console_name)
     actual_slug = result["slug"]
     if slug and slug != actual_slug:
-        # Allow caller to specify a custom slug by re-registering
-        store.add_game(slug, name)
-        actual_slug = slug
+        click.echo(
+            f"Note: the server assigned slug '{actual_slug}' (custom slugs aren't supported).",
+            err=True,
+        )
 
     if rom_path or save_path or launch_command:
-        client.set_game_device(actual_slug, GameDeviceConfig(rom_path=rom_path, save_path=save_path, launch_command=launch_command))
-
-    if console_name and (rom_path or save_path):
-        upsert_console_for_game(store, cfg.device_id, console_name, rom_path, save_path, "")
+        client.set_game_device(
+            actual_slug,
+            GameDeviceConfig(rom_path=rom_path, save_path=save_path, launch_command=launch_command),
+        )
 
     click.echo(f"Added: {name} (slug: {actual_slug})")
 
@@ -78,25 +79,16 @@ def game_list() -> None:
                 save_path = device.get('save_path', '-')
                 rom_path = device.get('rom_path', '-')
 
-                # Construct and create state folder as: {parent_dir}/{game_name}/
+                # Construct state folder as: {parent_dir}/{game_name}/, inferring
+                # parent_dir from the state_path, else the save dir (saves→states).
                 state_folder = '-'
                 parent_dir = None
                 if state_path and state_path != '-':
-                    # Use configured state_path
                     parent_dir = os.path.dirname(state_path)
                 elif save_path and save_path != '-':
-                    # Infer from save_path by replacing 'saves' with 'states'
-                    save_dir = os.path.dirname(save_path)
-                    # Replace all occurrences of 'saves' with 'states' to handle nested structures
-                    parent_dir = save_dir.replace('/saves/', '/states/').replace('/saves', '/states')
-                    # Handle case where path starts with 'saves/'
-                    if parent_dir.startswith('saves/'):
-                        parent_dir = parent_dir.replace('saves/', 'states/', 1)
+                    parent_dir = saves_path_to_states(os.path.dirname(save_path))
                 elif default_save_dir:
-                    # Use the default console saves folder structure and swap saves->states
-                    parent_dir = default_save_dir.replace('/saves/', '/states/').replace('/saves', '/states')
-                    if parent_dir.startswith('saves/'):
-                        parent_dir = parent_dir.replace('saves/', 'states/', 1)
+                    parent_dir = saves_path_to_states(default_save_dir)
 
                 if parent_dir and parent_dir != '-':
                     state_folder = os.path.join(parent_dir, g['name']) + os.sep

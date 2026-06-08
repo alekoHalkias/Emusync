@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import platform
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,13 +10,19 @@ import tomlkit
 CONFIG_PATH = Path.home() / ".emusync" / "emusync.toml"
 
 
+def _hostname() -> str:
+    """Cross-platform machine name. `os.uname()` does not exist on Windows, and
+    the project ships a Windows build, so use platform.node()."""
+    return platform.node() or "emusync-device"
+
+
 @dataclass
 class Config:
     server_host: str = ""
     server_port: int = 8765
     data_dir: str = field(default_factory=lambda: str(Path.home() / ".emusync"))
     device_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    device_name: str = field(default_factory=lambda: os.uname().nodename)
+    device_name: str = field(default_factory=_hostname)
     is_server: bool = False
     server_pin: str = ""
     recent_import_folders: dict = field(default_factory=dict)
@@ -37,7 +43,7 @@ def load() -> Config:
         server_port=int(data.get("server_port", 8765)),
         data_dir=str(data.get("data_dir", str(Path.home() / ".emusync"))),
         device_id=str(data.get("device_id", str(uuid.uuid4()))),
-        device_name=str(data.get("device_name", os.uname().nodename)),
+        device_name=str(data.get("device_name", _hostname())),
         is_server=bool(data.get("is_server", False)),
         server_pin=str(data.get("server_pin", "")),
         recent_import_folders=recent_folders,
