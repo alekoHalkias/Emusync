@@ -1065,7 +1065,8 @@ ipcMain.handle("state:push", async (_event, slug: string, statePath: string): Pr
     // statePath is the state FOLDER. Pack all files inside it into a tar.gz
     // archive so that every state slot (game.state, game.state1, …) is synced.
     if (!existsSync(statePath)) return { ok: false, error: "State folder not found" };
-    const tarResult = spawnSync("tar", ["-czf", "-", "-C", statePath, "."], {
+    // Exclude .bak backups (kept by state:pull) so they don't propagate to peers.
+    const tarResult = spawnSync("tar", ["-czf", "-", "-C", statePath, "--exclude=*.bak", "."], {
       maxBuffer: 200 * 1024 * 1024,
     });
     if (tarResult.error || tarResult.status !== 0) {
@@ -1103,11 +1104,16 @@ ipcMain.handle("state:pull", async (_event, slug: string, statePath: string): Pr
       return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
     }
     const buf = Buffer.from(await res.arrayBuffer());
-    // Ensure the state folder exists and back up any existing files
+    // Ensure the state folder exists and back up any existing files. The .bak
+    // backups are RETAINED on success so an overwrite is recoverable (a state
+    // pull must not be destructive); unlink any prior .bak first so only one
+    // generation is kept and renameSync can't fail on Windows.
     mkdirSync(statePath, { recursive: true });
     const existing = readdirSync(statePath).filter(f => !f.endsWith(".bak"));
     for (const f of existing) {
-      try { renameSync(join(statePath, f), join(statePath, f + ".bak")); } catch {}
+      const bak = join(statePath, f + ".bak");
+      try { if (existsSync(bak)) unlinkSync(bak); } catch {}
+      try { renameSync(join(statePath, f), bak); } catch {}
     }
     // Extract the tar.gz archive into the state folder
     const extractResult = spawnSync("tar", ["-xzf", "-", "-C", statePath], {
@@ -1122,11 +1128,7 @@ ipcMain.handle("state:pull", async (_event, slug: string, statePath: string): Pr
       }
       return { ok: false, pulled: false, error: "Failed to extract state archive" };
     }
-    // Remove backup files on success
-    for (const f of existing) {
-      const bak = join(statePath, f + ".bak");
-      if (existsSync(bak)) try { unlinkSync(bak); } catch {}
-    }
+    // Backups are intentionally kept on success (see comment above).
     return { ok: true, pulled: true };
   } catch (e: any) {
     return { ok: false, pulled: false, error: e.message || "Pull failed" };

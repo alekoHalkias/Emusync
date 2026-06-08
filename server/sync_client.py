@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import shutil
 import tarfile
 from dataclasses import dataclass
@@ -8,6 +9,29 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
+
+
+def _extract_state_folder(content: bytes, folder: Path) -> None:
+    """Overwrite a states folder with a tar.gz archive, keeping a one-generation
+    ``.bak`` backup of every file it replaces.
+
+    State pulls must not be destructive: the previous code renamed existing files
+    to ``.bak`` and then *deleted* those backups on success, so an overwrite was
+    unrecoverable (saves, by contrast, retain a ``.bak``). Here the backups are
+    retained. ``os.replace`` overwrites any prior ``.bak`` so only one generation
+    is kept and it works on Windows (where ``Path.rename`` errors if the target
+    exists). ``.bak`` files are skipped when backing up so they don't recurse.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    for existing in list(folder.iterdir()):
+        if existing.is_file() and not existing.name.endswith(".bak"):
+            os.replace(str(existing), str(existing) + ".bak")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
+            _safe_extract_tar(tar, folder)
+    except tarfile.TarError:
+        # Legacy: server stored a raw state file; write it as <FolderName>.state.
+        (folder / f"{folder.name}.state").write_bytes(content)
 
 
 def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
@@ -256,20 +280,9 @@ class SyncClient:
         r.raise_for_status()
         p = Path(state_path)
         if p.is_dir() or not p.suffix:
-            # state_path is the states FOLDER — extract the tar.gz archive into it.
-            p.mkdir(parents=True, exist_ok=True)
-            for existing in list(p.iterdir()):
-                if existing.is_file() and not existing.name.endswith(".bak"):
-                    existing.rename(str(existing) + ".bak")
-            try:
-                with tarfile.open(fileobj=io.BytesIO(r.content), mode="r:gz") as tar:
-                    _safe_extract_tar(tar, p)
-                for bak in p.glob("*.bak"):
-                    bak.unlink(missing_ok=True)
-            except tarfile.TarError:
-                # Legacy: server stored a raw state file; write it as GameName.state
-                dest = p / f"{p.name}.state"
-                dest.write_bytes(r.content)
+            # state_path is the states FOLDER — extract the tar.gz, retaining a
+            # .bak of every file it overwrites (non-destructive).
+            _extract_state_folder(r.content, p)
         else:
             if p.exists():
                 shutil.copy2(p, p.with_suffix(p.suffix + ".bak"))
@@ -284,7 +297,8 @@ class SyncClient:
             buf = io.BytesIO()
             with tarfile.open(fileobj=buf, mode="w:gz") as tar:
                 for f in sorted(p.iterdir()):
-                    if f.is_file():
+                    # Skip .bak backups so they don't propagate to the server/peers.
+                    if f.is_file() and not f.name.endswith(".bak"):
                         tar.add(str(f), arcname=f.name)
             data = buf.getvalue()
         else:
