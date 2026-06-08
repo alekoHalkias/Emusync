@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import threading
 import uuid
+from pathlib import Path
 from typing import Optional
 
 import asyncio
@@ -13,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from .store import GameDevice, Store, upsert_console_for_game
+from .store import GameDevice, SaveMeta, Store, upsert_console_for_game
 
 app = FastAPI(title="EmuSync")
 
@@ -68,10 +70,43 @@ def init(store: Store, master_pin: str, data_dir: str = "") -> None:
     _data_dir = data_dir
     _online_devices.clear()
     _device_names.clear()
+    _sweep_stale_staging()
     if not _monitor_started:
         _monitor_started = True
         t = threading.Thread(target=_monitor_presence, daemon=True)
         t.start()
+
+
+def _staging_root() -> Optional[Path]:
+    return Path(_data_dir) / "rom_staging" if _data_dir else None
+
+
+def _remove_staging_dir(staged_file: str) -> None:
+    """Delete the per-transfer staging directory once a transfer is finished.
+
+    Each transfer stages its file under `rom_staging/{transfer_id}/{filename}`,
+    so removing the file's parent reclaims the whole transfer's disk. Guarded so
+    it only ever deletes directories directly under the staging root.
+    """
+    if not staged_file:
+        return
+    subdir = Path(staged_file).parent
+    root = _staging_root()
+    if root is not None and subdir.parent == root and subdir.exists():
+        shutil.rmtree(subdir, ignore_errors=True)
+
+
+def _sweep_stale_staging() -> None:
+    """On startup, drop staging dirs whose transfer is gone or already finished."""
+    root = _staging_root()
+    if root is None or not root.exists() or _store is None:
+        return
+    for sub in root.iterdir():
+        if not sub.is_dir():
+            continue
+        transfer = _store.get_rom_transfer(sub.name)
+        if transfer is None or transfer.status != "pending":
+            shutil.rmtree(sub, ignore_errors=True)
 
 
 def _get_store() -> Store:
@@ -177,6 +212,15 @@ def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
     return {"slug": game.slug, "name": game.name, "console": game.console}
 
 
+@app.get("/games/overview")
+def games_overview(device_id: str = Depends(_auth)) -> list[dict]:
+    """Per-device snapshot of every game (lock + last save + this device's config)
+    in one response, so the GUI doesn't fan out 3 requests per game on a timer.
+
+    Registered before /games/{slug} so "overview" isn't matched as a slug."""
+    return _get_store().games_overview(device_id)
+
+
 @app.get("/games/{slug}")
 def get_game(slug: str, device_id: str = Depends(_auth)) -> dict:
     game = _get_store().get_game(slug)
@@ -280,6 +324,7 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
             "console_name": c.console_name,
             "device_game_folder": c.device_game_folder,
             "device_save_folder": c.device_save_folder,
+            "device_state_folder": c.device_state_folder,
             "device_emulator": c.device_emulator,
         }
         for c in consoles
@@ -318,7 +363,7 @@ async def create_rom_transfer(
     transfer_subdir.mkdir(parents=True, exist_ok=True)
     staged_path = transfer_subdir / filename
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     with open(staged_path, "wb") as f:
         async for chunk in request.stream():
             await loop.run_in_executor(None, f.write, chunk)
@@ -401,6 +446,8 @@ def update_transfer(transfer_id: str, request_body: dict, device_id: str = Depen
     if status not in ("completed", "failed"):
         raise HTTPException(status_code=400, detail="status must be 'completed' or 'failed'")
     _get_store().update_transfer_status(transfer_id, status)
+    # Transfer is delivered (or dead) — reclaim its staged file.
+    _remove_staging_dir(transfer.staged_file)
     return {"ok": True}
 
 
@@ -547,8 +594,15 @@ def pull_save(slug: str, device_id: str = Depends(_auth)) -> Response:
 @app.post("/games/{slug}/save")
 async def push_save(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
     data = await request.body()
-    meta = _get_store().push_save(slug, device_id, data)
-    _get_store().log_event("save_synced", slug, device_id)
+
+    def _store_save() -> SaveMeta:
+        store = _get_store()
+        m = store.push_save(slug, device_id, data)
+        store.log_event("save_synced", slug, device_id)
+        return m
+
+    # Offload the synchronous BLOB write so a multi-MB save doesn't block the loop.
+    meta = await asyncio.to_thread(_store_save)
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
 
@@ -584,8 +638,15 @@ def pull_state(slug: str, device_id: str = Depends(_auth)) -> Response:
 @app.post("/games/{slug}/state")
 async def push_state(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
     data = await request.body()
-    meta = _get_store().push_state(slug, device_id, data)
-    _get_store().log_event("state_synced", slug, device_id)
+
+    def _store_state() -> SaveMeta:
+        store = _get_store()
+        m = store.push_state(slug, device_id, data)
+        store.log_event("state_synced", slug, device_id)
+        return m
+
+    # Offload the synchronous BLOB write so a multi-MB state archive doesn't block the loop.
+    meta = await asyncio.to_thread(_store_state)
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
 

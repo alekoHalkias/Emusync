@@ -56,6 +56,24 @@ export async function health(): Promise<boolean> {
   }
 }
 
+export type GameOverview = {
+  slug: string;
+  name: string;
+  console: string;
+  locked: boolean;
+  lock_device_id: string | null;
+  last_push: string | null;
+  is_local: boolean;
+  rom_path: string;
+  save_path: string;
+  state_path: string;
+  launch_command: string;
+  rom_folder_path: string;
+};
+
+/** One call returning lock + last save + this device's config for every game. */
+export const gamesOverview = (): Promise<GameOverview[]> => _fetch("GET", "/games/overview");
+
 export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
 export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
 export const updateGame = (slug: string, name: string): Promise<Game> =>

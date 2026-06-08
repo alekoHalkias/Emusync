@@ -5,7 +5,6 @@ import os
 
 import click
 
-import server.config as cfg_module
 from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _print_table
@@ -27,28 +26,31 @@ def console() -> None:
 @console.command("list")
 def console_list() -> None:
     """List all configured consoles with device installations."""
-    from server.store import Store
-    cfg = cfg_module.load()
-    store = Store(cfg.data_dir)
+    import sys
 
-    devices = store.list_devices()
+    # Route through the server API, not a local Store: on a client device the
+    # local DB is not the server's, so a direct Store read would show stale data.
+    client = _client()
+    if not client.health():
+        click.echo("Cannot reach EmuSync server. Is it running?", err=True)
+        sys.exit(1)
+
+    devices = client.list_devices()
     if not devices:
         click.echo("No devices configured.")
         return
 
     rows = []
     for device in devices:
-        consoles = store.list_consoles(device.id)
-        if not consoles:
-            continue
-        for console in consoles:
+        consoles = client.get_device_consoles(device["id"])
+        for c in consoles:
             rows.append([
-                console.console_name,
-                device.name,
-                console.device_emulator or '-',
-                console.device_game_folder or '-',
-                console.device_save_folder or '-',
-                console.device_state_folder or '-',
+                c["console_name"],
+                device["name"],
+                c.get("device_emulator") or '-',
+                c.get("device_game_folder") or '-',
+                c.get("device_save_folder") or '-',
+                c.get("device_state_folder") or '-',
             ])
 
     if not rows:

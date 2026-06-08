@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, configureDevice, getGameDevice, health, listGames, getLock, releaseLock } from "./api";
+import { configure, configureDevice, getGameDevice, health, gamesOverview, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
@@ -10,10 +10,13 @@ import DevicesButton from "./components/DevicesButton";
 function CopyBox({ text }: { text: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
   function copy(): void {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => { /* clipboard blocked (permissions / non-secure context) — no-op */ },
+    );
   }
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 16 }}>
@@ -127,11 +130,10 @@ export default function App(): React.ReactElement {
 
   async function releaseStaleLocks(deviceId: string): Promise<void> {
     try {
-      const games = await listGames();
-      for (const game of games) {
-        const lock = await getLock(game.slug);
-        if (lock.locked && lock.device_id === deviceId) {
-          await releaseLock(game.slug);
+      const overview = await gamesOverview();
+      for (const g of overview) {
+        if (g.locked && g.lock_device_id === deviceId) {
+          await releaseLock(g.slug);
         }
       }
     } catch { /* server offline */ }
@@ -144,20 +146,18 @@ export default function App(): React.ReactElement {
       if (await window.emusync.game.isRunning()) return; // already tracked via gameProcess
       const pidFileActive = await window.emusync.game.hasPidFile();
       try {
-        const games = await listGames();
-        for (const game of games) {
-          const lock = await getLock(game.slug);
-          if (lock.locked && lock.device_id === myDeviceId) {
-            if (pidFileActive) {
-              setGameRunning(true);
-              setGameIsExternal(true);
-              setRunningGameName(game.name);
-              setRunningGameSlug(game.slug);
-            } else {
-              await releaseLock(game.slug);
-            }
-            return;
+        const overview = await gamesOverview();
+        const mine = overview.find((g) => g.locked && g.lock_device_id === myDeviceId);
+        if (mine) {
+          if (pidFileActive) {
+            setGameRunning(true);
+            setGameIsExternal(true);
+            setRunningGameName(mine.name);
+            setRunningGameSlug(mine.slug);
+          } else {
+            await releaseLock(mine.slug);
           }
+          return;
         }
         setGameRunning(false);
         setGameIsExternal(false);

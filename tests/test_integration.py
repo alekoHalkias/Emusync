@@ -1205,3 +1205,251 @@ def test_foreign_keys_enforced_on_worker_thread():
 
         assert result["save_after_delete"] is None
         assert result["lock_after_delete"] is None
+
+
+# ── games overview batch endpoint (#202) ───────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_games_overview_batches_lock_save_and_config(client):
+    """One call returns each game's lock + last save + this device's config."""
+    await client.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=AUTH)
+    await client.post("/games", json={"name": "Zelda", "console": "GBA"}, headers=AUTH)
+    # Configure + lock + push a save for Metroid only
+    await client.put(
+        "/games/metroid/device",
+        json={"rom_path": "/roms/metroid.gba", "save_path": "/saves/metroid.srm"},
+        headers=AUTH,
+    )
+    await client.post("/games/metroid/lock", headers=AUTH)
+    await client.post("/games/metroid/save", content=b"savedata", headers=AUTH)
+
+    r = await client.get("/games/overview", headers=AUTH)
+    assert r.status_code == 200
+    overview = {g["slug"]: g for g in r.json()}
+
+    assert overview["metroid"]["locked"] is True
+    assert overview["metroid"]["lock_device_id"] == DEVICE_ID
+    assert overview["metroid"]["is_local"] is True
+    assert overview["metroid"]["rom_path"] == "/roms/metroid.gba"
+    assert overview["metroid"]["last_push"] is not None
+
+    # Zelda has no config / lock / save
+    assert overview["zelda"]["locked"] is False
+    assert overview["zelda"]["is_local"] is False
+    assert overview["zelda"]["last_push"] is None
+
+
+@pytest.mark.asyncio
+async def test_games_overview_route_not_shadowed_by_slug(client):
+    """GET /games/overview must hit the overview route, not get_game('overview')."""
+    r = await client.get("/games/overview", headers=AUTH)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+# ── mDNS primary LAN IP (#9) ───────────────────────────────────────────────────
+
+def test_primary_lan_ip_is_dotted_ipv4():
+    """mDNS must advertise a real IPv4 (never crash); see _primary_lan_ip docstring."""
+    from server.mdns import _primary_lan_ip
+    ip = _primary_lan_ip()
+    octets = ip.split(".")
+    assert len(octets) == 4 and all(o.isdigit() and 0 <= int(o) <= 255 for o in octets)
+
+
+# ── saves→states path helper (#202) ────────────────────────────────────────────
+
+def test_saves_path_to_states_only_swaps_whole_segment():
+    from server.store import saves_path_to_states
+    assert saves_path_to_states("/home/u/.config/retroarch/saves/SNES") == \
+        "/home/u/.config/retroarch/states/SNES"
+    assert saves_path_to_states("saves/GBA") == "states/GBA"
+    # "saves" inside another segment must NOT be touched
+    assert saves_path_to_states("/home/saves_backup/SNES") == "/home/saves_backup/SNES"
+    assert saves_path_to_states("") == ""
+
+
+# ── console-def seeding is additive (#202) ─────────────────────────────────────
+
+def test_seed_console_defs_picks_up_additions():
+    """Re-seeding an existing console with a new core must add it (not skip)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        base = [{
+            "key": "gba", "label": "Game Boy Advance", "abbr": "GBA",
+            "suggestions": [], "system_keys": ["gba"],
+            "systems": {"gba": {"name": "GBA", "save_exts": ["srm"],
+                                "cores": [{"lib": "mgba", "folder": "mGBA"}]}},
+            "folder_names": [], "standalones": [],
+        }]
+        store.seed_console_defs(base)
+        assert {c["lib"] for c in store.get_system_defs()["gba"]["cores"]} == {"mgba"}
+
+        # Add a second core to the same console and re-seed.
+        base[0]["systems"]["gba"]["cores"].append({"lib": "vbam", "folder": "VBA-M"})
+        store.seed_console_defs(base)
+        assert {c["lib"] for c in store.get_system_defs()["gba"]["cores"]} == {"mgba", "vbam"}
+
+
+# ── device deletion with dependents (#202) ─────────────────────────────────────
+
+def test_remove_device_with_games_and_saves():
+    """Deleting a device that has configured games / saves / locks must not raise
+    a FOREIGN KEY violation (foreign_keys is ON per connection)."""
+    from server.store import GameDevice
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("dev1", "PC")
+        store.add_game("metroid", "Metroid", "GBA")
+        store.set_game_device(
+            GameDevice(game_slug="metroid", device_id="dev1", rom_path="/x/m.gba",
+                       save_path="", launch_command="", state_path="", rom_folder_path="")
+        )
+        store.push_save("metroid", "dev1", b"savedata")
+        store.acquire_lock("metroid", "dev1")
+
+        store.remove_device("dev1")  # must not raise
+
+        assert all(d.id != "dev1" for d in store.list_devices())
+        assert store.get_lock("metroid") is None
+        assert store.get_game_device("metroid", "dev1") is None
+
+
+@pytest.mark.asyncio
+async def test_delete_device_endpoint_with_configured_game(tmp_path):
+    """DELETE /devices/{id} succeeds for a device that has a game configured."""
+    with tempfile.TemporaryDirectory() as db_dir:
+        store = Store(db_dir)
+        api_module.init(store, MASTER_PIN, str(tmp_path))
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app), base_url="http://test"
+        ) as c:
+            auth = _device_auth("dev-x", "PC")
+            await c.post("/games", json={"name": "Zelda", "console": "GBA"}, headers=auth)
+            await c.put(
+                "/games/zelda/device",
+                json={"rom_path": "/roms/zelda.gba", "save_path": "/saves/zelda.srm"},
+                headers=auth,
+            )
+            r = await c.delete("/devices/dev-x", headers=auth)
+            assert r.status_code == 200
+
+
+# ── fresh-DB schema versioning (#202) ──────────────────────────────────────────
+
+def test_fresh_db_is_stamped_at_latest_schema_version():
+    """A freshly created DB must report the latest schema version so warm starts
+    skip _migrate() entirely (regression: user_version was left at 0, causing the
+    whole migration chain to run against a just-created schema)."""
+    from server.store.schema import _SCHEMA_VERSION
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        version = store._conn.execute("PRAGMA user_version").fetchone()[0]
+        assert version == _SCHEMA_VERSION
+
+
+# ── staged-file cleanup (#202) ─────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_completed_transfer_removes_staged_file(tmp_path):
+    """Marking a transfer completed must reclaim its staging directory."""
+    rom_file = tmp_path / "game.gba"
+    rom_file.write_bytes(b"ROMDATA" * 100)
+    with tempfile.TemporaryDirectory() as db_dir:
+        store = Store(db_dir)
+        api_module.init(store, MASTER_PIN, str(tmp_path))
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app), base_url="http://test"
+        ) as c:
+            auth_src = _device_auth("dev-src", "PC")
+            auth_dst = _device_auth("dev-dst", "Deck")
+            await c.get("/games", headers=auth_src)
+            await c.get("/games", headers=auth_dst)
+            await c.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=auth_src)
+
+            r = await c.post(
+                "/games/metroid/rom-transfer",
+                content=rom_file.read_bytes(),
+                headers={
+                    **auth_src,
+                    "Content-Type": "application/octet-stream",
+                    "X-To-Device-ID": "dev-dst",
+                    "X-Destination-Path": "/home/deck/Games/GBA/Metroid.gba",
+                    "X-Filename": "Metroid.gba",
+                },
+            )
+            transfer_id = r.json()["transfer_id"]
+            staging_subdir = tmp_path / "rom_staging" / transfer_id
+            assert staging_subdir.exists()
+
+            # Receiver marks it completed → staged file is reclaimed.
+            r = await c.put(
+                f"/rom-transfers/{transfer_id}",
+                json={"status": "completed"},
+                headers=auth_dst,
+            )
+            assert r.status_code == 200
+            assert not staging_subdir.exists()
+
+
+def test_startup_sweep_removes_orphan_staging(tmp_path):
+    """init() must drop staging dirs that have no matching pending transfer."""
+    staging_root = tmp_path / "rom_staging"
+    orphan = staging_root / "ghost-transfer"
+    orphan.mkdir(parents=True)
+    (orphan / "leftover.gba").write_bytes(b"junk")
+
+    with tempfile.TemporaryDirectory() as db_dir:
+        store = Store(db_dir)
+        api_module.init(store, MASTER_PIN, str(tmp_path))
+        assert not orphan.exists()
+
+
+# ── tar extraction hardening (#202) ────────────────────────────────────────────
+
+def test_safe_extract_tar_rejects_path_traversal(tmp_path):
+    """A state archive with a ../ member must be rejected, not written outside."""
+    import io
+    import tarfile
+    from server.sync_client import _safe_extract_tar
+
+    dest = tmp_path / "states"
+    dest.mkdir()
+
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        payload = b"pwned"
+        info = tarfile.TarInfo(name="../escape.state")
+        info.size = len(payload)
+        tar.addfile(info, io.BytesIO(payload))
+    buf.seek(0)
+
+    with tarfile.open(fileobj=buf, mode="r:gz") as tar:
+        with pytest.raises(tarfile.TarError):
+            _safe_extract_tar(tar, dest)
+
+    assert not (tmp_path / "escape.state").exists()
+
+
+def test_safe_extract_tar_allows_normal_members(tmp_path):
+    """A well-formed archive extracts normally into the destination folder."""
+    import io
+    import tarfile
+    from server.sync_client import _safe_extract_tar
+
+    dest = tmp_path / "states"
+    dest.mkdir()
+
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for name, payload in (("game.state", b"slot0"), ("game.state1", b"slot1")):
+            info = tarfile.TarInfo(name=name)
+            info.size = len(payload)
+            tar.addfile(info, io.BytesIO(payload))
+    buf.seek(0)
+
+    with tarfile.open(fileobj=buf, mode="r:gz") as tar:
+        _safe_extract_tar(tar, dest)
+
+    assert (dest / "game.state").read_bytes() == b"slot0"
+    assert (dest / "game.state1").read_bytes() == b"slot1"

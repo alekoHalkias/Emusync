@@ -10,6 +10,24 @@ from typing import Optional
 import httpx
 
 
+def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
+    """Extract a tar archive, refusing any member that resolves outside *dest*.
+
+    Guards against malicious archives using ``../`` paths, absolute paths, or
+    symlink/hardlink targets that would write outside the destination folder.
+    (``TarFile.extractall``'s ``filter="data"`` argument only exists on Python
+    3.12+, and this project supports 3.10+.)
+    """
+    dest_root = dest.resolve()
+    for member in tar.getmembers():
+        if member.islnk() or member.issym():
+            raise tarfile.TarError(f"refusing link member in archive: {member.name}")
+        target = (dest_root / member.name).resolve()
+        if target != dest_root and dest_root not in target.parents:
+            raise tarfile.TarError(f"refusing member outside destination: {member.name}")
+    tar.extractall(path=str(dest))
+
+
 @dataclass
 class GameDeviceConfig:
     rom_path: str = ""
@@ -245,7 +263,7 @@ class SyncClient:
                     existing.rename(str(existing) + ".bak")
             try:
                 with tarfile.open(fileobj=io.BytesIO(r.content), mode="r:gz") as tar:
-                    tar.extractall(path=str(p))
+                    _safe_extract_tar(tar, p)
                 for bak in p.glob("*.bak"):
                     bak.unlink(missing_ok=True)
             except tarfile.TarError:

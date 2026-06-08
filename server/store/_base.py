@@ -27,6 +27,10 @@ class StoreBase:
                 statement = statement.strip()
                 if statement:
                     self._conn.execute(statement)
+            # _SCHEMA already reflects the latest version, so stamp it and skip
+            # _migrate() — otherwise a fresh DB (user_version defaults to 0) would
+            # re-run the whole migration chain against the schema it just created.
+            self._conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
             self._conn.commit()
         db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
         if db_version < _SCHEMA_VERSION:

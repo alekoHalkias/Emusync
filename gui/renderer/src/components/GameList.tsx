@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { listGames, removeGame, getSaveMeta, getLock, getGameDevice, listGameDevices, getDeviceGameDevices, getDeviceConsoles, createPullRequest, type Game, type Device } from "../api";
+import { gamesOverview, removeGame, listGameDevices, getDeviceGameDevices, getDeviceConsoles, createPullRequest, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import { useDevices } from "../DeviceContext";
 
@@ -123,23 +123,23 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     const thisId = ++loadIdRef.current;
     if (!silent) setLoading(true);
     try {
-      const raw = await listGames();
+      // One batched request replaces the old per-game fan-out (save meta + lock +
+      // device config). getSaveTime stays — it's a local fs stat, not a server call.
+      const overview = await gamesOverview();
       const enriched = await Promise.all(
-        raw.map(async (g): Promise<GameRow> => {
-          const [meta, lock, config] = await Promise.allSettled([getSaveMeta(g.slug), getLock(g.slug), getGameDevice(g.slug)]);
-          // A game is local if this device has ANY config row for it (save path, rom path, etc.).
-          // Requiring rom_path would incorrectly hide games added with only a save path.
-          const isLocal = config.status === "fulfilled";
+        overview.map(async (g): Promise<GameRow> => {
           let lastSave: string | null = null;
-          if (config.status === "fulfilled" && config.value?.save_path) {
-            lastSave = await (window as any).emusync.files.getSaveTime(config.value.save_path);
+          if (g.is_local && g.save_path) {
+            lastSave = await (window as any).emusync.files.getSaveTime(g.save_path);
           }
           return {
-            ...g,
-            lastPush: meta.status === "fulfilled" && meta.value ? meta.value.pushed_at.slice(0, 19) : undefined,
+            slug: g.slug,
+            name: g.name,
+            console: g.console,
+            lastPush: g.last_push ? g.last_push.slice(0, 19) : undefined,
             lastSave,
-            locked: lock.status === "fulfilled" ? lock.value.locked : false,
-            isLocal,
+            locked: g.locked,
+            isLocal: g.is_local,
           };
         })
       );
