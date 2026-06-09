@@ -6,6 +6,7 @@ These cover the pure decision logic and the on-disk helpers — no server needed
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,6 +20,7 @@ from cli.run import (
     _load_cached_game_device,
     _log_offline_play,
     _parse_iso,
+    _reconcile_save,
 )
 from server.sync_client import GameDeviceConfig
 
@@ -95,6 +97,78 @@ def test_game_device_cache_round_trip(tmp_path):
 
 
 # ── offline play log ────────────────────────────────────────────────────────────
+
+# ── conflict warning + log (#5) ─────────────────────────────────────────────────
+
+class _FakeClient:
+    """Minimal stand-in for SyncClient — records which sync action ran.
+    (Not a DB mock; the project's no-mocks rule is about SQLite.)"""
+
+    def __init__(self, meta, server_hash="server-hash"):
+        self._meta = meta
+        self._server_hash = server_hash
+        self.pushed = False
+        self.pulled = False
+
+    def get_save_meta(self, slug):
+        return self._meta
+
+    def push_save(self, slug, path):
+        self.pushed = True
+        return "local-hash"
+
+    def pull_save(self, slug, path):
+        self.pulled = True
+        return True, self._server_hash
+
+
+def _write_save(path: Path, data: bytes, mtime: datetime) -> None:
+    path.write_bytes(data)
+    os.utime(path, (mtime.timestamp(), mtime.timestamp()))
+
+
+def test_reconcile_local_newer_conflict_pushes_warns_and_logs(tmp_path):
+    save = tmp_path / "s.srm"
+    _write_save(save, b"LOCAL-NEW", NOW)  # local edited "now"
+    server_meta = {"hash": "server-old", "pushed_at": EARLIER.isoformat()}
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    client = _FakeClient(server_meta)
+
+    _reconcile_save(client, cfg, "metroid", str(save))
+
+    assert client.pushed and not client.pulled
+    conflicts = json.loads((tmp_path / "save_conflicts.json").read_text())
+    assert len(conflicts) == 1
+    assert conflicts[0]["winner"] == "local"
+    assert conflicts[0]["server_hash"] == "server-old"
+
+
+def test_reconcile_server_newer_conflict_pulls_warns_and_logs(tmp_path):
+    save = tmp_path / "s.srm"
+    _write_save(save, b"LOCAL-OLD", EARLIER)
+    server_meta = {"hash": "server-new", "pushed_at": NOW.isoformat()}
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    client = _FakeClient(server_meta)
+
+    _reconcile_save(client, cfg, "zelda", str(save))
+
+    assert client.pulled and not client.pushed
+    conflicts = json.loads((tmp_path / "save_conflicts.json").read_text())
+    assert conflicts[0]["winner"] == "server"
+
+
+def test_reconcile_no_conflict_logged_when_not_diverged(tmp_path):
+    # Server has no save → push, but this is not a divergence, so no conflict log.
+    save = tmp_path / "s.srm"
+    _write_save(save, b"DATA", NOW)
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    client = _FakeClient(None)
+
+    _reconcile_save(client, cfg, "g", str(save))
+
+    assert client.pushed
+    assert not (tmp_path / "save_conflicts.json").exists()
+
 
 def test_offline_play_log_appends_and_records_save(tmp_path):
     cfg = SimpleNamespace(data_dir=str(tmp_path))

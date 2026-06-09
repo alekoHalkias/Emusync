@@ -72,11 +72,63 @@ def _decide_save_action(
     return "pull"
 
 
-def _reconcile_save(client, game_slug: str, save_path: str) -> Optional[str]:
+def _notify(title: str, msg: str) -> None:
+    """Best-effort, non-blocking desktop notification (so a Steam launch, which
+    shows no terminal, still surfaces a conflict). Silently no-ops if unavailable."""
+    try:
+        subprocess.Popen(
+            ["notify-send", "--app-name=EmuSync", "--urgency=critical", title, msg],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def _log_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
+    """Append a record of an auto-resolved save divergence to save_conflicts.json."""
+    entry = {
+        "slug": game_slug,
+        "resolved_at": datetime.now(timezone.utc).isoformat(),
+        "winner": winner,  # "local" or "server"
+        "local_hash": local_hash,
+        "server_hash": server_meta.get("hash") if server_meta else None,
+        "server_pushed_at": server_meta.get("pushed_at") if server_meta else None,
+    }
+    path = Path(cfg.data_dir) / "save_conflicts.json"
+    try:
+        existing = json.loads(path.read_text()) if path.exists() else []
+        if not isinstance(existing, list):
+            existing = []
+    except Exception:
+        existing = []
+    existing.append(entry)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(existing, indent=2))
+    except Exception:
+        pass
+
+
+def _warn_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
+    """Surface an auto-resolved divergence: stderr + desktop notification + log."""
+    if winner == "local":
+        detail = ("this device's save is newer, so it was kept and pushed; the server's "
+                  "older copy was replaced (its hash is recorded in save_conflicts.json)")
+    else:
+        detail = ("the server's save is newer, so it was pulled; this device's previous "
+                  "save was backed up to a .bak file next to it")
+    msg = (f"Save conflict for '{game_slug}': both copies changed since the last sync — {detail}.")
+    click.echo(f"⚠ {msg}", err=True)
+    _log_save_conflict(cfg, game_slug, winner, local_hash, server_meta)
+    _notify("EmuSync — save conflict resolved", msg)
+
+
+def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str]:
     """Reconcile the local save with the server's before launch.
 
     Returns the hash now authoritative on the server, for the post-game
-    push-if-changed comparison.
+    push-if-changed comparison. When both copies diverged (a true conflict) the
+    auto-resolution is surfaced loudly via _warn_save_conflict.
     """
     p = Path(save_path)
     try:
@@ -90,14 +142,22 @@ def _reconcile_save(client, game_slug: str, save_path: str) -> Optional[str]:
         local_hash = hashlib.sha256(p.read_bytes()).hexdigest()
         local_mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
 
+    # A true divergence = both sides have a save and they differ.
+    diverged = local_hash is not None and meta is not None and local_hash != meta.get("hash")
+
     action = _decide_save_action(local_hash, local_mtime, meta)
     if action == "push":
         client.push_save(game_slug, save_path)
-        click.echo(f"Local save is newer — pushed {game_slug} to server.")
+        if diverged:
+            _warn_save_conflict(cfg, game_slug, "local", local_hash, meta)
+        else:
+            click.echo(f"Local save is newer — pushed {game_slug} to server.")
         return local_hash
     if action == "pull":
         pulled, server_hash = client.pull_save(game_slug, save_path)
-        if pulled:
+        if diverged:
+            _warn_save_conflict(cfg, game_slug, "server", local_hash, meta)
+        elif pulled:
             click.echo(f"Pulled save for {game_slug}.")
         return server_hash
     return meta.get("hash") if meta else local_hash
@@ -284,7 +344,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # Reconcile the save before launch: push if the local save is newer than
         # the server's, pull if the server's is newer (newest wins; loser kept
         # as .bak). server_hash = what's authoritative on the server afterwards.
-        server_hash = _reconcile_save(client, game_slug, save_path)
+        server_hash = _reconcile_save(client, cfg, game_slug, save_path)
 
         # Pull state if configured
         state_path = gd.state_path
