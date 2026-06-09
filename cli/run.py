@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -226,20 +227,44 @@ def _launch_and_wait(command: tuple[str, ...], game_pid_file: Path) -> int:
     return code
 
 
-def _run_offline(cfg, game_slug: str, command: tuple[str, ...], game_pid_file: Path) -> None:
+def _run_offline(cfg, game_slug: str, game_pid_file: Path, command: tuple[str, ...] = ()) -> None:
     """Server unreachable: launch the game anyway and record the play window so a
-    newer offline save can win the next time the device is online."""
+    newer offline save can win the next time the device is online.
+
+    Offline, "imported" means a config was cached on a previous online launch — so
+    a game never played online (and thus unknown to EmuSync here) is refused, just
+    like the online path. The launch command comes from the cached config, unless
+    an explicit `command` is passed (the old-method fallback), which then wins.
+    """
+    cached = _load_cached_game_device(cfg, game_slug)
+    if not cached or not cached.save_path:
+        click.echo(
+            f"EmuSync server unreachable and '{game_slug}' has no cached config "
+            f"(it hasn't been imported / played online here), so it won't be launched.",
+            err=True,
+        )
+        sys.exit(1)
+    if command:
+        launch_argv = command
+    elif cached.launch_command:
+        launch_argv = tuple(shlex.split(cached.launch_command))
+    else:
+        click.echo(
+            f"EmuSync server unreachable and no cached launch command for '{game_slug}'. "
+            f"Launch it once while online first so the command can be cached.",
+            err=True,
+        )
+        sys.exit(1)
     click.echo(
         "EmuSync server unreachable — launching offline. Your save will sync on the next online launch.",
         err=True,
     )
-    cached = _load_cached_game_device(cfg, game_slug)
-    save_path = cached.save_path if cached else ""
+    save_path = cached.save_path
     started_at = datetime.now(timezone.utc).isoformat()
     game_pid_file.write_text(str(os.getpid()))
     exit_code = 0
     try:
-        exit_code = _launch_and_wait(command, game_pid_file)
+        exit_code = _launch_and_wait(launch_argv, game_pid_file)
     except Exception as exc:
         click.echo(f"Emulator error: {exc}", err=True)
         game_pid_file.unlink(missing_ok=True)
@@ -267,10 +292,25 @@ def _find_save_or_state_file(configured_path: str) -> str | None:
 
 
 @cli.command("run")
-@click.option("--game", "game_slug", required=True, help="Game slug (from 'emusync game list')")
-@click.argument("command", nargs=-1, required=True)
+@click.argument("game_slug")
+@click.argument("command", nargs=-1)
 def run_game(game_slug: str, command: tuple[str, ...]) -> None:
-    """Pull save, launch emulator, push save. Use as a Steam launch wrapper."""
+    """Reconcile save, launch the emulator, push save.
+
+    GAME_SLUG is the game's slug (from 'emusync game list'). Normally that's all
+    you need — the emulator command is taken from the game's saved launch_command:
+
+        emusync run zelda
+
+    As a fallback for the old method, you may pass an explicit command (e.g. from
+    a Steam shortcut that wraps RetroArch's own launcher via '%command%'):
+
+        emusync run zelda -- retroarch -L mgba.so /roms/zelda.gba
+
+    EmuSync then links that launch to the imported game and still syncs the save —
+    but only if the game has been imported. If it hasn't, EmuSync refuses to launch
+    it (it can't sync a game it doesn't know about).
+    """
     cfg = cfg_module.load()
     client = _client(cfg)
     game_pid_file = Path(cfg.data_dir) / ".game_pid"
@@ -278,19 +318,47 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     # Server unreachable → launch offline and record the play window instead of
     # bailing out, so the game is still playable away from the LAN (issue #5).
     if not client.health():
-        _run_offline(cfg, game_slug, command, game_pid_file)
+        _run_offline(cfg, game_slug, game_pid_file, command)
         return  # _run_offline exits
 
     gd = client.get_game_device(game_slug)
+
+    # A game is "imported" on this device when it has a save path configured (so
+    # EmuSync knows what to sync). Both launch modes require this.
     if not gd or not gd.save_path:
-        click.echo(
-            f"No save path configured for '{game_slug}'. "
-            f"Run 'emusync game edit {game_slug} --save <path>' first.",
-            err=True,
-        )
+        if command:
+            # Fallback path: an external launcher tried to run a game EmuSync
+            # doesn't know about — refuse, since we can't sync its save.
+            click.echo(
+                f"'{game_slug}' is not imported into EmuSync, so it won't be launched. "
+                f"Import it first (Add Console / 'emusync console import').",
+                err=True,
+            )
+        else:
+            click.echo(
+                f"No save path configured for '{game_slug}'. "
+                f"Run 'emusync game edit {game_slug} --save <path>' first.",
+                err=True,
+            )
         sys.exit(1)
 
-    # Cache the config so a future offline launch knows the save/state paths.
+    if command:
+        # Fallback (old method): honor the externally supplied command — e.g.
+        # RetroArch's own launch file via a Steam '%command%' wrapper — while still
+        # wrapping it in the EmuSync sync/lock flow.
+        launch_argv = command
+    else:
+        if not gd.launch_command:
+            click.echo(
+                f"No launch command configured for '{game_slug}'. "
+                f"Re-import the console or set it with 'emusync game edit'.",
+                err=True,
+            )
+            sys.exit(1)
+        # The emulator invocation lives in the game config — parse it into argv.
+        launch_argv = tuple(shlex.split(gd.launch_command))
+
+    # Cache the config so a future offline launch knows the paths + command.
     _cache_game_device(cfg, game_slug, gd)
 
     save_path = gd.save_path
@@ -355,7 +423,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 click.echo(f"Pulled state for {game_slug}.")
 
         try:
-            exit_code = _launch_and_wait(command, game_pid_file)
+            exit_code = _launch_and_wait(launch_argv, game_pid_file)
         except Exception as exc:
             click.echo(f"Emulator error: {exc}", err=True)
             _release()

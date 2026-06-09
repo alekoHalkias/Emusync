@@ -22,7 +22,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 2. Python writes `~/.emusync/.server_pid` and `~/.emusync/.server_token` on start
 3. Renderer calls Python REST API directly (`http://localhost:8765`) via `api.ts`
 4. Electron IPC (`preload.ts` → `main.ts`) handles config I/O, server lifecycle, file dialogs, game launch
-5. `emusync run` wraps emulator launch: reconcile save (push if local is newer than the server, else pull) → launch → push save → release lock. A true divergence (both copies changed) is auto-resolved newest-wins and surfaced via stderr + a `notify-send` desktop notification + an entry in `save_conflicts.json`. If the server is unreachable it launches **offline** (no lock/sync) and appends the play window to `offline_plays.json` so a newer offline save wins the next online launch (issue #5)
+5. `emusync run <slug>` wraps emulator launch — it takes the game slug and derives the emulator command from the game's stored `launch_command`: reconcile save (push if local is newer than the server, else pull) → launch → push save → release lock. As a fallback for the old method, an explicit command may still be passed (`emusync run <slug> -- retroarch …`, e.g. a Steam `%command%` wrapper around RetroArch's own launcher); that command is honored **only if the game is imported** on this device (has a `save_path`), so EmuSync can sync it — otherwise the launch is refused. A true divergence (both copies changed) is auto-resolved newest-wins and surfaced via stderr + a `notify-send` desktop notification + an entry in `save_conflicts.json`. If the server is unreachable it launches **offline** (no lock/sync) and appends the play window to `offline_plays.json` so a newer offline save wins the next online launch (issue #5)
 
 ---
 
@@ -139,7 +139,7 @@ window.emusync.device.probe(ip, port)      // TCP probe: resolves true if ip:por
 
 window.emusync.launcher.path()             // absolute path to emusync launcher binary
 
-window.emusync.game.launch(slug, command)  // spawns emusync run
+window.emusync.game.launch(slug)           // spawns `emusync run <slug>` (emulator command derived server-side from the game config)
 window.emusync.game.stop()                 // SIGKILL game process group (in-app launches)
 window.emusync.game.stopExternal()         // kill emulator + emusync via .game_pid file (Steam launches)
 window.emusync.game.hasPidFile()           // true if .game_pid exists, process is alive, and cmdline contains emusync/python
