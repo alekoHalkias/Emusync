@@ -6,11 +6,14 @@ handler is registered at import time so it is active for the running process.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import signal
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import click
 
@@ -31,6 +34,220 @@ def _sigterm_handler(*_) -> None:
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)
+
+
+def _parse_iso(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO-8601 timestamp to an aware UTC datetime, or None."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def _decide_save_action(
+    local_hash: Optional[str],
+    local_mtime: Optional[datetime],
+    server_meta: Optional[dict],
+) -> str:
+    """Pre-launch save reconciliation policy — returns 'push' | 'pull' | 'noop'.
+
+    `local_hash` is None when there is no local save; `server_meta` is the
+    `get_save_meta` dict ({hash, pushed_at}) or None. On a true divergence
+    (both sides changed) the newer timestamp wins — the loser is preserved as a
+    `.bak` by pull_save's caller — so a newer local save is never clobbered by an
+    older server one (issue #5).
+    """
+    if local_hash is None:
+        return "pull" if server_meta else "noop"
+    if not server_meta:
+        return "push"  # server has no save — local is authoritative
+    if local_hash == server_meta.get("hash"):
+        return "noop"  # identical content
+    server_time = _parse_iso(server_meta.get("pushed_at"))
+    if server_time is None or (local_mtime is not None and local_mtime > server_time):
+        return "push"
+    return "pull"
+
+
+def _notify(title: str, msg: str) -> None:
+    """Best-effort, non-blocking desktop notification (so a Steam launch, which
+    shows no terminal, still surfaces a conflict). Silently no-ops if unavailable."""
+    try:
+        subprocess.Popen(
+            ["notify-send", "--app-name=EmuSync", "--urgency=critical", title, msg],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def _log_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
+    """Append a record of an auto-resolved save divergence to save_conflicts.json."""
+    entry = {
+        "slug": game_slug,
+        "resolved_at": datetime.now(timezone.utc).isoformat(),
+        "winner": winner,  # "local" or "server"
+        "local_hash": local_hash,
+        "server_hash": server_meta.get("hash") if server_meta else None,
+        "server_pushed_at": server_meta.get("pushed_at") if server_meta else None,
+    }
+    path = Path(cfg.data_dir) / "save_conflicts.json"
+    try:
+        existing = json.loads(path.read_text()) if path.exists() else []
+        if not isinstance(existing, list):
+            existing = []
+    except Exception:
+        existing = []
+    existing.append(entry)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(existing, indent=2))
+    except Exception:
+        pass
+
+
+def _warn_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
+    """Surface an auto-resolved divergence: stderr + desktop notification + log."""
+    if winner == "local":
+        detail = ("this device's save is newer, so it was kept and pushed; the server's "
+                  "older copy was replaced (its hash is recorded in save_conflicts.json)")
+    else:
+        detail = ("the server's save is newer, so it was pulled; this device's previous "
+                  "save was backed up to a .bak file next to it")
+    msg = (f"Save conflict for '{game_slug}': both copies changed since the last sync — {detail}.")
+    click.echo(f"⚠ {msg}", err=True)
+    _log_save_conflict(cfg, game_slug, winner, local_hash, server_meta)
+    _notify("EmuSync — save conflict resolved", msg)
+
+
+def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str]:
+    """Reconcile the local save with the server's before launch.
+
+    Returns the hash now authoritative on the server, for the post-game
+    push-if-changed comparison. When both copies diverged (a true conflict) the
+    auto-resolution is surfaced loudly via _warn_save_conflict.
+    """
+    p = Path(save_path)
+    try:
+        meta = client.get_save_meta(game_slug)
+    except Exception:
+        meta = None
+
+    local_hash: Optional[str] = None
+    local_mtime: Optional[datetime] = None
+    if p.exists():
+        local_hash = hashlib.sha256(p.read_bytes()).hexdigest()
+        local_mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
+
+    # A true divergence = both sides have a save and they differ.
+    diverged = local_hash is not None and meta is not None and local_hash != meta.get("hash")
+
+    action = _decide_save_action(local_hash, local_mtime, meta)
+    if action == "push":
+        client.push_save(game_slug, save_path)
+        if diverged:
+            _warn_save_conflict(cfg, game_slug, "local", local_hash, meta)
+        else:
+            click.echo(f"Local save is newer — pushed {game_slug} to server.")
+        return local_hash
+    if action == "pull":
+        pulled, server_hash = client.pull_save(game_slug, save_path)
+        if diverged:
+            _warn_save_conflict(cfg, game_slug, "server", local_hash, meta)
+        elif pulled:
+            click.echo(f"Pulled save for {game_slug}.")
+        return server_hash
+    return meta.get("hash") if meta else local_hash
+
+
+def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig) -> None:
+    """Persist this device's game config so an offline launch knows the paths
+    (the authoritative config lives on the server)."""
+    try:
+        path = Path(cfg.data_dir) / "game_cache" / f"{game_slug}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "rom_path": gd.rom_path,
+            "save_path": gd.save_path,
+            "launch_command": gd.launch_command,
+            "state_path": gd.state_path,
+            "rom_folder_path": gd.rom_folder_path,
+        }))
+    except Exception:
+        pass
+
+
+def _load_cached_game_device(cfg, game_slug: str) -> Optional[GameDeviceConfig]:
+    try:
+        path = Path(cfg.data_dir) / "game_cache" / f"{game_slug}.json"
+        if path.exists():
+            return GameDeviceConfig(**json.loads(path.read_text()))
+    except Exception:
+        pass
+    return None
+
+
+def _log_offline_play(cfg, game_slug: str, started_at: str, ended_at: str, save_path: str) -> None:
+    """Append a record of an offline play to ~/.emusync/offline_plays.json so a
+    later online sync has a timestamped trail for conflict resolution (issue #5)."""
+    entry = {"slug": game_slug, "started_at": started_at, "ended_at": ended_at, "offline": True}
+    try:
+        sp = Path(save_path) if save_path else None
+        if sp and sp.exists():
+            entry["save_mtime"] = datetime.fromtimestamp(sp.stat().st_mtime, tz=timezone.utc).isoformat()
+            entry["save_hash"] = hashlib.sha256(sp.read_bytes()).hexdigest()
+    except Exception:
+        pass
+    log_path = Path(cfg.data_dir) / "offline_plays.json"
+    try:
+        existing = json.loads(log_path.read_text()) if log_path.exists() else []
+        if not isinstance(existing, list):
+            existing = []
+    except Exception:
+        existing = []
+    existing.append(entry)
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(json.dumps(existing, indent=2))
+    except Exception:
+        pass
+
+
+def _launch_and_wait(command: tuple[str, ...], game_pid_file: Path) -> int:
+    """Spawn the emulator, record its PID, and block until it exits."""
+    global _child_proc
+    _child_proc = subprocess.Popen(list(command))
+    game_pid_file.write_text(f"{os.getpid()}\n{_child_proc.pid}")
+    code = _child_proc.wait()
+    _child_proc = None
+    return code
+
+
+def _run_offline(cfg, game_slug: str, command: tuple[str, ...], game_pid_file: Path) -> None:
+    """Server unreachable: launch the game anyway and record the play window so a
+    newer offline save can win the next time the device is online."""
+    click.echo(
+        "EmuSync server unreachable — launching offline. Your save will sync on the next online launch.",
+        err=True,
+    )
+    cached = _load_cached_game_device(cfg, game_slug)
+    save_path = cached.save_path if cached else ""
+    started_at = datetime.now(timezone.utc).isoformat()
+    game_pid_file.write_text(str(os.getpid()))
+    exit_code = 0
+    try:
+        exit_code = _launch_and_wait(command, game_pid_file)
+    except Exception as exc:
+        click.echo(f"Emulator error: {exc}", err=True)
+        game_pid_file.unlink(missing_ok=True)
+        sys.exit(1)
+    ended_at = datetime.now(timezone.utc).isoformat()
+    _log_offline_play(cfg, game_slug, started_at, ended_at, save_path)
+    game_pid_file.unlink(missing_ok=True)
+    sys.exit(exit_code)
 
 
 def _find_save_or_state_file(configured_path: str) -> str | None:
@@ -56,13 +273,13 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     """Pull save, launch emulator, push save. Use as a Steam launch wrapper."""
     cfg = cfg_module.load()
     client = _client(cfg)
+    game_pid_file = Path(cfg.data_dir) / ".game_pid"
 
+    # Server unreachable → launch offline and record the play window instead of
+    # bailing out, so the game is still playable away from the LAN (issue #5).
     if not client.health():
-        click.echo(
-            "Cannot reach EmuSync server. Is it running on your gaming PC?",
-            err=True,
-        )
-        sys.exit(1)
+        _run_offline(cfg, game_slug, command, game_pid_file)
+        return  # _run_offline exits
 
     gd = client.get_game_device(game_slug)
     if not gd or not gd.save_path:
@@ -73,8 +290,10 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         )
         sys.exit(1)
 
+    # Cache the config so a future offline launch knows the save/state paths.
+    _cache_game_device(cfg, game_slug, gd)
+
     save_path = gd.save_path
-    game_pid_file = Path(cfg.data_dir) / ".game_pid"
 
     # Block duplicate launches before attempting to acquire the lock
     try:
@@ -122,9 +341,10 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     exit_code = 0
     game_pid_file.write_text(str(os.getpid()))
     try:
-        pulled, server_hash = client.pull_save(game_slug, save_path)
-        if pulled:
-            click.echo(f"Pulled save for {game_slug}.")
+        # Reconcile the save before launch: push if the local save is newer than
+        # the server's, pull if the server's is newer (newest wins; loser kept
+        # as .bak). server_hash = what's authoritative on the server afterwards.
+        server_hash = _reconcile_save(client, cfg, game_slug, save_path)
 
         # Pull state if configured
         state_path = gd.state_path
@@ -135,11 +355,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 click.echo(f"Pulled state for {game_slug}.")
 
         try:
-            global _child_proc
-            _child_proc = subprocess.Popen(list(command))
-            game_pid_file.write_text(f"{os.getpid()}\n{_child_proc.pid}")
-            exit_code = _child_proc.wait()
-            _child_proc = None
+            exit_code = _launch_and_wait(command, game_pid_file)
         except Exception as exc:
             click.echo(f"Emulator error: {exc}", err=True)
             _release()
