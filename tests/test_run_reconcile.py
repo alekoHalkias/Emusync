@@ -1,0 +1,116 @@
+"""Unit tests for the `emusync run` wrapper's save-reconciliation policy,
+offline-play logging, and local game-device cache (issue #5).
+
+These cover the pure decision logic and the on-disk helpers — no server needed.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from cli.run import (
+    _cache_game_device,
+    _decide_save_action,
+    _load_cached_game_device,
+    _log_offline_play,
+    _parse_iso,
+)
+from server.sync_client import GameDeviceConfig
+
+NOW = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+EARLIER = NOW - timedelta(hours=2)
+LATER = NOW + timedelta(hours=2)
+
+
+def _meta(hash_: str, pushed_at: datetime) -> dict:
+    return {"hash": hash_, "pushed_at": pushed_at.isoformat()}
+
+
+# ── _decide_save_action ────────────────────────────────────────────────────────
+
+def test_no_local_no_server_is_noop():
+    assert _decide_save_action(None, None, None) == "noop"
+
+
+def test_no_local_but_server_pulls():
+    assert _decide_save_action(None, None, _meta("abc", NOW)) == "pull"
+
+
+def test_local_but_no_server_pushes():
+    assert _decide_save_action("abc", NOW, None) == "push"
+
+
+def test_identical_hashes_noop():
+    assert _decide_save_action("same", NOW, _meta("same", EARLIER)) == "noop"
+
+
+def test_divergence_local_newer_pushes():
+    # local changed more recently than the server's pushed_at → local wins
+    assert _decide_save_action("local", LATER, _meta("server", NOW)) == "push"
+
+
+def test_divergence_server_newer_pulls():
+    assert _decide_save_action("local", EARLIER, _meta("server", NOW)) == "pull"
+
+
+def test_divergence_unparseable_server_time_defaults_to_push():
+    assert _decide_save_action("local", NOW, {"hash": "server", "pushed_at": "garbage"}) == "push"
+
+
+def test_divergence_missing_local_mtime_pulls():
+    # local hash present but mtime unknown → don't risk clobbering server
+    assert _decide_save_action("local", None, _meta("server", NOW)) == "pull"
+
+
+# ── _parse_iso ──────────────────────────────────────────────────────────────────
+
+def test_parse_iso_handles_naive_and_aware_and_bad():
+    assert _parse_iso(NOW.isoformat()) == NOW
+    naive = _parse_iso("2026-06-01T12:00:00")
+    assert naive is not None and naive.tzinfo is timezone.utc
+    assert _parse_iso("nope") is None
+    assert _parse_iso(None) is None
+
+
+# ── game-device cache ───────────────────────────────────────────────────────────
+
+def test_game_device_cache_round_trip(tmp_path):
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    gd = GameDeviceConfig(
+        rom_path="/roms/x.gba", save_path="/saves/x.srm",
+        launch_command="ra x.gba", state_path="/states/X", rom_folder_path="/roms",
+    )
+    assert _load_cached_game_device(cfg, "x") is None
+    _cache_game_device(cfg, "x", gd)
+    loaded = _load_cached_game_device(cfg, "x")
+    assert loaded is not None
+    assert loaded.save_path == "/saves/x.srm"
+    assert loaded.state_path == "/states/X"
+    assert loaded.launch_command == "ra x.gba"
+
+
+# ── offline play log ────────────────────────────────────────────────────────────
+
+def test_offline_play_log_appends_and_records_save(tmp_path):
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    save = tmp_path / "save.srm"
+    save.write_bytes(b"offline-progress")
+
+    _log_offline_play(cfg, "metroid", NOW.isoformat(), LATER.isoformat(), str(save))
+    _log_offline_play(cfg, "zelda", NOW.isoformat(), LATER.isoformat(), "")
+
+    log = json.loads((tmp_path / "offline_plays.json").read_text())
+    assert len(log) == 2
+    first = log[0]
+    assert first["slug"] == "metroid"
+    assert first["offline"] is True
+    assert first["started_at"] == NOW.isoformat()
+    assert "save_hash" in first and "save_mtime" in first
+    # second entry had no save file — no hash recorded, but still logged
+    assert log[1]["slug"] == "zelda"
+    assert "save_hash" not in log[1]
