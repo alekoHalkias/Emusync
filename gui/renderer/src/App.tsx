@@ -51,12 +51,15 @@ function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
   const [launched, setLaunched] = useState(false);
   const [launcherPath, setLauncherPath] = useState("emusync");
   useEffect(() => { window.emusync.launcher.path().then(setLauncherPath); }, []);
-  const steamCommand = `"${launcherPath}" run --game ${slug} -- %command%`;
+  const steamCommand = `"${launcherPath}" run ${slug}`;
+  // Fallback for the old method: wrap RetroArch's own launcher (Steam substitutes
+  // %command%). EmuSync still syncs the save, but only because the game is imported.
+  const steamCommandExternal = `"${launcherPath}" run ${slug} -- %command%`;
 
   async function launchDirect(): Promise<void> {
     if (!launchCommand) return;
     setLaunching(true);
-    await window.emusync.game.launch(slug, launchCommand);
+    await window.emusync.game.launch(slug);
     setLaunching(false);
     setLaunched(true);
     onLaunched();
@@ -65,7 +68,7 @@ function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 900, maxWidth: "90vw" }}>
         <h3 style={{ marginBottom: 20 }}>Play {slug}</h3>
 
         <p style={{ marginBottom: 8, fontWeight: 500 }}>Launch directly</p>
@@ -92,6 +95,12 @@ function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
           Paste this into Steam → game properties → launch options:
         </p>
         <CopyBox text={steamCommand} />
+
+        <p style={{ fontSize: 12, color: "var(--muted, #888)", marginTop: 12, marginBottom: 6 }}>
+          Already launch this game through RetroArch/another emulator? Use this instead — it
+          keeps that launcher and still syncs the save (the game must be imported):
+        </p>
+        <CopyBox text={steamCommandExternal} />
 
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>

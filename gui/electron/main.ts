@@ -369,11 +369,11 @@ ipcMain.handle("dialog:openFile", async (_event, options: Electron.OpenDialogOpt
   return result.canceled ? null : result.filePaths[0];
 });
 
-ipcMain.handle("game:launch", (_event, slug: string, command: string) => {
+ipcMain.handle("game:launch", (_event, slug: string) => {
   if (gameProcess) return { ok: false };
-  const args = (command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [])
-    .map(a => /^["']/.test(a) ? a.slice(1, -1) : a);
-  const proc = spawn(PYTHON, [SCRIPT, "run", "--game", slug, "--", ...args], {
+  // The emulator command is derived server-side from the game config, so the
+  // launcher only needs the slug.
+  const proc = spawn(PYTHON, [SCRIPT, "run", slug], {
     stdio: "ignore",
     detached: true,
     env: { ...process.env, DISPLAY: process.env.DISPLAY || ":0", WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY || "wayland-0" },

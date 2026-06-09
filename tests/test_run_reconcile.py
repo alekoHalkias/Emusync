@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cli.run import (
@@ -21,6 +23,7 @@ from cli.run import (
     _log_offline_play,
     _parse_iso,
     _reconcile_save,
+    _run_offline,
 )
 from server.sync_client import GameDeviceConfig
 
@@ -188,3 +191,73 @@ def test_offline_play_log_appends_and_records_save(tmp_path):
     # second entry had no save file — no hash recorded, but still logged
     assert log[1]["slug"] == "zelda"
     assert "save_hash" not in log[1]
+
+
+# ── offline launch derives its command from the cached config (#207) ─────────────
+
+def test_run_offline_errors_without_cached_command(tmp_path):
+    # No cached config at all → can't know how to launch, so exit non-zero.
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    with pytest.raises(SystemExit) as exc:
+        _run_offline(cfg, "never-played", tmp_path / ".game_pid")
+    assert exc.value.code == 1
+
+
+def test_run_offline_launches_using_cached_launch_command(tmp_path):
+    # A game played online at least once has its launch_command cached; offline
+    # launch parses it (via shlex) and runs it without any command being passed.
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    save = tmp_path / "save.srm"
+    save.write_bytes(b"progress")
+    gd = GameDeviceConfig(
+        rom_path="/roms/x.gba", save_path=str(save),
+        launch_command="true", state_path="", rom_folder_path="/roms",
+    )
+    _cache_game_device(cfg, "x", gd)
+
+    with pytest.raises(SystemExit) as exc:
+        _run_offline(cfg, "x", tmp_path / ".game_pid")
+    assert exc.value.code == 0  # `true` exits 0
+
+    # The play was logged for later reconciliation.
+    log = json.loads((tmp_path / "offline_plays.json").read_text())
+    assert log[-1]["slug"] == "x"
+
+
+def test_run_offline_explicit_command_overrides_cached(tmp_path):
+    # Old-method fallback: an explicit command wins over the cached launch_command.
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    save = tmp_path / "save.srm"
+    save.write_bytes(b"progress")
+    gd = GameDeviceConfig(
+        rom_path="/roms/x.gba", save_path=str(save),
+        launch_command="false", state_path="", rom_folder_path="/roms",  # cached cmd fails
+    )
+    _cache_game_device(cfg, "x", gd)
+
+    with pytest.raises(SystemExit) as exc:
+        _run_offline(cfg, "x", tmp_path / ".game_pid", command=("true",))
+    assert exc.value.code == 0  # ran the override `true`, not the cached `false`
+
+
+# ── old-method fallback gates on the game being imported (#207) ───────────────────
+
+def test_run_refuses_external_command_for_unimported_game(monkeypatch, tmp_path):
+    # A passed-in command for a game EmuSync doesn't know about → refuse to launch.
+    import cli.run as run_mod
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="d", device_name="pc")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+
+    class _C:
+        def health(self):
+            return True
+
+        def get_game_device(self, slug):
+            return None  # not imported on this device
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+
+    with pytest.raises(SystemExit) as exc:
+        run_mod.run_game.callback(game_slug="ghost", command=("retroarch", "ghost.gba"))
+    assert exc.value.code == 1
