@@ -6,6 +6,8 @@ import re
 import signal
 import subprocess
 import sys
+import threading
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -21,6 +23,57 @@ from cli.transfer import _run_transfer_daemon
 @cli.group()
 def server() -> None:
     """Manage the EmuSync server."""
+
+
+class _TimestampedStream:
+    """Wrap a text stream so every new line written gets a '[YYYY-MM-DD HH:MM:SS] '
+    prefix. Installed over ``sys.stdout`` at server start so all server log lines
+    — current and future, from any thread — are timestamped uniformly.
+
+    Thread-safe (writes are serialized) and ``\\r``-aware, so carriage-return
+    progress updates re-stamp cleanly instead of mangling the line.
+    """
+
+    def __init__(self, stream) -> None:
+        self._stream = stream
+        self._at_line_start = True
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _stamp() -> str:
+        return datetime.now().strftime("[%Y-%m-%d %H:%M:%S] ")
+
+    def write(self, data) -> int:
+        if not isinstance(data, str):
+            try:
+                data = data.decode()
+            except Exception:
+                data = str(data)
+        if not data:
+            return 0
+        out: list[str] = []
+        with self._lock:
+            for ch in data:
+                if self._at_line_start and ch not in ("\n", "\r"):
+                    out.append(self._stamp())
+                    self._at_line_start = False
+                out.append(ch)
+                if ch in ("\n", "\r"):
+                    self._at_line_start = True
+            self._stream.write("".join(out))
+        return len(data)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+def _install_timestamped_stdout() -> None:
+    """Route server stdout through the timestamping wrapper (idempotent)."""
+    if not isinstance(sys.stdout, _TimestampedStream):
+        sys.stdout = _TimestampedStream(sys.stdout)
 
 
 def _find_pid_by_port(port: int) -> int | None:
@@ -118,11 +171,13 @@ def _do_start_server() -> None:
     Performs initialization check, duplicate-launch detection, and runs uvicorn.
     """
     import signal
-    import threading
     import uvicorn
     from server.store import Store
     from server import api as api_module
     from server import mdns as mdns_module
+
+    # Timestamp every line the server writes to stdout (idempotent).
+    _install_timestamped_stdout()
 
     cfg = cfg_module.load()
 
