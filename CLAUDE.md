@@ -184,26 +184,45 @@ Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_na
 
 ---
 
-## Device activity logging (terminal output)
+## Server activity logging (terminal output)
 
-The server prints real-time device connection/disconnection events to stdout for operator visibility:
+The server prints real-time activity to stdout for operator visibility. **Every line is timestamped** with a `[YYYY-MM-DD HH:MM:SS] ` prefix:
 
 ```
-EmuSync server running on :8765
-new device paired called steamdeck at ip:192.168.1.42
-steamdeck online
-steamdeck went offline
-steamdeck unpaired
+[2026-06-09 14:03:18] EmuSync server ready
+[2026-06-09 14:03:18] EmuSync server running on :8765
+[2026-06-09 14:03:21] new device paired called steamdeck at ip:192.168.1.42
+[2026-06-09 14:05:02] steamdeck online
+[2026-06-09 14:10:44] Pokemon Emerald is running on steamdeck
+[2026-06-09 14:10:45] save pulled: Pokemon Emerald by steamdeck
+[2026-06-09 14:55:12] save pushed: Pokemon Emerald from steamdeck
+[2026-06-09 14:55:13] Pokemon Emerald stopped on steamdeck
+[2026-06-09 15:01:00] steamdeck went offline
+[2026-06-09 15:30:00] steamdeck unpaired
 ```
 
-**How it works:**
+**Timestamping** — `cli/server.py` defines `_TimestampedStream` (a thin `sys.stdout` wrapper) and installs it via `_install_timestamped_stdout()` at the top of `_do_start_server`. It prefixes every newly started line (thread-safe, `\r`-aware), so all current *and* future stdout lines — `click.echo`, `print`, `api._print_activity`, the transfer-daemon log — are timestamped uniformly without touching each call site. It does **not** wrap stderr (e.g. the mDNS warning) or uvicorn's own logs.
 
-- **"new device paired"** — Fired in `api._auth()` when `ensure_device()` performs its first INSERT (new device). Printed immediately, includes device name and IP.
-- **"online"** — Fired in `api._auth()` when a known device makes a request but wasn't previously in the `_online_devices` set (i.e., it was offline or this is its first request after server restart). Printed immediately, includes device name.
-- **"went offline"** — Fired by a background monitoring thread (`_monitor_presence()`) that wakes every 30 seconds and checks `last_seen_at` for all devices. Any device idle > 5 minutes is flagged offline. The monitoring thread is started as a daemon in `api.init()`.
-- **"unpaired"** — Fired in the `DELETE /devices/{id}` endpoint when a device is removed. Printed before deletion, includes device name.
+**The full set of server stdout lines:**
 
-**Thread safety:** The `_online_devices` set and `_device_names` dict are protected by `_presence_lock` (threading.Lock) because FastAPI's synchronous dependencies like `_auth` may run in concurrent worker threads.
+| Line | Where | When |
+|------|-------|------|
+| `EmuSync server ready` / `EmuSync server running on :<port>` | `cli/server.py` | startup (the GUI's `main.ts` matches `EmuSync server ready` via `.includes()` to confirm it started — keep that substring intact) |
+| `EmuSync server is already running …`, `Server (PID …) stopped.`, `server not running`, init/clear-devices messages | `cli/server.py` | lifecycle commands |
+| `new device paired called <name> at ip:<ip>` | `api._auth()` | first INSERT for a device (`ensure_device` returns `is_new=True`) |
+| `<name> online` | `api._auth()` | a known device requests while not in `_online_devices` |
+| `<name> went offline` | `_monitor_presence()` daemon thread | device idle > 5 min (checked every 30 s) |
+| `<name> unpaired` | `DELETE /devices/{id}` | device removed (printed before deletion) |
+| `<game> is running on <device>` | `POST /games/{slug}/lock` | lock acquired (game launched) |
+| `<game> stopped on <device>` | `DELETE /games/{slug}/lock` | lock released (the stop time is the timestamp prefix) |
+| `save pushed: <game> from <device>` / `save pulled: <game> by <device>` | `POST` / `GET /games/{slug}/save` | save sync (pull only logs when a save actually exists, i.e. not a 204) |
+| `state pushed: <game> from <device>` / `state pulled: <game> by <device>` | `POST` / `GET /games/{slug}/state` | state sync (pull only logs on a real hit) |
+| `ROM pushed: <game> from <device> → <target> (queued)` | `POST /games/{slug}/rom-transfer` | ROM staged for delivery |
+| `ROM pulled: <game> by <device>` | `GET /rom-transfers/{id}/file` | target device downloads the staged ROM |
+
+`api._print_activity(msg)` is the single sink for the API-side lines — it does one atomic `sys.stdout.write(msg + "\n")` (so concurrent worker threads can't interleave). `_game_label(slug)` / `_device_label(device_id)` resolve human-readable names (device names come from the `_device_names` cache `_auth` populates, falling back to a `list_devices` scan, then the raw id).
+
+**Thread safety:** The `_online_devices` set and `_device_names` dict are protected by `_presence_lock` (threading.Lock) because FastAPI's synchronous dependencies like `_auth` may run in concurrent worker threads. `_TimestampedStream` has its own lock so writes from those same threads stay line-atomic.
 
 ---
 

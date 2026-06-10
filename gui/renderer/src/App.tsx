@@ -51,10 +51,12 @@ function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
   const [launched, setLaunched] = useState(false);
   const [launcherPath, setLauncherPath] = useState("emusync");
   useEffect(() => { window.emusync.launcher.path().then(setLauncherPath); }, []);
-  const steamCommand = `"${launcherPath}" run ${slug}`;
-  // Fallback for the old method: wrap RetroArch's own launcher (Steam substitutes
-  // %command%). EmuSync still syncs the save, but only because the game is imported.
-  const steamCommandExternal = `"${launcherPath}" run ${slug} -- %command%`;
+  // Steam appends launch options to the game's own command unless they contain
+  // %command% (the token Steam replaces with that command). The %command% form is
+  // therefore required: it makes emusync run wrap the real emulator — acquiring the
+  // lock and syncing the save (so the app sees the game running). Without it, Steam
+  // would run "<emulator> <launcher> run <slug>" and emusync run would never execute.
+  const steamCommand = `"${launcherPath}" run ${slug} -- %command%`;
 
   async function launchDirect(): Promise<void> {
     if (!launchCommand) return;
@@ -92,15 +94,11 @@ function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
 
         <p style={{ marginBottom: 8, fontWeight: 500 }}>Add to Steam</p>
         <p style={{ fontSize: 13, color: "var(--muted, #888)", marginBottom: 8 }}>
-          Paste this into Steam → game properties → launch options:
+          Paste this into Steam → game properties → launch options. Keep the
+          <code> %command%</code> — Steam replaces it with the emulator command, and EmuSync
+          wraps it so the game shows as running and the save syncs:
         </p>
         <CopyBox text={steamCommand} />
-
-        <p style={{ fontSize: 12, color: "var(--muted, #888)", marginTop: 12, marginBottom: 6 }}>
-          Already launch this game through RetroArch/another emulator? Use this instead — it
-          keeps that launcher and still syncs the save (the game must be imported):
-        </p>
-        <CopyBox text={steamCommandExternal} />
 
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>

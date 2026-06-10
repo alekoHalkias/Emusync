@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import sys
 import threading
 import uuid
 from pathlib import Path
@@ -116,7 +117,32 @@ def _get_store() -> Store:
 
 
 def _print_activity(msg: str) -> None:
-    print(msg, flush=True)
+    # Single write so concurrent worker threads can't interleave a line (the
+    # timestamp wrapper over stdout serializes a whole write() call atomically).
+    sys.stdout.write(msg + "\n")
+    sys.stdout.flush()
+
+
+def _device_label(device_id: str) -> str:
+    """Human-readable device name for log lines (falls back to the id)."""
+    with _presence_lock:
+        name = _device_names.get(device_id)
+    if name:
+        return name
+    if _store is not None:
+        for dev in _store.list_devices():
+            if dev.id == device_id:
+                return dev.name
+    return device_id
+
+
+def _game_label(slug: str) -> str:
+    """Human-readable game name for log lines (falls back to the slug)."""
+    if _store is not None:
+        game = _store.get_game(slug)
+        if game:
+            return game.name
+    return slug
 
 
 def _auth(
@@ -393,7 +419,9 @@ async def create_rom_transfer(
         })
 
     store.log_event("rom_transfer_queued", slug, device_id)
-    _print_activity(f"ROM transfer queued: {game.name} → {target_name}")
+    _print_activity(
+        f"ROM pushed: {game.name} from {_device_label(device_id)} → {target_name} (queued)"
+    )
 
     return {"transfer_id": transfer_id, "status": "pending", "target_online": is_online}
 
@@ -431,6 +459,7 @@ def download_transfer_file(transfer_id: str, device_id: str = Depends(_auth)) ->
     staged = _Path(transfer.staged_file)
     if not staged.exists():
         raise HTTPException(status_code=410, detail="Staged file no longer exists")
+    _print_activity(f"ROM pulled: {_game_label(transfer.slug)} by {_device_label(device_id)}")
     return FileResponse(str(staged), filename=staged.name, media_type="application/octet-stream")
 
 
@@ -580,6 +609,7 @@ def pull_save(slug: str, device_id: str = Depends(_auth)) -> Response:
     data, meta = _get_store().pull_save(slug)
     if data is None:
         return Response(status_code=204)
+    _print_activity(f"save pulled: {_game_label(slug)} by {_device_label(device_id)}")
     return Response(
         content=data,
         media_type="application/octet-stream",
@@ -603,6 +633,7 @@ async def push_save(slug: str, request: Request, device_id: str = Depends(_auth)
 
     # Offload the synchronous BLOB write so a multi-MB save doesn't block the loop.
     meta = await asyncio.to_thread(_store_save)
+    _print_activity(f"save pushed: {_game_label(slug)} from {_device_label(device_id)}")
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
 
@@ -624,6 +655,7 @@ def pull_state(slug: str, device_id: str = Depends(_auth)) -> Response:
     data, meta = _get_store().pull_state(slug)
     if data is None:
         return Response(status_code=204)
+    _print_activity(f"state pulled: {_game_label(slug)} by {_device_label(device_id)}")
     return Response(
         content=data,
         media_type="application/octet-stream",
@@ -647,6 +679,7 @@ async def push_state(slug: str, request: Request, device_id: str = Depends(_auth
 
     # Offload the synchronous BLOB write so a multi-MB state archive doesn't block the loop.
     meta = await asyncio.to_thread(_store_state)
+    _print_activity(f"state pushed: {_game_label(slug)} from {_device_label(device_id)}")
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
 
@@ -670,6 +703,7 @@ def acquire_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     _get_store().log_event("game_started", slug, device_id)
+    _print_activity(f"{_game_label(slug)} is running on {_device_label(device_id)}")
     return {"ok": True}
 
 
@@ -677,6 +711,7 @@ def acquire_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
 def release_lock(slug: str, device_id: str = Depends(_auth)) -> dict:
     _get_store().release_lock(slug, device_id)
     _get_store().log_event("game_stopped", slug, device_id)
+    _print_activity(f"{_game_label(slug)} stopped on {_device_label(device_id)}")
     return {"ok": True}
 
 
