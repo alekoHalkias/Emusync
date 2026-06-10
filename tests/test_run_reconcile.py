@@ -23,6 +23,8 @@ from cli.run import (
     _log_offline_play,
     _parse_iso,
     _reconcile_save,
+    _resolve_written_save,
+    _resolve_written_state,
     _run_offline,
 )
 from server.sync_client import GameDeviceConfig
@@ -261,3 +263,73 @@ def test_run_refuses_external_command_for_unimported_game(monkeypatch, tmp_path)
     with pytest.raises(SystemExit) as exc:
         run_mod.run_game.callback(game_slug="ghost", command=("retroarch", "ghost.gba"))
     assert exc.value.code == 1
+
+
+# ── RetroArch content-name detection: filename vs database-label folder (#210) ────
+
+SINCE = 1_000_000.0  # arbitrary epoch baseline for "launch start"
+
+
+def _touch(path: Path, mtime: float, data: bytes = b"x") -> None:
+    """Write *path* (creating parents) and stamp its mtime."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    os.utime(path, (mtime, mtime))
+
+
+def test_resolve_save_keeps_configured_when_written_this_session(tmp_path):
+    cfg_save = tmp_path / "saves" / "Rom_Name" / "Rom_Name.srm"
+    _touch(cfg_save, SINCE + 10)
+    assert _resolve_written_save(str(cfg_save), SINCE) == str(cfg_save)
+
+
+def test_resolve_save_adopts_db_label_folder_when_configured_untouched(tmp_path):
+    # Configured (filename) folder exists but is stale; RetroArch wrote the
+    # database-label folder this session → adopt it.
+    cfg_save = tmp_path / "saves" / "Rom_Name" / "Rom_Name.srm"
+    _touch(cfg_save, SINCE - 500)
+    db_save = tmp_path / "saves" / "Pokémon Pinball_ Ruby & Sapphire [2003]" / "Pokémon Pinball_ Ruby & Sapphire [2003].srm"
+    _touch(db_save, SINCE + 10)
+    assert _resolve_written_save(str(cfg_save), SINCE) == str(db_save)
+
+
+def test_resolve_save_adopts_different_extension_same_folder(tmp_path):
+    # Configured .sav never appears; RetroArch wrote .srm in the same folder.
+    cfg_save = tmp_path / "saves" / "Rom_Name" / "Rom_Name.sav"
+    real = tmp_path / "saves" / "Rom_Name" / "Rom_Name.srm"
+    _touch(real, SINCE + 10)
+    assert _resolve_written_save(str(cfg_save), SINCE) == str(real)
+
+
+def test_resolve_save_none_when_nothing_written(tmp_path):
+    cfg_save = tmp_path / "saves" / "Rom_Name" / "Rom_Name.srm"
+    _touch(cfg_save, SINCE - 500)  # stale only
+    assert _resolve_written_save(str(cfg_save), SINCE) is None
+
+
+def test_resolve_save_ignores_bak_files(tmp_path):
+    cfg_save = tmp_path / "saves" / "Rom_Name" / "Rom_Name.srm"
+    _touch(cfg_save, SINCE - 500)
+    # A fresh .bak (e.g. from a pull) must not be mistaken for the live save.
+    _touch(tmp_path / "saves" / "Rom_Name" / "Rom_Name.srm.bak", SINCE + 10)
+    assert _resolve_written_save(str(cfg_save), SINCE) is None
+
+
+def test_resolve_state_keeps_configured_folder_when_written(tmp_path):
+    cfg_folder = tmp_path / "states" / "Rom_Name"
+    _touch(cfg_folder / "Rom_Name.state", SINCE + 10)
+    assert _resolve_written_state(str(cfg_folder), SINCE) == str(cfg_folder)
+
+
+def test_resolve_state_adopts_db_label_folder(tmp_path):
+    cfg_folder = tmp_path / "states" / "Rom_Name"
+    cfg_folder.mkdir(parents=True)  # exists but empty/stale
+    db_folder = tmp_path / "states" / "Pokémon Pinball_ Ruby & Sapphire [2003]"
+    _touch(db_folder / "Pokémon Pinball_ Ruby & Sapphire [2003].state1", SINCE + 10)
+    assert _resolve_written_state(str(cfg_folder), SINCE) == str(db_folder)
+
+
+def test_resolve_state_none_when_nothing_written(tmp_path):
+    cfg_folder = tmp_path / "states" / "Rom_Name"
+    _touch(cfg_folder / "Rom_Name.state", SINCE - 500)  # stale only
+    assert _resolve_written_state(str(cfg_folder), SINCE) is None
