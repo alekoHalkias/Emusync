@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -275,20 +276,87 @@ def _run_offline(cfg, game_slug: str, game_pid_file: Path, command: tuple[str, .
     sys.exit(exit_code)
 
 
-def _find_save_or_state_file(configured_path: str) -> str | None:
-    """Look for save/state files with different extensions. Return path if found, None if not."""
-    if not configured_path:
+# RetroArch names save/state files after the *content name*, which differs by
+# launch method: the ROM filename when loaded by path, or the database/playlist
+# label when loaded from a scanned playlist (e.g. "Pokémon Pinball_ Ruby &
+# Sapphire [2003]"). So the real save/state may sit in a different folder AND/OR
+# under a different extension than we configured. After the emulator exits we
+# detect where it actually wrote *this session* and adopt that path (issue #210).
+_SAVE_EXTS = {"srm", "sav", "save", "fla", "eep", "mcr", "rtc", "dsv", "ss0"}
+_STATE_RE = re.compile(r"\.state(\d+|\.auto)?$", re.IGNORECASE)
+
+
+def _mtime(p: Path) -> float:
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _saves_root(save_path: str) -> Path:
+    """Directory tree to search for the real save. Saves use the content-dir
+    layout savesRoot/<content>/<content>.<ext>, so the root is two levels up;
+    fall back to one level for flat layouts."""
+    parent = Path(save_path).parent
+    grand = parent.parent
+    return grand if grand != parent else parent
+
+
+def _newest_matching(root: Path, since: float, match) -> Optional[Path]:
+    """Newest file under *root* (recursively) modified at/after *since* for which
+    match(file) is truthy, or None."""
+    if not root.exists():
         return None
-    p = Path(configured_path)
-    if p.exists():
-        return configured_path
-    dir_path = p.parent
-    base_name = p.stem
-    if dir_path.exists():
-        for f in dir_path.iterdir():
-            if f.is_file() and f.stem == base_name:
-                return str(f)
-    return None
+    best: Optional[Path] = None
+    best_m = since
+    for f in root.rglob("*"):
+        try:
+            if not f.is_file() or not match(f):
+                continue
+            m = _mtime(f)
+        except OSError:
+            continue
+        if m >= since and (best is None or m > best_m):
+            best, best_m = f, m
+    return best
+
+
+def _resolve_written_save(configured: str, since: float) -> Optional[str]:
+    """The save file RetroArch actually wrote this session, or None if none was.
+
+    Conservative: if our configured save was written this session, keep it. Only
+    when it was *not* (RetroArch used a different content name) do we adopt the
+    newest save written elsewhere under the saves root — so a working config is
+    never disturbed. Also catches a same-folder extension change for free.
+    """
+    if not configured:
+        return None
+    p = Path(configured)
+    if p.exists() and _mtime(p) >= since:
+        return configured
+    found = _newest_matching(
+        _saves_root(configured), since,
+        lambda f: f.suffix.lstrip(".").lower() in _SAVE_EXTS and ".bak" not in f.suffixes,
+    )
+    return str(found) if found else None
+
+
+def _resolve_written_state(configured: str, since: float) -> Optional[str]:
+    """The state FOLDER RetroArch actually wrote this session, or None.
+
+    States are synced as a whole folder, so this returns a directory. Same
+    conservative policy as _resolve_written_save: keep the configured folder if it
+    was written, else adopt the folder containing the newest state file.
+    """
+    if not configured:
+        return None
+    folder = Path(configured)
+    if folder.is_dir() and any(
+        _mtime(f) >= since for f in folder.rglob("*") if f.is_file()
+    ):
+        return configured
+    found = _newest_matching(folder.parent, since, lambda f: bool(_STATE_RE.search(f.name)))
+    return str(found.parent) if found else None
 
 
 @cli.command("run")
@@ -422,6 +490,10 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             if pulled:
                 click.echo(f"Pulled state for {game_slug}.")
 
+        # Mark the moment before launch (minus a small epsilon for mtime
+        # granularity) so we can tell which save/state files were written *this*
+        # session when reconciling RetroArch's content-name folder afterwards.
+        launch_start = datetime.now(timezone.utc).timestamp() - 1.0
         try:
             exit_code = _launch_and_wait(launch_argv, game_pid_file)
         except Exception as exc:
@@ -429,9 +501,11 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             _release()
             sys.exit(1)
 
-        # Check if save/state files were created with different extensions and update config
-        actual_save_path = _find_save_or_state_file(save_path)
-        actual_state_path = _find_save_or_state_file(state_path) if state_path else None
+        # Detect where RetroArch actually wrote the save/state this session — it
+        # may differ in folder and/or extension from what we configured (content
+        # name = ROM filename vs database label) — and adopt that path.
+        actual_save_path = _resolve_written_save(save_path, launch_start)
+        actual_state_path = _resolve_written_state(state_path, launch_start) if state_path else None
 
         if (actual_save_path and actual_save_path != save_path) or (actual_state_path and actual_state_path != state_path):
             try:
@@ -440,6 +514,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     save_path=actual_save_path or save_path,
                     launch_command=gd.launch_command,
                     state_path=actual_state_path or state_path,
+                    rom_folder_path=gd.rom_folder_path,
                 )
                 client.set_game_device(game_slug, updated_gd)
                 if actual_save_path and actual_save_path != save_path:
