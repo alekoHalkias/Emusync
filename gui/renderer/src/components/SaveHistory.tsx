@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { listSaveHistory, restoreSave, type SaveVersion } from "../api";
+import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
 
 type Props = {
@@ -80,7 +81,7 @@ export default function SaveHistory({ slug, name, savePath, onClose, onRestored 
               <li key={v.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13 }}>
-                    {v.pushed_at.slice(0, 19).replace("T", " ")}
+                    <RelTime iso={v.pushed_at} />
                     {i === 0 && <span style={{ color: "var(--green)", marginLeft: 8, fontSize: 11 }}>current</span>}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>

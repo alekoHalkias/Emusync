@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { addGame, getGameDevice, getSaveMeta, getStateMeta, setGameDevice, updateGame, type GameDeviceConfig, type SaveMeta } from "../api";
+import { RelTime } from "../time";
 
 type Props = {
   slug: string | null;
@@ -12,10 +13,6 @@ type Props = {
 type SyncOp = { status: "idle" | "busy" | "ok" | "error"; action: "push" | "pull" | null; msg: string };
 const IDLE_OP: SyncOp = { status: "idle", action: null, msg: "" };
 
-function fmtTime(t: string | null | undefined): string {
-  if (!t) return "—";
-  return t.replace("T", " ").slice(0, 19);
-}
 
 
 export default function GameConfig({ slug, name: initialName, onBack, onSaved, onPlay }: Props): React.ReactElement {
@@ -388,13 +385,13 @@ function SyncSection({
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "8px 12px", alignItems: "center" }}>
         <span style={{ fontSize: 13 }}>
           <span style={{ color: "var(--text-muted)" }}>{localLabel}: </span>
-          <strong>{fmtTime(localTime)}</strong>
+          <strong><RelTime iso={localTime} /></strong>
         </span>
         <SyncBtn action="push" onClick={onPush} disabled={pushDisabled}>↑ Push</SyncBtn>
 
         <span style={{ fontSize: 13 }}>
           <span style={{ color: "var(--text-muted)" }}>Server: </span>
-          <strong>{fmtTime(serverTime)}</strong>
+          <strong><RelTime iso={serverTime} /></strong>
         </span>
         <SyncBtn action="pull" onClick={onPull} disabled={pullDisabled}>↓ Pull</SyncBtn>
       </div>

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { gamesOverview, removeGame, listGameDevices, getDeviceGameDevices, getDeviceConsoles, createPullRequest, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import SaveHistory from "./SaveHistory";
+import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
 
 type Props = {
@@ -140,7 +141,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             slug: g.slug,
             name: g.name,
             console: g.console,
-            lastPush: g.last_push ? g.last_push.slice(0, 19) : undefined,
+            lastPush: g.last_push ?? undefined,
             lastSave,
             locked: g.locked,
             isLocal: g.is_local,
@@ -458,11 +459,11 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                         </div>
                         <div className="game-cell game-cell-name">{g.name}</div>
                         <div className="game-cell game-cell-muted">
-                          {canPlay ? (g.lastSave ? g.lastSave : "No save locally") : "—"}
+                          {canPlay ? <RelTime iso={g.lastSave} fallback="No save locally" /> : "—"}
                         </div>
                         <div className="game-cell game-cell-muted">
                           {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
-                          <span>{g.lastPush ? g.lastPush : "Never synced"}</span>
+                          <RelTime iso={g.lastPush} fallback="Never synced" />
                         </div>
                         <div className="game-cell game-cell-actions">
                           <button

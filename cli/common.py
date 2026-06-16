@@ -2,11 +2,60 @@
 from __future__ import annotations
 
 import subprocess
+from datetime import datetime, timezone
+from typing import Optional
 
 import click
 
 import server.config as cfg_module
 from server.sync_client import SyncClient
+
+
+def _parse_iso_utc(iso: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO-8601 timestamp to an aware UTC datetime, or None.
+
+    All EmuSync timestamps are UTC; a value with no tz designator is assumed UTC.
+    """
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def _relative(dt_utc: datetime, now: datetime) -> str:
+    """Human relative phrase, e.g. 'just now', '2 hours ago', 'in 3 minutes'."""
+    sec = (now - dt_utc).total_seconds()
+    future = sec < 0
+    sec = abs(sec)
+    if sec < 45:
+        return "just now"
+    for name, size in (("year", 31536000), ("month", 2592000), ("week", 604800),
+                       ("day", 86400), ("hour", 3600), ("minute", 60)):
+        if sec >= size:
+            n = int(round(sec / size))
+            label = f"{n} {name}{'s' if n != 1 else ''}"
+            return f"in {label}" if future else f"{label} ago"
+    return "just now"
+
+
+def _fmt_time(iso: Optional[str]) -> str:
+    """Render a timestamp as '<relative> (<exact local 12h>)' for CLI output.
+
+    The CLI can't show a hover tooltip like the GUI, so the exact local time is
+    appended in parentheses (issue #216). Returns the raw value (or '?') if it
+    can't be parsed.
+    """
+    dt = _parse_iso_utc(iso)
+    if dt is None:
+        return iso or "?"
+    rel = _relative(dt, datetime.now(timezone.utc))
+    local = dt.astimezone()  # convert to the machine's local timezone
+    hour = local.strftime("%I").lstrip("0") or "12"
+    exact = f"{local.strftime('%b')} {local.day} {local.year}, {hour}:{local.strftime('%M %p')}"
+    return f"{rel} ({exact})"
 
 
 def _client(cfg=None) -> SyncClient:

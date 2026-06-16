@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { listEvents, removeDevice, type ActivityEvent } from "../api";
+import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
 
 export default function DevicesButton(): React.ReactElement {
@@ -31,7 +32,7 @@ export default function DevicesButton(): React.ReactElement {
       e => e.device_id === deviceId && (e.type === "save_synced" || e.type === "state_synced"),
     );
     if (syncEvents.length === 0) return null;
-    return syncEvents[0].occurred_at.slice(0, 19);
+    return syncEvents[0].occurred_at;
   };
 
   async function handleRemoveDevice(): Promise<void> {
@@ -101,7 +102,7 @@ export default function DevicesButton(): React.ReactElement {
                         {getLastSync(d.id)
                           ? <>
                               <div style={{ marginBottom: 2 }}>Last sync</div>
-                              <div>{getLastSync(d.id)}</div>
+                              <div><RelTime iso={getLastSync(d.id)} /></div>
                             </>
                           : "Never synced"}
                       </div>

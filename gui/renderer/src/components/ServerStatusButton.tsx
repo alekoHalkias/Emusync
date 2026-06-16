@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { configure, configureDevice, health, listEvents, type ActivityEvent } from "../api";
+import { RelTime } from "../time";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
@@ -412,12 +413,11 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                     game_stopped: (ev) => `${ev.game_slug} stopped${ev.device_name ? ` on ${ev.device_name}` : ""}`,
                     save_synced: (ev) => `${ev.game_slug} synced${ev.device_name ? ` from ${ev.device_name}` : ""}`,
                   };
-                  const time = e.occurred_at ? e.occurred_at.slice(0, 19).replace("T", " ") : "";
                   return (
                     <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "8px 4px", borderBottom: i < events.length - 1 ? "1px solid var(--border)" : "none" }}>
                       <span style={{ fontSize: 13, minWidth: 18, textAlign: "center" }}>{icons[e.type] ?? "•"}</span>
                       <span style={{ flex: 1, fontSize: 13 }}>{(descriptions[e.type] ?? (() => e.type))(e)}</span>
-                      <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{time}</span>
+                      <RelTime iso={e.occurred_at} fallback="" style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }} />
                     </div>
                   );
                 })}
