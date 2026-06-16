@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import click
 
-from cli.common import _client
+from cli.common import _client, _fmt_time
 from cli.root import cli
 
 
@@ -45,7 +45,7 @@ def sync_status() -> None:
             lock_str = "?"
         try:
             meta = client.get_save_meta(slug)
-            push_str = meta["pushed_at"][:19] if meta else "never"
+            push_str = _fmt_time(meta["pushed_at"]) if meta else "never"
         except Exception:
             push_str = "?"
         click.echo(f"{slug:<30}  {lock_str:<22}  {push_str}")
@@ -67,12 +67,12 @@ def sync_history(slug: str, is_state: bool) -> None:
         click.echo(f"No {kind} history for '{slug}'.")
         return
     click.echo(f"{kind.capitalize()} history for '{slug}' (newest first):\n")
-    click.echo(f"  {'#':<3} {'When':<20} {'Size':<10} {'From device':<24} Version ID")
-    click.echo("  " + "-" * 88)
+    click.echo(f"  {'#':<3} {'When':<38} {'Size':<10} {'From device':<24} Version ID")
+    click.echo("  " + "-" * 100)
     for i, v in enumerate(history, 1):
         current = " (current)" if i == 1 else ""
         click.echo(
-            f"  {i:<3} {v.get('pushed_at', '')[:19]:<20} {_fmt_size(v.get('size')):<10} "
+            f"  {i:<3} {_fmt_time(v.get('pushed_at')):<38} {_fmt_size(v.get('size')):<10} "
             f"{(v.get('device_id') or '')[:22]:<24} {v.get('id', '')}{current}"
         )
     click.echo(f"\nRestore one with:  emusync sync restore {slug} <version-id>" + (" --state" if is_state else ""))
