@@ -76,10 +76,14 @@ def _decide_save_action(
 
 def _notify(title: str, msg: str) -> None:
     """Best-effort, non-blocking desktop notification (so a Steam launch, which
-    shows no terminal, still surfaces a conflict). Silently no-ops if unavailable."""
+    shows no terminal, still surfaces a conflict). Silently no-ops if unavailable.
+
+    Uses normal urgency + a 3 s expire time so the toast auto-dismisses (issue
+    #218) — `critical` urgency would make compositors keep it on screen forever.
+    """
     try:
         subprocess.Popen(
-            ["notify-send", "--app-name=EmuSync", "--urgency=critical", title, msg],
+            ["notify-send", "--app-name=EmuSync", "--urgency=normal", "-t", "3000", title, msg],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     except Exception:

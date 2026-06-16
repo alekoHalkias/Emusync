@@ -99,7 +99,9 @@ def _show_game_running_popup(game_name: str, device_name: str) -> None:
         # notify-send is non-blocking but works inside gamescope (Steam Deck Gaming Mode)
         # where zenity/kdialog cannot create windows; run it and also continue to a
         # blocking dialog so the user sees a modal on desktop environments too.
-        ["notify-send", "--app-name=EmuSync", "--urgency=normal", "EmuSync", msg],
+        # `-t 3000` auto-dismisses the toast after 3 s (issue #218); the blocking
+        # dialog below is deliberate and still waits for acknowledgement.
+        ["notify-send", "--app-name=EmuSync", "--urgency=normal", "-t", "3000", "EmuSync", msg],
         ["zenity", "--info", "--title=EmuSync", f"--text={msg}", "--width=360", "--no-wrap"],
         ["kdialog", "--msgbox", msg, "--title", "EmuSync"],
         ["xmessage", "-center", "-buttons", "OK:0", msg],

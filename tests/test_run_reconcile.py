@@ -110,6 +110,27 @@ def test_mild_shrink_within_floor_is_safe():
     assert _save_is_safe_to_push(20000, 32768) is True
 
 
+# ── _notify (auto-dismissing desktop toast, issue #218) ──────────────────────────
+
+def test_notify_sends_expiring_non_critical_toast(monkeypatch):
+    import cli.run as run_module
+
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return SimpleNamespace()
+
+    monkeypatch.setattr(run_module.subprocess, "Popen", fake_popen)
+    run_module._notify("title", "message")
+
+    cmd = captured["cmd"]
+    # 3-second expiry so the toast auto-hides, and NOT critical (which would
+    # make compositors keep it on screen forever).
+    assert "-t" in cmd and cmd[cmd.index("-t") + 1] == "3000"
+    assert "--urgency=critical" not in cmd
+
+
 # ── _parse_iso ──────────────────────────────────────────────────────────────────
 
 def test_parse_iso_handles_naive_and_aware_and_bad():
