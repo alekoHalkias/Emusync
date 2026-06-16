@@ -49,6 +49,7 @@ class SaveMeta:
     device_id: str
     hash: str
     pushed_at: str
+    size: Optional[int] = None  # bytes; populated by metadata queries, not by push
 
 
 @dataclass
@@ -69,6 +70,7 @@ class RomTransfer:
     status: str
     queued_at: str
     completed_at: Optional[str] = None
+    sha256: Optional[str] = None  # hash of the staged ROM, for download integrity checks
 
 
 @dataclass

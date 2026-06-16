@@ -111,6 +111,41 @@ def _log_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[st
         pass
 
 
+# A post-game save that is empty, or has shrunk to below this fraction of the
+# previous server copy, is treated as corruption (e.g. a crashed/force-killed
+# emulator left a truncated file) and is NOT pushed, so it can't destroy the good
+# server copy (issue #213). SRAM is fixed-size, so a legitimate save never trips
+# this; the floor is deliberately generous to avoid false positives.
+_SAVE_SHRINK_FLOOR = 0.5
+
+
+def _save_is_safe_to_push(local_size: int, server_size: Optional[int], floor: float = _SAVE_SHRINK_FLOOR) -> bool:
+    """Whether a freshly-written save is safe to push over the server's copy.
+
+    Refuses a 0-byte save outright, and refuses one that has shrunk below *floor*
+    of the previous server save (a strong truncation signal). When the server has
+    no prior save, any non-empty save is allowed (it's the first one).
+    """
+    if local_size <= 0:
+        return False
+    if not server_size or server_size <= 0:
+        return True
+    return local_size >= server_size * floor
+
+
+def _warn_unsafe_save(cfg, game_slug: str, local_size: int, server_size: Optional[int]) -> None:
+    """Surface a refused (likely-truncated) save: stderr + desktop notification."""
+    detail = (
+        f"the save written this session is {local_size} bytes"
+        + (f" (was {server_size} bytes)" if server_size else "")
+        + " — it looks truncated/corrupt, so it was NOT pushed. The good server copy "
+        "was kept. If this was intentional, re-save in the emulator and play again."
+    )
+    msg = f"Refused to sync save for '{game_slug}': {detail}"
+    click.echo(f"⚠ {msg}", err=True)
+    _notify("EmuSync — save not synced", msg)
+
+
 def _warn_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
     """Surface an auto-resolved divergence: stderr + desktop notification + log."""
     if winner == "local":
@@ -527,13 +562,25 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
 
         if Path(save_path).exists():
-            local_hash = hashlib.sha256(Path(save_path).read_bytes()).hexdigest()
+            local_bytes = Path(save_path).read_bytes()
+            local_hash = hashlib.sha256(local_bytes).hexdigest()
             if local_hash != server_hash:
+                # Guard against pushing a truncated/zero-byte save from a crashed
+                # emulator over the good server copy (issue #213).
+                server_size: Optional[int] = None
                 try:
-                    client.push_save(game_slug, save_path)
-                    click.echo(f"Pushed save for {game_slug}.")
-                except Exception as exc:
-                    click.echo(f"Warning: failed to push save: {exc}", err=True)
+                    sm = client.get_save_meta(game_slug)
+                    server_size = sm.get("size") if sm else None
+                except Exception:
+                    server_size = None
+                if _save_is_safe_to_push(len(local_bytes), server_size):
+                    try:
+                        client.push_save(game_slug, save_path)
+                        click.echo(f"Pushed save for {game_slug}.")
+                    except Exception as exc:
+                        click.echo(f"Warning: failed to push save: {exc}", err=True)
+                else:
+                    _warn_unsafe_save(cfg, game_slug, len(local_bytes), server_size)
 
         # Push state if configured
         if state_path and Path(state_path).exists():

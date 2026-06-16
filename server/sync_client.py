@@ -198,31 +198,50 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def download_transfer(self, transfer_id: str, destination_path: str) -> None:
-        """Stream a staged ROM file to disk at the given destination path."""
+    def download_transfer(self, transfer_id: str, destination_path: str, expected_hash: Optional[str] = None) -> None:
+        """Stream a staged ROM file to disk at the given destination path.
+
+        Verifies the download against the server-recorded SHA256 (passed in or read
+        from the ``X-Rom-Hash`` response header). On mismatch the partial file is
+        deleted and ValueError is raised, so a corrupt transfer over flaky Wi-Fi is
+        caught instead of landing an unplayable ROM (issue #214).
+        """
+        import hashlib as _hashlib
+
         path = Path(destination_path)
         if path.is_dir() or not path.suffix:
             raise ValueError(
                 f"destination_path must be a full file path, not a directory: {destination_path}"
             )
         path.parent.mkdir(parents=True, exist_ok=True)
+        hasher = _hashlib.sha256()
         with self._client.stream(
             "GET",
             self._url(f"/rom-transfers/{transfer_id}/file"),
             timeout=httpx.Timeout(None),
         ) as r:
             r.raise_for_status()
+            expected = expected_hash or r.headers.get("X-Rom-Hash")
             total = int(r.headers.get("content-length", 0))
             received = 0
             with open(destination_path, "wb") as f:
                 for chunk in r.iter_bytes(chunk_size=64 * 1024):
                     f.write(chunk)
+                    hasher.update(chunk)
                     received += len(chunk)
                     if total:
                         pct = received * 100 // total
                         mb = received / (1024 * 1024)
                         print(f"\r  {mb:.1f} / {total/(1024*1024):.1f} MB ({pct}%)", end="", flush=True)
             print(flush=True)
+        if expected and hasher.hexdigest() != expected:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise ValueError(
+                f"ROM transfer integrity check failed (expected {expected[:12]}…, got {hasher.hexdigest()[:12]}…)"
+            )
 
     def complete_transfer(self, transfer_id: str, status: str = "completed") -> None:
         r = self._client.put(
@@ -361,6 +380,30 @@ class SyncClient:
         r = self._client.get(self._url(f"/games/{slug}/save/meta"), timeout=10)
         if r.status_code == 204:
             return None
+        r.raise_for_status()
+        return r.json()
+
+    def list_save_history(self, slug: str) -> list[dict]:
+        """Return every retained save generation for a game, newest first."""
+        r = self._client.get(self._url(f"/games/{slug}/save/history"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def restore_save(self, slug: str, version_id: str) -> dict:
+        """Make a past save generation the current one on the server."""
+        r = self._client.post(self._url(f"/games/{slug}/save/restore"), json={"version_id": version_id}, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def list_state_history(self, slug: str) -> list[dict]:
+        """Return every retained state generation for a game, newest first."""
+        r = self._client.get(self._url(f"/games/{slug}/state/history"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def restore_state(self, slug: str, version_id: str) -> dict:
+        """Make a past state generation the current one on the server."""
+        r = self._client.post(self._url(f"/games/{slug}/state/restore"), json={"version_id": version_id}, timeout=10)
         r.raise_for_status()
         return r.json()
 

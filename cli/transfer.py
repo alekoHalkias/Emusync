@@ -301,11 +301,12 @@ def _receive_transfer(
     console: str,
     game_name: str,
     log=click.echo,
+    sha256: str | None = None,
 ) -> bool:
     """Download one pending transfer, save it, register the game. Returns True on success."""
     try:
         log(f"  Receiving {game_name}...")
-        client.download_transfer(transfer_id, destination_path)
+        client.download_transfer(transfer_id, destination_path, expected_hash=sha256)
         client.complete_transfer(transfer_id)
         log(f"  Saved to {destination_path}")
     except Exception as e:
@@ -418,7 +419,8 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
                 if _stopping():
                     return
                 _receive_transfer(client, t["id"], t["destination_path"],
-                                  t["slug"], t.get("console", ""), t.get("game_name", t["slug"]), log)
+                                  t["slug"], t.get("console", ""), t.get("game_name", t["slug"]), log,
+                                  sha256=t.get("sha256"))
     except Exception as e:
         log(f"Warning: could not check pending transfers: {e}")
 
@@ -451,6 +453,7 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
                         event.get("console", ""),
                         event.get("game_name", event.get("slug", event["transfer_id"])),
                         log,
+                        sha256=event.get("sha256"),
                     )
                 elif event.get("type") == "rom_pull_requested":
                     _handle_pull_request(

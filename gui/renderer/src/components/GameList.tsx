@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { gamesOverview, removeGame, listGameDevices, getDeviceGameDevices, getDeviceConsoles, createPullRequest, type Game, type Device } from "../api";
 import ConsoleImport from "./ConsoleImport";
+import SaveHistory from "./SaveHistory";
 import { useDevices } from "../DeviceContext";
 
 type Props = {
@@ -14,9 +15,11 @@ type GameRow = Game & {
   lastSave?: string | null;
   locked?: boolean;
   isLocal: boolean;
+  savePath?: string;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
+type HistoryModal = { slug: string; name: string; savePath?: string } | null;
 type TransferState = { status: "idle" | "loading" | "success" | "error"; message: string };
 
 type DeviceModal = {
@@ -110,6 +113,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [deviceModal, setDeviceModal] = useState<DeviceModal>(null);
+  const [historyModal, setHistoryModal] = useState<HistoryModal>(null);
   const [colWidths, setColWidths] = useState({ name: 260, lastSave: 150, synced: 150 });
   const [sortBy, setSortBy] = useState<'default' | 'game' | 'lastSave' | 'synced'>('default');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -140,6 +144,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
             lastSave,
             locked: g.locked,
             isLocal: g.is_local,
+            savePath: g.save_path || undefined,
           };
         })
       );
@@ -477,6 +482,13 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                           </button>
                           <button
                             className="btn btn-icon"
+                            title="Save history & rollback"
+                            onClick={() => setHistoryModal({ slug: g.slug, name: g.name, savePath: g.savePath })}
+                          >
+                            🕘
+                          </button>
+                          <button
+                            className="btn btn-icon"
                             title="Settings"
                             onClick={() => onEdit(g)}
                           >
@@ -548,6 +560,16 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         <ConsoleImport
           onClose={() => setShowEmulatorImport(false)}
           onImported={load}
+        />
+      )}
+
+      {historyModal && (
+        <SaveHistory
+          slug={historyModal.slug}
+          name={historyModal.name}
+          savePath={historyModal.savePath}
+          onClose={() => setHistoryModal(null)}
+          onRestored={() => load(true)}
         />
       )}
 
