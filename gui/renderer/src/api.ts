@@ -131,6 +131,15 @@ export const listEvents = (): Promise<ActivityEvent[]> => _fetch("GET", "/events
 
 export const listGameDevices = (slug: string): Promise<Device[]> => _fetch("GET", `/games/${slug}/devices`);
 
+export type SaveVersion = { id: string; device_id: string; hash: string; pushed_at: string; size: number };
+
+/** Retained save generations for a game, newest first (issue #7). */
+export const listSaveHistory = (slug: string): Promise<SaveVersion[]> =>
+  _fetch("GET", `/games/${slug}/save/history`);
+/** Make a past save version current on the server. */
+export const restoreSave = (slug: string, versionId: string): Promise<{ hash: string; pushed_at: string }> =>
+  _fetch("POST", `/games/${slug}/save/restore`, { version_id: versionId });
+
 export type DeviceConsole = { console_name: string; device_game_folder: string; device_save_folder: string; device_emulator: string };
 export type DeviceGameDevice = { slug: string; name: string; console?: string; rom_path: string; save_path: string };
 

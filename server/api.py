@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -390,9 +391,12 @@ async def create_rom_transfer(
     staged_path = transfer_subdir / filename
 
     loop = asyncio.get_running_loop()
+    hasher = hashlib.sha256()
     with open(staged_path, "wb") as f:
         async for chunk in request.stream():
+            hasher.update(chunk)
             await loop.run_in_executor(None, f.write, chunk)
+    sha256 = hasher.hexdigest()
 
     store.create_rom_transfer(
         id=transfer_id,
@@ -401,6 +405,7 @@ async def create_rom_transfer(
         to_device_id=x_to_device_id,
         destination_path=x_destination_path or "",
         staged_file=str(staged_path),
+        sha256=sha256,
     )
 
     target_name = next((d.name for d in devices if d.id == x_to_device_id), x_to_device_id)
@@ -416,6 +421,7 @@ async def create_rom_transfer(
             "game_name": game.name,
             "console": game.console,
             "destination_path": x_destination_path or "",
+            "sha256": sha256,
         })
 
     store.log_event("rom_transfer_queued", slug, device_id)
@@ -443,6 +449,7 @@ def list_pending_transfers(device_id: str = Depends(_auth)) -> list[dict]:
             "queued_at": t.queued_at,
             "console": game.console if game else "",
             "game_name": game.name if game else t.slug,
+            "sha256": t.sha256,
         })
     return result
 
@@ -460,7 +467,8 @@ def download_transfer_file(transfer_id: str, device_id: str = Depends(_auth)) ->
     if not staged.exists():
         raise HTTPException(status_code=410, detail="Staged file no longer exists")
     _print_activity(f"ROM pulled: {_game_label(transfer.slug)} by {_device_label(device_id)}")
-    return FileResponse(str(staged), filename=staged.name, media_type="application/octet-stream")
+    headers = {"X-Rom-Hash": transfer.sha256} if transfer.sha256 else None
+    return FileResponse(str(staged), filename=staged.name, media_type="application/octet-stream", headers=headers)
 
 
 @app.put("/rom-transfers/{transfer_id}")
@@ -643,9 +651,31 @@ def get_save_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     if not meta:
         return Response(status_code=204)
     return Response(
-        content=json.dumps({"hash": meta.hash, "pushed_at": meta.pushed_at, "device_id": meta.device_id}),
+        content=json.dumps({"hash": meta.hash, "pushed_at": meta.pushed_at, "device_id": meta.device_id, "size": meta.size}),
         media_type="application/json",
     )
+
+
+@app.get("/games/{slug}/save/history")
+def list_save_history(slug: str, device_id: str = Depends(_auth)) -> list[dict]:
+    """Every retained save generation for a game, newest first (issue #7)."""
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")
+    return _get_store().list_save_history(slug)
+
+
+class RestoreRequest(BaseModel):
+    version_id: str
+
+
+@app.post("/games/{slug}/save/restore")
+def restore_save(slug: str, req: RestoreRequest, device_id: str = Depends(_auth)) -> dict:
+    """Make a past save generation current (it becomes the next thing pulled)."""
+    meta = _get_store().restore_save(slug, req.version_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="Save version not found")
+    _print_activity(f"save restored: {_game_label(slug)} by {_device_label(device_id)}")
+    return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
 
 # ── states ────────────────────────────────────────────────────────────────────
@@ -689,9 +719,27 @@ def get_state_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     if not meta:
         return Response(status_code=204)
     return Response(
-        content=json.dumps({"hash": meta.hash, "pushed_at": meta.pushed_at, "device_id": meta.device_id}),
+        content=json.dumps({"hash": meta.hash, "pushed_at": meta.pushed_at, "device_id": meta.device_id, "size": meta.size}),
         media_type="application/json",
     )
+
+
+@app.get("/games/{slug}/state/history")
+def list_state_history(slug: str, device_id: str = Depends(_auth)) -> list[dict]:
+    """Every retained state generation for a game, newest first (issue #7)."""
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")
+    return _get_store().list_state_history(slug)
+
+
+@app.post("/games/{slug}/state/restore")
+def restore_state(slug: str, req: RestoreRequest, device_id: str = Depends(_auth)) -> dict:
+    """Make a past state generation current (it becomes the next thing pulled)."""
+    meta = _get_store().restore_state(slug, req.version_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="State version not found")
+    _print_activity(f"state restored: {_game_label(slug)} by {_device_label(device_id)}")
+    return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
 
 # ── locks ─────────────────────────────────────────────────────────────────────

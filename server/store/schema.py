@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 6
+_SCHEMA_VERSION = 7
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -86,7 +86,8 @@ CREATE TABLE IF NOT EXISTS rom_transfers (
     staged_file      TEXT NOT NULL DEFAULT '',
     status           TEXT NOT NULL DEFAULT 'pending',
     queued_at        TEXT NOT NULL,
-    completed_at     TEXT
+    completed_at     TEXT,
+    sha256           TEXT
 );
 CREATE TABLE IF NOT EXISTS rom_pull_requests (
     id               TEXT PRIMARY KEY,
@@ -234,4 +235,7 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
             _try(conn, "ALTER TABLE core_defs ADD COLUMN console_key TEXT REFERENCES console_defs(key)")
             # Clear old core_defs rows without console_key so they'll be re-seeded
             conn.execute("DELETE FROM core_defs WHERE console_key IS NULL")
+    if from_version < 7:
+        # Record each staged ROM's SHA256 so the receiver can verify its download (issue #214).
+        _try(conn, "ALTER TABLE rom_transfers ADD COLUMN sha256 TEXT")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

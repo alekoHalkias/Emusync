@@ -26,6 +26,7 @@ from cli.run import (
     _resolve_written_save,
     _resolve_written_state,
     _run_offline,
+    _save_is_safe_to_push,
 )
 from server.sync_client import GameDeviceConfig
 
@@ -72,6 +73,41 @@ def test_divergence_unparseable_server_time_defaults_to_push():
 def test_divergence_missing_local_mtime_pulls():
     # local hash present but mtime unknown → don't risk clobbering server
     assert _decide_save_action("local", None, _meta("server", NOW)) == "pull"
+
+
+# ── _save_is_safe_to_push (truncated/zero-byte guard, issue #213) ────────────────
+
+def test_zero_byte_save_is_never_safe():
+    # A 0-byte save (crashed emulator) must never overwrite the server copy.
+    assert _save_is_safe_to_push(0, 32768) is False
+
+
+def test_zero_byte_save_unsafe_even_with_no_server_copy():
+    assert _save_is_safe_to_push(0, None) is False
+
+
+def test_first_nonempty_save_is_safe_when_server_has_none():
+    assert _save_is_safe_to_push(32768, None) is True
+    assert _save_is_safe_to_push(32768, 0) is True
+
+
+def test_same_size_save_is_safe():
+    assert _save_is_safe_to_push(32768, 32768) is True
+
+
+def test_grown_save_is_safe():
+    assert _save_is_safe_to_push(65536, 32768) is True
+
+
+def test_drastically_shrunk_save_is_unsafe():
+    # Shrunk below the 50% floor — looks truncated.
+    assert _save_is_safe_to_push(1000, 32768) is False
+
+
+def test_mild_shrink_within_floor_is_safe():
+    # Exactly at the floor is allowed; just above stays allowed.
+    assert _save_is_safe_to_push(16384, 32768) is True
+    assert _save_is_safe_to_push(20000, 32768) is True
 
 
 # ── _parse_iso ──────────────────────────────────────────────────────────────────

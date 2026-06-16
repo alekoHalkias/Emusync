@@ -1509,3 +1509,118 @@ def test_safe_extract_tar_allows_normal_members(tmp_path):
 
     assert (dest / "game.state").read_bytes() == b"slot0"
     assert (dest / "game.state1").read_bytes() == b"slot1"
+
+
+# ── save history & rollback (issue #7) ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_save_history_accumulates_generations(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    for payload in (b"gen-one", b"gen-two-bigger", b"gen-three"):
+        await client.post("/games/zelda/save", content=payload, headers=AUTH)
+
+    r = await client.get("/games/zelda/save/history", headers=AUTH)
+    assert r.status_code == 200
+    history = r.json()
+    assert len(history) == 3
+    # Newest first; size reported.
+    assert history[0]["hash"] == hashlib.sha256(b"gen-three").hexdigest()
+    assert history[0]["size"] == len(b"gen-three")
+    assert history[-1]["hash"] == hashlib.sha256(b"gen-one").hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_save_history_dedupes_identical_pushes(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    await client.post("/games/zelda/save", content=b"same", headers=AUTH)
+    await client.post("/games/zelda/save", content=b"same", headers=AUTH)
+
+    r = await client.get("/games/zelda/save/history", headers=AUTH)
+    assert len(r.json()) == 1  # identical content does not create a new generation
+
+
+@pytest.mark.asyncio
+async def test_restore_save_makes_old_version_current(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    await client.post("/games/zelda/save", content=b"good-save", headers=AUTH)
+    await client.post("/games/zelda/save", content=b"bad-save", headers=AUTH)
+
+    history = (await client.get("/games/zelda/save/history", headers=AUTH)).json()
+    good_version = next(v for v in history if v["hash"] == hashlib.sha256(b"good-save").hexdigest())
+
+    r = await client.post("/games/zelda/save/restore", json={"version_id": good_version["id"]}, headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["hash"] == hashlib.sha256(b"good-save").hexdigest()
+
+    # Pulling now returns the restored content.
+    pulled = await client.get("/games/zelda/save", headers=AUTH)
+    assert pulled.content == b"good-save"
+    # Restore added a forward generation rather than dropping anything.
+    assert len(history) == 2
+
+
+@pytest.mark.asyncio
+async def test_restore_unknown_version_returns_404(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    await client.post("/games/zelda/save", content=b"x", headers=AUTH)
+    r = await client.post("/games/zelda/save/restore", json={"version_id": "no-such-id"}, headers=AUTH)
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_save_history_pruned_to_limit(client):
+    from server.store.blobs import HISTORY_LIMIT
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    for i in range(HISTORY_LIMIT + 5):
+        await client.post("/games/zelda/save", content=f"gen-{i}".encode(), headers=AUTH)
+    history = (await client.get("/games/zelda/save/history", headers=AUTH)).json()
+    assert len(history) == HISTORY_LIMIT
+    assert history[0]["hash"] == hashlib.sha256(f"gen-{HISTORY_LIMIT + 4}".encode()).hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_save_history_404_for_unknown_game(client):
+    r = await client.get("/games/ghost/save/history", headers=AUTH)
+    assert r.status_code == 404
+
+
+# ── ROM transfer integrity (issue #214) ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_rom_transfer_records_and_serves_sha256(tmp_path):
+    rom_bytes = b"ROMDATA" * 500
+    expected = hashlib.sha256(rom_bytes).hexdigest()
+    with tempfile.TemporaryDirectory() as db_dir:
+        store = Store(db_dir)
+        api_module.init(store, MASTER_PIN, str(tmp_path))
+        async with AsyncClient(
+            transport=ASGITransport(app=api_module.app), base_url="http://test"
+        ) as c:
+            auth_src = _device_auth("dev-src", "PC")
+            auth_dst = _device_auth("dev-dst", "Deck")
+            await c.get("/games", headers=auth_src)
+            await c.get("/games", headers=auth_dst)
+            await c.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=auth_src)
+
+            r = await c.post(
+                "/games/metroid/rom-transfer",
+                content=rom_bytes,
+                headers={
+                    **auth_src,
+                    "Content-Type": "application/octet-stream",
+                    "X-To-Device-ID": "dev-dst",
+                    "X-Destination-Path": "/home/deck/Games/GBA/Metroid.gba",
+                    "X-Filename": "Metroid.gba",
+                },
+            )
+            transfer_id = r.json()["transfer_id"]
+
+            # Pending list surfaces the hash so the receiver can verify.
+            pending = (await c.get("/rom-transfers/pending", headers=auth_dst)).json()
+            assert pending[0]["sha256"] == expected
+
+            # Download response carries the hash header.
+            dl = await c.get(f"/rom-transfers/{transfer_id}/file", headers=auth_dst)
+            assert dl.status_code == 200
+            assert dl.headers["x-rom-hash"] == expected
+            assert hashlib.sha256(dl.content).hexdigest() == expected

@@ -20,25 +20,26 @@ class TransferMixin:
         to_device_id: str,
         destination_path: str,
         staged_file: str,
+        sha256: Optional[str] = None,
     ) -> RomTransfer:
         now = datetime.now(timezone.utc).isoformat()
         self._conn.execute(
             """INSERT INTO rom_transfers
-               (id, slug, from_device_id, to_device_id, destination_path, staged_file, status, queued_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)""",
-            (id, slug, from_device_id, to_device_id, destination_path, staged_file, now),
+               (id, slug, from_device_id, to_device_id, destination_path, staged_file, status, queued_at, sha256)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)""",
+            (id, slug, from_device_id, to_device_id, destination_path, staged_file, now, sha256),
         )
         self._conn.commit()
         return RomTransfer(
             id=id, slug=slug, from_device_id=from_device_id, to_device_id=to_device_id,
             destination_path=destination_path, staged_file=staged_file,
-            status="pending", queued_at=now,
+            status="pending", queued_at=now, sha256=sha256,
         )
 
     def get_rom_transfer(self, transfer_id: str) -> Optional[RomTransfer]:
         row = self._conn.execute(
             """SELECT id, slug, from_device_id, to_device_id, destination_path,
-                      staged_file, status, queued_at, completed_at
+                      staged_file, status, queued_at, completed_at, sha256
                FROM rom_transfers WHERE id = ?""",
             (transfer_id,),
         ).fetchone()
@@ -47,7 +48,7 @@ class TransferMixin:
     def list_pending_transfers_for_device(self, device_id: str) -> list[RomTransfer]:
         rows = self._conn.execute(
             """SELECT id, slug, from_device_id, to_device_id, destination_path,
-                      staged_file, status, queued_at, completed_at
+                      staged_file, status, queued_at, completed_at, sha256
                FROM rom_transfers WHERE to_device_id = ? AND status = 'pending'
                ORDER BY queued_at""",
             (device_id,),
