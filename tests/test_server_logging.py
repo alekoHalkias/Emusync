@@ -8,21 +8,12 @@ from __future__ import annotations
 
 import io
 import re
-import sys
-import tempfile
-from pathlib import Path
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cli.server import _TimestampedStream
-from server import api as api_module
-from server.store import Store
+from tests.conftest import MASTER_PIN
 
-MASTER_PIN = "test-master-pin"
 AUTH = {
     "Authorization": f"Bearer {MASTER_PIN}",
     "X-Device-ID": "device-abc",
@@ -72,18 +63,6 @@ def test_timestamped_stream_delegates_unknown_attrs():
 
 
 # ── activity lines ───────────────────────────────────────────────────────────────
-
-@pytest_asyncio.fixture
-async def client():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = Store(tmpdir)
-        api_module.init(store, MASTER_PIN, tmpdir)
-        async with AsyncClient(
-            transport=ASGITransport(app=api_module.app),
-            base_url="http://test",
-        ) as c:
-            yield c
-
 
 @pytest.mark.asyncio
 async def test_lock_acquire_release_log_run_and_stop(client, capsys):
