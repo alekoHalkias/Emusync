@@ -9,28 +9,11 @@ Run:  .venv/bin/python -m pytest tests/test_rom_import.py -v
 """
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from server import api as api_module
-from server.store import Store
-
-MASTER_PIN = "test-master-pin"
-DEVICE_ID = "device-abc"
-DEVICE_NAME = "test-pc"
-
-AUTH = {
-    "Authorization": f"Bearer {MASTER_PIN}",
-    "X-Device-ID": DEVICE_ID,
-    "X-Device-Name": DEVICE_NAME,
-}
+from tests.conftest import AUTH
 
 # Path to test ROM folder (relative to repo root)
 TEST_ROM_BASE = Path(__file__).parent.parent / "test_rom_folders"
@@ -60,19 +43,6 @@ TEST_CONSOLES = {
         ],
     },
 }
-
-
-@pytest_asyncio.fixture
-async def client():
-    """Fresh in-memory store + FastAPI app for each test."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store = Store(tmpdir)
-        api_module.init(store, MASTER_PIN)
-        async with AsyncClient(
-            transport=ASGITransport(app=api_module.app),
-            base_url="http://test",
-        ) as c:
-            yield c
 
 
 @pytest.mark.asyncio

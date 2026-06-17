@@ -4,11 +4,7 @@ Pure functions — no server needed.
 """
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cli.common import _fmt_time, _parse_iso_utc, _relative
 
