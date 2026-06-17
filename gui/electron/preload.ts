@@ -44,14 +44,14 @@ contextBridge.exposeInMainWorld("emusync", {
     consoles: (): Promise<{ key: string; label: string }[]> =>
       ipcRenderer.invoke("emulator:consoles"),
     detect: (consoleKey: string): Promise<{
-      options: import("../../../electron/main").DetectedEmulatorOption[];
+      options: import("./emulator/types").DetectedEmulatorOption[];
       suggestions: string[];
     }> => ipcRenderer.invoke("emulator:detect", consoleKey),
     scan: (
       consoleKey: string,
-      emulatorOption: import("../../../electron/main").DetectedEmulatorOption,
+      emulatorOption: import("./emulator/types").DetectedEmulatorOption,
       extraPaths: string[],
-    ): Promise<import("../../../electron/main").EmulatorScanResult> =>
+    ): Promise<import("./emulator/types").EmulatorScanResult> =>
       ipcRenderer.invoke("emulator:scan", { consoleKey, emulatorOption, extraPaths }),
   },
   files: {
