@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { addGame, setGameDevice, listGames, getGameDevice, listDevices, listGameDevices, type Game, type Device } from "../api";
+import { addGame, setGameDevice, listGames, getGameDevice, listDevices, listGameDevices, type Device } from "../api";
 
 type ConsoleOption = { key: string; label: string };
 
@@ -25,7 +25,7 @@ type RomEntry = {
   statePath?: string;
   stateExists?: boolean;
   existingGameSlug?: string;
-  romFolderPath?: string;
+  romFolderPath: string;
   linkedSlug?: string;
   linkedName?: string;
 };
@@ -183,10 +183,6 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           }
         }
 
-        // Build slug→name map for all server games (for cross-device badge label)
-        const allGamesBySlug: Record<string, string> = {};
-        for (const g of existingGames) allGamesBySlug[g.slug] = g.name;
-
         const withMatches = annotated.map((rom: RomEntry) => {
           // 1. Already on this device → skip
           const thisMatch = thisDeviceConfigs.find(cfg =>
@@ -197,7 +193,6 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
           // 2. Exists on another device → link candidate (match by slug or name)
           const slugified = rom.romFileName.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
           const crossMatch = existingGames.find(g => {
-            if (allGamesBySlug[g.slug] === undefined) return false;
             const nameSlug = g.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
             return g.slug === slugified || nameSlug === slugified ||
               g.name.toLowerCase() === rom.name.toLowerCase();
@@ -284,7 +279,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
   function toggleRom(romPath: string): void {
     setSelected(prev => {
       const next = new Set(prev);
-      next.has(romPath) ? next.delete(romPath) : next.add(romPath);
+      if (next.has(romPath)) next.delete(romPath);
+      else next.add(romPath);
       return next;
     });
   }
@@ -293,7 +289,8 @@ export default function ConsoleImport({ onClose, onImported }: Props): React.Rea
     const allOn = paths.every(p => selected.has(p));
     setSelected(prev => {
       const next = new Set(prev);
-      allOn ? paths.forEach(p => next.delete(p)) : paths.forEach(p => next.add(p));
+      if (allOn) paths.forEach(p => next.delete(p));
+      else paths.forEach(p => next.add(p));
       return next;
     });
   }
