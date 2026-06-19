@@ -1,7 +1,7 @@
 // State machine + async orchestration for the Add-Console wizard.
 // The presentational step components consume the object this hook returns.
 import { useEffect, useState } from "react";
-import { addGame, setGameDevice, listGames, getGameDevice, listDevices, listGameDevices, type Device } from "../../api";
+import { addGame, setGameDevice, gamesOverview, getDeviceGameDevices, listDevices, type Device } from "../../api";
 import {
   annotateRoms,
   dedupeAndLink,
@@ -77,22 +77,15 @@ export function useConsoleImport({ onClose, onImported }: Props) {
       // Dedup: filter already-imported ROMs; detect cross-device links.
       let newRoms = annotated;
       try {
-        const existingGames = await listGames();
+        // One batched call gives every game's slug/name/console plus this
+        // device's rom_path (empty when the game isn't configured here),
+        // replacing the old listGames() + per-game getGameDevice() fan-out.
+        const overview = await gamesOverview();
+        const thisDeviceConfigs = overview
+          .filter(o => o.rom_path)
+          .map(o => ({ slug: o.slug, romPath: o.rom_path }));
 
-        // Collect this-device configs (404 = game exists on server but not this device)
-        const thisDeviceConfigs: Array<{ slug: string; romPath: string }> = [];
-        for (const g of existingGames) {
-          try {
-            const config = await getGameDevice(g.slug);
-            if (config.rom_path) {
-              thisDeviceConfigs.push({ slug: g.slug, romPath: config.rom_path });
-            }
-          } catch {
-            // 404 = game known to server but not configured on this device — candidate for linking
-          }
-        }
-
-        const { roms: deduped, skipCount } = dedupeAndLink(annotated, existingGames, thisDeviceConfigs);
+        const { roms: deduped, skipCount } = dedupeAndLink(annotated, overview, thisDeviceConfigs);
         newRoms = deduped;
         if (skipCount > 0 && deduped.length === 0) {
           setError(`${skipCount} ROM${skipCount !== 1 ? "s" : ""} found — all already imported on this device.`);
@@ -259,10 +252,12 @@ export function useConsoleImport({ onClose, onImported }: Props) {
         let offline = false;
         let errMsg = "";
 
+        // Fetch this device's existing games once instead of per-entry.
+        const deviceSlugs = new Set((await getDeviceGameDevices(device.id)).map(g => g.slug));
+
         for (const entry of entries) {
           // Skip if this device already has the game
-          const peers = await listGameDevices(entry.slug);
-          if (peers.some(p => p.id === device.id)) continue;
+          if (deviceSlugs.has(entry.slug)) continue;
 
           // Push ROM
           const romResult: { ok: boolean; targetOnline?: boolean; error?: string } =
