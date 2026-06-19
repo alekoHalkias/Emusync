@@ -48,7 +48,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | `gui/renderer/src/components/GameList.tsx` | Main game list; play/edit/remove actions; bulk delete with checkboxes; per-game 🕘 button opens `SaveHistory` |
 | `gui/renderer/src/components/SaveHistory.tsx` | Per-game save history + rollback modal (issue #7) — lists retained versions (time/size/source device), Restore makes a version current on the server and (if the game is local) writes it to disk via `save:pull` |
 | `gui/renderer/src/components/GameConfig.tsx` | Add/edit game form with file pickers |
-| `gui/renderer/src/components/ConsoleImport.tsx` | "Add Console" wizard modal — console dropdown → emulator detection → ROM scan → import |
+| `gui/renderer/src/components/ConsoleImport.tsx` | "Add Console" wizard modal — console dropdown → emulator detection → ROM scan → import. Thin shell: runs the `useConsoleImport` state machine and renders the step component for the current phase (issue #229). The pieces live in `components/console-import/`: `types.ts`, `helpers.ts` (pure, testable: `slugify`/`getConsoleAbbreviation`/`resolveRomFolder`/`annotateRoms`/`dedupeAndLink`/`groupByDir`), `useConsoleImport.ts` (all state + async handlers; returns a `ConsoleImportVM` object the steps consume), and one component per phase (`ConsoleStep`/`EmulatorStep`/`ResultsStep`/`DoneStep` + shared `Stepper`/`Spinner`) |
 
 ---
 
