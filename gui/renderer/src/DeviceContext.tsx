@@ -49,12 +49,12 @@ export function DeviceProvider({ children }: { children: React.ReactNode }): Rea
   useEffect(() => {
     (async () => {
       try {
-        const cfg = await (window as any).emusync.config.load();
+        const cfg = await window.emusync.config.load();
         const host: string = cfg?.server_host || "";
         if (host && host !== "localhost" && host !== "127.0.0.1") {
           setServerIp(host);
         } else {
-          const ip = await (window as any).emusync.server.localIp();
+          const ip = await window.emusync.server.localIp();
           if (ip) setServerIp(ip);
         }
       } catch {}

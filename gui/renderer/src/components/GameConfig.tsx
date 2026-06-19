@@ -55,19 +55,19 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
   useEffect(() => {
     if (!savePath) return;
-    (window as any).emusync.files.getSaveTime(savePath).then(setLocalSaveTime).catch(() => {});
+    window.emusync.files.getSaveTime(savePath).then(setLocalSaveTime).catch(() => {});
   }, [savePath]);
 
   useEffect(() => {
     if (!statePath) return;
     // statePath is now the state FOLDER itself
-    (window as any).emusync.files.getLatestInFolder(statePath).then(setLatestStateFile).catch(() => {});
+    window.emusync.files.getLatestInFolder(statePath).then(setLatestStateFile).catch(() => {});
   }, [statePath]);
 
   useEffect(() => { loadSyncInfo(); }, [loadSyncInfo]);
 
   async function pickFile(setter: (p: string) => void, title: string): Promise<void> {
-    const path = await (window as any).emusync.dialog.openFile({ title });
+    const path = await window.emusync.dialog.openFile({ title });
     if (path) setter(path);
   }
 
@@ -108,11 +108,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   async function handlePushSave(): Promise<void> {
     if (!slug || !savePath) return;
     setSaveOp({ status: "busy", action: "push", msg: "" });
-    const result = await (window as any).emusync.save.push(slug, savePath);
+    const result = await window.emusync.save.push(slug, savePath);
     if (result.ok) {
       setSaveOp({ status: "ok", action: "push", msg: "Pushed to server" });
       await loadSyncInfo();
-      const t = await (window as any).emusync.files.getSaveTime(savePath).catch(() => null);
+      const t = await window.emusync.files.getSaveTime(savePath).catch(() => null);
       setLocalSaveTime(t);
     } else {
       setSaveOp({ status: "error", action: "push", msg: result.error || "Push failed" });
@@ -122,11 +122,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   async function handlePullSave(): Promise<void> {
     if (!slug || !savePath) return;
     setSaveOp({ status: "busy", action: "pull", msg: "" });
-    const result = await (window as any).emusync.save.pull(slug, savePath);
+    const result = await window.emusync.save.pull(slug, savePath);
     if (result.ok) {
       if (result.pulled) {
         setSaveOp({ status: "ok", action: "pull", msg: "Pulled — previous save backed up to .bak" });
-        const t = await (window as any).emusync.files.getSaveTime(savePath).catch(() => null);
+        const t = await window.emusync.files.getSaveTime(savePath).catch(() => null);
         setLocalSaveTime(t);
       } else {
         setSaveOp({ status: "ok", action: "pull", msg: "No server save yet" });
@@ -139,11 +139,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   async function handlePushState(): Promise<void> {
     if (!slug || !statePath) return;
     setStateOp({ status: "busy", action: "push", msg: "" });
-    const result = await (window as any).emusync.state.push(slug, statePath);
+    const result = await window.emusync.state.push(slug, statePath);
     if (result.ok) {
       setStateOp({ status: "ok", action: "push", msg: "Pushed to server" });
       await loadSyncInfo();
-      const latest = await (window as any).emusync.files.getLatestInFolder(statePath).catch(() => null);
+      const latest = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
       setLatestStateFile(latest);
     } else {
       setStateOp({ status: "error", action: "push", msg: result.error || "Push failed" });
@@ -153,11 +153,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   async function handlePullState(): Promise<void> {
     if (!slug || !statePath) return;
     setStateOp({ status: "busy", action: "pull", msg: "" });
-    const result = await (window as any).emusync.state.pull(slug, statePath);
+    const result = await window.emusync.state.pull(slug, statePath);
     if (result.ok) {
       if (result.pulled) {
         setStateOp({ status: "ok", action: "pull", msg: "Pulled — previous state backed up to .bak" });
-        const latest = await (window as any).emusync.files.getLatestInFolder(statePath).catch(() => null);
+        const latest = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
         setLatestStateFile(latest);
       } else {
         setStateOp({ status: "ok", action: "pull", msg: "No server state yet" });
@@ -243,7 +243,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               placeholder="/home/user/.config/retroarch/states/GameName"
             />
             <button className="btn btn-icon" title="Browse folder" onClick={async () => {
-              const folder = await (window as any).emusync.dialog.openFolder();
+              const folder = await window.emusync.dialog.openFolder();
               if (folder) setStatePath(folder);
             }}>
               📁
