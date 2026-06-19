@@ -24,7 +24,7 @@ export function DoneStep({ vm }: { vm: ConsoleImportVM }) {
           {pushResults.map(r => (
             <div key={r.deviceName} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 6 }}>
               {r.status === "pushing" && <span className="spinner" style={{ width: 12, height: 12, flexShrink: 0 }} />}
-              {r.status === "ok"      && <span style={{ color: "var(--green, #4caf50)" }}>✓</span>}
+              {r.status === "ok"      && <span className="ci-ok">✓</span>}
               {r.status === "offline" && <span>📤</span>}
               {r.status === "error"   && <span style={{ color: "var(--red, #f44336)" }}>✗</span>}
               <span>

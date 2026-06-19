@@ -1,6 +1,6 @@
 // Shared types for the Add-Console import wizard.
 
-export type ConsoleOption = { key: string; label: string };
+export type ConsoleOption = { key: string; label: string; abbr?: string };
 
 export type EmulatorOption = {
   id: string;

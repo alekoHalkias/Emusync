@@ -1,7 +1,7 @@
 // Pure helpers for the import wizard — no React, no IPC, no network.
 // Kept side-effect-free so they're trivially unit-testable.
 import type { Game } from "../../api";
-import type { Phase, RomEntry } from "./types";
+import type { ConsoleOption, Phase, RomEntry } from "./types";
 
 export const STEP_LABELS = ["Console", "Emulator", "ROMs"];
 
@@ -11,20 +11,13 @@ export function stepIndex(phase: Phase): number {
   return 2;
 }
 
-export function getConsoleAbbreviation(consoleKey: string): string {
-  const map: Record<string, string> = {
-    gba: "GBA",
-    gb: "GB",
-    snes: "SNES",
-    nes: "NES",
-    n64: "N64",
-    nds: "NDS",
-    genesis: "Genesis",
-    sms: "SMS",
-    pce: "PCE",
-    psx: "PSX",
-  };
-  return map[consoleKey] || consoleKey.toUpperCase();
+/**
+ * The console's stored abbreviation (used as the game's `console` value),
+ * derived from the defs fetched from the server (which carry `abbr`) rather
+ * than a hardcoded map. Falls back to the upper-cased key.
+ */
+export function getConsoleAbbreviation(consoleKey: string, consoles: ConsoleOption[]): string {
+  return consoles.find(c => c.key === consoleKey)?.abbr || consoleKey.toUpperCase();
 }
 
 /** ROM filename without extension, lowercased (used for fuzzy matching). */

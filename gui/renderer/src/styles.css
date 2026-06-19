@@ -244,3 +244,8 @@ input.error { border-color: var(--red); }
 }
 .config-header h2 { flex: 1; font-size: 18px; }
 .config-form { display: flex; flex-direction: column; gap: 20px; }
+
+/* Console import wizard — shared utilities for repeated inline styles */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ci-ok { color: var(--green); }
+.ci-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }

@@ -123,7 +123,7 @@ window.emusync.server.localIp()   // returns this machine's LAN IPv4 address (os
 window.emusync.dialog.openFile()  // native file picker
 window.emusync.dialog.openFolder() // native folder picker
 
-window.emusync.emulator.consoles()          // returns ordered console list { key, label }[] for the dropdown
+window.emusync.emulator.consoles()          // returns ordered console list { key, label, abbr }[] for the dropdown (abbr used as the game's stored console value — issue #230)
 window.emusync.emulator.detect(consoleKey)  // scans for installed emulators for that console; checks RetroArch (native+flatpak) cores + standalone emulators (mGBA etc.); looks for console-specific ROM subfolders (GBA, SNES, NES, etc.) within the configured ROM directory; resolves per-core save subfolder; returns { options: DetectedEmulatorOption[], suggestions[] }
 window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; uses emulatorOption.saveDir (already resolved to core subfolder); returns { emulators, romDirs, roms[] } with consoleName+coreName on each entry
 window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if the file doesn't exist; called during import for games with no existing save
