@@ -30,7 +30,7 @@ export interface EmusyncBridge {
     openFolder: () => Promise<string | null>;
   };
   emulator: {
-    consoles: () => Promise<{ key: string; label: string }[]>;
+    consoles: () => Promise<{ key: string; label: string; abbr?: string }[]>;
     detect: (consoleKey: string) => Promise<{ options: any[]; suggestions: string[] }>;
     scan: (consoleKey: string, emulatorOption: any, extraPaths: string[]) => Promise<{ emulators: any[]; romDirs: string[]; roms: any[] }>;
   };

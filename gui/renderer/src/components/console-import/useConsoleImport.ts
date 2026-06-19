@@ -190,7 +190,7 @@ export function useConsoleImport({ onClose, onImported }: Props) {
     setPhase("importing");
     const errs: string[] = [];
     const imported: ImportedEntry[] = [];
-    const consoleAbbr = getConsoleAbbreviation(consoleSel);
+    const consoleAbbr = getConsoleAbbreviation(consoleSel, consoles);
     for (let i = 0; i < toImport.length; i++) {
       const rom = toImport[i];
       try {
@@ -229,7 +229,10 @@ export function useConsoleImport({ onClose, onImported }: Props) {
           rom_folder_path: scanRoot || rom.romFolderPath || "",
         });
         imported.push({ slug, savePath, statePath });
-      } catch { errs.push(names[rom.romPath] ?? rom.name); }
+      } catch (e: unknown) {
+        const reason = e instanceof Error ? e.message : "import failed";
+        errs.push(`${names[rom.romPath] ?? rom.name} (${reason})`);
+      }
       setProgress({ done: i + 1, total: toImport.length });
     }
     setImportErrors(errs);

@@ -30,8 +30,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
         )}
         {allRomDirs.map(p => (
           <div key={p} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 4 }}>
-            <span style={{ flex: 1, color: "var(--text-muted)", overflow: "hidden",
-              textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span className="truncate" style={{ flex: 1, color: "var(--text-muted)" }}>
               {p}
               {!extraPaths.includes(p) && !removedDirs.has(p) && (
                 <span style={{ fontSize: 11, color: "var(--text-muted)" }}> (detected)</span>
@@ -98,15 +97,15 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                       onClick={(e) => e.stopPropagation()}
                       style={{ fontSize: 13, fontWeight: 500, width: "100%" }}
                     />
-                    <div style={{ fontSize: 11, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div className="truncate" style={{ fontSize: 11, color: "var(--text-muted)" }}>
                       {rom.romPath}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 8, alignItems: "center" }}>
                       {rom.saveExists && (
-                        <span style={{ color: "var(--green, #4caf50)" }}>✓ Save found</span>
+                        <span className="ci-ok">✓ Save found</span>
                       )}
                       {rom.statePath && rom.stateExists && (
-                        <span style={{ color: "var(--green, #4caf50)" }}>✓ State found</span>
+                        <span className="ci-ok">✓ State found</span>
                       )}
                       {rom.linkedSlug && (
                         <span style={{ color: "var(--accent, #7c8cf8)" }}>→ Links to {rom.linkedName}</span>
@@ -120,11 +119,11 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
       </div>
 
       <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+        <label className="ci-check">
           <input type="checkbox" checked={pushSaves} onChange={e => vm.setPushSaves(e.target.checked)} />
           Push saves to other devices
         </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+        <label className="ci-check">
           <input type="checkbox" checked={pushStates} onChange={e => vm.setPushStates(e.target.checked)} />
           Push states to other devices
         </label>
