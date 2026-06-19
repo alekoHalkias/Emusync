@@ -135,7 +135,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         overview.map(async (g): Promise<GameRow> => {
           let lastSave: string | null = null;
           if (g.is_local && g.save_path) {
-            lastSave = await (window as any).emusync.files.getSaveTime(g.save_path);
+            lastSave = await window.emusync.files.getSaveTime(g.save_path);
           }
           return {
             slug: g.slug,
@@ -170,7 +170,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   }, [load]);
 
   useEffect(() => {
-    (window as any).emusync.server.localIp().then(setLocalIp).catch(() => {});
+    window.emusync.server.localIp().then(setLocalIp).catch(() => {});
   }, []);
 
   async function handleRemove(): Promise<void> {
@@ -209,7 +209,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
   async function handlePush(toDevice: Device): Promise<void> {
     if (!deviceModal) return;
     setTransfer(toDevice.id, { status: "loading", message: "" });
-    const result = await (window as any).emusync.rom.push(deviceModal.slug, toDevice.id, deviceModal.gameConsole);
+    const result = await window.emusync.rom.push(deviceModal.slug, toDevice.id, deviceModal.gameConsole);
     if (result.ok) {
       setTransfer(toDevice.id, {
         status: "success",
@@ -237,7 +237,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
 
     // Fall back to folder picker if no console config found
     if (!folder) {
-      folder = await (window as any).emusync.dialog.openFolder();
+      folder = await window.emusync.dialog.openFolder();
       if (!folder) return;
     }
 
@@ -268,7 +268,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
     });
   }
 
-  function toggleConsoleSelection(consoleKey: string, consoleGames: GameRow[]): void {
+  function toggleConsoleSelection(consoleGames: GameRow[]): void {
     const consoleSlugs = consoleGames.map(g => g.slug);
     const allSelected = consoleSlugs.every(s => selectedSlugs.has(s));
     setSelectedSlugs(prev => {
@@ -440,7 +440,7 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                       <ConsoleCheckbox
                         games={consoleGames}
                         selectedSlugs={selectedSlugs}
-                        onToggle={() => toggleConsoleSelection(colKey, consoleGames)}
+                        onToggle={() => toggleConsoleSelection(consoleGames)}
                       />
                       <span>{collapsedConsoles.has(colKey) ? "▶" : "▼"}</span>
                       <span style={{ flex: 1 }}>{key}</span>

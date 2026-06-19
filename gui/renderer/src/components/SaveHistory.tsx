@@ -47,7 +47,7 @@ export default function SaveHistory({ slug, name, savePath, onClose, onRestored 
       await restoreSave(slug, v.id);
       // Write the now-current version to this device's disk if it has one.
       if (savePath) {
-        const res = await (window as any).emusync.save.pull(slug, savePath);
+        const res = await window.emusync.save.pull(slug, savePath);
         if (!res.ok) throw new Error(res.error || "Restored on server, but failed to write locally");
         setStatus("Restored and written to this device (previous save kept as .bak).");
       } else {

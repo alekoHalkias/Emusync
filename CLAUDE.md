@@ -153,7 +153,7 @@ window.emusync.daemon.start()              // spawn emusync sync-daemon (client 
 window.emusync.daemon.stop()               // kill the sync daemon if running
 ```
 
-When adding a new IPC channel, add the handler to `main.ts` AND the bridge entry to `preload.ts`. The renderer's TypeScript sees `window.emusync` as `any` (no separate `.d.ts`) — the global type declaration lives in `Setup.tsx`.
+When adding a new IPC channel, register the handler in the relevant `gui/electron/` module (via its `register*Ipc()`), add the bridge entry to `preload.ts`, AND add the typed signature to the `EmusyncBridge` interface in `gui/renderer/src/emusync.d.ts` so the renderer stays type-checked (issue #228). `window.emusync` is globally typed from that `.d.ts` — it is no longer `any`.
 
 ---
 
@@ -512,7 +512,7 @@ dev mode — visible in the `make dev-gui` terminal.
 
 **Stale DB schema** — If you see `sqlite3.OperationalError: no such column`, delete `~/.emusync/emusync.db` and restart the server.
 
-**TypeScript on `window.emusync`** — Typed as `any`; the global interface declaration is in `Setup.tsx`. If you add new IPC channels, add them there too or type errors won't surface at compile time.
+**TypeScript on `window.emusync`** — Globally typed via the `EmusyncBridge` interface in `gui/renderer/src/emusync.d.ts` (issue #228), the single source of truth that mirrors `preload.ts`. If you add a new IPC channel, add its signature there too or renderer call sites won't be type-checked. `config.load`/`save` and the `emulator.detect`/`scan` returns are intentionally loose (`Record<string, any>` / `any[]`) — the config is an open TOML dict and the emulator result types live in the electron package.
 
 **RetroArch config paths use `~` which Node.js does not expand** — `retroarch.cfg` commonly stores paths like `savefile_directory = "~/.config/retroarch/saves"`. `parseRetroArchCfg` in `main.ts` expands leading `~/` to the real home directory so that `existsSync`, `mkdirSync`, and `join` work correctly. Do not call `parseRetroArchCfg` without passing `home` and do not use raw config values as filesystem paths without checking for tilde. Also, `rgui_browser_directory = "default"` is RetroArch's placeholder for "not configured" — it is filtered out and never passed as a ROM directory.
 

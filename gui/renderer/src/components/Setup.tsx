@@ -12,54 +12,7 @@ type Step =
 
 type DiscoveredServer = { name: string; host: string; port: number };
 
-declare global {
-  interface Window {
-    emusync: {
-      config: {
-        load: () => Promise<Record<string, unknown> | null>;
-        save: (data: Record<string, unknown>) => Promise<boolean>;
-        exists: () => Promise<boolean>;
-        getRecentFolders: (consoleKey: string) => Promise<string[]>;
-        addRecentFolder: (consoleKey: string, path: string) => Promise<void>;
-      };
-      server: {
-        start: () => Promise<{ ok: boolean }>;
-        stop: () => Promise<boolean>;
-        token: () => Promise<string | null>;
-        changePin: (pin: string | null) => Promise<{ ok: boolean }>;
-        discover: () => Promise<Array<{ name: string; host: string; port: number }>>;
-      };
-      dialog: {
-        openFile: (opts?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
-        openFolder: () => Promise<string | null>;
-      };
-      emulator: {
-        consoles: () => Promise<Array<{ key: string; label: string }>>;
-        detect: (consoleKey: string) => Promise<unknown>;
-        scan: (consoleKey: string, emulatorOption: unknown, extraPaths: string[]) => Promise<unknown>;
-      };
-      files: {
-        ensureSave: (path: string) => Promise<void>;
-        getSaveTime: (path: string) => Promise<string | null>;
-      };
-      device: {
-        probe: (ip: string, port: number) => Promise<boolean>;
-      };
-      launcher: {
-        path: () => Promise<string>;
-      };
-      game: {
-        launch: (slug: string, command: string) => Promise<void>;
-        stop: () => Promise<void>;
-        stopExternal: () => Promise<void>;
-        hasPidFile: () => Promise<boolean>;
-        isRunning: () => Promise<boolean>;
-        onExited: (cb: () => void) => void;
-        offExited: (cb: () => void) => void;
-      };
-    };
-  }
-}
+// `window.emusync` is typed globally in src/emusync.d.ts (matches preload.ts).
 
 type Props = { onDone: () => void };
 

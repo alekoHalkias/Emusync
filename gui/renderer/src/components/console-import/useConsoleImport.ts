@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 // IPC bridge (typing deferred to the typed-bridge work in #228).
-const emusync = (window as any).emusync;
+const emusync = window.emusync;
 
 export function useConsoleImport({ onClose, onImported }: Props) {
   const [phase, setPhase]         = useState<Phase>("console");
@@ -119,7 +119,7 @@ export function useConsoleImport({ onClose, onImported }: Props) {
     const updated = extraPaths.filter(p => p !== path);
     setSavedFolders(updated);
     setExtraPaths(updated);
-    const cfg = await emusync.config.load();
+    const cfg = (await emusync.config.load()) ?? {};
     if (!cfg.recent_import_folders) cfg.recent_import_folders = {};
     cfg.recent_import_folders[consoleSel] = updated;
     await emusync.config.save(cfg);
