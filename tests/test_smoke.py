@@ -69,8 +69,24 @@ async def test_games_overview_batches_lock_save_and_config(client):
 
 
 @pytest.mark.asyncio
-async def test_games_overview_route_not_shadowed_by_slug(client):
-    """GET /games/overview must hit the overview route, not get_game('overview')."""
-    r = await client.get("/games/overview", headers=AUTH)
-    assert r.status_code == 200
-    assert isinstance(r.json(), list)
+async def test_games_overview_no_duplicate_rows_after_multiple_saves(client):
+    """A game played more than once (several save generations) must still appear
+    exactly once, with last_push = the newest generation (regression for #249:
+    the saves JOIN fanned out over save history)."""
+    await client.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=AUTH)
+    await client.put(
+        "/games/metroid/device",
+        json={"rom_path": "/roms/metroid.gba", "save_path": "/saves/metroid.srm"},
+        headers=AUTH,
+    )
+    # Three distinct save pushes → three retained generations.
+    await client.post("/games/metroid/save", content=b"gen-1", headers=AUTH)
+    await client.post("/games/metroid/save", content=b"gen-2", headers=AUTH)
+    last = await client.post("/games/metroid/save", content=b"gen-3", headers=AUTH)
+    newest_pushed_at = last.json()["pushed_at"]
+
+    rows = (await client.get("/games/overview", headers=AUTH)).json()
+
+    metroid_rows = [g for g in rows if g["slug"] == "metroid"]
+    assert len(metroid_rows) == 1
+    assert metroid_rows[0]["last_push"] == newest_pushed_at

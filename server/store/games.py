@@ -93,21 +93,26 @@ class GameDeviceMixin:
         """Everything the game list needs for one device, in a single query.
 
         Collapses the renderer's old per-game fan-out (getSaveMeta + getLock +
-        getGameDevice for every game) into one round-trip. Each referenced table
-        has at most one matching row per game — locks PK is game_slug, saves is
-        delete-then-insert (one row/slug), game_devices PK is (slug, device_id) —
-        so the LEFT JOINs never fan out.
+        getGameDevice for every game) into one round-trip. `locks` (PK game_slug)
+        and `game_devices` (PK (slug, device_id), filtered to this device) each
+        match at most one row per game, so those LEFT JOINs never fan out. `saves`
+        does NOT — it keeps history (many generations per game, issue #7), so
+        joining it would emit one row per generation and duplicate the game in the
+        list once a game has been played more than once (issue #249). The only
+        column needed from it is `last_push`, so it's a correlated subquery picking
+        the newest generation (rowid DESC = the current blob, matching blobs.py).
         """
         rows = self._conn.execute(
             """SELECT g.slug, g.name, g.console,
                       l.device_id      AS lock_device_id,
-                      s.pushed_at      AS last_push,
+                      (SELECT s.pushed_at FROM saves s
+                         WHERE s.game_slug = g.slug
+                         ORDER BY s.rowid DESC LIMIT 1) AS last_push,
                       gd.rom_path, gd.save_path, gd.state_path,
                       gd.launch_command, gd.rom_folder_path,
                       (gd.game_slug IS NOT NULL) AS is_local
                FROM games g
                LEFT JOIN locks l        ON l.game_slug = g.slug
-               LEFT JOIN saves s        ON s.game_slug = g.slug
                LEFT JOIN game_devices gd ON gd.game_slug = g.slug AND gd.device_id = ?
                ORDER BY g.name""",
             (device_id,),
