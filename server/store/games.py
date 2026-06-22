@@ -31,6 +31,9 @@ class GameMixin:
         self._conn.commit()
 
     def remove_game(self, slug: str) -> None:
+        # Drop on-disk save/state blobs first; the rows go via FK cascade, but the
+        # files would otherwise be orphaned (issue #239).
+        self.delete_blobs_for_game(slug)
         self._conn.execute("DELETE FROM games WHERE slug = ?", (slug,))
         self._conn.commit()
 

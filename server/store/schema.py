@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 7
+_SCHEMA_VERSION = 8
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -51,17 +51,17 @@ CREATE TABLE IF NOT EXISTS saves (
     id         TEXT PRIMARY KEY,
     game_slug  TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
     device_id  TEXT NOT NULL REFERENCES devices(id),
-    data       BLOB NOT NULL,
     hash       TEXT NOT NULL,
-    pushed_at  TEXT NOT NULL
+    pushed_at  TEXT NOT NULL,
+    size       INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS states (
     id         TEXT PRIMARY KEY,
     game_slug  TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
     device_id  TEXT NOT NULL REFERENCES devices(id),
-    data       BLOB NOT NULL,
     hash       TEXT NOT NULL,
-    pushed_at  TEXT NOT NULL
+    pushed_at  TEXT NOT NULL,
+    size       INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS locks (
     game_slug   TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE,
@@ -156,8 +156,31 @@ def _try(conn: sqlite3.Connection, sql: str) -> None:
             raise
 
 
-def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
-    """Apply incremental migrations for databases older than _SCHEMA_VERSION."""
+def _migrate_blobs_to_disk(conn: sqlite3.Connection, table: str, blob_dir) -> None:
+    """Move every BLOB in *table* out of SQLite into a file under blob_dir/<table>.
+
+    Each row's bytes are written to ``blob_dir/<table>/<row id>`` and its ``size``
+    column is populated, so the ``data`` column can be dropped afterwards. Rows are
+    read one at a time so a large DB isn't loaded into memory all at once.
+    """
+    from pathlib import Path
+
+    tdir = Path(blob_dir) / table
+    tdir.mkdir(parents=True, exist_ok=True)
+    ids = [r["id"] for r in conn.execute(f"SELECT id FROM {table}").fetchall()]
+    for blob_id in ids:
+        row = conn.execute(f"SELECT data FROM {table} WHERE id = ?", (blob_id,)).fetchone()
+        data = bytes(row["data"]) if row and row["data"] is not None else b""
+        (tdir / blob_id).write_bytes(data)
+        conn.execute(f"UPDATE {table} SET size = ? WHERE id = ?", (len(data), blob_id))
+
+
+def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None:
+    """Apply incremental migrations for databases older than _SCHEMA_VERSION.
+
+    `blob_dir` is the on-disk blob root (``<data_dir>/blobs``); required for the v8
+    migration that moves save/state BLOBs out of SQLite onto disk (issue #239).
+    """
     if from_version < 1:
         # Add columns that may not exist on pre-versioned databases
         _try(conn, "ALTER TABLE game_devices ADD COLUMN state_path TEXT NOT NULL DEFAULT ''")
@@ -238,4 +261,13 @@ def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
     if from_version < 7:
         # Record each staged ROM's SHA256 so the receiver can verify its download (issue #214).
         _try(conn, "ALTER TABLE rom_transfers ADD COLUMN sha256 TEXT")
+    if from_version < 8:
+        # Move save/state BLOBs out of SQLite onto disk to keep the DB small (#239).
+        _try(conn, "ALTER TABLE saves ADD COLUMN size INTEGER NOT NULL DEFAULT 0")
+        _try(conn, "ALTER TABLE states ADD COLUMN size INTEGER NOT NULL DEFAULT 0")
+        if blob_dir is not None:
+            for table in ("saves", "states"):
+                _migrate_blobs_to_disk(conn, table, blob_dir)
+            _try(conn, "ALTER TABLE saves DROP COLUMN data")
+            _try(conn, "ALTER TABLE states DROP COLUMN data")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

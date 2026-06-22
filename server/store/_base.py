@@ -17,6 +17,12 @@ class StoreBase:
     def __init__(self, data_dir: str) -> None:
         db_path = Path(data_dir) / "emusync.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
+        # Save/state bytes live on disk under blobs/<saves|states>/<row id>; only
+        # metadata lives in SQLite (issue #239). Created before any migration runs,
+        # since the v8 migration materializes existing BLOBs into here.
+        self._blob_dir = Path(data_dir) / "blobs"
+        (self._blob_dir / "saves").mkdir(parents=True, exist_ok=True)
+        (self._blob_dir / "states").mkdir(parents=True, exist_ok=True)
         is_fresh = not db_path.exists()
         # Per-thread connections; PRAGMAs (WAL, synchronous, foreign_keys) are
         # applied to each connection as it is created (see connection.py).
@@ -34,5 +40,5 @@ class StoreBase:
             self._conn.commit()
         db_version: int = self._conn.execute("PRAGMA user_version").fetchone()[0]
         if db_version < _SCHEMA_VERSION:
-            _migrate(self._conn, db_version)
+            _migrate(self._conn, db_version, self._blob_dir)
         self._conn.commit()

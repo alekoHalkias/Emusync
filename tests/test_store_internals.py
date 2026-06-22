@@ -88,6 +88,121 @@ def test_fresh_db_is_stamped_at_latest_schema_version():
         assert version == _SCHEMA_VERSION
 
 
+# ── on-disk blob storage (#239) ────────────────────────────────────────────────
+
+def test_save_bytes_live_on_disk_not_in_sqlite():
+    """A pushed save's bytes go to blobs/saves/<id> on disk; SQLite keeps only meta."""
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("dev-1", "PC")
+        store.add_game("zelda", "Zelda")
+        meta = store.push_save("zelda", "dev-1", b"hello-save")
+
+        # The blob file exists on disk and holds exactly the pushed bytes.
+        row = store._conn.execute(
+            "SELECT id, size FROM saves WHERE game_slug = ?", ("zelda",)
+        ).fetchone()
+        blob_file = Path(tmpdir) / "blobs" / "saves" / row["id"]
+        assert blob_file.read_bytes() == b"hello-save"
+        assert row["size"] == len(b"hello-save") == meta.size
+
+        # The saves table no longer carries a data column at all.
+        cols = {c[1] for c in store._conn.execute("PRAGMA table_info(saves)").fetchall()}
+        assert "data" not in cols
+
+        # Round-trips through the byte API.
+        assert store.pull_save("zelda")[0] == b"hello-save"
+
+
+def test_remove_game_deletes_on_disk_blobs():
+    """Removing a game unlinks its save/state files, not just the DB rows (#239)."""
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("dev-1", "PC")
+        store.add_game("zelda", "Zelda")
+        store.push_save("zelda", "dev-1", b"save-bytes")
+        store.push_state("zelda", "dev-1", b"state-bytes")
+
+        saves_dir = Path(tmpdir) / "blobs" / "saves"
+        states_dir = Path(tmpdir) / "blobs" / "states"
+        assert list(saves_dir.iterdir()) and list(states_dir.iterdir())
+
+        store.remove_game("zelda")
+        assert list(saves_dir.iterdir()) == []
+        assert list(states_dir.iterdir()) == []
+
+
+def test_prune_unlinks_old_generation_files():
+    """Pushing past HISTORY_LIMIT prunes both the rows and their on-disk files."""
+    from pathlib import Path
+    from server.store.blobs import HISTORY_LIMIT
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("dev-1", "PC")
+        store.add_game("zelda", "Zelda")
+        for i in range(HISTORY_LIMIT + 5):
+            store.push_save("zelda", "dev-1", f"save-{i}".encode())
+
+        saves_dir = Path(tmpdir) / "blobs" / "saves"
+        rows = store._conn.execute("SELECT COUNT(*) AS n FROM saves").fetchone()["n"]
+        assert rows == HISTORY_LIMIT
+        # File count tracks row count — no orphans left behind.
+        assert len(list(saves_dir.iterdir())) == HISTORY_LIMIT
+
+
+def test_v7_to_v8_migration_moves_blobs_to_disk():
+    """A v7 DB with BLOBs in SQLite migrates its bytes to disk and drops the column.
+
+    Builds a realistic pre-migration `saves` row (data BLOB, no size column), opens
+    it through Store(), and asserts the bytes are now on disk and still pullable.
+    No mocks — a real on-disk SQLite file, per the project's testing rule.
+    """
+    import sqlite3
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "emusync.db"
+        conn = sqlite3.connect(db_path)
+        conn.executescript(
+            """
+            CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+            CREATE TABLE games (slug TEXT PRIMARY KEY, name TEXT NOT NULL, console TEXT DEFAULT '');
+            CREATE TABLE saves (
+                id TEXT PRIMARY KEY, game_slug TEXT NOT NULL, device_id TEXT NOT NULL,
+                data BLOB NOT NULL, hash TEXT NOT NULL, pushed_at TEXT NOT NULL
+            );
+            CREATE TABLE states (
+                id TEXT PRIMARY KEY, game_slug TEXT NOT NULL, device_id TEXT NOT NULL,
+                data BLOB NOT NULL, hash TEXT NOT NULL, pushed_at TEXT NOT NULL
+            );
+            """
+        )
+        conn.execute("INSERT INTO devices (id, name) VALUES ('dev-1', 'PC')")
+        conn.execute("INSERT INTO games (slug, name) VALUES ('zelda', 'Zelda')")
+        conn.execute(
+            "INSERT INTO saves (id, game_slug, device_id, data, hash, pushed_at) "
+            "VALUES ('v1', 'zelda', 'dev-1', ?, 'h', '2026-01-01T00:00:00+00:00')",
+            (b"legacy-save-bytes",),
+        )
+        conn.execute("PRAGMA user_version = 7")
+        conn.commit()
+        conn.close()
+
+        # Opening through Store() runs the v8 migration.
+        store = Store(tmpdir)
+
+        assert store._conn.execute("PRAGMA user_version").fetchone()[0] >= 8
+        cols = {c[1] for c in store._conn.execute("PRAGMA table_info(saves)").fetchall()}
+        assert "data" not in cols and "size" in cols
+
+        blob_file = Path(tmpdir) / "blobs" / "saves" / "v1"
+        assert blob_file.read_bytes() == b"legacy-save-bytes"
+        data, meta = store.pull_save("zelda")
+        assert data == b"legacy-save-bytes"
+        assert meta.size == len(b"legacy-save-bytes")
+
+
 # ── console-def seeding is additive (#202) ─────────────────────────────────────
 
 def test_seed_console_defs_picks_up_additions():
