@@ -98,3 +98,63 @@ async def test_stale_lock_can_be_taken_after_ttl(client):
         lock = store.get_lock("test-game")
         assert lock is not None
         assert lock.device_id == "device-2"
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_reacquire_refreshes_acquired_at(client):
+    """The lock heartbeat re-acquires as the same holder, bumping acquired_at so a
+    long session never crosses the TTL and gets stolen (issue #238)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, MASTER_PIN)
+
+        store.ensure_device("device-1", "PC")
+        store.ensure_device("device-2", "Deck")
+        store.add_game("test-game", "Test Game")
+
+        # Device 1 holds a lock that is almost stale.
+        store.acquire_lock("test-game", "device-1")
+        near_stale = (datetime.now(timezone.utc) - timedelta(hours=LOCK_TTL_HOURS - 0.1)).isoformat()
+        store._conn.execute(
+            "UPDATE locks SET acquired_at = ? WHERE game_slug = ?",
+            (near_stale, "test-game"),
+        )
+        store._conn.commit()
+
+        # A heartbeat beat (same-holder re-acquire) refreshes the timestamp.
+        store.acquire_lock("test-game", "device-1")
+
+        # Now another device must still be blocked — the lock is fresh again.
+        with pytest.raises(ValueError):
+            store.acquire_lock("test-game", "device-2")
+        assert store.get_lock("test-game").device_id == "device-1"
+
+
+@pytest.mark.asyncio
+async def test_release_device_locks_frees_all_held_locks(client):
+    """When a device goes offline its locks are released so a crashed device
+    doesn't block games until the TTL (issue #238)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, MASTER_PIN)
+
+        store.ensure_device("device-1", "PC")
+        store.ensure_device("device-2", "Deck")
+        store.add_game("game-a", "Game A")
+        store.add_game("game-b", "Game B")
+        store.add_game("game-c", "Game C")
+
+        store.acquire_lock("game-a", "device-1")
+        store.acquire_lock("game-b", "device-1")
+        store.acquire_lock("game-c", "device-2")
+
+        freed = store.release_device_locks("device-1")
+        assert sorted(freed) == ["game-a", "game-b"]
+
+        # device-1's locks are gone; device-2's is untouched.
+        assert store.get_lock("game-a") is None
+        assert store.get_lock("game-b") is None
+        assert store.get_lock("game-c").device_id == "device-2"
+
+        # A second call is a no-op (returns nothing to free).
+        assert store.release_device_locks("device-1") == []
