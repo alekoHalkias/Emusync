@@ -58,11 +58,21 @@ def _monitor_presence() -> None:
                     continue
                 last_seen = datetime.fromisoformat(d.last_seen_at)
                 if (now - last_seen).total_seconds() > OFFLINE_TIMEOUT_SECONDS:
+                    went_offline = False
                     with _presence_lock:
                         if d.id in _online_devices:
                             _online_devices.discard(d.id)
                             name = _device_names.pop(d.id, d.name)
                             _print_activity(f"{name} went offline")
+                            went_offline = True
+                    # Release any locks the now-offline device still holds so a
+                    # crashed device doesn't block a game until the TTL (issue #238).
+                    if went_offline:
+                        for slug in _store.release_device_locks(d.id):
+                            _store.log_event("game_stopped", slug, d.id)
+                            _print_activity(
+                                f"{_game_label(slug)} lock released ({name} went offline)"
+                            )
         except Exception:
             pass
 

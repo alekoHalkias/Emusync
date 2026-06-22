@@ -45,6 +45,21 @@ class LockMixin:
         )
         self._conn.commit()
 
+    def release_device_locks(self, device_id: str) -> list[str]:
+        """Release every lock held by a device and return the freed game slugs.
+
+        Used when a device is detected offline (issue #238): a crashed device that
+        never released its lock would otherwise hold it until the TTL expires.
+        """
+        rows = self._conn.execute(
+            "SELECT game_slug FROM locks WHERE device_id = ?", (device_id,)
+        ).fetchall()
+        slugs = [row["game_slug"] for row in rows]
+        if slugs:
+            self._conn.execute("DELETE FROM locks WHERE device_id = ?", (device_id,))
+            self._conn.commit()
+        return slugs
+
     def get_lock(self, game_slug: str) -> Optional[Lock]:
         row = self._conn.execute(
             "SELECT game_slug, device_id, acquired_at FROM locks WHERE game_slug = ?",

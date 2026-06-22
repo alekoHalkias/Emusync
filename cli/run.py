@@ -13,6 +13,7 @@ import shlex
 import signal
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,7 @@ from typing import Optional
 import click
 
 import server.config as cfg_module
+from server.store import LOCK_TTL_HOURS
 from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _get_device_name, _show_game_running_popup
@@ -255,6 +257,29 @@ def _log_offline_play(cfg, game_slug: str, started_at: str, ended_at: str, save_
         log_path.write_text(json.dumps(existing, indent=2))
     except Exception:
         pass
+
+
+# Refresh the lock at a quarter of the TTL so a play session longer than the TTL
+# never lets another device steal the lock mid-game (issue #238). A re-acquire by
+# the same holder just bumps `acquired_at`, so it's a cheap keep-alive.
+_HEARTBEAT_INTERVAL_SECONDS = max(60, int(LOCK_TTL_HOURS * 3600) // 4)
+
+
+def _start_lock_heartbeat(client, game_slug: str, stop: threading.Event) -> threading.Thread:
+    """Periodically re-acquire the lock while the game runs to keep it fresh.
+
+    Runs until *stop* is set (i.e. the emulator exits). A failed beat is ignored —
+    it's transient, and the next beat or the server-side TTL/offline reap covers it.
+    """
+    def _beat() -> None:
+        while not stop.wait(_HEARTBEAT_INTERVAL_SECONDS):
+            try:
+                client.acquire_lock(game_slug)
+            except Exception:
+                pass
+    t = threading.Thread(target=_beat, daemon=True)
+    t.start()
+    return t
 
 
 def _launch_and_wait(command: tuple[str, ...], game_pid_file: Path) -> int:
@@ -529,6 +554,11 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             if pulled:
                 click.echo(f"Pulled state for {game_slug}.")
 
+        # Keep the lock fresh for the whole session so a long play can't have its
+        # lock stolen at the TTL by another device (issue #238).
+        stop_heartbeat = threading.Event()
+        _start_lock_heartbeat(client, game_slug, stop_heartbeat)
+
         # Mark the moment before launch (minus a small epsilon for mtime
         # granularity) so we can tell which save/state files were written *this*
         # session when reconciling RetroArch's content-name folder afterwards.
@@ -536,9 +566,11 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         try:
             exit_code = _launch_and_wait(launch_argv, game_pid_file)
         except Exception as exc:
+            stop_heartbeat.set()
             click.echo(f"Emulator error: {exc}", err=True)
             _release()
             sys.exit(1)
+        stop_heartbeat.set()
 
         # Detect where RetroArch actually wrote the save/state this session — it
         # may differ in folder and/or extension from what we configured (content
