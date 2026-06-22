@@ -383,29 +383,29 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def list_save_history(self, slug: str) -> list[dict]:
-        """Return every retained save generation for a game, newest first."""
-        r = self._client.get(self._url(f"/games/{slug}/save/history"), timeout=10)
+    def _list_history(self, kind: str, slug: str) -> list[dict]:
+        """Return every retained generation of `kind` ('save'/'state') for a game."""
+        r = self._client.get(self._url(f"/games/{slug}/{kind}/history"), timeout=10)
         r.raise_for_status()
         return r.json()
+
+    def _restore(self, kind: str, slug: str, version_id: str) -> dict:
+        """Make a past generation of `kind` the current one on the server."""
+        r = self._client.post(self._url(f"/games/{slug}/{kind}/restore"), json={"version_id": version_id}, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def list_save_history(self, slug: str) -> list[dict]:
+        return self._list_history("save", slug)
 
     def restore_save(self, slug: str, version_id: str) -> dict:
-        """Make a past save generation the current one on the server."""
-        r = self._client.post(self._url(f"/games/{slug}/save/restore"), json={"version_id": version_id}, timeout=10)
-        r.raise_for_status()
-        return r.json()
+        return self._restore("save", slug, version_id)
 
     def list_state_history(self, slug: str) -> list[dict]:
-        """Return every retained state generation for a game, newest first."""
-        r = self._client.get(self._url(f"/games/{slug}/state/history"), timeout=10)
-        r.raise_for_status()
-        return r.json()
+        return self._list_history("state", slug)
 
     def restore_state(self, slug: str, version_id: str) -> dict:
-        """Make a past state generation the current one on the server."""
-        r = self._client.post(self._url(f"/games/{slug}/state/restore"), json={"version_id": version_id}, timeout=10)
-        r.raise_for_status()
-        return r.json()
+        return self._restore("state", slug, version_id)
 
     def get_console_defs(self) -> list[dict]:
         """Return all console definitions from server."""

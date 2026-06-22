@@ -105,3 +105,29 @@ def test_safe_extract_tar_allows_normal_members(tmp_path):
 
     assert (dest / "game.state").read_bytes() == b"slot0"
     assert (dest / "game.state1").read_bytes() == b"slot1"
+
+
+# ── state routes share the save handlers (#240) ────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_state_restore_round_trip_and_unknown_version_404(client):
+    """State routes are thin wrappers over the shared `_BlobKind` handlers (#240);
+    exercise the _STATE path end-to-end incl. its kind-specific 404 message."""
+    import hashlib
+
+    from tests.conftest import AUTH
+
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    await client.post("/games/zelda/state", content=b"good-state", headers=AUTH)
+    await client.post("/games/zelda/state", content=b"bad-state", headers=AUTH)
+
+    history = (await client.get("/games/zelda/state/history", headers=AUTH)).json()
+    good = next(v for v in history if v["hash"] == hashlib.sha256(b"good-state").hexdigest())
+
+    r = await client.post("/games/zelda/state/restore", json={"version_id": good["id"]}, headers=AUTH)
+    assert r.status_code == 200
+    assert (await client.get("/games/zelda/state", headers=AUTH)).content == b"good-state"
+
+    r = await client.post("/games/zelda/state/restore", json={"version_id": "nope"}, headers=AUTH)
+    assert r.status_code == 404
+    assert r.json()["detail"] == "State version not found"
