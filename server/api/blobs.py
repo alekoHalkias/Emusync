@@ -3,11 +3,13 @@
 States mirror saves at every endpoint."""
 from __future__ import annotations
 
+import hashlib
 import json
 
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from ..store import SaveMeta
@@ -20,16 +22,40 @@ class RestoreRequest(BaseModel):
     version_id: str
 
 
+async def _stage_upload(request: Request):
+    """Stream the request body to a temp file under the blob root, hashing as we go.
+
+    Returns (path, sha256_hex, size) so a multi-MB save/state is never held whole in
+    memory (issue #239). The store moves the file into place on a same-filesystem
+    rename; on a dedupe hit it's discarded.
+    """
+    store = _get_store()
+    tmp = store.new_upload_path()
+    hasher = hashlib.sha256()
+    size = 0
+    try:
+        with open(tmp, "wb") as f:
+            async for chunk in request.stream():
+                f.write(chunk)
+                hasher.update(chunk)
+                size += len(chunk)
+    except BaseException:
+        tmp.unlink(missing_ok=True)  # don't leave a half-written .part behind
+        raise
+    return tmp, hasher.hexdigest(), size
+
+
 # ── saves ─────────────────────────────────────────────────────────────────────
 
 @router.get("/games/{slug}/save")
 def pull_save(slug: str, device_id: str = Depends(_auth)) -> Response:
-    data, meta = _get_store().pull_save(slug)
-    if data is None:
+    path, meta = _get_store().pull_save_path(slug)
+    if path is None:
         return Response(status_code=204)
     _print_activity(f"save pulled: {_game_label(slug)} by {_device_label(device_id)}")
-    return Response(
-        content=data,
+    # FileResponse streams from disk instead of loading the blob into memory.
+    return FileResponse(
+        path,
         media_type="application/octet-stream",
         headers={
             "X-Save-Hash": meta.hash,
@@ -41,15 +67,15 @@ def pull_save(slug: str, device_id: str = Depends(_auth)) -> Response:
 
 @router.post("/games/{slug}/save")
 async def push_save(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
-    data = await request.body()
+    tmp, h, size = await _stage_upload(request)
 
     def _store_save() -> SaveMeta:
         store = _get_store()
-        m = store.push_save(slug, device_id, data)
+        m = store.push_save_file(slug, device_id, tmp, h, size)
         store.log_event("save_synced", slug, device_id)
         return m
 
-    # Offload the synchronous BLOB write so a multi-MB save doesn't block the loop.
+    # Offload the synchronous move + DB write so it doesn't block the event loop.
     meta = await asyncio.to_thread(_store_save)
     _print_activity(f"save pushed: {_game_label(slug)} from {_device_label(device_id)}")
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
@@ -88,12 +114,12 @@ def restore_save(slug: str, req: RestoreRequest, device_id: str = Depends(_auth)
 
 @router.get("/games/{slug}/state")
 def pull_state(slug: str, device_id: str = Depends(_auth)) -> Response:
-    data, meta = _get_store().pull_state(slug)
-    if data is None:
+    path, meta = _get_store().pull_state_path(slug)
+    if path is None:
         return Response(status_code=204)
     _print_activity(f"state pulled: {_game_label(slug)} by {_device_label(device_id)}")
-    return Response(
-        content=data,
+    return FileResponse(
+        path,
         media_type="application/octet-stream",
         headers={
             "X-State-Hash": meta.hash,
@@ -105,15 +131,15 @@ def pull_state(slug: str, device_id: str = Depends(_auth)) -> Response:
 
 @router.post("/games/{slug}/state")
 async def push_state(slug: str, request: Request, device_id: str = Depends(_auth)) -> dict:
-    data = await request.body()
+    tmp, h, size = await _stage_upload(request)
 
     def _store_state() -> SaveMeta:
         store = _get_store()
-        m = store.push_state(slug, device_id, data)
+        m = store.push_state_file(slug, device_id, tmp, h, size)
         store.log_event("state_synced", slug, device_id)
         return m
 
-    # Offload the synchronous BLOB write so a multi-MB state archive doesn't block the loop.
+    # Offload the synchronous move + DB write so it doesn't block the event loop.
     meta = await asyncio.to_thread(_store_state)
     _print_activity(f"state pushed: {_game_label(slug)} from {_device_label(device_id)}")
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
