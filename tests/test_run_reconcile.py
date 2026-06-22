@@ -18,6 +18,7 @@ from cli.run import (
     _decide_save_action,
     _load_cached_game_device,
     _log_offline_play,
+    _log_save_conflict,
     _parse_iso,
     _reconcile_save,
     _resolve_written_save,
@@ -387,3 +388,33 @@ def test_resolve_state_none_when_nothing_written(tmp_path):
     cfg_folder = tmp_path / "states" / "Rom_Name"
     _touch(cfg_folder / "Rom_Name.state", SINCE - 500)  # stale only
     assert _resolve_written_state(str(cfg_folder), SINCE) is None
+
+
+# ── best-effort writers log instead of swallowing failures (issue #241) ─────────
+
+def test_log_save_conflict_warns_on_write_failure(tmp_path, caplog):
+    """A failed save_conflicts.json write is logged, not silently dropped."""
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")  # data_dir under a file → mkdir/write fails
+    cfg = SimpleNamespace(data_dir=str(blocker / "nested"))
+
+    with caplog.at_level("WARNING", logger="emusync.run"):
+        _log_save_conflict(cfg, "zelda", "local", "abc123", None)
+
+    assert any("save conflict log" in r.getMessage() for r in caplog.records)
+
+
+def test_cache_game_device_warns_on_write_failure(tmp_path, caplog):
+    """A failed game-config cache write is logged, not silently dropped."""
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")
+    cfg = SimpleNamespace(data_dir=str(blocker / "nested"))
+    gd = GameDeviceConfig(
+        rom_path="/roms/z.gba", save_path="/saves/z.srm",
+        launch_command="retroarch", state_path="", rom_folder_path="/roms",
+    )
+
+    with caplog.at_level("WARNING", logger="emusync.run"):
+        _cache_game_device(cfg, "zelda", gd)
+
+    assert any("cache game config" in r.getMessage() for r in caplog.records)
