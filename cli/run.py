@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import shlex
@@ -26,6 +27,8 @@ from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _get_device_name, _show_game_running_popup
 from cli.root import cli
+
+logger = logging.getLogger("emusync.run")
 
 # Track the emulator child process so SIGTERM can kill it before exiting
 _child_proc: subprocess.Popen | None = None  # type: ignore[type-arg]
@@ -108,13 +111,14 @@ def _log_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[st
         if not isinstance(existing, list):
             existing = []
     except Exception:
+        logger.debug("could not read existing %s; starting fresh", path, exc_info=True)
         existing = []
     existing.append(entry)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(existing, indent=2))
     except Exception:
-        pass
+        logger.warning("failed to write save conflict log %s", path, exc_info=True)
 
 
 # A post-game save that is empty, or has shrunk to below this fraction of the
@@ -220,7 +224,9 @@ def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig) -> None:
             "rom_folder_path": gd.rom_folder_path,
         }))
     except Exception:
-        pass
+        # Non-fatal: a missing cache only means a later offline launch can't
+        # resolve this game's paths (issue #241).
+        logger.warning("failed to cache game config for '%s'", game_slug, exc_info=True)
 
 
 def _load_cached_game_device(cfg, game_slug: str) -> Optional[GameDeviceConfig]:
@@ -229,7 +235,7 @@ def _load_cached_game_device(cfg, game_slug: str) -> Optional[GameDeviceConfig]:
         if path.exists():
             return GameDeviceConfig(**json.loads(path.read_text()))
     except Exception:
-        pass
+        logger.debug("could not load cached game config for '%s'", game_slug, exc_info=True)
     return None
 
 
@@ -243,20 +249,21 @@ def _log_offline_play(cfg, game_slug: str, started_at: str, ended_at: str, save_
             entry["save_mtime"] = datetime.fromtimestamp(sp.stat().st_mtime, tz=timezone.utc).isoformat()
             entry["save_hash"] = hashlib.sha256(sp.read_bytes()).hexdigest()
     except Exception:
-        pass
+        logger.debug("could not stat/hash offline save %s", save_path, exc_info=True)
     log_path = Path(cfg.data_dir) / "offline_plays.json"
     try:
         existing = json.loads(log_path.read_text()) if log_path.exists() else []
         if not isinstance(existing, list):
             existing = []
     except Exception:
+        logger.debug("could not read existing %s; starting fresh", log_path, exc_info=True)
         existing = []
     existing.append(entry)
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text(json.dumps(existing, indent=2))
     except Exception:
-        pass
+        logger.warning("failed to write offline play log %s", log_path, exc_info=True)
 
 
 # Refresh the lock at a quarter of the TTL so a play session longer than the TTL

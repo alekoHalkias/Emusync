@@ -8,6 +8,7 @@ re-importing the reassigned globals directly.
 """
 from __future__ import annotations
 
+import logging
 import shutil
 import sys
 import threading
@@ -15,6 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 import asyncio
+
+logger = logging.getLogger("emusync.api")
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,7 +77,9 @@ def _monitor_presence() -> None:
                                 f"{_game_label(slug)} lock released ({name} went offline)"
                             )
         except Exception:
-            pass
+            # Never let a transient failure kill the monitor thread silently —
+            # log it (with traceback) and keep polling (issue #241).
+            logger.exception("presence monitor iteration failed")
 
 
 def init(store: Store, master_pin: str, data_dir: str = "") -> None:
