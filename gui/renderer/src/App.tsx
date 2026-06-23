@@ -6,6 +6,7 @@ import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
 import ServerStatusButton from "./components/ServerStatusButton";
 import DevicesButton from "./components/DevicesButton";
+import ConflictsButton from "./components/ConflictsButton";
 
 function CopyBox({ text }: { text: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
@@ -300,6 +301,7 @@ export default function App(): React.ReactElement {
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>
+          <ConflictsButton />
           <DevicesButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
         </div>

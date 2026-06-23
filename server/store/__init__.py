@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from server.store._base import StoreBase
 from server.store.blobs import SaveStateMixin
+from server.store.conflicts import ConflictMixin
 from server.store.console_defs import ConsoleDefMixin
 from server.store.consoles import ConsoleMixin, saves_path_to_states, upsert_console_for_game
 from server.store.devices import DeviceMixin
@@ -38,6 +39,7 @@ class Store(
     EventMixin,
     TransferMixin,
     ConsoleDefMixin,
+    ConflictMixin,
     StoreBase,
 ):
     """SQLite-backed store. CRUD is split across the mixins above; connection and

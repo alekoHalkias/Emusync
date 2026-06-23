@@ -149,3 +149,24 @@ export const getDeviceGameDevices = (deviceId: string): Promise<DeviceGameDevice
   _fetch("GET", `/devices/${deviceId}/game-devices`);
 export const createPullRequest = (slug: string, fromDeviceId: string, destinationPath: string): Promise<{ pull_request_id: string; status: string; source_online: boolean }> =>
   _fetch("POST", `/games/${slug}/rom-pull-request`, { from_device_id: fromDeviceId, destination_path: destinationPath });
+
+// ── save conflicts (issue #243) ────────────────────────────────────────────────
+
+export type SaveConflict = {
+  id: string;
+  game_slug: string;
+  game_name: string;
+  winner_device_id: string;
+  loser_device_id: string;
+  winner_hash: string;
+  loser_hash: string;
+  resolved_at: string;
+  winner_device_name: string | null;
+  loser_device_name: string | null;
+};
+
+/** Open (un-dismissed) save conflicts across all games, newest first. */
+export const listConflicts = (): Promise<SaveConflict[]> => _fetch("GET", "/conflicts");
+/** Dismiss a conflict so it no longer shows in the panel. */
+export const dismissConflict = (id: string): Promise<{ ok: boolean }> =>
+  _fetch("POST", `/conflicts/${id}/dismiss`);

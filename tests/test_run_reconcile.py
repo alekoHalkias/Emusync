@@ -169,6 +169,7 @@ class _FakeClient:
         self._server_hash = server_hash
         self.pushed = False
         self.pulled = False
+        self.reported_conflict = None
 
     def get_save_meta(self, slug):
         return self._meta
@@ -181,6 +182,13 @@ class _FakeClient:
         self.pulled = True
         return True, self._server_hash
 
+    def report_conflict(self, slug, winner_device_id, loser_device_id, winner_hash, loser_hash):
+        self.reported_conflict = {
+            "slug": slug, "winner_device_id": winner_device_id, "loser_device_id": loser_device_id,
+            "winner_hash": winner_hash, "loser_hash": loser_hash,
+        }
+        return {"id": "c1", "resolved_at": NOW.isoformat()}
+
 
 def _write_save(path: Path, data: bytes, mtime: datetime) -> None:
     path.write_bytes(data)
@@ -190,8 +198,8 @@ def _write_save(path: Path, data: bytes, mtime: datetime) -> None:
 def test_reconcile_local_newer_conflict_pushes_warns_and_logs(tmp_path):
     save = tmp_path / "s.srm"
     _write_save(save, b"LOCAL-NEW", NOW)  # local edited "now"
-    server_meta = {"hash": "server-old", "pushed_at": EARLIER.isoformat()}
-    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    server_meta = {"hash": "server-old", "pushed_at": EARLIER.isoformat(), "device_id": "dev-server"}
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local")
     client = _FakeClient(server_meta)
 
     _reconcile_save(client, cfg, "metroid", str(save))
@@ -201,13 +209,17 @@ def test_reconcile_local_newer_conflict_pushes_warns_and_logs(tmp_path):
     assert len(conflicts) == 1
     assert conflicts[0]["winner"] == "local"
     assert conflicts[0]["server_hash"] == "server-old"
+    # The conflict is also reported to the server (this device won) — issue #243.
+    assert client.reported_conflict is not None
+    assert client.reported_conflict["winner_device_id"] == "dev-local"
+    assert client.reported_conflict["loser_device_id"] == "dev-server"
 
 
 def test_reconcile_server_newer_conflict_pulls_warns_and_logs(tmp_path):
     save = tmp_path / "s.srm"
     _write_save(save, b"LOCAL-OLD", EARLIER)
-    server_meta = {"hash": "server-new", "pushed_at": NOW.isoformat()}
-    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    server_meta = {"hash": "server-new", "pushed_at": NOW.isoformat(), "device_id": "dev-server"}
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local")
     client = _FakeClient(server_meta)
 
     _reconcile_save(client, cfg, "zelda", str(save))
@@ -215,6 +227,9 @@ def test_reconcile_server_newer_conflict_pulls_warns_and_logs(tmp_path):
     assert client.pulled and not client.pushed
     conflicts = json.loads((tmp_path / "save_conflicts.json").read_text())
     assert conflicts[0]["winner"] == "server"
+    # Server won → it's the winner; this device's overwritten copy is the loser (#243).
+    assert client.reported_conflict["winner_device_id"] == "dev-server"
+    assert client.reported_conflict["loser_device_id"] == "dev-local"
 
 
 def test_reconcile_no_conflict_logged_when_not_diverged(tmp_path):

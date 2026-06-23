@@ -156,8 +156,28 @@ def _warn_unsafe_save(cfg, game_slug: str, local_size: int, server_size: Optiona
     _notify("EmuSync — save not synced", msg)
 
 
-def _warn_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
-    """Surface an auto-resolved divergence: stderr + desktop notification + log."""
+def _report_conflict_to_server(client, cfg, game_slug: str, winner: str,
+                               local_hash: Optional[str], server_meta: Optional[dict]) -> None:
+    """Record the resolved divergence on the server so the GUI Conflicts panel can
+    show it from any device (issue #243). Best-effort — local logging already
+    happened, so a failure here is non-fatal."""
+    try:
+        server_device = (server_meta or {}).get("device_id", "")
+        server_hash = (server_meta or {}).get("hash", "")
+        this_device = getattr(cfg, "device_id", "")
+        if winner == "local":
+            winner_device, loser_device = this_device, server_device
+            winner_hash, loser_hash = local_hash or "", server_hash
+        else:
+            winner_device, loser_device = server_device, this_device
+            winner_hash, loser_hash = server_hash, local_hash or ""
+        client.report_conflict(game_slug, winner_device, loser_device, winner_hash, loser_hash)
+    except Exception:
+        logger.warning("failed to report save conflict for '%s' to server", game_slug, exc_info=True)
+
+
+def _warn_save_conflict(client, cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
+    """Surface an auto-resolved divergence: stderr + notification + local log + server record."""
     if winner == "local":
         detail = ("this device's save is newer, so it was kept and pushed; the server's "
                   "older copy was replaced (its hash is recorded in save_conflicts.json)")
@@ -167,6 +187,7 @@ def _warn_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[s
     msg = (f"Save conflict for '{game_slug}': both copies changed since the last sync — {detail}.")
     click.echo(f"⚠ {msg}", err=True)
     _log_save_conflict(cfg, game_slug, winner, local_hash, server_meta)
+    _report_conflict_to_server(client, cfg, game_slug, winner, local_hash, server_meta)
     _notify("EmuSync — save conflict resolved", msg)
 
 
@@ -196,14 +217,14 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
     if action == "push":
         client.push_save(game_slug, save_path)
         if diverged:
-            _warn_save_conflict(cfg, game_slug, "local", local_hash, meta)
+            _warn_save_conflict(client, cfg, game_slug, "local", local_hash, meta)
         else:
             click.echo(f"Local save is newer — pushed {game_slug} to server.")
         return local_hash
     if action == "pull":
         pulled, server_hash = client.pull_save(game_slug, save_path)
         if diverged:
-            _warn_save_conflict(cfg, game_slug, "server", local_hash, meta)
+            _warn_save_conflict(client, cfg, game_slug, "server", local_hash, meta)
         elif pulled:
             click.echo(f"Pulled save for {game_slug}.")
         return server_hash

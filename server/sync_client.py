@@ -395,6 +395,22 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def report_conflict(self, slug: str, winner_device_id: str, loser_device_id: str,
+                        winner_hash: str, loser_hash: str) -> dict:
+        """Record an auto-resolved save divergence on the server (issue #243)."""
+        r = self._client.post(
+            self._url(f"/games/{slug}/conflicts"),
+            json={
+                "winner_device_id": winner_device_id,
+                "loser_device_id": loser_device_id,
+                "winner_hash": winner_hash or "",
+                "loser_hash": loser_hash or "",
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+
     def list_save_history(self, slug: str) -> list[dict]:
         return self._list_history("save", slug)
 
