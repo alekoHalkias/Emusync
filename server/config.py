@@ -26,6 +26,8 @@ class Config:
     is_server: bool = False
     server_pin: str = ""
     recent_import_folders: dict = field(default_factory=dict)
+    # Opt-in background save/state watcher in sync-daemon (issue #242).
+    watch_saves: bool = False
 
 
 def load() -> Config:
@@ -47,6 +49,7 @@ def load() -> Config:
         is_server=bool(data.get("is_server", False)),
         server_pin=str(data.get("server_pin", "")),
         recent_import_folders=recent_folders,
+        watch_saves=bool(data.get("watch_saves", False)),
     )
 
 
@@ -61,6 +64,8 @@ def save(cfg: Config) -> None:
     doc.add("is_server", cfg.is_server)
     if cfg.server_pin:
         doc.add("server_pin", cfg.server_pin)
+    if cfg.watch_saves:
+        doc.add("watch_saves", cfg.watch_saves)
     if cfg.recent_import_folders:
         doc.add("recent_import_folders", cfg.recent_import_folders)
     with open(CONFIG_PATH, "w") as f:

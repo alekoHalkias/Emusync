@@ -261,6 +261,7 @@ def _do_start_server() -> None:
             client, cfg.device_name,
             log=lambda msg: print(msg, flush=True),
             shutdown_event=_daemon_shutdown,
+            watch_cfg=cfg,
         )
 
     daemon_thread = threading.Thread(target=_start_daemon_for_server, daemon=True)
