@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 8
+_SCHEMA_VERSION = 9
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -116,6 +116,16 @@ CREATE TABLE IF NOT EXISTS core_defs (
     system_extension TEXT NOT NULL REFERENCES system_defs(extension),
     lib_name         TEXT NOT NULL,
     folder_name      TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS save_conflicts (
+    id                TEXT PRIMARY KEY,
+    game_slug         TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+    winner_device_id  TEXT NOT NULL DEFAULT '',
+    loser_device_id   TEXT NOT NULL DEFAULT '',
+    winner_hash       TEXT NOT NULL DEFAULT '',
+    loser_hash        TEXT NOT NULL DEFAULT '',
+    resolved_at       TEXT NOT NULL,
+    status            TEXT NOT NULL DEFAULT 'open'
 );
 CREATE TABLE IF NOT EXISTS console_folder_names (
     console_key      TEXT NOT NULL REFERENCES console_defs(key),
@@ -270,4 +280,17 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
                 _migrate_blobs_to_disk(conn, table, blob_dir)
             _try(conn, "ALTER TABLE saves DROP COLUMN data")
             _try(conn, "ALTER TABLE states DROP COLUMN data")
+    if from_version < 9:
+        # Central record of auto-resolved save divergences for the GUI Conflicts
+        # panel (issue #243).
+        _try(conn, """CREATE TABLE IF NOT EXISTS save_conflicts (
+            id                TEXT PRIMARY KEY,
+            game_slug         TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+            winner_device_id  TEXT NOT NULL DEFAULT '',
+            loser_device_id   TEXT NOT NULL DEFAULT '',
+            winner_hash       TEXT NOT NULL DEFAULT '',
+            loser_hash        TEXT NOT NULL DEFAULT '',
+            resolved_at       TEXT NOT NULL,
+            status            TEXT NOT NULL DEFAULT 'open'
+        )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
