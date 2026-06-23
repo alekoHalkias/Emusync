@@ -403,12 +403,27 @@ def _handle_pull_request(
         return False
 
 
-def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo, shutdown_event=None) -> None:
-    """Core daemon loop: drain pending transfers/pull-requests then hold SSE connection open."""
+def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
+                         shutdown_event=None, watch_cfg=None) -> None:
+    """Core daemon loop: drain pending transfers/pull-requests then hold SSE connection open.
+
+    If `watch_cfg` is a config with `watch_saves=True`, a background save/state
+    watcher thread is started alongside the transfer loop (issue #242).
+    """
+    import threading
     import time
 
     def _stopping() -> bool:
         return shutdown_event is not None and shutdown_event.is_set()
+
+    if watch_cfg is not None and getattr(watch_cfg, "watch_saves", False):
+        from cli.watch import run_save_watcher
+        threading.Thread(
+            target=run_save_watcher,
+            args=(client, watch_cfg),
+            kwargs={"log": log, "shutdown_event": shutdown_event},
+            daemon=True,
+        ).start()
 
     # Drain any pending incoming transfers
     try:
@@ -488,6 +503,6 @@ def sync_daemon() -> None:
         sys.exit(1)
 
     try:
-        _run_transfer_daemon(client, cfg.device_name)
+        _run_transfer_daemon(client, cfg.device_name, watch_cfg=cfg)
     except KeyboardInterrupt:
         click.echo("\nStopped.")
