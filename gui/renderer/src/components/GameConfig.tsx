@@ -286,32 +286,30 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </div>
           {romSource === "network" && !isNew && (
             <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
-              <div style={{ fontSize: 13, marginBottom: 6 }}>
-                🌐 Network ROM — {localRomPath
-                  ? <>a local copy exists for offline play.</>
-                  : <>played from the network share.</>}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                <span style={{ fontSize: 13, minWidth: 0 }}>
+                  🌐 Network ROM — {localRomPath
+                    ? <>local copy ready for offline play.</>
+                    : <>played from the network share.</>}
+                </span>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+                  {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Working…</span>}
+                  {localRomPath ? (
+                    <button className="btn" disabled={romBusy} onClick={handleDelocalize}>Remove offline copy</button>
+                  ) : (
+                    <button className="btn" disabled={romBusy} onClick={handleLocalize}>Copy for offline play</button>
+                  )}
+                </div>
               </div>
               {!localRomPath && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                   <span>Local copy folder:</span>
-                  <span className="truncate" style={{ maxWidth: 280 }}>{localDestFolder || "not set"}</span>
+                  <span className="truncate" style={{ maxWidth: 240 }}>{localDestFolder || "not set"}</span>
                   <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 8px" }} onClick={handlePickDestFolder}>
                     {localDestFolder ? "Change…" : "Choose…"}
                   </button>
                 </div>
               )}
-              <div className="input-row" style={{ gap: 8 }}>
-                {localRomPath ? (
-                  <button className="btn" disabled={romBusy} onClick={handleDelocalize}>
-                    Remove offline copy
-                  </button>
-                ) : (
-                  <button className="btn" disabled={romBusy} onClick={handleLocalize}>
-                    Copy for offline play
-                  </button>
-                )}
-                {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Working…</span>}
-              </div>
               {romMsg && <div style={{ fontSize: 12, marginTop: 6, color: "var(--text-muted)" }}>{romMsg}</div>}
             </div>
           )}
