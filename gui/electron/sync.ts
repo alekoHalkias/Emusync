@@ -246,10 +246,12 @@ export function registerSyncIpc(): void {
         // destFolder (from a picker) → the console's configured local folder.
         const rel = (gd.rom_rel_path as string) || basename(networkPath);
         let localPath = (gd.local_rom_path as string) || "";
+        let learnedFolder = "";   // a folder we should remember on the console
         if (!localPath) {
           let folder = destFolder || "";
           if (!folder) folder = await consoleLocalFolder(host, port, authHeaders, slug);
           if (!folder) return { ok: false, error: "No local destination set for this console — choose a folder." };
+          if (destFolder) learnedFolder = destFolder;  // teach the console this folder
           localPath = join(folder, ...rel.split("/"));
         }
         if (resolvePath(localPath) === resolvePath(networkPath)) {
@@ -271,7 +273,10 @@ export function registerSyncIpc(): void {
           copyFileSync(networkPath, tmp);
           const hash = await sha256OfFile(tmp);
           renameSync(tmp, localPath);
-          const updated = { ...gd, local_rom_path: localPath, rom_sha256: hash };
+          // Remember a manually-picked folder on the console so the next game of
+          // this console localizes without re-prompting (issue #255).
+          const updated = { ...gd, local_rom_path: localPath, rom_sha256: hash,
+            ...(learnedFolder ? { device_local_folder: learnedFolder } : {}) };
           const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
             method: "PUT",
             headers: { ...authHeaders, "Content-Type": "application/json" },
@@ -333,7 +338,11 @@ async function consoleLocalFolder(
     const consolesRes = await fetch(`http://${host}:${port}/devices/${device_id}/consoles`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
     if (!consolesRes.ok) return "";
     const consoles = await consolesRes.json() as Array<{ console_name: string; device_local_folder?: string }>;
-    return consoles.find(c => c.console_name === game.console)?.device_local_folder || "";
+    // A console can have several rows (e.g. a prior local import + this network
+    // one); prefer whichever row actually has a local folder configured.
+    const matches = consoles.filter(c => c.console_name === game.console);
+    return matches.find(c => c.device_local_folder)?.device_local_folder
+      || matches[0]?.device_local_folder || "";
   } catch {
     return "";
   }
