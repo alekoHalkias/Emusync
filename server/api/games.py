@@ -23,6 +23,11 @@ class GameDeviceRequest(BaseModel):
     launch_command: str = ""
     state_path: str = ""
     rom_folder_path: str = ""
+    # Network-ROM source fields (issue #255).
+    rom_source: str = "local"
+    rom_rel_path: str = ""
+    local_rom_path: str = ""
+    rom_sha256: str = ""
 
 
 @router.get("/games")
@@ -81,7 +86,10 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     gd = _get_store().get_game_device(slug, device_id)
     if not gd:
         raise HTTPException(status_code=404, detail="No device config for this game")
-    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command, "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path}
+    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command,
+            "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path,
+            "rom_source": gd.rom_source, "rom_rel_path": gd.rom_rel_path,
+            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256}
 
 
 @router.get("/games/{slug}/devices")
@@ -106,6 +114,10 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
             launch_command=req.launch_command,
             state_path=req.state_path,
             rom_folder_path=req.rom_folder_path,
+            rom_source=req.rom_source or "local",
+            rom_rel_path=req.rom_rel_path,
+            local_rom_path=req.local_rom_path,
+            rom_sha256=req.rom_sha256,
         )
     )
 

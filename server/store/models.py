@@ -30,6 +30,8 @@ class Console:
     device_save_folder: str = ""
     device_state_folder: str = ""
     device_emulator: str = ""
+    device_network_folder: str = ""  # this device's NAS mount for the console (issue #255)
+    device_local_folder: str = ""    # this device's local copy destination (issue #255)
 
 
 @dataclass
@@ -41,6 +43,12 @@ class GameDevice:
     launch_command: str
     state_path: str = ""
     rom_folder_path: str = ""
+    # Network-ROM source fields (issue #255).  rom_source defaults to 'local' so
+    # pre-#255 games behave exactly as before.
+    rom_source: str = "local"       # 'local' | 'network'
+    rom_rel_path: str = ""          # path relative to the console's network root
+    local_rom_path: str = ""        # on-demand local copy; empty until localized
+    rom_sha256: str = ""            # master hash captured at localize time
 
 
 @dataclass

@@ -59,6 +59,11 @@ class GameDeviceConfig:
     launch_command: str = ""
     state_path: str = ""
     rom_folder_path: str = ""
+    # Network-ROM source fields (issue #255); default keeps pre-#255 behaviour.
+    rom_source: str = "local"
+    rom_rel_path: str = ""
+    local_rom_path: str = ""
+    rom_sha256: str = ""
 
 
 class SyncClient:
@@ -135,13 +140,19 @@ class SyncClient:
             launch_command=d.get("launch_command", ""),
             state_path=d.get("state_path", ""),
             rom_folder_path=d.get("rom_folder_path", ""),
+            rom_source=d.get("rom_source", "local"),
+            rom_rel_path=d.get("rom_rel_path", ""),
+            local_rom_path=d.get("local_rom_path", ""),
+            rom_sha256=d.get("rom_sha256", ""),
         )
 
     def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:
         r = self._client.put(
             self._url(f"/games/{slug}/device"),
             json={"rom_path": cfg.rom_path, "save_path": cfg.save_path, "launch_command": cfg.launch_command,
-                  "state_path": cfg.state_path, "rom_folder_path": cfg.rom_folder_path},
+                  "state_path": cfg.state_path, "rom_folder_path": cfg.rom_folder_path,
+                  "rom_source": cfg.rom_source, "rom_rel_path": cfg.rom_rel_path,
+                  "local_rom_path": cfg.local_rom_path, "rom_sha256": cfg.rom_sha256},
             timeout=10,
         )
         r.raise_for_status()

@@ -26,9 +26,29 @@ from server.store import LOCK_TTL_HOURS
 from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _get_device_name, _show_game_running_popup
+from cli.netrom import resolve_rom_path
 from cli.root import cli
 
 logger = logging.getLogger("emusync.run")
+
+
+def _resolve_launch_command(gd) -> Optional[str]:
+    """Return *gd*'s launch command pointed at an available ROM copy, or None.
+
+    Local games are returned unchanged. For network-sourced games, prefer the
+    live NAS master; if it's unreachable, fall back to a localized copy and
+    rewrite the command to point at it. None means no ROM copy is currently
+    available (mount down + no local copy) so the caller should refuse.
+    """
+    cmd = gd.launch_command
+    if getattr(gd, "rom_source", "local") != "network":
+        return cmd
+    effective = resolve_rom_path(gd.rom_source, gd.rom_path, gd.local_rom_path)
+    if not effective:
+        return None
+    if effective != gd.rom_path and gd.rom_path and cmd:
+        cmd = cmd.replace(gd.rom_path, effective)
+    return cmd
 
 # Track the emulator child process so SIGTERM can kill it before exiting
 _child_proc: subprocess.Popen | None = None  # type: ignore[type-arg]
@@ -243,6 +263,10 @@ def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig) -> None:
             "launch_command": gd.launch_command,
             "state_path": gd.state_path,
             "rom_folder_path": gd.rom_folder_path,
+            "rom_source": gd.rom_source,
+            "rom_rel_path": gd.rom_rel_path,
+            "local_rom_path": gd.local_rom_path,
+            "rom_sha256": gd.rom_sha256,
         }))
     except Exception:
         # Non-fatal: a missing cache only means a later offline launch can't
@@ -340,7 +364,16 @@ def _run_offline(cfg, game_slug: str, game_pid_file: Path, command: tuple[str, .
     if command:
         launch_argv = command
     elif cached.launch_command:
-        launch_argv = tuple(shlex.split(cached.launch_command))
+        launch_command = _resolve_launch_command(cached)
+        if launch_command is None:
+            click.echo(
+                f"Offline and the ROM for '{game_slug}' is unavailable: the network "
+                f"share is unreachable and there's no local copy. Localize it while "
+                f"on the network so it can be played offline.",
+                err=True,
+            )
+            sys.exit(1)
+        launch_argv = tuple(shlex.split(launch_command))
     else:
         click.echo(
             f"EmuSync server unreachable and no cached launch command for '{game_slug}'. "
@@ -516,7 +549,18 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             )
             sys.exit(1)
         # The emulator invocation lives in the game config — parse it into argv.
-        launch_argv = tuple(shlex.split(gd.launch_command))
+        # For a network-sourced ROM this prefers the live NAS master, falls back
+        # to a localized copy, or refuses if neither is reachable.
+        launch_command = _resolve_launch_command(gd)
+        if launch_command is None:
+            click.echo(
+                f"ROM for '{game_slug}' is unavailable: the network share is "
+                f"unreachable and there's no local copy. Run "
+                f"'emusync rom localize {game_slug}' while on the network.",
+                err=True,
+            )
+            sys.exit(1)
+        launch_argv = tuple(shlex.split(launch_command))
 
     # Cache the config so a future offline launch knows the paths + command.
     _cache_game_device(cfg, game_slug, gd)
@@ -614,6 +658,12 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     launch_command=gd.launch_command,
                     state_path=actual_state_path or state_path,
                     rom_folder_path=gd.rom_folder_path,
+                    # Preserve network-ROM source fields — adopting a written
+                    # save/state path must not reset rom_source to 'local' (#255).
+                    rom_source=gd.rom_source,
+                    rom_rel_path=gd.rom_rel_path,
+                    local_rom_path=gd.local_rom_path,
+                    rom_sha256=gd.rom_sha256,
                 )
                 client.set_game_device(game_slug, updated_gd)
                 if actual_save_path and actual_save_path != save_path:

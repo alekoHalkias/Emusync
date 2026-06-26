@@ -54,15 +54,19 @@ class GameDeviceMixin:
     def set_game_device(self, gd: GameDevice) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO game_devices
-               (game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command, gd.state_path, gd.rom_folder_path),
+               (game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path,
+                rom_source, rom_rel_path, local_rom_path, rom_sha256)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command,
+             gd.state_path, gd.rom_folder_path, gd.rom_source, gd.rom_rel_path,
+             gd.local_rom_path, gd.rom_sha256),
         )
         self._conn.commit()
 
     def get_game_device(self, game_slug: str, device_id: str) -> Optional[GameDevice]:
         row = self._conn.execute(
-            """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path
+            """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path,
+                      rom_folder_path, rom_source, rom_rel_path, local_rom_path, rom_sha256
                FROM game_devices WHERE game_slug = ? AND device_id = ?""",
             (game_slug, device_id),
         ).fetchone()
@@ -110,6 +114,7 @@ class GameDeviceMixin:
                          ORDER BY s.rowid DESC LIMIT 1) AS last_push,
                       gd.rom_path, gd.save_path, gd.state_path,
                       gd.launch_command, gd.rom_folder_path,
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
                       (gd.game_slug IS NOT NULL) AS is_local
                FROM games g
                LEFT JOIN locks l        ON l.game_slug = g.slug
@@ -132,13 +137,17 @@ class GameDeviceMixin:
                 "state_path": r["state_path"] or "",
                 "launch_command": r["launch_command"] or "",
                 "rom_folder_path": r["rom_folder_path"] or "",
+                "rom_source": r["rom_source"] or "local",
+                "rom_rel_path": r["rom_rel_path"] or "",
+                "local_rom_path": r["local_rom_path"] or "",
             })
         return result
 
     def list_game_devices_for_device(self, device_id: str) -> list[dict]:
         rows = self._conn.execute(
             """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
-                      gd.launch_command, gd.state_path, gd.rom_folder_path
+                      gd.launch_command, gd.state_path, gd.rom_folder_path,
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path
                FROM game_devices gd
                JOIN games g ON g.slug = gd.game_slug
                WHERE gd.device_id = ?

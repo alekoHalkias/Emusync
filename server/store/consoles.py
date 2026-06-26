@@ -31,16 +31,19 @@ class ConsoleMixin:
     def set_console(self, console: Console) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO consoles
-               (id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
+                device_state_folder, device_emulator, device_network_folder, device_local_folder)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (console.id, console.device_id, console.console_name, console.shortform_name,
-             console.device_game_folder, console.device_save_folder, console.device_state_folder, console.device_emulator),
+             console.device_game_folder, console.device_save_folder, console.device_state_folder,
+             console.device_emulator, console.device_network_folder, console.device_local_folder),
         )
         self._conn.commit()
 
     def get_console(self, device_id: str, console_name: str) -> Optional[Console]:
         row = self._conn.execute(
-            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator
+            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
+                      device_state_folder, device_emulator, device_network_folder, device_local_folder
                FROM consoles WHERE device_id = ? AND console_name = ?""",
             (device_id, console_name),
         ).fetchone()
@@ -48,7 +51,8 @@ class ConsoleMixin:
 
     def list_consoles(self, device_id: str) -> list[Console]:
         rows = self._conn.execute(
-            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator
+            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
+                      device_state_folder, device_emulator, device_network_folder, device_local_folder
                FROM consoles WHERE device_id = ?""",
             (device_id,),
         ).fetchall()
