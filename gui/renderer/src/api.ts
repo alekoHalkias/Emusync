@@ -11,6 +11,10 @@ export type GameDeviceConfig = {
   rom_rel_path?: string;
   local_rom_path?: string;
   rom_sha256?: string;
+  // Transient hints (not stored on the game) used to populate the console row's
+  // per-console network/local folders during a network import.
+  device_network_folder?: string;
+  device_local_folder?: string;
 };
 
 export type Game = { slug: string; name: string; console?: string };

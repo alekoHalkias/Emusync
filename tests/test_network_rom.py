@@ -82,6 +82,40 @@ async def test_device_consoles_expose_network_local_folders(client):
     assert "device_local_folder" in consoles[0]
 
 
+@pytest.mark.asyncio
+async def test_network_import_populates_and_preserves_console_folders(client):
+    """A network import stores the console's network/local folders; a later plain
+    save/state update must not blank them (regression: localize lost its dest)."""
+    slug = await _add_game(client)
+    await client.put(f"/games/{slug}/device", json={
+        "rom_path": "/mnt/nas/roms/GBA/g.gba",
+        "save_path": "/saves/GBA/g.srm",
+        "rom_folder_path": "/mnt/nas/roms/GBA",
+        "rom_source": "network",
+        "rom_rel_path": "GBA/g.gba",
+        "device_network_folder": "/mnt/nas/roms/GBA",
+        "device_local_folder": "/home/deck/Games/GBA",
+    }, headers=AUTH)
+
+    whoami = (await client.get("/whoami", headers=AUTH)).json()
+    consoles = (await client.get(f"/devices/{whoami['device_id']}/consoles", headers=AUTH)).json()
+    row = next(c for c in consoles if c["console_name"] == "GBA")
+    assert row["device_network_folder"] == "/mnt/nas/roms/GBA"
+    assert row["device_local_folder"] == "/home/deck/Games/GBA"
+
+    # A subsequent update with no folder hints must keep them.
+    await client.put(f"/games/{slug}/device", json={
+        "rom_path": "/mnt/nas/roms/GBA/g.gba",
+        "save_path": "/saves/GBA/g-real.srm",
+        "rom_folder_path": "/mnt/nas/roms/GBA",
+        "rom_source": "network",
+        "rom_rel_path": "GBA/g.gba",
+    }, headers=AUTH)
+    consoles = (await client.get(f"/devices/{whoami['device_id']}/consoles", headers=AUTH)).json()
+    row = next(c for c in consoles if c["console_name"] == "GBA")
+    assert row["device_local_folder"] == "/home/deck/Games/GBA"
+
+
 def test_v9_to_v10_migration(tmp_path):
     """A real v9 DB upgrades to v10, gaining the new columns without data loss."""
     from server.store import schema

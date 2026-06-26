@@ -242,12 +242,15 @@ export function registerSyncIpc(): void {
           return { ok: false, error: "Network ROM is unreachable (is the share mounted?)" };
         }
 
-        // Destination: an already-stored local path, else under the chosen folder.
+        // Destination precedence: an already-stored local path → an explicit
+        // destFolder (from a picker) → the console's configured local folder.
         const rel = (gd.rom_rel_path as string) || basename(networkPath);
         let localPath = (gd.local_rom_path as string) || "";
         if (!localPath) {
-          if (!destFolder) return { ok: false, error: "No local destination configured for this console" };
-          localPath = join(destFolder, ...rel.split("/"));
+          let folder = destFolder || "";
+          if (!folder) folder = await consoleLocalFolder(host, port, authHeaders, slug);
+          if (!folder) return { ok: false, error: "No local destination set for this console — choose a folder." };
+          localPath = join(folder, ...rel.split("/"));
         }
         if (resolvePath(localPath) === resolvePath(networkPath)) {
           return { ok: false, error: "Local destination equals the network master" };
@@ -313,6 +316,27 @@ export function registerSyncIpc(): void {
       }
     }
   );
+}
+
+// Look up this game's console, then its configured local-copy folder on this
+// device — the destination chosen during a network import (issue #255).
+async function consoleLocalFolder(
+  host: string, port: number, authHeaders: Record<string, string>, slug: string,
+): Promise<string> {
+  try {
+    const gameRes = await fetch(`http://${host}:${port}/games/${slug}`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+    if (!gameRes.ok) return "";
+    const game = await gameRes.json() as { console?: string };
+    const whoamiRes = await fetch(`http://${host}:${port}/whoami`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+    if (!whoamiRes.ok) return "";
+    const { device_id } = await whoamiRes.json() as { device_id: string };
+    const consolesRes = await fetch(`http://${host}:${port}/devices/${device_id}/consoles`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+    if (!consolesRes.ok) return "";
+    const consoles = await consolesRes.json() as Array<{ console_name: string; device_local_folder?: string }>;
+    return consoles.find(c => c.console_name === game.console)?.device_local_folder || "";
+  } catch {
+    return "";
+  }
 }
 
 function sha256OfFile(path: string): Promise<string> {

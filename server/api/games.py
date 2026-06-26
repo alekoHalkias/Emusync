@@ -28,6 +28,9 @@ class GameDeviceRequest(BaseModel):
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
+    # Transient: populate the console row's per-console network/local folders.
+    device_network_folder: str = ""
+    device_local_folder: str = ""
 
 
 @router.get("/games")
@@ -126,6 +129,8 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
         upsert_console_for_game(
             store, device_id, game.console,
             req.rom_path, req.save_path, req.rom_folder_path,
+            network_folder=req.device_network_folder,
+            local_folder=req.device_local_folder,
         )
 
     if req.rom_path:

@@ -221,14 +221,15 @@ export function useConsoleImport({ onClose, onImported }: Props) {
         const scanRoot   = (rom.romFolderPath ?? "").replace(/\/$/, "");
 
         // Network ROMs: never reorganise the share — store the master path as-is
-        // plus a portable rel-path and a pre-derived local-copy destination.
-        // Local ROMs: organise into a per-game subfolder (RetroArch mirrors the
-        // folder structure into saves/states) as before.
-        let romRelPath   = "";
-        let localRomPath = "";
+        // plus a portable rel-path. local_rom_path stays EMPTY until an actual
+        // copy is made (a non-empty value means "a local copy exists"); the chosen
+        // destination folder is saved on the console instead, so localize derives
+        // the path from there. Local ROMs: organise into a per-game subfolder.
+        let romRelPath = "";
+        let netRoot = "";
         if (romSource === "network") {
-          romRelPath   = relPathUnder(romPath, scanRoots);
-          localRomPath = localRomRoot ? `${localRomRoot.replace(/\/$/, "")}/${romRelPath}` : "";
+          romRelPath = relPathUnder(romPath, scanRoots);
+          netRoot = scanRoots.find(r => romPath === r || romPath.startsWith(r + "/")) ?? scanRoot;
         } else {
           const romParent = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
           if (scanRoot && romParent === scanRoot) {
@@ -255,7 +256,13 @@ export function useConsoleImport({ onClose, onImported }: Props) {
           rom_folder_path: scanRoot || rom.romFolderPath || "",
           rom_source: romSource,
           rom_rel_path: romRelPath,
-          local_rom_path: localRomPath,
+          local_rom_path: "",
+          // Network root + chosen local-copy destination land on the console row
+          // so `Copy for offline play` / `emusync rom localize` know where to put it.
+          ...(romSource === "network" ? {
+            device_network_folder: netRoot,
+            device_local_folder: localRomRoot,
+          } : {}),
         });
         imported.push({ slug, savePath, statePath });
       } catch (e: unknown) {

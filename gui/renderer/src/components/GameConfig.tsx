@@ -90,14 +90,14 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   async function handleLocalize(): Promise<void> {
     if (!slug) return;
     setRomBusy(true); setRomMsg("");
-    let dest: string | undefined;
-    if (!localRomPath) {
-      // No pre-derived destination — ask where local copies should land.
+    // First attempt: let the backend use the console's configured local folder.
+    let r = await window.emusync.rom.localize(slug);
+    if (!r.ok && /destination|folder/i.test(r.error ?? "")) {
+      // No folder configured — ask where local copies should land, then retry.
       const folder = await window.emusync.dialog.openFolder();
       if (!folder) { setRomBusy(false); return; }
-      dest = folder;
+      r = await window.emusync.rom.localize(slug, folder);
     }
-    const r = await window.emusync.rom.localize(slug, dest);
     if (r.ok) { setLocalRomPath(r.localPath ?? ""); setRomMsg("✓ Localized for offline play."); }
     else setRomMsg(r.error ?? "Localize failed.");
     setRomBusy(false);
