@@ -6,6 +6,11 @@ export type GameDeviceConfig = {
   launch_command: string;
   state_path?: string;
   rom_folder_path?: string;
+  // Network-ROM source fields (issue #255).
+  rom_source?: string;        // 'local' | 'network'
+  rom_rel_path?: string;
+  local_rom_path?: string;
+  rom_sha256?: string;
 };
 
 export type Game = { slug: string; name: string; console?: string };
@@ -69,6 +74,9 @@ export type GameOverview = {
   state_path: string;
   launch_command: string;
   rom_folder_path: string;
+  rom_source: string;        // 'local' | 'network' (issue #255)
+  rom_rel_path: string;
+  local_rom_path: string;
 };
 
 /** One call returning lock + last save + this device's config for every game. */

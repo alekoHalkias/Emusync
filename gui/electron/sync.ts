@@ -2,9 +2,10 @@
 // device and the Python server.
 import { ipcMain } from "electron";
 import { spawnSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, renameSync, statSync, createReadStream } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream } from "fs";
+import { createHash } from "crypto";
 import { request as httpRequest } from "http";
-import { join, dirname, basename } from "path";
+import { join, dirname, basename, resolve as resolvePath } from "path";
 import { parse as parseTOML } from "smol-toml";
 import { CONFIG_PATH } from "./runtime";
 import { loadServerCfg } from "./config-store";
@@ -221,4 +222,105 @@ export function registerSyncIpc(): void {
       }
     }
   );
+
+  // ── network ROM localize / delocalize (issue #255) ──────────────────────────
+  // Copy a network-sourced ROM onto local disk for offline play, and remove it.
+  // The NAS master is never modified or deleted.
+
+  ipcMain.handle(
+    "rom:localize",
+    async (_event, slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; error?: string }> => {
+      try {
+        const { host, port, authHeaders } = loadServerCfg();
+        const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+        if (!gdRes.ok) return { ok: false, error: "Game is not configured on this device" };
+        const gd = await gdRes.json() as any;
+        if (gd.rom_source !== "network") return { ok: false, error: "Not a network-sourced ROM" };
+
+        const networkPath = gd.rom_path as string;
+        if (!networkPath || !existsSync(networkPath)) {
+          return { ok: false, error: "Network ROM is unreachable (is the share mounted?)" };
+        }
+
+        // Destination: an already-stored local path, else under the chosen folder.
+        const rel = (gd.rom_rel_path as string) || basename(networkPath);
+        let localPath = (gd.local_rom_path as string) || "";
+        if (!localPath) {
+          if (!destFolder) return { ok: false, error: "No local destination configured for this console" };
+          localPath = join(destFolder, ...rel.split("/"));
+        }
+        if (resolvePath(localPath) === resolvePath(networkPath)) {
+          return { ok: false, error: "Local destination equals the network master" };
+        }
+        mkdirSync(dirname(localPath), { recursive: true });
+
+        // Free-space precheck so a big console can't half-fill the disk.
+        const size = statSync(networkPath).size;
+        const fs = statfsSync(dirname(localPath));
+        const free = Number(fs.bavail) * Number(fs.bsize);
+        if (free < size) {
+          return { ok: false, error: `Not enough free space: need ${size} bytes, ${free} available` };
+        }
+
+        // Atomic: copy to .part, hash, then rename into place.
+        const tmp = localPath + ".part";
+        try {
+          copyFileSync(networkPath, tmp);
+          const hash = await sha256OfFile(tmp);
+          renameSync(tmp, localPath);
+          const updated = { ...gd, local_rom_path: localPath, rom_sha256: hash };
+          const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
+            method: "PUT",
+            headers: { ...authHeaders, "Content-Type": "application/json" },
+            body: JSON.stringify(updated),
+          });
+          if (!putRes.ok) return { ok: false, error: "Copied, but failed to update server config" };
+          return { ok: true, localPath };
+        } finally {
+          if (existsSync(tmp)) { try { unlinkSync(tmp); } catch { /* best effort */ } }
+        }
+      } catch (e: any) {
+        return { ok: false, error: e.message || "Localize failed" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "rom:delocalize",
+    async (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        const { host, port, authHeaders } = loadServerCfg();
+        const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+        if (!gdRes.ok) return { ok: false, error: "Game is not configured on this device" };
+        const gd = await gdRes.json() as any;
+        const localPath = (gd.local_rom_path as string) || "";
+        if (!localPath) return { ok: false, error: "No local copy to remove" };
+        // Guard: never delete the NAS master.
+        if (gd.rom_path && resolvePath(localPath) === resolvePath(gd.rom_path)) {
+          return { ok: false, error: "Refusing to delete the network master" };
+        }
+        if (existsSync(localPath)) unlinkSync(localPath);
+        const updated = { ...gd, local_rom_path: "", rom_sha256: "" };
+        const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
+          method: "PUT",
+          headers: { ...authHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify(updated),
+        });
+        if (!putRes.ok) return { ok: false, error: "Removed copy, but failed to update server config" };
+        return { ok: true };
+      } catch (e: any) {
+        return { ok: false, error: e.message || "Delocalize failed" };
+      }
+    }
+  );
+}
+
+function sha256OfFile(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const h = createHash("sha256");
+    const s = createReadStream(path);
+    s.on("error", reject);
+    s.on("data", (d) => h.update(d));
+    s.on("end", () => resolve(h.digest("hex")));
+  });
 }

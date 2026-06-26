@@ -239,7 +239,19 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                             style={{ cursor: "pointer" }}
                           />
                         </div>
-                        <div className="game-cell game-cell-name">{g.name}</div>
+                        <div className="game-cell game-cell-name">
+                          {g.name}
+                          {g.romSource === "network" && (
+                            <span
+                              title={g.hasLocalCopy
+                                ? "Network ROM — local copy available for offline play"
+                                : "Network ROM — played from the network share"}
+                              style={{ marginLeft: 6, opacity: 0.8 }}
+                            >
+                              {g.hasLocalCopy ? "💾" : "🌐"}
+                            </span>
+                          )}
+                        </div>
                         <div className="game-cell game-cell-muted">
                           {canPlay ? <RelTime iso={g.lastSave} fallback="No save locally" /> : "—"}
                         </div>

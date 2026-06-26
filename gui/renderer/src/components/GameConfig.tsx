@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { addGame, getGameDevice, getSaveMeta, getStateMeta, setGameDevice, updateGame, type GameDeviceConfig, type SaveMeta } from "../api";
 import { RelTime } from "../time";
 
@@ -34,6 +34,14 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [saveOp, setSaveOp] = useState<SyncOp>(IDLE_OP);
   const [stateOp, setStateOp] = useState<SyncOp>(IDLE_OP);
 
+  // Network-ROM source (issue #255): source + the on-demand local copy.
+  const [romSource, setRomSource] = useState("local");
+  const [localRomPath, setLocalRomPath] = useState("");
+  const [romBusy, setRomBusy] = useState(false);
+  const [romMsg, setRomMsg] = useState("");
+  // Fields we preserve verbatim across a save (not editable in this form).
+  const netExtraRef = useRef<{ rom_rel_path?: string; rom_sha256?: string; rom_folder_path?: string }>({});
+
   useEffect(() => {
     if (!slug) return;
     getGameDevice(slug)
@@ -42,6 +50,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         setSavePath(cfg.save_path);
         setStatePath(cfg.state_path ?? "");
         setLaunchCommand(cfg.launch_command);
+        setRomSource(cfg.rom_source ?? "local");
+        setLocalRomPath(cfg.local_rom_path ?? "");
+        netExtraRef.current = {
+          rom_rel_path: cfg.rom_rel_path ?? "",
+          rom_sha256: cfg.rom_sha256 ?? "",
+          rom_folder_path: cfg.rom_folder_path ?? "",
+        };
       })
       .catch(() => setLoadError("Could not load device config — the server may be unreachable."));
   }, [slug]);
@@ -71,6 +86,32 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     if (path) setter(path);
   }
 
+  // Copy this network ROM onto local disk for offline play (or remove the copy).
+  async function handleLocalize(): Promise<void> {
+    if (!slug) return;
+    setRomBusy(true); setRomMsg("");
+    let dest: string | undefined;
+    if (!localRomPath) {
+      // No pre-derived destination — ask where local copies should land.
+      const folder = await window.emusync.dialog.openFolder();
+      if (!folder) { setRomBusy(false); return; }
+      dest = folder;
+    }
+    const r = await window.emusync.rom.localize(slug, dest);
+    if (r.ok) { setLocalRomPath(r.localPath ?? ""); setRomMsg("✓ Localized for offline play."); }
+    else setRomMsg(r.error ?? "Localize failed.");
+    setRomBusy(false);
+  }
+
+  async function handleDelocalize(): Promise<void> {
+    if (!slug) return;
+    setRomBusy(true); setRomMsg("");
+    const r = await window.emusync.rom.delocalize(slug);
+    if (r.ok) { setLocalRomPath(""); setRomMsg("✓ Local copy removed."); }
+    else setRomMsg(r.error ?? "Failed to remove local copy.");
+    setRomBusy(false);
+  }
+
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Game name is required.";
@@ -95,6 +136,12 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         save_path: savePath.trim(),
         launch_command: launchCommand.trim(),
         state_path: statePath.trim(),
+        // Preserve the network-ROM source fields the form doesn't edit (#255).
+        rom_source: romSource,
+        rom_rel_path: netExtraRef.current.rom_rel_path,
+        local_rom_path: localRomPath,
+        rom_sha256: netExtraRef.current.rom_sha256,
+        rom_folder_path: netExtraRef.current.rom_folder_path,
       };
       await setGameDevice(finalSlug!, cfg);
       onSaved();
@@ -214,6 +261,28 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
+          {romSource === "network" && !isNew && (
+            <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>
+                🌐 Network ROM — {localRomPath
+                  ? <>a local copy exists for offline play.</>
+                  : <>played from the network share.</>}
+              </div>
+              <div className="input-row" style={{ gap: 8 }}>
+                {localRomPath ? (
+                  <button className="btn" disabled={romBusy} onClick={handleDelocalize}>
+                    Remove offline copy
+                  </button>
+                ) : (
+                  <button className="btn" disabled={romBusy} onClick={handleLocalize}>
+                    Copy for offline play
+                  </button>
+                )}
+                {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Working…</span>}
+              </div>
+              {romMsg && <div style={{ fontSize: 12, marginTop: 6, color: "var(--text-muted)" }}>{romMsg}</div>}
+            </div>
+          )}
         </div>
 
         <div className="input-group">

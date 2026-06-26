@@ -28,6 +28,9 @@ class Config:
     recent_import_folders: dict = field(default_factory=dict)
     # Opt-in background save/state watcher in sync-daemon (issue #242).
     watch_saves: bool = False
+    # Per-console remembered import ROM source + local-copy destination (issue #255).
+    import_rom_source: dict = field(default_factory=dict)
+    import_local_folder: dict = field(default_factory=dict)
 
 
 def load() -> Config:
@@ -50,6 +53,8 @@ def load() -> Config:
         server_pin=str(data.get("server_pin", "")),
         recent_import_folders=recent_folders,
         watch_saves=bool(data.get("watch_saves", False)),
+        import_rom_source=dict(data.get("import_rom_source", {})),
+        import_local_folder=dict(data.get("import_local_folder", {})),
     )
 
 
@@ -68,5 +73,9 @@ def save(cfg: Config) -> None:
         doc.add("watch_saves", cfg.watch_saves)
     if cfg.recent_import_folders:
         doc.add("recent_import_folders", cfg.recent_import_folders)
+    if cfg.import_rom_source:
+        doc.add("import_rom_source", cfg.import_rom_source)
+    if cfg.import_local_folder:
+        doc.add("import_local_folder", cfg.import_local_folder)
     with open(CONFIG_PATH, "w") as f:
         tomlkit.dump(doc, f)

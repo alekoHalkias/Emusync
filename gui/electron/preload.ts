@@ -83,6 +83,10 @@ contextBridge.exposeInMainWorld("emusync", {
   rom: {
     push: (slug: string, toDeviceId: string, consoleName: string): Promise<{ ok: boolean; targetOnline?: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:push", slug, toDeviceId, consoleName),
+    localize: (slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; error?: string }> =>
+      ipcRenderer.invoke("rom:localize", slug, destFolder),
+    delocalize: (slug: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("rom:delocalize", slug),
   },
   daemon: {
     start: (): Promise<void> => ipcRenderer.invoke("daemon:start"),
