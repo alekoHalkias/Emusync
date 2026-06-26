@@ -51,13 +51,15 @@ def console_list() -> None:
                 c.get("device_game_folder") or '-',
                 c.get("device_save_folder") or '-',
                 c.get("device_state_folder") or '-',
+                c.get("device_network_folder") or '-',
+                c.get("device_local_folder") or '-',
             ])
 
     if not rows:
         click.echo("No consoles configured.")
         return
 
-    headers = ["Console", "Device", "Emulator/Core", "ROM Path", "Save Path", "State Path"]
+    headers = ["Console", "Device", "Emulator/Core", "ROM Path", "Save Path", "State Path", "Network Folder", "Local Folder"]
     _print_table(headers, rows)
 
 
