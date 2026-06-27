@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { configure, configureDevice, health, listEvents, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
+import DevicesPanel from "./DevicesPanel";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
@@ -382,6 +383,9 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                 )}
               </div>
             )}
+
+            {/* Paired devices — folded in from the old standalone modal (#262) */}
+            <DevicesPanel />
           </div>
         </div>
       )}
