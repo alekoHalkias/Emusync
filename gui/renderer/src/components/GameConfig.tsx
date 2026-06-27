@@ -371,9 +371,6 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-            The folder where RetroArch stores all save states for this game. All files in the folder are synced.
-          </span>
           {!isNew && statePath && (
             <SyncLine
               localTime={latestStateFile?.time ?? null}
@@ -395,9 +392,6 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             onChange={(e) => setLaunchCommand(e.target.value)}
             placeholder="retroarch -L snes.so %ROM%"
           />
-          <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-            Use %ROM% as a placeholder for the ROM path.
-          </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
