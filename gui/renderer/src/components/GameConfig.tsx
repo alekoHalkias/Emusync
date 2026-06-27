@@ -301,11 +301,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           {romSource === "network" && !isNew && (
             <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 13, minWidth: 0 }}>
-                  🌐 Network ROM — {localRomPath
-                    ? <>local copy ready for offline play.</>
-                    : <>played from the network share.</>}
-                </span>
+                <span style={{ fontSize: 13, minWidth: 0 }}>🌐 Network ROM</span>
                 {localRomPath ? (
                   <button className="btn" disabled={romBusy} onClick={handleDelocalize} style={{ flexShrink: 0 }}>Remove offline copy</button>
                 ) : (
