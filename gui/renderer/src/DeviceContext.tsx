@@ -1,7 +1,8 @@
 /**
  * Shared device state — polls /devices + /whoami every 30 seconds so every
- * component that needs the device list (DevicesButton count, GameList device
- * modal) reads from one shared fetch instead of each making independent calls.
+ * component that needs the device list (DevicesPanel in the Server modal, the
+ * per-game devices tab) reads from one shared fetch instead of each making
+ * independent calls.
  *
  * On error it retries after 5 seconds; after a successful retry it goes back
  * to the 30-second interval. This means a brief server blip recovers quickly
