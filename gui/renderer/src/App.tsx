@@ -5,7 +5,6 @@ import Setup from "./components/Setup";
 import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
 import ServerStatusButton from "./components/ServerStatusButton";
-import DevicesButton from "./components/DevicesButton";
 import ConflictsButton from "./components/ConflictsButton";
 
 
@@ -203,7 +202,6 @@ export default function App(): React.ReactElement {
             <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>Bulk import</button>
           )}
           <ConflictsButton />
-          <DevicesButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
         </div>
       </header>
