@@ -292,12 +292,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                 ) : (
                   <button className="btn" disabled={romBusy} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
                 )}
-                <span style={{ fontSize: 13, minWidth: 0 }}>
-                  🌐 Network ROM — {localRomPath
-                    ? <>local copy ready for offline play.</>
-                    : <>played from the network share.</>}
+                <span style={{ fontSize: 13, minWidth: 0, color: romMsg ? "var(--text-muted)" : undefined }}>
+                  {romBusy
+                    ? "Working…"
+                    : romMsg
+                      ? romMsg
+                      : <>🌐 Network ROM — {localRomPath ? <>local copy ready for offline play.</> : <>played from the network share.</>}</>}
                 </span>
-                {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>Working…</span>}
               </div>
               {!localRomPath && (
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -308,7 +309,6 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                   </button>
                 </div>
               )}
-              {romMsg && <div style={{ fontSize: 12, marginTop: 6, color: "var(--text-muted)" }}>{romMsg}</div>}
             </div>
           )}
         </div>
