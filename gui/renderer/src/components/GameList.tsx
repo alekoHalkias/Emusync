@@ -1,23 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
-import { removeGame, type Game } from "../api";
+import { removeGame } from "../api";
 import ConsoleImport from "./ConsoleImport";
-import SaveHistory from "./SaveHistory";
 import { RelTime } from "../time";
-import GameDeviceModal from "./game-list/GameDeviceModal";
+import GameModal, { type GameModalTarget } from "./GameModal";
 import { useGameList } from "./game-list/useGameList";
 import { groupByConsole, sortGamesInConsole, lastActivity } from "./game-list/helpers";
-import type { GameRow, DeviceModalTarget, SortBy, SortDir } from "./game-list/types";
+import type { GameRow, SortBy, SortDir } from "./game-list/types";
 
 type Props = {
   onAdd: () => void;
-  onEdit: (game: Game) => void;
   onPlay: (slug: string, name: string) => void;
   importOpen: boolean;                       // Bulk-import modal, lifted to the topbar
   onImportOpenChange: (open: boolean) => void;
 };
-
-type ConfirmRemove = { slug: string; name: string } | null;
-type HistoryModal = { slug: string; name: string; savePath?: string } | null;
 
 function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   games: GameRow[]; selectedSlugs: Set<string>; onToggle: () => void;
@@ -44,17 +39,14 @@ function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   );
 }
 
-export default function GameList({ onAdd, onEdit, onPlay, importOpen, onImportOpenChange }: Props): React.ReactElement {
+export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange }: Props): React.ReactElement {
   const { games, loading, reload } = useGameList();
-  const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
-  const [removing, setRemoving] = useState(false);
+  const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [deviceModal, setDeviceModal] = useState<DeviceModalTarget | null>(null);
-  const [historyModal, setHistoryModal] = useState<HistoryModal>(null);
   const [colWidths, setColWidths] = useState({ name: 260, activity: 180 });
   const [sortBy, setSortBy] = useState<SortBy>('default');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -63,22 +55,11 @@ export default function GameList({ onAdd, onEdit, onPlay, importOpen, onImportOp
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
-  async function handleRemove(): Promise<void> {
-    if (!confirmRemove) return;
-    setRemoving(true);
-    try {
-      await removeGame(confirmRemove.slug);
-      setConfirmRemove(null);
-      await reload();
-    } catch {
-      /* ignore — game might not exist */
-    } finally {
-      setRemoving(false);
-    }
-  }
-
-  function openDeviceModal(g: GameRow): void {
-    setDeviceModal({ slug: g.slug, name: g.name, gameConsole: g.console || "", gameIsLocal: g.isLocal });
+  function openGameModal(g: GameRow, canPlay: boolean): void {
+    setGameModal({
+      slug: g.slug, name: g.name, gameConsole: g.console || "",
+      gameIsLocal: g.isLocal, savePath: g.savePath, canPlay,
+    });
   }
 
   function toggleSelection(slug: string): void {
@@ -194,17 +175,17 @@ export default function GameList({ onAdd, onEdit, onPlay, importOpen, onImportOp
           <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
         </div>
       ) : (
-        <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px 44px ${colWidths.activity}px 1fr` }}>
+        <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px ${colWidths.activity}px 44px 1fr` }}>
           {/* Column headers */}
           <div className="col-header" />
           <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('game'); }} title="Click to sort">
             Game {sortBy === 'game' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("name")} />
           </div>
-          <div className="col-header" style={{ justifyContent: "center" }} title="ROM source — 🌐 network · 💾 local copy">Src</div>
           <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('activity'); }} title="Most recent local save or server sync">
             Last Activity {sortBy === 'activity' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("activity")} />
           </div>
-          <div className="col-header">Actions</div>
+          <div className="col-header" style={{ justifyContent: "center" }} title="ROM source — 🌐 network · 💾 local copy">Src</div>
+          <div className="col-header" style={{ justifyContent: "flex-end" }}>Actions</div>
 
           {(() => {
             const localGames = games.filter(g => g.isLocal);
@@ -224,18 +205,6 @@ export default function GameList({ onAdd, onEdit, onPlay, importOpen, onImportOp
                   <div className="game-cell game-cell-name">
                     {g.name}
                   </div>
-                  <div className="game-cell" style={{ justifyContent: "center" }}>
-                    {g.romSource === "network" && (
-                      <span
-                        title={g.hasLocalCopy
-                          ? "Network ROM — local copy available for offline play"
-                          : "Network ROM — played from the network share"}
-                        style={{ opacity: 0.8 }}
-                      >
-                        {g.hasLocalCopy ? "💾" : "🌐"}
-                      </span>
-                    )}
-                  </div>
                   <div className="game-cell game-cell-muted">
                     {g.locked && <span style={{ color: "var(--red)", marginRight: 6 }}>🔒</span>}
                     {(() => {
@@ -248,12 +217,21 @@ export default function GameList({ onAdd, onEdit, onPlay, importOpen, onImportOp
                       return <><RelTime iso={newer} /> <span style={{ opacity: 0.55, fontSize: 11 }}>{kind}</span></>;
                     })()}
                   </div>
+                  <div className="game-cell" style={{ justifyContent: "center" }}>
+                    {g.romSource === "network" && (
+                      <span
+                        title={g.hasLocalCopy
+                          ? "Network ROM — local copy available for offline play"
+                          : "Network ROM — played from the network share"}
+                        style={{ opacity: 0.8 }}
+                      >
+                        {g.hasLocalCopy ? "💾" : "🌐"}
+                      </span>
+                    )}
+                  </div>
                   <div className="game-cell game-cell-actions">
-                    <button className="btn btn-icon" title="Show devices with this game" onClick={() => openDeviceModal(g)}>🖥</button>
                     <button className="btn btn-icon" title="Play" disabled={g.locked || !canPlay} onClick={() => canPlay && onPlay(g.slug, g.name)}>▶</button>
-                    <button className="btn btn-icon" title="Save history & rollback" onClick={() => setHistoryModal({ slug: g.slug, name: g.name, savePath: g.savePath })}>🕘</button>
-                    <button className="btn btn-icon" title="Settings" onClick={() => onEdit(g)}>⚙</button>
-                    <button className="btn btn-icon" title="Remove from EmuSync" onClick={() => setConfirmRemove({ slug: g.slug, name: g.name })}>🗑</button>
+                    <button className="btn btn-icon" title="Settings, devices, history & run" onClick={() => openGameModal(g, canPlay)}>⚙</button>
                   </div>
                 </React.Fragment>
               );
@@ -360,43 +338,12 @@ export default function GameList({ onAdd, onEdit, onPlay, importOpen, onImportOp
         />
       )}
 
-      {historyModal && (
-        <SaveHistory
-          slug={historyModal.slug}
-          name={historyModal.name}
-          savePath={historyModal.savePath}
-          onClose={() => setHistoryModal(null)}
-          onRestored={() => reload(true)}
-        />
-      )}
-
-      {confirmRemove && (
-        <div className="modal-overlay" onClick={() => setConfirmRemove(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Remove {confirmRemove.name}?</h3>
-            <p>
-              This removes the game from EmuSync management. The save file on your
-              device will <strong>not</strong> be deleted.
-            </p>
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setConfirmRemove(null)} disabled={removing}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" onClick={handleRemove} disabled={removing}>
-                {removing ? <><span className="spinner" /> Removing…</> : "Remove"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {deviceModal && (
-        <GameDeviceModal
-          slug={deviceModal.slug}
-          name={deviceModal.name}
-          gameConsole={deviceModal.gameConsole}
-          gameIsLocal={deviceModal.gameIsLocal}
-          onClose={() => setDeviceModal(null)}
+      {gameModal && (
+        <GameModal
+          target={gameModal}
+          onClose={() => setGameModal(null)}
+          onChanged={() => reload(true)}
+          onLaunch={onPlay}
         />
       )}
 

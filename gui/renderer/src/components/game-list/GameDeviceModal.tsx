@@ -9,7 +9,7 @@ import {
 import { useDevices } from "../../DeviceContext";
 import type { DeviceModalTarget, TransferState } from "./types";
 
-type Props = DeviceModalTarget & { onClose: () => void };
+type Props = DeviceModalTarget & { onClose: () => void; embedded?: boolean };
 
 /** Returns a freshness tier based on last_seen_at ISO string. */
 function deviceFreshness(lastSeenAt: string | null | undefined): "online" | "recent" | "stale" {
@@ -59,7 +59,7 @@ function DeviceRow({ d, dim, displayIp }: { d: Device; dim: boolean; displayIp?:
  * device that has it). Owns its own data fetch and transfer state — the parent
  * just hands it the game it's scoped to.
  */
-export default function GameDeviceModal({ slug, name, gameConsole, gameIsLocal, onClose }: Props): React.ReactElement {
+export default function GameDeviceModal({ slug, name, gameConsole, gameIsLocal, onClose, embedded }: Props): React.ReactElement {
   const { devices: allDevices, currentDeviceId } = useDevices();
   const [localIp, setLocalIp] = useState<string | null>(null);
   const [installed, setInstalled] = useState<Device[] | null>(null);
@@ -141,10 +141,8 @@ export default function GameDeviceModal({ slug, name, gameConsole, gameIsLocal, 
     }
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-        <h3>Devices — {name}</h3>
+  const body = (
+    <>
         {installed === null ? (
           <div style={{ textAlign: "center", padding: "16px 0" }}>
             <span className="spinner" style={{ width: 20, height: 20 }} />
@@ -217,6 +215,15 @@ export default function GameDeviceModal({ slug, name, gameConsole, gameIsLocal, 
             )}
           </>
         )}
+    </>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+        <h3>Devices — {name}</h3>
+        {body}
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>

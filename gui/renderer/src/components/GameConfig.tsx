@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { addGame, getGame, getGameDevice, getDeviceConsoles, getSaveMeta, getStateMeta, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
+import { addGame, getGame, getGameDevice, getDeviceConsoles, getSaveMeta, getStateMeta, removeGame, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
 import { RelTime } from "../time";
 
 type Props = {
@@ -8,6 +8,8 @@ type Props = {
   onBack: () => void;
   onSaved: () => void;
   onPlay?: (slug: string) => void;
+  embedded?: boolean;            // rendered inside the tabbed game modal (#260)
+  onRemoved?: () => void;        // game deleted from the Settings tab
 };
 
 type SyncOp = { status: "idle" | "busy" | "ok" | "error"; action: "push" | "pull" | null; msg: string };
@@ -15,8 +17,10 @@ const IDLE_OP: SyncOp = { status: "idle", action: null, msg: "" };
 
 
 
-export default function GameConfig({ slug, name: initialName, onBack, onSaved, onPlay }: Props): React.ReactElement {
+export default function GameConfig({ slug, name: initialName, onBack, onSaved, onPlay, embedded, onRemoved }: Props): React.ReactElement {
   const isNew = slug === null;
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState(initialName ?? "");
   const [romPath, setRomPath] = useState("");
   const [savePath, setSavePath] = useState("");
@@ -101,6 +105,19 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   async function pickFile(setter: (p: string) => void, title: string): Promise<void> {
     const path = await window.emusync.dialog.openFile({ title });
     if (path) setter(path);
+  }
+
+  async function handleDelete(): Promise<void> {
+    if (!slug) return;
+    setDeleting(true);
+    try {
+      await removeGame(slug);
+      onRemoved?.();
+    } catch (e: unknown) {
+      setErrors({ _global: e instanceof Error ? e.message : "Failed to delete game." });
+      setDeleting(false);
+      setDeleteConfirm(false);
+    }
   }
 
   // Copy this network ROM onto local disk for offline play (or remove the copy).
@@ -247,13 +264,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
   return (
     <div>
-      <div className="config-header">
-        <button className="btn btn-ghost" onClick={onBack}>← Back</button>
-        <h2>{isNew ? "Add game" : "Game settings"}</h2>
-        {!isNew && onPlay && (
-          <button className="btn btn-primary" onClick={() => onPlay(slug!)}>▶ Play</button>
-        )}
-      </div>
+      {!embedded && (
+        <div className="config-header">
+          <button className="btn btn-ghost" onClick={onBack}>← Back</button>
+          <h2>{isNew ? "Add game" : "Game settings"}</h2>
+          {!isNew && onPlay && (
+            <button className="btn btn-primary" onClick={() => onPlay(slug!)}>▶ Play</button>
+          )}
+        </div>
+      )}
 
       {loadError && <p className="error-msg" style={{ marginBottom: 16 }}>{loadError}</p>}
       {errors._global && <p className="error-msg" style={{ marginBottom: 16 }}>{errors._global}</p>}
@@ -364,7 +383,20 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </span>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div>
+            {!isNew && (deleteConfirm ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                Delete this game?
+                <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
+                </button>
+                <button className="btn btn-ghost" onClick={() => setDeleteConfirm(false)} disabled={deleting}>Cancel</button>
+              </span>
+            ) : (
+              <button className="btn btn-danger" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
+            ))}
+          </div>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? <><span className="spinner" /> Saving…</> : "✓ Save"}
           </button>
