@@ -55,6 +55,8 @@ export interface EmusyncBridge {
     push: (slug: string, toDeviceId: string, consoleName: string) => Promise<{ ok: boolean; targetOnline?: boolean; error?: string }>;
     localize: (slug: string, destFolder?: string) => Promise<{ ok: boolean; localPath?: string; error?: string }>;
     delocalize: (slug: string) => Promise<{ ok: boolean; error?: string }>;
+    uploadMaster: (localPath: string, networkPath: string) => Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }>;
+    setupNetworkPlay: (slug: string, mountRoot: string) => Promise<{ ok: boolean; romPath?: string; error?: string }>;
   };
   daemon: {
     start: () => Promise<void>;

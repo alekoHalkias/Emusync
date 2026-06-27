@@ -142,3 +142,55 @@ def test_delocalize_refuses_to_delete_master(tmp_path):
 
 def test_delocalize_missing_is_noop(tmp_path):
     assert netrom.delocalize_rom(str(tmp_path / "nope.gba"), "") is False
+
+
+# ── upload_to_master (issue #270) ────────────────────────────────────────────
+
+def test_upload_copies_local_to_network_and_returns_hash(tmp_path):
+    local = tmp_path / "local" / "x.gba"
+    local.parent.mkdir()
+    local.write_bytes(b"hello rom")
+    master = tmp_path / "nas" / "GBA" / "x.gba"  # parents created by the helper
+    res = netrom.upload_to_master(str(local), str(master))
+    assert master.read_bytes() == b"hello rom"
+    assert res.skipped is False
+    assert res.sha256 == netrom.sha256_file(str(local))
+    assert not (tmp_path / "nas" / "GBA" / "x.gba.part").exists()
+
+
+def test_upload_skips_when_master_exists(tmp_path):
+    local = tmp_path / "local" / "x.gba"
+    local.parent.mkdir()
+    local.write_bytes(b"new local bytes")
+    master = tmp_path / "nas" / "x.gba"
+    master.parent.mkdir()
+    master.write_bytes(b"existing master")
+    res = netrom.upload_to_master(str(local), str(master))
+    assert res.skipped is True
+    # Master is left untouched, and its hash (not the local one) is returned.
+    assert master.read_bytes() == b"existing master"
+    assert res.sha256 == netrom.sha256_file(str(master))
+
+
+def test_upload_can_overwrite_when_skip_disabled(tmp_path):
+    local = tmp_path / "local" / "x.gba"
+    local.parent.mkdir()
+    local.write_bytes(b"new local bytes")
+    master = tmp_path / "nas" / "x.gba"
+    master.parent.mkdir()
+    master.write_bytes(b"old")
+    res = netrom.upload_to_master(str(local), str(master), skip_if_exists=False)
+    assert res.skipped is False
+    assert master.read_bytes() == b"new local bytes"
+
+
+def test_upload_refuses_same_path(tmp_path):
+    f = tmp_path / "x.gba"
+    f.write_bytes(b"rom")
+    with pytest.raises(netrom.LocalizeError):
+        netrom.upload_to_master(str(f), str(f))
+
+
+def test_upload_missing_local_source(tmp_path):
+    with pytest.raises(netrom.LocalizeError):
+        netrom.upload_to_master(str(tmp_path / "nope.gba"), str(tmp_path / "nas" / "x.gba"))

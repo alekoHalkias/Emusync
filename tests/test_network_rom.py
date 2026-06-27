@@ -7,7 +7,7 @@ import sqlite3
 
 import pytest
 
-from tests.conftest import AUTH
+from tests.conftest import AUTH, _device_auth
 
 
 async def _add_game(client, name="Pokemon Emerald", console="GBA"):
@@ -36,6 +36,44 @@ async def test_game_device_network_fields_roundtrip(client):
     assert got["rom_source"] == "network"
     assert got["rom_rel_path"] == "GBA/Pokemon Emerald.gba"
     assert got["local_rom_path"] == ""
+
+
+@pytest.mark.asyncio
+async def test_network_source_discovery_across_devices(client):
+    """A device that doesn't have the game can discover another device's network
+    config so it can join the rel-path to its own mount root (issue #270)."""
+    slug = await _add_game(client)
+    # Device A configures the game on a network share.
+    auth_a = _device_auth("dev-a", "Gaming PC")
+    await client.put(f"/games/{slug}/device", json={
+        "rom_path": "/mnt/nas/roms/GBA/Pokemon Emerald.gba",
+        "save_path": "/home/a/saves/GBA/Pokemon Emerald/Pokemon Emerald.srm",
+        "state_path": "/home/a/states/GBA/Pokemon Emerald",
+        "launch_command": "retroarch -L core.so '/mnt/nas/roms/GBA/Pokemon Emerald.gba'",
+        "rom_folder_path": "/mnt/nas/roms/GBA",
+        "rom_source": "network", "rom_rel_path": "GBA/Pokemon Emerald.gba",
+    }, headers=auth_a)
+
+    # Device B (no config for this game) discovers the network source.
+    auth_b = _device_auth("dev-b", "Steam Deck")
+    r = await client.get(f"/games/{slug}/network-source", headers=auth_b)
+    assert r.status_code == 200
+    src = r.json()
+    assert src["rom_rel_path"] == "GBA/Pokemon Emerald.gba"
+    assert src["console"] == "GBA"
+    assert src["device_name"] == "Gaming PC"
+    assert src["rom_path"] == "/mnt/nas/roms/GBA/Pokemon Emerald.gba"
+
+
+@pytest.mark.asyncio
+async def test_network_source_404_when_only_local(client):
+    slug = await _add_game(client)
+    await client.put(f"/games/{slug}/device", json={
+        "rom_path": "/home/me/roms/g.gba", "save_path": "/saves/g.srm",
+        "rom_source": "local", "rom_rel_path": "",
+    }, headers=AUTH)
+    r = await client.get(f"/games/{slug}/network-source", headers=_device_auth("dev-b", "Deck"))
+    assert r.status_code == 404
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { removeGame } from "../api";
 import ConsoleImport from "./ConsoleImport";
+import NetworkPlaySetup from "./NetworkPlaySetup";
 import { RelTime } from "../time";
 import GameModal, { type GameModalTarget } from "./GameModal";
 import { useGameList } from "./game-list/useGameList";
@@ -42,6 +43,7 @@ function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
 export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange }: Props): React.ReactElement {
   const { games, loading, reload } = useGameList();
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
+  const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -230,7 +232,16 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
                     )}
                   </div>
                   <div className="game-cell game-cell-actions">
-                    <button className="btn btn-icon" title="Play" disabled={g.locked || !canPlay} onClick={() => canPlay && onPlay(g.slug, g.name)}>▶</button>
+                    <button
+                      className="btn btn-icon"
+                      title={canPlay ? "Play" : "Set up to play on this device"}
+                      disabled={g.locked}
+                      onClick={() => {
+                        if (g.locked) return;
+                        if (canPlay) onPlay(g.slug, g.name);
+                        else setNetPlayTarget({ slug: g.slug, name: g.name });
+                      }}
+                    >▶</button>
                     <button className="btn btn-icon" title="Settings, devices, history & run" onClick={() => openGameModal(g, canPlay)}>⚙</button>
                   </div>
                 </React.Fragment>
@@ -344,6 +355,16 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
           onClose={() => setGameModal(null)}
           onChanged={() => reload(true)}
           onLaunch={onPlay}
+        />
+      )}
+
+      {netPlayTarget && (
+        <NetworkPlaySetup
+          slug={netPlayTarget.slug}
+          name={netPlayTarget.name}
+          onClose={() => setNetPlayTarget(null)}
+          onPlay={onPlay}
+          onChanged={() => reload(true)}
         />
       )}
 

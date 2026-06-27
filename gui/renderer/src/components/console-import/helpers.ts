@@ -112,6 +112,47 @@ export function relPathUnder(romPath: string, roots: string[]): string {
   return norm.split("/").pop() || norm;
 }
 
+/** True if `p` is `root` or sits underneath it (slash-normalized). */
+function underRoot(p: string, root: string): boolean {
+  if (!root) return false;
+  const n = p.replace(/\/$/, "");
+  const r = root.replace(/\/$/, "");
+  return n === r || n.startsWith(r + "/");
+}
+
+/**
+ * Network-import classification (issue #270). Given ROMs scanned across the
+ * network share root(s) and the console's local-copy folder, tag each as
+ * "network" (only on the share), "local" (only on local disk), or "both" (on the
+ * share with a local copy present). The same game found under both roots merges
+ * into ONE "both" entry (matched by filename), keyed off the network copy as the
+ * master with `localRomPath` pointing at the local copy.
+ */
+export function classifyByRoot(
+  roms: RomEntry[],
+  _networkRoots: string[],
+  localRoot: string,
+): RomEntry[] {
+  const lRoot = localRoot.replace(/\/$/, "");
+  const byKey = new Map<string, { network?: RomEntry; local?: RomEntry }>();
+  for (const rom of roms) {
+    const key = (rom.romPath.split("/").pop() || rom.romPath).toLowerCase();
+    const slot = byKey.get(key) ?? {};
+    // A ROM under the local root is the local copy; otherwise treat it as
+    // network (covers both an explicit network root and the auto-detected dirs).
+    if (lRoot && underRoot(rom.romPath, lRoot)) slot.local = rom;
+    else slot.network = rom;
+    byKey.set(key, slot);
+  }
+  const out: RomEntry[] = [];
+  for (const { network, local } of byKey.values()) {
+    if (network && local) out.push({ ...network, presence: "both", localRomPath: local.romPath });
+    else if (network)     out.push({ ...network, presence: "network" });
+    else if (local)       out.push({ ...local, presence: "local", localRomPath: local.romPath });
+  }
+  return out;
+}
+
 /** Group ROMs by their parent directory (for the results list headers). */
 export function groupByDir(roms: RomEntry[]): Record<string, RomEntry[]> {
   const grouped: Record<string, RomEntry[]> = {};

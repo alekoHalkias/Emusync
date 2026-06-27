@@ -190,6 +190,83 @@ def localize_rom(network_path: str, local_path: str, *, verify: bool = True) -> 
     return master_hash
 
 
+class UploadResult:
+    """Outcome of :func:`upload_to_master`.
+
+    ``skipped`` is True when a master already existed and was left untouched.
+    ``sha256`` is the master's hash (the existing master's when skipped, else the
+    freshly-copied one's).
+    """
+
+    __slots__ = ("sha256", "skipped")
+
+    def __init__(self, sha256: str, skipped: bool) -> None:
+        self.sha256 = sha256
+        self.skipped = skipped
+
+
+def upload_to_master(
+    local_path: str, network_path: str, *, skip_if_exists: bool = True, verify: bool = True
+) -> UploadResult:
+    """Copy a local-only ROM *up* to the network master at *network_path* (issue #270).
+
+    The reverse of :func:`localize_rom`: used during import when a game is found
+    on local disk but not yet on the network share, so the share becomes the
+    canonical master while the existing local file is treated as an already-made
+    local copy.
+
+    Safety mirrors ``localize_rom``: when *skip_if_exists* (the default) a master
+    already present is **never overwritten** — its hash is returned with
+    ``skipped=True``. Otherwise free space on the share is checked, the copy goes
+    to a ``.part`` temp then ``os.replace`` (atomic), and the destination is
+    re-hashed to confirm an intact copy. Raises :class:`LocalizeError` on failure,
+    leaving no partial file.
+    """
+    if not local_path or not os.path.isfile(local_path):
+        raise LocalizeError(f"local ROM not found: {local_path}")
+    if not network_path:
+        raise LocalizeError("no network destination given")
+    if os.path.abspath(local_path) == os.path.abspath(network_path):
+        raise LocalizeError("network destination equals the local source")
+
+    # A master already on the share is authoritative — never clobber it.
+    if skip_if_exists and path_is_reachable(network_path):
+        return UploadResult(sha256_file(network_path), skipped=True)
+
+    parent = os.path.dirname(network_path) or "."
+    try:
+        os.makedirs(parent, exist_ok=True)
+    except OSError as exc:
+        raise LocalizeError(f"cannot reach network folder {parent}: {exc}") from exc
+
+    size = os.path.getsize(local_path)
+    try:
+        free = shutil.disk_usage(parent).free
+    except OSError as exc:
+        raise LocalizeError(f"cannot reach network folder {parent}: {exc}") from exc
+    if free < size:
+        raise LocalizeError(
+            f"not enough free space on the share: need {size} bytes, {free} available at {parent}"
+        )
+
+    tmp = network_path + ".part"
+    try:
+        shutil.copyfile(local_path, tmp)
+        local_hash = sha256_file(local_path)
+        if verify and sha256_file(tmp) != local_hash:
+            raise LocalizeError("upload verification failed (hash mismatch)")
+        os.replace(tmp, network_path)
+    except OSError as exc:
+        raise LocalizeError(str(exc)) from exc
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    return UploadResult(local_hash, skipped=False)
+
+
 def delocalize_rom(local_path: str, network_path: str) -> bool:
     """Delete a localized copy, refusing to touch the network master.
 

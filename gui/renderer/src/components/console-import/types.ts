@@ -27,6 +27,14 @@ export type RomEntry = {
   romFolderPath: string;
   linkedSlug?: string;
   linkedName?: string;
+  // Network import (issue #270): where this ROM was found relative to the chosen
+  // source roots. "network" = only on the share, "local" = only on local disk
+  // (will be uploaded to the share + treated as already localized), "both" = on
+  // the share with a local copy already present. Unset for local-source imports.
+  presence?: "network" | "local" | "both";
+  // For a local/both ROM, the path of the local copy (used to upload to the
+  // master and recorded as local_rom_path so it's treated as localized).
+  localRomPath?: string;
 };
 
 export type Phase =

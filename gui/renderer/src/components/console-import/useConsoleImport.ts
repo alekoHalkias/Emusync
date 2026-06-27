@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { addGame, setGameDevice, gamesOverview, getDeviceGameDevices, listDevices, type Device } from "../../api";
 import {
   annotateRoms,
+  classifyByRoot,
   dedupeAndLink,
   getConsoleAbbreviation,
   groupByDir,
@@ -81,8 +82,20 @@ export function useConsoleImport({ onClose, onImported }: Props) {
     setPhase("scanning");
     setError("");
     try {
-      const result = await emusync.emulator.scan(consoleSel, emuSel, paths);
-      const annotated = annotateRoms(result.roms, paths, result.romDirs ?? []);
+      // Network import (issue #270): also scan the console's local-copy folder so
+      // ROMs already on local disk are detected — local-only ones get uploaded to
+      // the share, ones present in both are treated as already localized.
+      const scanNetwork = romSource === "network";
+      const scanPaths = scanNetwork && localRomRoot && !paths.includes(localRomRoot)
+        ? [...paths, localRomRoot]
+        : paths;
+      const result = await emusync.emulator.scan(consoleSel, emuSel, scanPaths);
+      let annotated = annotateRoms(result.roms, scanPaths, result.romDirs ?? []);
+
+      // Tag each ROM network/local/both and merge net+local duplicates into one row.
+      if (scanNetwork) {
+        annotated = classifyByRoot(annotated, paths, localRomRoot);
+      }
 
       // Dedup: filter already-imported ROMs; detect cross-device links.
       let newRoms = annotated;
@@ -221,15 +234,39 @@ export function useConsoleImport({ onClose, onImported }: Props) {
         const scanRoot   = (rom.romFolderPath ?? "").replace(/\/$/, "");
 
         // Network ROMs: never reorganise the share — store the master path as-is
-        // plus a portable rel-path. local_rom_path stays EMPTY until an actual
-        // copy is made (a non-empty value means "a local copy exists"); the chosen
-        // destination folder is saved on the console instead, so localize derives
-        // the path from there. Local ROMs: organise into a per-game subfolder.
+        // plus a portable rel-path. local_rom_path is EMPTY for a network-only
+        // ROM, but holds the existing local file when the ROM was also found on
+        // local disk (presence "both") or was uploaded from local disk
+        // (presence "local") — in both cases the game is treated as already
+        // localized. Local-source ROMs: organise into a per-game subfolder.
         let romRelPath = "";
         let netRoot = "";
+        let localCopyPath = "";
+        let romSha = "";
         if (romSource === "network") {
-          romRelPath = relPathUnder(romPath, scanRoots);
-          netRoot = scanRoots.find(r => romPath === r || romPath.startsWith(r + "/")) ?? scanRoot;
+          const lRoot = (localRomRoot || "").replace(/\/$/, "");
+          const networkRoots = scanRoots.filter(r => r !== lRoot);
+          if (rom.presence === "local") {
+            // Found only on local disk → copy it UP to the share so the share
+            // becomes the master, and keep the local file as the localized copy.
+            const localPath = rom.localRomPath ?? romPath;
+            const rel = relPathUnder(localPath, [localRomRoot]);
+            netRoot = networkRoots[0] ?? "";
+            if (!netRoot) throw new Error("no network folder configured to upload to");
+            const masterPath = `${netRoot}/${rel}`;
+            const up = await emusync.rom.uploadMaster(localPath, masterPath);
+            if (!up.ok) throw new Error(up.error ?? "upload to share failed");
+            launchCmd     = launchCmd.replaceAll(localPath, masterPath);
+            romPath       = masterPath;       // master is now the canonical ROM
+            romRelPath    = rel;
+            localCopyPath = localPath;        // existing local file = localized copy
+            romSha        = up.sha256 ?? "";
+          } else {
+            // network-only or both: romPath is the share master as scanned.
+            romRelPath = relPathUnder(romPath, networkRoots);
+            netRoot = networkRoots.find(r => romPath === r || romPath.startsWith(r + "/")) ?? scanRoot;
+            if (rom.presence === "both") localCopyPath = rom.localRomPath ?? "";
+          }
         } else {
           const romParent = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
           if (scanRoot && romParent === scanRoot) {
@@ -256,7 +293,8 @@ export function useConsoleImport({ onClose, onImported }: Props) {
           rom_folder_path: scanRoot || rom.romFolderPath || "",
           rom_source: romSource,
           rom_rel_path: romRelPath,
-          local_rom_path: "",
+          local_rom_path: localCopyPath,
+          ...(romSha ? { rom_sha256: romSha } : {}),
           // Network root + chosen local-copy destination land on the console row
           // so `Copy for offline play` / `emusync rom localize` know where to put it.
           ...(romSource === "network" ? {
