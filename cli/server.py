@@ -25,6 +25,55 @@ def server() -> None:
     """Manage the EmuSync server."""
 
 
+class _RotatingLogWriter:
+    """Append text to a size-capped log file, rotating to numbered backups.
+
+    When the file would exceed *max_bytes*, it is rotated: ``server.log`` →
+    ``server.log.1`` → ``server.log.2`` … keeping at most *backups* old files.
+    Used by :class:`_TimestampedStream` to mirror already-stamped stdout lines to
+    ``~/.emusync/server.log``. Not thread-safe on its own — the caller
+    (``_TimestampedStream``) serializes writes under its own lock.
+    """
+
+    def __init__(self, path: Path, max_bytes: int = 5 * 1024 * 1024, backups: int = 3) -> None:
+        self._path = path
+        self._max_bytes = max_bytes
+        self._backups = backups
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._fh = open(self._path, "a", encoding="utf-8")
+
+    def write(self, text: str) -> None:
+        if not text:
+            return
+        try:
+            if self._fh.tell() + len(text.encode("utf-8", "replace")) > self._max_bytes:
+                self._rotate()
+            self._fh.write(text)
+            self._fh.flush()
+        except Exception:
+            # Never let logging-to-file break the server's stdout path.
+            pass
+
+    def _rotate(self) -> None:
+        self._fh.close()
+        # Drop the oldest, shift the rest up by one.
+        oldest = self._path.with_name(self._path.name + f".{self._backups}")
+        oldest.unlink(missing_ok=True)
+        for i in range(self._backups - 1, 0, -1):
+            src = self._path.with_name(self._path.name + f".{i}")
+            if src.exists():
+                src.rename(self._path.with_name(self._path.name + f".{i + 1}"))
+        if self._path.exists():
+            self._path.rename(self._path.with_name(self._path.name + ".1"))
+        self._fh = open(self._path, "a", encoding="utf-8")
+
+    def close(self) -> None:
+        try:
+            self._fh.close()
+        except Exception:
+            pass
+
+
 class _TimestampedStream:
     """Wrap a text stream so every new line written gets a '[YYYY-MM-DD HH:MM:SS] '
     prefix. Installed over ``sys.stdout`` at server start so all server log lines
@@ -32,10 +81,14 @@ class _TimestampedStream:
 
     Thread-safe (writes are serialized) and ``\\r``-aware, so carriage-return
     progress updates re-stamp cleanly instead of mangling the line.
+
+    If *log_writer* is given, every stamped chunk is also mirrored to it (the
+    rotating ``server.log`` file — stdout only, issue #268).
     """
 
-    def __init__(self, stream) -> None:
+    def __init__(self, stream, log_writer: "_RotatingLogWriter | None" = None) -> None:
         self._stream = stream
+        self._log_writer = log_writer
         self._at_line_start = True
         self._lock = threading.Lock()
 
@@ -60,7 +113,10 @@ class _TimestampedStream:
                 out.append(ch)
                 if ch in ("\n", "\r"):
                     self._at_line_start = True
-            self._stream.write("".join(out))
+            stamped = "".join(out)
+            self._stream.write(stamped)
+            if self._log_writer is not None:
+                self._log_writer.write(stamped)
         return len(data)
 
     def flush(self) -> None:
@@ -70,10 +126,18 @@ class _TimestampedStream:
         return getattr(self._stream, name)
 
 
-def _install_timestamped_stdout() -> None:
-    """Route server stdout through the timestamping wrapper (idempotent)."""
-    if not isinstance(sys.stdout, _TimestampedStream):
-        sys.stdout = _TimestampedStream(sys.stdout)
+def _install_timestamped_stdout(log_path: Path | None = None) -> "_RotatingLogWriter | None":
+    """Route server stdout through the timestamping wrapper (idempotent).
+
+    If *log_path* is given, stdout is also mirrored to a rotating log file at
+    that path; the writer is returned so the caller can close it on shutdown.
+    Returns None if stdout was already wrapped or no log path was given.
+    """
+    if isinstance(sys.stdout, _TimestampedStream):
+        return None
+    log_writer = _RotatingLogWriter(log_path) if log_path is not None else None
+    sys.stdout = _TimestampedStream(sys.stdout, log_writer=log_writer)
+    return log_writer
 
 
 def _find_pid_by_port(port: int) -> int | None:
@@ -124,44 +188,15 @@ def _is_server_running(data_dir: str) -> tuple[bool, int | None]:
         return False, None
 
 
-def _initialize_server_interactive(cfg: cfg_module.Config) -> cfg_module.Config:
-    """Interactively initialize the server with user input.
+def _auto_initialize_server(cfg: cfg_module.Config) -> cfg_module.Config:
+    """Initialize the server with preset defaults — no user prompts (issue #268).
 
-    Prompts the user to set a PIN and confirm the port. Returns updated config.
+    Keeps the existing config defaults (port 8765, blank PIN = open access),
+    flips ``is_server`` on, and persists. The PIN can be set afterwards via the
+    GUI or by editing ``server_pin`` in ``emusync.toml``.
     """
-    click.echo("\n" + "=" * 60)
-    click.echo("EmuSync Server Initialization")
-    click.echo("=" * 60)
-    click.echo(f"Device name: {cfg.device_name}")
-    click.echo(f"Data directory: {cfg.data_dir}")
-    click.echo()
-
-    # Set PIN
-    pin = click.prompt(
-        "Enter a PIN for this server (leave blank for open access)",
-        default="",
-        show_default=False,
-        type=str,
-    ).strip()
-    cfg.server_pin = pin
-
-    # Confirm port
-    default_port = cfg.server_port
-    port_input = click.prompt(
-        f"Server port",
-        default=default_port,
-        type=int,
-    )
-    cfg.server_port = port_input
-
     cfg.is_server = True
     cfg_module.save(cfg)
-
-    click.echo("\n✓ Server initialized.")
-    click.echo(f"  PIN: {'(open access)' if not pin else '***'}")
-    click.echo(f"  Port: {cfg.server_port}")
-    click.echo()
-
     return cfg
 
 
@@ -176,19 +211,19 @@ def _do_start_server() -> None:
     from server import api as api_module
     from server import mdns as mdns_module
 
-    # Timestamp every line the server writes to stdout (idempotent).
-    _install_timestamped_stdout()
-
     cfg = cfg_module.load()
 
-    # Check if server needs initialization
+    # Timestamp every line the server writes to stdout (idempotent), and mirror
+    # stdout to a rotating log file at ~/.emusync/server.log (issue #268).
+    log_writer = _install_timestamped_stdout(Path(cfg.data_dir) / "server.log")
+
+    # Auto-initialize with preset defaults on first start — no interactive prompt.
     if not cfg.is_server:
-        click.echo("Server not yet initialized on this device.")
-        should_init = click.confirm("Initialize now?", default=True)
-        if not should_init:
-            click.echo("Cancelled.")
-            sys.exit(0)
-        cfg = _initialize_server_interactive(cfg)
+        cfg = _auto_initialize_server(cfg)
+        click.echo(
+            "EmuSync server initialized (open access — set a PIN in the GUI or "
+            "emusync.toml)"
+        )
 
     # Check if server is already running via PID file
     is_running, running_pid = _is_server_running(cfg.data_dir)
@@ -277,7 +312,17 @@ def _do_start_server() -> None:
     logging.getLogger("uvicorn.error").addFilter(_SuppressSSECancelFilter())
 
     try:
-        uvicorn.run(api_module.app, host="0.0.0.0", port=cfg.server_port, log_level="warning")
+        # timeout_graceful_shutdown lets a single Ctrl+C exit cleanly: uvicorn
+        # asks the long-lived SSE (/events/stream) connections to close, then
+        # force-cancels them after the timeout instead of waiting forever for a
+        # second Ctrl+C (issue #268).
+        uvicorn.run(
+            api_module.app,
+            host="0.0.0.0",
+            port=cfg.server_port,
+            log_level="warning",
+            timeout_graceful_shutdown=3,
+        )
     finally:
         _daemon_shutdown.set()
         mdns_thread.join(timeout=2)
@@ -287,6 +332,8 @@ def _do_start_server() -> None:
                 zc.close()
         token_file.unlink(missing_ok=True)
         pid_file.unlink(missing_ok=True)
+        if log_writer is not None:
+            log_writer.close()
 
 
 @server.command("start")
