@@ -286,20 +286,18 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </div>
           {romSource === "network" && !isNew && (
             <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {localRomPath ? (
+                  <button className="btn" disabled={romBusy} onClick={handleDelocalize} style={{ flexShrink: 0 }}>Remove offline copy</button>
+                ) : (
+                  <button className="btn" disabled={romBusy} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
+                )}
                 <span style={{ fontSize: 13, minWidth: 0 }}>
                   🌐 Network ROM — {localRomPath
                     ? <>local copy ready for offline play.</>
                     : <>played from the network share.</>}
                 </span>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-                  {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Working…</span>}
-                  {localRomPath ? (
-                    <button className="btn" disabled={romBusy} onClick={handleDelocalize}>Remove offline copy</button>
-                  ) : (
-                    <button className="btn" disabled={romBusy} onClick={handleLocalize}>Copy for offline play</button>
-                  )}
-                </div>
+                {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>Working…</span>}
               </div>
               {!localRomPath && (
                 <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
