@@ -195,12 +195,13 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
           <button className="btn btn-primary" onClick={onAdd}>+ Add game</button>
         </div>
       ) : (
-        <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px ${colWidths.lastSave}px ${colWidths.synced}px 1fr` }}>
+        <div className="game-table" style={{ gridTemplateColumns: `32px ${colWidths.name}px 44px ${colWidths.lastSave}px ${colWidths.synced}px 1fr` }}>
           {/* Column headers */}
           <div className="col-header" />
           <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('game'); }} title="Click to sort">
             Game {sortBy === 'game' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("name")} />
           </div>
+          <div className="col-header" style={{ justifyContent: "center" }} title="ROM source — 🌐 network · 💾 local copy">Src</div>
           <div className="col-header sortable" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.resize-handle') === null) handleSort('lastSave'); }} title="Click to sort">
             Last Saved {sortBy === 'lastSave' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("lastSave")} />
           </div>
@@ -241,12 +242,14 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
                         </div>
                         <div className="game-cell game-cell-name">
                           {g.name}
+                        </div>
+                        <div className="game-cell" style={{ justifyContent: "center" }}>
                           {g.romSource === "network" && (
                             <span
                               title={g.hasLocalCopy
                                 ? "Network ROM — local copy available for offline play"
                                 : "Network ROM — played from the network share"}
-                              style={{ marginLeft: 6, opacity: 0.8 }}
+                              style={{ opacity: 0.8 }}
                             >
                               {g.hasLocalCopy ? "💾" : "🌐"}
                             </span>
