@@ -309,20 +309,21 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                 {localRomPath ? (
                   <button className="btn" disabled={romBusy} onClick={handleDelocalize} style={{ flexShrink: 0 }}>Remove offline copy</button>
                 ) : (
-                  <button className="btn" disabled={romBusy} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
+                  <>
+                    <button className="btn" disabled={romBusy} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ flexShrink: 0 }}
+                      onClick={handlePickDestFolder}
+                      title={localDestFolder ? `Local copies go to: ${localDestFolder}` : "Choose where local copies are saved"}
+                    >
+                      {localDestFolder ? "Change folder…" : "Choose folder…"}
+                    </button>
+                  </>
                 )}
                 {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>Working…</span>}
                 {!romBusy && romMsg && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>{romMsg}</span>}
               </div>
-              {!localRomPath && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <span>Local copy folder:</span>
-                  <span className="truncate" style={{ maxWidth: 240 }}>{localDestFolder || "not set"}</span>
-                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 8px" }} onClick={handlePickDestFolder}>
-                    {localDestFolder ? "Change…" : "Choose…"}
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
