@@ -169,6 +169,7 @@ When adding a new IPC channel, register the handler in the relevant `gui/electro
 | `~/.emusync/emusync.toml` | Per-device config (server host, port, PIN, device ID/name, is_server flag, recent ROM folders) |
 | `~/.emusync/emusync.db` | SQLite database (devices, games, saves, locks) |
 | `~/.emusync/.server_pid` | PID of the running server process (written on start, deleted on clean exit) |
+| `~/.emusync/server.log` | Rotating mirror of the server's timestamped stdout activity log (stdout only). Capped at ~5 MB with up to 3 numbered backups (`server.log.1`…`.3`); written by `_RotatingLogWriter` via `_TimestampedStream` (issue #268) |
 | `~/.emusync/.game_pid` | Two-line file: line 1 = emusync run PID, line 2 = emulator child PID (written by `emusync run`, deleted on exit) |
 | `~/.emusync/blobs/{saves,states}/{row-id}` | Save/state blob bytes (one file per retained generation); the SQLite `saves`/`states` rows hold only metadata. `blobs/.uploads/` holds in-flight streamed uploads before they're moved into place (issue #239) |
 | `~/.emusync/rom_staging/` | Staged ROM files for pending transfers (named `{transfer_id}{ext}`); created by `POST /games/{slug}/rom-transfer` |
@@ -182,7 +183,8 @@ Config fields: `server_host`, `server_port`, `data_dir`, `device_id`, `device_na
 
 ## Server process lifecycle
 
-- **Initialization:** When `emusync server start` is run on a fresh device (`is_server=false`), the user is prompted to initialize the server interactively. This sets a PIN and confirms the port before startup.
+- **Initialization (zero-config, issue #268):** When `emusync server start` is run on a fresh device (`is_server=false`), it auto-initializes with preset defaults — **no interactive prompt**. `_auto_initialize_server` sets `is_server=true` and persists; the port stays the `Config` default (8765) and the PIN stays blank (open access). The PIN is changed afterwards via the GUI (`server:change-pin` IPC) or by editing `server_pin` in `emusync.toml`. This means the server starts from no config at all, and the GUI auto-start path (which checks `is_server`) sees the flag on the next launch.
+- **Single Ctrl+C shutdown (issue #268):** `uvicorn.run(..., timeout_graceful_shutdown=3)` so one Ctrl+C exits cleanly. Without it, uvicorn waits indefinitely on the long-lived `/events/stream` SSE connections, forcing a second Ctrl+C. After the 3 s timeout uvicorn force-cancels those tasks (the SSE generator handles `CancelledError`), then the `finally` block runs the normal teardown.
 - **Duplicate-launch detection:** `emusync server start` checks if a server is already running by reading `.server_pid` and verifying the process exists. If running, it exits gracefully with a message showing the PID and port. Stale PID files are cleaned up automatically.
 - **Start:** `startServerProcess()` in `main.ts` spawns Python with `PYTHONUNBUFFERED=1`; waits for server startup signal in stdout; returns `{ ok: boolean }`. Renderer health-polls to confirm server is ready.
 - **Stop:** Can be triggered from GUI ("Stop Server" button) or CLI (`emusync server stop`). GUI method: SIGKILL `serverProcess` + read `.server_pid` and SIGKILL that PID + `pkill -9 -f "emusync.py server start"`. CLI method: checks `.server_pid`, kills that process, echoes "server not running" if not active. All methods clean up the PID file. Resets `serverStartedByApp` flag in GUI.
@@ -209,7 +211,7 @@ The server prints real-time activity to stdout for operator visibility. **Every 
 [2026-06-09 15:30:00] steamdeck unpaired
 ```
 
-**Timestamping** — `cli/server.py` defines `_TimestampedStream` (a thin `sys.stdout` wrapper) and installs it via `_install_timestamped_stdout()` at the top of `_do_start_server`. It prefixes every newly started line (thread-safe, `\r`-aware), so all current *and* future stdout lines — `click.echo`, `print`, `api._print_activity`, the transfer-daemon log — are timestamped uniformly without touching each call site. It does **not** wrap stderr (e.g. the mDNS warning) or uvicorn's own logs.
+**Timestamping** — `cli/server.py` defines `_TimestampedStream` (a thin `sys.stdout` wrapper) and installs it via `_install_timestamped_stdout(log_path)` at the top of `_do_start_server`. It prefixes every newly started line (thread-safe, `\r`-aware), so all current *and* future stdout lines — `click.echo`, `print`, `api._print_activity`, the transfer-daemon log — are timestamped uniformly without touching each call site. It does **not** wrap stderr (e.g. the mDNS warning) or uvicorn's own logs. The same stamped chunks are also mirrored to `~/.emusync/server.log` via `_RotatingLogWriter` (size-capped, rotating; stdout only — issue #268); the writer is returned and closed in the `finally` block.
 
 **The full set of server stdout lines:**
 
