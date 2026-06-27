@@ -185,7 +185,7 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
             Last Activity {sortBy === 'activity' && <span style={{ marginLeft: 4 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>} <span className="resize-handle" onMouseDown={startResize("activity")} />
           </div>
           <div className="col-header" style={{ justifyContent: "center" }} title="ROM source — 🌐 network · 💾 local copy">Src</div>
-          <div className="col-header">Actions</div>
+          <div className="col-header" style={{ justifyContent: "flex-end" }}>Actions</div>
 
           {(() => {
             const localGames = games.filter(g => g.isLocal);
