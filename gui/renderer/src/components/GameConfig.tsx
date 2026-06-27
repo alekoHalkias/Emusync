@@ -254,11 +254,6 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     }
   }
 
-  function opColor(op: SyncOp): string {
-    if (op.status === "ok") return "var(--green, #4caf50)";
-    if (op.status === "error") return "var(--red, #ef4444)";
-    return "var(--text-muted)";
-  }
 
   const showSyncPanel = !isNew && !!savePath;
 
@@ -347,6 +342,17 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             </button>
           </div>
           {errors.savePath && <span className="error-msg">{errors.savePath}</span>}
+          {showSyncPanel && (
+            <SyncLine
+              localTime={localSaveTime}
+              serverTime={serverSaveMeta?.pushed_at ?? null}
+              op={saveOp}
+              onPush={handlePushSave}
+              onPull={handlePullSave}
+              pushDisabled={!localSaveTime}
+              pullDisabled={!serverSaveMeta}
+            />
+          )}
         </div>
 
         <div className="input-group">
@@ -368,6 +374,17 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
             The folder where RetroArch stores all save states for this game. All files in the folder are synced.
           </span>
+          {!isNew && statePath && (
+            <SyncLine
+              localTime={latestStateFile?.time ?? null}
+              serverTime={serverStateMeta?.pushed_at ?? null}
+              op={stateOp}
+              onPush={handlePushState}
+              onPull={handlePullState}
+              pushDisabled={!latestStateFile}
+              pullDisabled={!serverStateMeta}
+            />
+          )}
         </div>
 
         <div className="input-group">
@@ -403,76 +420,18 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
       </div>
 
-      {showSyncPanel && (
-        <div className="card" style={{ marginTop: 16 }}>
-
-          {/* ── Save sync ── */}
-          <SyncSection
-            label="Save"
-            pathLine={savePath}
-            localLabel="Local"
-            localTime={localSaveTime}
-            serverTime={serverSaveMeta?.pushed_at ?? null}
-            op={saveOp}
-            onPush={handlePushSave}
-            onPull={handlePullSave}
-            pushDisabled={!localSaveTime}
-            pullDisabled={!serverSaveMeta}
-            opColor={opColor(saveOp)}
-          />
-
-          {/* ── State sync ── */}
-          <div style={{ borderTop: "1px solid var(--border)", margin: "16px -16px 0" }} />
-          <div style={{ paddingTop: 16 }}>
-            {statePath ? (
-              <SyncSection
-                label="Save state"
-                pathLine={statePath.endsWith("/") ? statePath : statePath + "/"}
-                localLabel="Local (latest)"
-                localTime={latestStateFile?.time ?? null}
-                serverTime={serverStateMeta?.pushed_at ?? null}
-                op={stateOp}
-                onPush={handlePushState}
-                onPull={handlePullState}
-                pushDisabled={!latestStateFile}
-                pullDisabled={!serverStateMeta}
-                opColor={opColor(stateOp)}
-              />
-            ) : (
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Save state
-                </div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                  No state file configured — set one above to enable state sync.
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 // ── shared sync section component ─────────────────────────────────────────────
 
-function SyncSection({
-  label,
-  pathLine,
-  localLabel,
-  localTime,
-  serverTime,
-  op,
-  onPush,
-  onPull,
-  pushDisabled,
-  pullDisabled,
-  opColor,
+// Compact one-line sync row shown under a save/state location field (#264):
+//   Sync: 💾 <local> · ☁ <server>            [↑ Push] [↓ Pull]
+// The Push/Pull buttons flash ✓/✗ briefly on result instead of a status line.
+function SyncLine({
+  localTime, serverTime, op, onPush, onPull, pushDisabled, pullDisabled,
 }: {
-  label: string;
-  pathLine: string;
-  localLabel: string;
   localTime: string | null;
   serverTime: string | null;
   op: SyncOp;
@@ -480,53 +439,44 @@ function SyncSection({
   onPull: () => void;
   pushDisabled: boolean;
   pullDisabled: boolean;
-  opColor: string;
 }): React.ReactElement {
   const busy = op.status === "busy";
+  const [flash, setFlash] = useState<{ action: "push" | "pull"; ok: boolean } | null>(null);
+  useEffect(() => {
+    if ((op.status === "ok" || op.status === "error") && op.action) {
+      setFlash({ action: op.action, ok: op.status === "ok" });
+      const t = setTimeout(() => setFlash(null), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [op.status, op.action]);
 
-  function SyncBtn({ action, onClick, disabled, children }: {
-    action: "push" | "pull"; onClick: () => void; disabled: boolean; children: React.ReactNode;
+  function Btn({ action, onClick, disabled, label }: {
+    action: "push" | "pull"; onClick: () => void; disabled: boolean; label: string;
   }): React.ReactElement {
-    const isActive = busy && op.action === action;
+    const showSpinner = busy && op.action === action;
+    const f = flash?.action === action ? flash : null;
     return (
       <button
         className="btn btn-ghost"
-        style={{ fontSize: 12, padding: "3px 10px", minWidth: 72 }}
+        style={{ fontSize: 12, padding: "3px 10px", minWidth: 64, color: f ? (f.ok ? "var(--green)" : "var(--red)") : undefined }}
         disabled={busy || disabled}
         onClick={onClick}
+        title={op.action === action && op.status === "error" ? op.msg : undefined}
       >
-        {isActive ? <span className="spinner" style={{ width: 10, height: 10 }} /> : children}
+        {showSpinner ? <span className="spinner" style={{ width: 10, height: 10 }} /> : f ? (f.ok ? "✓" : "✗") : label}
       </button>
     );
   }
 
   return (
-    <div>
-      <div style={{
-        fontWeight: 600, fontSize: 12, marginBottom: 10,
-        color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em",
-      }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10, wordBreak: "break-all" }}>
-        {pathLine}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "8px 12px", alignItems: "center" }}>
-        <span style={{ fontSize: 13 }}>
-          <span style={{ color: "var(--text-muted)" }}>{localLabel}: </span>
-          <strong><RelTime iso={localTime} /></strong>
-        </span>
-        <SyncBtn action="push" onClick={onPush} disabled={pushDisabled}>↑ Push</SyncBtn>
-
-        <span style={{ fontSize: 13 }}>
-          <span style={{ color: "var(--text-muted)" }}>Server: </span>
-          <strong><RelTime iso={serverTime} /></strong>
-        </span>
-        <SyncBtn action="pull" onClick={onPull} disabled={pullDisabled}>↓ Pull</SyncBtn>
-      </div>
-      {op.status !== "idle" && op.status !== "busy" && (
-        <div style={{ marginTop: 8, fontSize: 12, color: opColor }}>{op.msg}</div>
-      )}
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, fontSize: 13, flexWrap: "wrap" }}>
+      <span style={{ color: "var(--text-muted)", fontSize: 12 }}>Sync:</span>
+      <span title="On this device"><span style={{ opacity: 0.7 }}>💾</span> <RelTime iso={localTime} /></span>
+      <span style={{ color: "var(--text-muted)" }}>·</span>
+      <span title="On the server"><span style={{ opacity: 0.7 }}>☁️</span> <RelTime iso={serverTime} /></span>
+      <span style={{ flex: 1 }} />
+      <Btn action="push" onClick={onPush} disabled={pushDisabled} label="↑ Push" />
+      <Btn action="pull" onClick={onPull} disabled={pullDisabled} label="↓ Pull" />
     </div>
   );
 }
