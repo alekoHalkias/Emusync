@@ -22,5 +22,5 @@ export type DeviceModalTarget = {
   gameIsLocal: boolean;          // true = current device has rom_path for this game
 };
 
-export type SortBy = "default" | "game" | "lastSave" | "synced";
+export type SortBy = "default" | "game" | "activity";
 export type SortDir = "asc" | "desc";
