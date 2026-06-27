@@ -4,12 +4,38 @@ import type { ConsoleImportVM } from "./useConsoleImport";
 export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
   const {
     error, allRomDirs, extraPaths, removedDirs, roms, grouped, selected,
-    names, selectedCount, pushSaves, pushStates,
+    names, selectedCount, pushSaves, pushStates, romSource, localRomRoot,
   } = vm;
 
   return (
     <>
       {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+
+      {/* ROM source: local folder vs network share (issue #255) */}
+      <div style={{ marginBottom: 12, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>ROM source</span>
+        <label className="ci-check">
+          <input type="radio" name="romsrc" checked={romSource === "local"} onChange={() => vm.setRomSource("local")} />
+          Local folder
+        </label>
+        <label className="ci-check">
+          <input type="radio" name="romsrc" checked={romSource === "network"} onChange={() => vm.setRomSource("network")} />
+          Network / shared drive
+        </label>
+      </div>
+      {romSource === "network" && (
+        <div style={{ marginBottom: 12, fontSize: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ color: "var(--text-muted)" }}>Local copy destination (for offline play):</span>
+            <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 10px" }} onClick={vm.pickLocalRomRoot}>
+              Choose…
+            </button>
+          </div>
+          <div className="truncate" style={{ color: "var(--text-muted)", marginTop: 4 }}>
+            {localRomRoot || "Not set — you can still localize each game later from its settings."}
+          </div>
+        </div>
+      )}
 
       {/* ROM folder list */}
       <div style={{ marginBottom: 12 }}>
@@ -118,16 +144,22 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13 }}>
-        <label className="ci-check">
-          <input type="checkbox" checked={pushSaves} onChange={e => vm.setPushSaves(e.target.checked)} />
-          Push saves to other devices
-        </label>
-        <label className="ci-check">
-          <input type="checkbox" checked={pushStates} onChange={e => vm.setPushStates(e.target.checked)} />
-          Push states to other devices
-        </label>
-      </div>
+      {romSource === "network" ? (
+        <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
+          🌐 Network ROMs aren't copied to other devices — every device reads them from the share.
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13 }}>
+          <label className="ci-check">
+            <input type="checkbox" checked={pushSaves} onChange={e => vm.setPushSaves(e.target.checked)} />
+            Push saves to other devices
+          </label>
+          <label className="ci-check">
+            <input type="checkbox" checked={pushStates} onChange={e => vm.setPushStates(e.target.checked)} />
+            Push states to other devices
+          </label>
+        </div>
+      )}
 
       <div className="modal-actions" style={{ marginTop: 12 }}>
         <button className="btn btn-ghost" onClick={vm.backToEmulator}>← Back</button>

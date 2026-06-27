@@ -6,6 +6,15 @@ export type GameDeviceConfig = {
   launch_command: string;
   state_path?: string;
   rom_folder_path?: string;
+  // Network-ROM source fields (issue #255).
+  rom_source?: string;        // 'local' | 'network'
+  rom_rel_path?: string;
+  local_rom_path?: string;
+  rom_sha256?: string;
+  // Transient hints (not stored on the game) used to populate the console row's
+  // per-console network/local folders during a network import.
+  device_network_folder?: string;
+  device_local_folder?: string;
 };
 
 export type Game = { slug: string; name: string; console?: string };
@@ -69,12 +78,16 @@ export type GameOverview = {
   state_path: string;
   launch_command: string;
   rom_folder_path: string;
+  rom_source: string;        // 'local' | 'network' (issue #255)
+  rom_rel_path: string;
+  local_rom_path: string;
 };
 
 /** One call returning lock + last save + this device's config for every game. */
 export const gamesOverview = (): Promise<GameOverview[]> => _fetch("GET", "/games/overview");
 
 export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
+export const getGame = (slug: string): Promise<Game> => _fetch("GET", `/games/${slug}`);
 export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
@@ -140,7 +153,7 @@ export const listSaveHistory = (slug: string): Promise<SaveVersion[]> =>
 export const restoreSave = (slug: string, versionId: string): Promise<{ hash: string; pushed_at: string }> =>
   _fetch("POST", `/games/${slug}/save/restore`, { version_id: versionId });
 
-export type DeviceConsole = { console_name: string; device_game_folder: string; device_save_folder: string; device_emulator: string };
+export type DeviceConsole = { console_name: string; device_game_folder: string; device_save_folder: string; device_emulator: string; device_network_folder?: string; device_local_folder?: string };
 export type DeviceGameDevice = { slug: string; name: string; console?: string; rom_path: string; save_path: string };
 
 export const getDeviceConsoles = (deviceId: string): Promise<DeviceConsole[]> =>

@@ -44,6 +44,8 @@ export function useGameList(): UseGameList {
             locked: g.locked,
             isLocal: g.is_local,
             savePath: g.save_path || undefined,
+            romSource: g.rom_source,
+            hasLocalCopy: g.rom_source === "network" && !!g.local_rom_path,
           };
         })
       );

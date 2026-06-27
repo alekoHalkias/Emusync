@@ -31,16 +31,19 @@ class ConsoleMixin:
     def set_console(self, console: Console) -> None:
         self._conn.execute(
             """INSERT OR REPLACE INTO consoles
-               (id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
+                device_state_folder, device_emulator, device_network_folder, device_local_folder)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (console.id, console.device_id, console.console_name, console.shortform_name,
-             console.device_game_folder, console.device_save_folder, console.device_state_folder, console.device_emulator),
+             console.device_game_folder, console.device_save_folder, console.device_state_folder,
+             console.device_emulator, console.device_network_folder, console.device_local_folder),
         )
         self._conn.commit()
 
     def get_console(self, device_id: str, console_name: str) -> Optional[Console]:
         row = self._conn.execute(
-            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator
+            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
+                      device_state_folder, device_emulator, device_network_folder, device_local_folder
                FROM consoles WHERE device_id = ? AND console_name = ?""",
             (device_id, console_name),
         ).fetchone()
@@ -48,7 +51,8 @@ class ConsoleMixin:
 
     def list_consoles(self, device_id: str) -> list[Console]:
         rows = self._conn.execute(
-            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder, device_state_folder, device_emulator
+            """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
+                      device_state_folder, device_emulator, device_network_folder, device_local_folder
                FROM consoles WHERE device_id = ?""",
             (device_id,),
         ).fetchall()
@@ -66,11 +70,15 @@ def upsert_console_for_game(
     rom_path: str,
     save_path: str,
     rom_folder_path: str,
+    network_folder: str = "",
+    local_folder: str = "",
 ) -> None:
     """Infer console folders/emulator from game paths and create-or-update the Console row.
 
     Called identically from the API (set_game_device) and the CLI (game add) so the
-    logic lives in one place.
+    logic lives in one place. ``network_folder``/``local_folder`` (issue #255) are
+    the per-console NAS mount + local-copy destination for a network import; they
+    are persisted when provided and preserved (never blanked) when empty.
     """
     emulator = ""
     game_folder = ""
@@ -100,6 +108,12 @@ def upsert_console_for_game(
         existing.device_save_folder = save_folder
         existing.device_state_folder = state_folder
         existing.device_emulator = emulator
+        # Only overwrite the network/local folders when new values are supplied,
+        # so a later plain save/state update doesn't blank them (issue #255).
+        if network_folder:
+            existing.device_network_folder = network_folder
+        if local_folder:
+            existing.device_local_folder = local_folder
         store.set_console(existing)
     else:
         store.set_console(Console(
@@ -111,4 +125,6 @@ def upsert_console_for_game(
             device_save_folder=save_folder,
             device_state_folder=state_folder,
             device_emulator=emulator,
+            device_network_folder=network_folder,
+            device_local_folder=local_folder,
         ))

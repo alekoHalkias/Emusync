@@ -10,6 +10,7 @@ import click
 import server.config as cfg_module
 from server.sync_client import GameDeviceConfig, SyncClient
 
+from cli import netrom
 from cli.common import _client
 from cli.root import cli
 
@@ -256,8 +257,8 @@ def push_rom() -> None:
 
         click.echo(f"\n── {game_name} ──")
 
-        if not os.path.isfile(rom_path):
-            click.echo(f"  ROM file not found: {rom_path}", err=True)
+        if not netrom.path_is_reachable(rom_path):
+            click.echo(f"  ROM file not reachable: {rom_path}", err=True)
             continue
 
         # Find suggested destination on target
@@ -384,8 +385,10 @@ def _handle_pull_request(
             return False
 
         rom_path = game_cfg["rom_path"]
-        if not os.path.isfile(rom_path):
-            log(f"  Cannot fulfill pull for '{game_name}': ROM file not found at {rom_path}")
+        # path_is_reachable (not os.path.isfile) so a hung NAS mount can't freeze
+        # the sync-daemon thread fulfilling this pull request (issue #255).
+        if not netrom.path_is_reachable(rom_path):
+            log(f"  Cannot fulfill pull for '{game_name}': ROM file not reachable at {rom_path}")
             client.complete_pull_request(pull_request_id, status="failed")
             return False
 

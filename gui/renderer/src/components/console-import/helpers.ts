@@ -97,6 +97,21 @@ export function dedupeAndLink(
   return { roms, skipCount: withMatches.length - roms.length };
 }
 
+/**
+ * POSIX relative path of `romPath` under whichever scan `root` contains it,
+ * for portable network-ROM storage (issue #255). Falls back to the basename
+ * when no root matches.
+ */
+export function relPathUnder(romPath: string, roots: string[]): string {
+  const norm = romPath.replace(/\/$/, "");
+  for (const root of roots) {
+    const r = root.replace(/\/$/, "");
+    if (norm === r) break;
+    if (norm.startsWith(r + "/")) return norm.slice(r.length + 1);
+  }
+  return norm.split("/").pop() || norm;
+}
+
 /** Group ROMs by their parent directory (for the results list headers). */
 export function groupByDir(roms: RomEntry[]): Record<string, RomEntry[]> {
   const grouped: Record<string, RomEntry[]> = {};

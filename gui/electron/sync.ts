@@ -2,9 +2,10 @@
 // device and the Python server.
 import { ipcMain } from "electron";
 import { spawnSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, renameSync, statSync, createReadStream } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, rmdirSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream } from "fs";
+import { createHash } from "crypto";
 import { request as httpRequest } from "http";
-import { join, dirname, basename } from "path";
+import { join, dirname, basename, resolve as resolvePath } from "path";
 import { parse as parseTOML } from "smol-toml";
 import { CONFIG_PATH } from "./runtime";
 import { loadServerCfg } from "./config-store";
@@ -221,4 +222,153 @@ export function registerSyncIpc(): void {
       }
     }
   );
+
+  // ── network ROM localize / delocalize (issue #255) ──────────────────────────
+  // Copy a network-sourced ROM onto local disk for offline play, and remove it.
+  // The NAS master is never modified or deleted.
+
+  ipcMain.handle(
+    "rom:localize",
+    async (_event, slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; error?: string }> => {
+      try {
+        const { host, port, authHeaders } = loadServerCfg();
+        const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+        if (!gdRes.ok) return { ok: false, error: "Game is not configured on this device" };
+        const gd = await gdRes.json() as any;
+        if (gd.rom_source !== "network") return { ok: false, error: "Not a network-sourced ROM" };
+
+        const networkPath = gd.rom_path as string;
+        if (!networkPath || !existsSync(networkPath)) {
+          return { ok: false, error: "Network ROM is unreachable (is the share mounted?)" };
+        }
+
+        // Destination precedence: an already-stored local path → an explicit
+        // destFolder (from a picker) → the console's configured local folder.
+        const rel = (gd.rom_rel_path as string) || basename(networkPath);
+        let localPath = (gd.local_rom_path as string) || "";
+        let learnedFolder = "";   // a folder we should remember on the console
+        if (!localPath) {
+          let folder = destFolder || "";
+          if (!folder) folder = await consoleLocalFolder(host, port, authHeaders, slug);
+          if (!folder) return { ok: false, error: "No local destination set for this console — choose a folder." };
+          if (destFolder) learnedFolder = destFolder;  // teach the console this folder
+          localPath = join(folder, ...rel.split("/"));
+        }
+        if (resolvePath(localPath) === resolvePath(networkPath)) {
+          return { ok: false, error: "Local destination equals the network master" };
+        }
+        mkdirSync(dirname(localPath), { recursive: true });
+
+        // Free-space precheck so a big console can't half-fill the disk.
+        const size = statSync(networkPath).size;
+        const fs = statfsSync(dirname(localPath));
+        const free = Number(fs.bavail) * Number(fs.bsize);
+        if (free < size) {
+          return { ok: false, error: `Not enough free space: need ${size} bytes, ${free} available` };
+        }
+
+        // Atomic: copy to .part, hash, then rename into place.
+        const tmp = localPath + ".part";
+        try {
+          copyFileSync(networkPath, tmp);
+          const hash = await sha256OfFile(tmp);
+          renameSync(tmp, localPath);
+          // Remember a manually-picked folder on the console so the next game of
+          // this console localizes without re-prompting (issue #255).
+          const updated = { ...gd, local_rom_path: localPath, rom_sha256: hash,
+            ...(learnedFolder ? { device_local_folder: learnedFolder } : {}) };
+          const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
+            method: "PUT",
+            headers: { ...authHeaders, "Content-Type": "application/json" },
+            body: JSON.stringify(updated),
+          });
+          if (!putRes.ok) return { ok: false, error: "Copied, but failed to update server config" };
+          return { ok: true, localPath };
+        } finally {
+          if (existsSync(tmp)) { try { unlinkSync(tmp); } catch { /* best effort */ } }
+        }
+      } catch (e: any) {
+        return { ok: false, error: e.message || "Localize failed" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "rom:delocalize",
+    async (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        const { host, port, authHeaders } = loadServerCfg();
+        const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+        if (!gdRes.ok) return { ok: false, error: "Game is not configured on this device" };
+        const gd = await gdRes.json() as any;
+        const localPath = (gd.local_rom_path as string) || "";
+        if (!localPath) return { ok: false, error: "No local copy to remove" };
+        // Guard: never delete the NAS master.
+        if (gd.rom_path && resolvePath(localPath) === resolvePath(gd.rom_path)) {
+          return { ok: false, error: "Refusing to delete the network master" };
+        }
+        if (existsSync(localPath)) unlinkSync(localPath);
+        // Remove now-empty per-game folders left behind, walking up to (but not
+        // including) the console's local root. rmdirSync throws on a non-empty
+        // dir, so a folder still holding other ROMs is never touched (#255).
+        try {
+          const root = await consoleLocalFolder(host, port, authHeaders, slug);
+          const stop = root ? resolvePath(root) : "";
+          // Without a known root, only the immediate parent is cleaned, so we
+          // never walk up an unbounded chain of coincidentally-empty dirs.
+          let remaining = stop ? Infinity : 1;
+          let dir = dirname(localPath);
+          while (remaining-- > 0 && dir && resolvePath(dir) !== stop && dir !== dirname(dir)) {
+            rmdirSync(dir);            // throws if non-empty → caught below, loop ends
+            dir = dirname(dir);
+          }
+        } catch { /* hit a non-empty dir or the root — nothing more to clean */ }
+        const updated = { ...gd, local_rom_path: "", rom_sha256: "" };
+        const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
+          method: "PUT",
+          headers: { ...authHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify(updated),
+        });
+        if (!putRes.ok) return { ok: false, error: "Removed copy, but failed to update server config" };
+        return { ok: true };
+      } catch (e: any) {
+        return { ok: false, error: e.message || "Delocalize failed" };
+      }
+    }
+  );
+}
+
+// Look up this game's console, then its configured local-copy folder on this
+// device — the destination chosen during a network import (issue #255).
+async function consoleLocalFolder(
+  host: string, port: number, authHeaders: Record<string, string>, slug: string,
+): Promise<string> {
+  try {
+    const gameRes = await fetch(`http://${host}:${port}/games/${slug}`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+    if (!gameRes.ok) return "";
+    const game = await gameRes.json() as { console?: string };
+    const whoamiRes = await fetch(`http://${host}:${port}/whoami`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+    if (!whoamiRes.ok) return "";
+    const { device_id } = await whoamiRes.json() as { device_id: string };
+    const consolesRes = await fetch(`http://${host}:${port}/devices/${device_id}/consoles`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+    if (!consolesRes.ok) return "";
+    const consoles = await consolesRes.json() as Array<{ console_name: string; device_local_folder?: string }>;
+    // A console can have several rows (e.g. a prior local import + this network
+    // one); prefer whichever row actually has a local folder configured.
+    const matches = consoles.filter(c => c.console_name === game.console);
+    return matches.find(c => c.device_local_folder)?.device_local_folder
+      || matches[0]?.device_local_folder || "";
+  } catch {
+    return "";
+  }
+}
+
+function sha256OfFile(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const h = createHash("sha256");
+    const s = createReadStream(path);
+    s.on("error", reject);
+    s.on("data", (d) => h.update(d));
+    s.on("end", () => resolve(h.digest("hex")));
+  });
 }

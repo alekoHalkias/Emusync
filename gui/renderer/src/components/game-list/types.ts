@@ -7,6 +7,8 @@ export type GameRow = Game & {
   locked?: boolean;
   isLocal: boolean;
   savePath?: string;
+  romSource?: string;          // 'local' | 'network' (issue #255)
+  hasLocalCopy?: boolean;      // network ROM that's been localized for offline play
 };
 
 /** State of an in-flight ROM push/pull to a single device, keyed by device id. */

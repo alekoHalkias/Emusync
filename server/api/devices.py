@@ -56,6 +56,8 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
             "device_save_folder": c.device_save_folder,
             "device_state_folder": c.device_state_folder,
             "device_emulator": c.device_emulator,
+            "device_network_folder": c.device_network_folder,
+            "device_local_folder": c.device_local_folder,
         }
         for c in consoles
     ]

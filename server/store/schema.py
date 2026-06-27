@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 9
+_SCHEMA_VERSION = 10
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS consoles (
     device_save_folder    TEXT NOT NULL DEFAULT '',
     device_state_folder   TEXT NOT NULL DEFAULT '',
     device_emulator       TEXT NOT NULL DEFAULT '',
+    device_network_folder TEXT NOT NULL DEFAULT '',
+    device_local_folder   TEXT NOT NULL DEFAULT '',
     UNIQUE(device_id, console_name, device_game_folder)
 );
 CREATE TABLE IF NOT EXISTS game_devices (
@@ -45,6 +47,10 @@ CREATE TABLE IF NOT EXISTS game_devices (
     launch_command  TEXT NOT NULL DEFAULT '',
     state_path      TEXT NOT NULL DEFAULT '',
     rom_folder_path TEXT NOT NULL DEFAULT '',
+    rom_source      TEXT NOT NULL DEFAULT 'local',
+    rom_rel_path    TEXT NOT NULL DEFAULT '',
+    local_rom_path  TEXT NOT NULL DEFAULT '',
+    rom_sha256      TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (game_slug, device_id)
 );
 CREATE TABLE IF NOT EXISTS saves (
@@ -293,4 +299,15 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             resolved_at       TEXT NOT NULL,
             status            TEXT NOT NULL DEFAULT 'open'
         )""")
+    if from_version < 10:
+        # Network-drive ROM source + on-demand local copies (issue #255).
+        # Per-console network/local roots (this device's NAS mount + local copy dest).
+        _try(conn, "ALTER TABLE consoles ADD COLUMN device_network_folder TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE consoles ADD COLUMN device_local_folder TEXT NOT NULL DEFAULT ''")
+        # Per-game source + portable rel-path + localized copy + master hash.
+        # Existing rows default to rom_source='local' so current launches are unaffected.
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_source TEXT NOT NULL DEFAULT 'local'")
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_rel_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN local_rom_path TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_sha256 TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
