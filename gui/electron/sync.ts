@@ -2,7 +2,7 @@
 // device and the Python server.
 import { ipcMain } from "electron";
 import { spawnSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, rmdirSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream } from "fs";
 import { createHash } from "crypto";
 import { request as httpRequest } from "http";
 import { join, dirname, basename, resolve as resolvePath } from "path";
@@ -308,6 +308,21 @@ export function registerSyncIpc(): void {
           return { ok: false, error: "Refusing to delete the network master" };
         }
         if (existsSync(localPath)) unlinkSync(localPath);
+        // Remove now-empty per-game folders left behind, walking up to (but not
+        // including) the console's local root. rmdirSync throws on a non-empty
+        // dir, so a folder still holding other ROMs is never touched (#255).
+        try {
+          const root = await consoleLocalFolder(host, port, authHeaders, slug);
+          const stop = root ? resolvePath(root) : "";
+          // Without a known root, only the immediate parent is cleaned, so we
+          // never walk up an unbounded chain of coincidentally-empty dirs.
+          let remaining = stop ? Infinity : 1;
+          let dir = dirname(localPath);
+          while (remaining-- > 0 && dir && resolvePath(dir) !== stop && dir !== dirname(dir)) {
+            rmdirSync(dir);            // throws if non-empty → caught below, loop ends
+            dir = dirname(dir);
+          }
+        } catch { /* hit a non-empty dir or the root — nothing more to clean */ }
         const updated = { ...gd, local_rom_path: "", rom_sha256: "" };
         const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
           method: "PUT",
