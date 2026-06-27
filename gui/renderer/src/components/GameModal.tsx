@@ -66,7 +66,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
               slug={slug}
               name={name}
               onBack={onClose}
-              onSaved={onChanged}
+              onSaved={() => { onChanged(); onClose(); }}
               onRemoved={() => { onChanged(); onClose(); }}
             />
           )}
