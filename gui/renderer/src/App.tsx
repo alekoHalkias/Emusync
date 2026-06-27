@@ -122,6 +122,7 @@ export default function App(): React.ReactElement {
   const [loadingMessage, setLoadingMessage] = useState("Loading…");
   const [isServer, setIsServer] = useState(false);
   const [gameListKey, setGameListKey] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
   const [playSlug, setPlaySlug] = useState<string | null>(null);
   const [playLaunchCommand, setPlayLaunchCommand] = useState<string | null>(null);
   const [gameRunning, setGameRunning] = useState(false);
@@ -301,6 +302,9 @@ export default function App(): React.ReactElement {
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>
+          {screen.name === "games" && (
+            <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>Bulk import</button>
+          )}
           <ConflictsButton />
           <DevicesButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
@@ -314,6 +318,8 @@ export default function App(): React.ReactElement {
             onAdd={() => setScreen({ name: "config-new" })}
             onEdit={(g) => setScreen({ name: "config-edit", slug: g.slug, gameName: g.name })}
             onPlay={handlePlay}
+            importOpen={importOpen}
+            onImportOpenChange={setImportOpen}
           />
         )}
 

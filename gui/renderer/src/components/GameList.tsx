@@ -12,6 +12,8 @@ type Props = {
   onAdd: () => void;
   onEdit: (game: Game) => void;
   onPlay: (slug: string, name: string) => void;
+  importOpen: boolean;                       // Bulk-import modal, lifted to the topbar
+  onImportOpenChange: (open: boolean) => void;
 };
 
 type ConfirmRemove = { slug: string; name: string } | null;
@@ -42,11 +44,10 @@ function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   );
 }
 
-export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactElement {
+export default function GameList({ onAdd, onEdit, onPlay, importOpen, onImportOpenChange }: Props): React.ReactElement {
   const { games, loading, reload } = useGameList();
   const [confirmRemove, setConfirmRemove] = useState<ConfirmRemove>(null);
   const [removing, setRemoving] = useState(false);
-  const [showEmulatorImport, setShowEmulatorImport] = useState(false);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -172,17 +173,15 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
 
   return (
     <>
-      <div className="section-header">
-        <h2>Games</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          {selectedSlugs.size > 0 && (
-            <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
-              🗑 Delete {selectedSlugs.size}
-            </button>
-          )}
-          <button className="btn btn-ghost" onClick={() => setShowEmulatorImport(true)}>Bulk import</button>
+      {/* Contextual bulk-delete bar — only shown while games are selected, so
+          there's no persistent header line (Bulk import lives in the topbar). */}
+      {selectedSlugs.size > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
+            🗑 Delete {selectedSlugs.size}
+          </button>
         </div>
-      </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: "center", padding: 40 }}>
@@ -354,9 +353,9 @@ export default function GameList({ onAdd, onEdit, onPlay }: Props): React.ReactE
         </div>
       )}
 
-      {showEmulatorImport && (
+      {importOpen && (
         <ConsoleImport
-          onClose={() => setShowEmulatorImport(false)}
+          onClose={() => onImportOpenChange(false)}
           onImported={reload}
         />
       )}
