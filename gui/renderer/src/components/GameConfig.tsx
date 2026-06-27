@@ -301,28 +301,25 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           {romSource === "network" && !isNew && (
             <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 13, minWidth: 0 }}>
-                  🌐 Network ROM — {localRomPath
-                    ? <>local copy ready for offline play.</>
-                    : <>played from the network share.</>}
-                </span>
+                <span style={{ fontSize: 13, minWidth: 0 }}>🌐 Network ROM</span>
                 {localRomPath ? (
                   <button className="btn" disabled={romBusy} onClick={handleDelocalize} style={{ flexShrink: 0 }}>Remove offline copy</button>
                 ) : (
-                  <button className="btn" disabled={romBusy} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
+                  <>
+                    <button className="btn" disabled={romBusy} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
+                    <button
+                      className="btn btn-ghost"
+                      style={{ flexShrink: 0 }}
+                      onClick={handlePickDestFolder}
+                      title={localDestFolder ? `Local copies go to: ${localDestFolder}` : "Choose where local copies are saved"}
+                    >
+                      {localDestFolder ? "Change folder…" : "Choose folder…"}
+                    </button>
+                  </>
                 )}
                 {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>Working…</span>}
                 {!romBusy && romMsg && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>{romMsg}</span>}
               </div>
-              {!localRomPath && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <span>Local copy folder:</span>
-                  <span className="truncate" style={{ maxWidth: 240 }}>{localDestFolder || "not set"}</span>
-                  <button className="btn btn-ghost" style={{ fontSize: 11, padding: "1px 8px" }} onClick={handlePickDestFolder}>
-                    {localDestFolder ? "Change…" : "Choose…"}
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -371,9 +368,6 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-            The folder where RetroArch stores all save states for this game. All files in the folder are synced.
-          </span>
           {!isNew && statePath && (
             <SyncLine
               localTime={latestStateFile?.time ?? null}
@@ -395,9 +389,6 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             onChange={(e) => setLaunchCommand(e.target.value)}
             placeholder="retroarch -L snes.so %ROM%"
           />
-          <span style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4 }}>
-            Use %ROM% as a placeholder for the ROM path.
-          </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
