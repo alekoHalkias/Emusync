@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, configureDevice, getGameDevice, health, gamesOverview, releaseLock } from "./api";
+import { configure, configureDevice, health, gamesOverview, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
 import GameList from "./components/GameList";
@@ -8,114 +8,12 @@ import ServerStatusButton from "./components/ServerStatusButton";
 import DevicesButton from "./components/DevicesButton";
 import ConflictsButton from "./components/ConflictsButton";
 
-function CopyBox({ text }: { text: string }): React.ReactElement {
-  const [copied, setCopied] = useState(false);
-  function copy(): void {
-    navigator.clipboard.writeText(text).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      },
-      () => { /* clipboard blocked (permissions / non-secure context) — no-op */ },
-    );
-  }
-  return (
-    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 16 }}>
-      <div style={{
-        flex: 1,
-        background: "var(--surface-2, #0f1923)",
-        borderRadius: 6,
-        padding: "10px 14px",
-        fontFamily: "monospace",
-        fontSize: 13,
-        userSelect: "text",
-        WebkitUserSelect: "text",
-        wordBreak: "break-all",
-        border: "1px solid var(--border, rgba(255,255,255,0.1))",
-      }}>
-        {text}
-      </div>
-      <button className="btn btn-ghost" onClick={copy} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
-        {copied ? "✓ Copied!" : "Copy"}
-      </button>
-    </div>
-  );
-}
-
-function PlayModal({ slug, launchCommand, onClose, onLaunched }: {
-  slug: string;
-  launchCommand: string | null;
-  onClose: () => void;
-  onLaunched: () => void;
-}): React.ReactElement {
-  const [launching, setLaunching] = useState(false);
-  const [launched, setLaunched] = useState(false);
-  const [launcherPath, setLauncherPath] = useState("emusync");
-  useEffect(() => { window.emusync.launcher.path().then(setLauncherPath); }, []);
-  // Steam appends launch options to the game's own command unless they contain
-  // %command% (the token Steam replaces with that command). The %command% form is
-  // therefore required: it makes emusync run wrap the real emulator — acquiring the
-  // lock and syncing the save (so the app sees the game running). Without it, Steam
-  // would run "<emulator> <launcher> run <slug>" and emusync run would never execute.
-  const steamCommand = `"${launcherPath}" run ${slug} -- %command%`;
-
-  async function launchDirect(): Promise<void> {
-    if (!launchCommand) return;
-    setLaunching(true);
-    await window.emusync.game.launch(slug);
-    setLaunching(false);
-    setLaunched(true);
-    onLaunched();
-    setTimeout(() => { setLaunched(false); onClose(); }, 1500);
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 900, maxWidth: "90vw" }}>
-        <h3 style={{ marginBottom: 20 }}>Play {slug}</h3>
-
-        <p style={{ marginBottom: 8, fontWeight: 500 }}>Launch directly</p>
-        {launchCommand ? (
-          <>
-            <CopyBox text={launchCommand} />
-            <button
-              className="btn btn-primary"
-              style={{ width: "100%", marginBottom: 20 }}
-              onClick={launchDirect}
-              disabled={launching || launched}
-            >
-              {launched ? "✓ Launched!" : launching ? "Launching…" : "▶ Launch now"}
-            </button>
-          </>
-        ) : (
-          <p style={{ color: "var(--muted, #888)", fontSize: 13, marginBottom: 20 }}>
-            No launch command configured. Edit this game and set a launch command first.
-          </p>
-        )}
-
-        <p style={{ marginBottom: 8, fontWeight: 500 }}>Add to Steam</p>
-        <p style={{ fontSize: 13, color: "var(--muted, #888)", marginBottom: 8 }}>
-          Paste this into Steam → game properties → launch options. Keep the
-          <code> %command%</code> — Steam replaces it with the emulator command, and EmuSync
-          wraps it so the game shows as running and the save syncs:
-        </p>
-        <CopyBox text={steamCommand} />
-
-        <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 type Screen =
   | { name: "loading" }
   | { name: "setup" }
   | { name: "games" }
-  | { name: "config-new" }
-  | { name: "config-edit"; slug: string; gameName: string };
+  | { name: "config-new" };
 
 export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
@@ -123,8 +21,6 @@ export default function App(): React.ReactElement {
   const [isServer, setIsServer] = useState(false);
   const [gameListKey, setGameListKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
-  const [playSlug, setPlaySlug] = useState<string | null>(null);
-  const [playLaunchCommand, setPlayLaunchCommand] = useState<string | null>(null);
   const [gameRunning, setGameRunning] = useState(false);
   const [gameIsExternal, setGameIsExternal] = useState(false);
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
@@ -249,13 +145,14 @@ export default function App(): React.ReactElement {
     });
   }
 
-  function handlePlay(slug: string, name?: string): void {
-    setPlayLaunchCommand(null);
-    setPlaySlug(slug);
+  async function handlePlay(slug: string, name?: string): Promise<void> {
+    // Quick play / Run tab: launch immediately (emusync run derives the command
+    // server-side). The topbar then reflects the running game (issue #260).
     if (name) setRunningGameName(name);
-    getGameDevice(slug)
-      .then((gd) => setPlayLaunchCommand(gd.launch_command || null))
-      .catch(() => {});
+    setRunningGameSlug(slug);
+    await window.emusync.game.launch(slug);
+    setGameRunning(true);
+    setGameIsExternal(false);
   }
 
   async function handleStop(): Promise<void> {
@@ -316,7 +213,6 @@ export default function App(): React.ReactElement {
           <GameList
             key={gameListKey}
             onAdd={() => setScreen({ name: "config-new" })}
-            onEdit={(g) => setScreen({ name: "config-edit", slug: g.slug, gameName: g.name })}
             onPlay={handlePlay}
             importOpen={importOpen}
             onImportOpenChange={setImportOpen}
@@ -330,26 +226,7 @@ export default function App(): React.ReactElement {
             onSaved={() => setScreen({ name: "games" })}
           />
         )}
-
-        {screen.name === "config-edit" && (
-          <GameConfig
-            slug={screen.slug}
-            name={screen.gameName}
-            onBack={() => setScreen({ name: "games" })}
-            onSaved={() => setScreen({ name: "games" })}
-            onPlay={handlePlay}
-          />
-        )}
       </main>
-
-      {playSlug && (
-        <PlayModal
-          slug={playSlug}
-          launchCommand={playLaunchCommand}
-          onClose={() => { setPlaySlug(null); setPlayLaunchCommand(null); }}
-          onLaunched={() => { setGameRunning(true); setGameIsExternal(false); }}
-        />
-      )}
 
     </div>
     </DeviceProvider>

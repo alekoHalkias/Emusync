@@ -10,6 +10,7 @@ type Props = {
   savePath?: string;
   onClose: () => void;
   onRestored: () => void;
+  embedded?: boolean;            // rendered inside the tabbed game modal (#260)
 };
 
 function fmtSize(n: number): string {
@@ -25,7 +26,7 @@ function fmtSize(n: number): string {
  * device has the game locally, writes it to disk (the replaced file is kept as
  * .bak by the existing save:pull handler).
  */
-export default function SaveHistory({ slug, name, savePath, onClose, onRestored }: Props): React.ReactElement {
+export default function SaveHistory({ slug, name, savePath, onClose, onRestored, embedded }: Props): React.ReactElement {
   const { devices } = useDevices();
   const [versions, setVersions] = useState<SaveVersion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,10 +64,8 @@ export default function SaveHistory({ slug, name, savePath, onClose, onRestored 
     }
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 540 }} onClick={(e) => e.stopPropagation()}>
-        <h3>Save history — {name}</h3>
+  const body = (
+    <>
         {versions === null ? (
           <div style={{ textAlign: "center", padding: "16px 0" }}>
             <span className="spinner" style={{ width: 20, height: 20 }} />
@@ -102,6 +101,15 @@ export default function SaveHistory({ slug, name, savePath, onClose, onRestored 
           </ul>
         )}
         {status && <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>{status}</p>}
+    </>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ width: 540 }} onClick={(e) => e.stopPropagation()}>
+        <h3>Save history — {name}</h3>
+        {body}
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>
