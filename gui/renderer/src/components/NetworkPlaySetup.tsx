@@ -108,8 +108,18 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
         return;
       }
 
+      // Detect emulator for this console so we can scan with the proper configuration
+      const { options: emulatorOptions } = await window.emusync.emulator.detect(consoleKey);
+      if (!emulatorOptions || emulatorOptions.length === 0) {
+        setError("No emulator detected for this console");
+        return;
+      }
+
+      // Use the first detected emulator
+      const emulatorOption = emulatorOptions[0];
+
       // Scan the mount for the game
-      const scanResult = await window.emusync.emulator.scan(consoleKey, {}, [mountToScan]);
+      const scanResult = await window.emusync.emulator.scan(consoleKey, emulatorOption, [mountToScan]);
       if (!scanResult?.roms || scanResult.roms.length === 0) {
         setError(`Game not found on ${mountToScan}`);
         return;
