@@ -87,101 +87,53 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
     setError(null);
     setBusy(true);
     try {
-      // If we have the game's network source info from another device,
-      // scan that network path on this device to get the proper config
-      if (gameNetworkSource && consoleKey) {
-        try {
-          // Detect emulator for this device
-          const { options: emulatorOptions } = await window.emusync.emulator.detect(consoleKey);
-          if (!emulatorOptions || emulatorOptions.length === 0) {
-            setError("No emulator detected for this console");
-            return;
-          }
-
-          const emulator = emulatorOptions[0];
-
-          // Scan the network path where the game is already configured on the other device
-          const scanResult = await window.emusync.emulator.scan(
-            consoleKey,
-            emulator,
-            [gameNetworkSource.rom_folder_path],
-          );
-
-          if (!scanResult?.roms || scanResult.roms.length === 0) {
-            setError(`Game not found at ${gameNetworkSource.rom_folder_path}`);
-            return;
-          }
-
-          // Find the game by matching the ROM path from network source
-          const gameRom = scanResult.roms.find(
-            (rom) => rom.romPath === gameNetworkSource.rom_path,
-          ) || scanResult.roms[0];
-
-          if (!gameRom?.romPath) {
-            setError("Could not determine ROM configuration");
-            return;
-          }
-
-          const config = {
-            rom_source: "network",
-            rom_path: gameRom.romPath,
-            save_path: gameRom.savePath,
-            state_path: gameRom.statePath || "",
-            launch_command: gameRom.launchCommand,
-            rom_folder_path: gameNetworkSource.rom_folder_path,
-          };
-
-          await setGameDevice(slug, config);
-          onChanged();
-          onClose();
-          onPlay(slug, name);
-          return;
-        } catch (e: any) {
-          setError(e.message || "Failed to import game from network");
+      // If this device already has the console configured with a network mount, scan there
+      if (networkMount && consoleKey) {
+        const { options: emulatorOptions } = await window.emusync.emulator.detect(consoleKey);
+        if (!emulatorOptions || emulatorOptions.length === 0) {
+          setError("No emulator detected for this console");
           return;
         }
-      }
 
-      // Otherwise, we need a local console mount to search in
-      if (!networkMount || !consoleKey) {
-        setError("Console not configured. Please set it up first.");
+        const emulator = emulatorOptions[0];
+        const scanResult = await window.emusync.emulator.scan(consoleKey, emulator, [networkMount]);
+
+        if (!scanResult?.roms || scanResult.roms.length === 0) {
+          setError(`Game not found on ${networkMount}`);
+          return;
+        }
+
+        const rom = scanResult.roms[0];
+        if (!rom.romPath) {
+          setError("Could not determine ROM path");
+          return;
+        }
+
+        const config = {
+          rom_source: "network",
+          rom_path: rom.romPath,
+          save_path: rom.savePath,
+          state_path: rom.statePath || "",
+          launch_command: rom.launchCommand,
+          rom_folder_path: networkMount,
+        };
+
+        await setGameDevice(slug, config);
+        onChanged();
+        onClose();
+        onPlay(slug, name);
         return;
       }
 
-      // Detect emulator and scan the local mount
-      const { options: emulatorOptions } = await window.emusync.emulator.detect(consoleKey);
-      if (!emulatorOptions || emulatorOptions.length === 0) {
-        setError("No emulator detected for this console");
+      // If console not configured locally but game is on network from another device,
+      // open the import wizard pre-seeded with the console so user can configure it
+      if (gameNetworkSource && consoleKey) {
+        setShowConsoleImport(true);
         return;
       }
 
-      const emulatorOption = emulatorOptions[0];
-      const scanResult = await window.emusync.emulator.scan(consoleKey, emulatorOption, [networkMount]);
-
-      if (!scanResult?.roms || scanResult.roms.length === 0) {
-        setError(`Game not found on ${networkMount}`);
-        return;
-      }
-
-      const rom = scanResult.roms[0];
-      if (!rom.romPath) {
-        setError("Could not determine ROM path");
-        return;
-      }
-
-      const config = {
-        rom_source: "network",
-        rom_path: rom.romPath,
-        save_path: rom.savePath,
-        state_path: rom.statePath || "",
-        launch_command: rom.launchCommand,
-        rom_folder_path: networkMount,
-      };
-
-      await setGameDevice(slug, config);
-      onChanged();
-      onClose();
-      onPlay(slug, name);
+      // Console not configured and no network source available
+      setError("Console not configured. Please set it up first.");
     } catch (e: any) {
       setError(e.message || "Failed to set up game");
     } finally {
