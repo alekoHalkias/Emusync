@@ -65,22 +65,16 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
           );
           if (found) setConsoleKey(found.key);
 
-          // Check if this console is already configured on this device with a network mount
+          // Check if this console is already configured on this device using the
+          // saved recent import folders from config (keyed by console key, e.g. "genesis")
           try {
-            const { device_id } = await whoami();
-            const deviceConsoles = await getDeviceConsoles(device_id);
-            console.log("Device consoles:", deviceConsoles);
-            console.log("Looking for console:", game.console);
-            const consoleConfig = deviceConsoles.find(c => c.console_name === game.console);
-            console.log("Console config found:", consoleConfig);
-            // Try device_network_folder first (network ROM root), fall back to device_game_folder
-            const mountPath = consoleConfig?.device_network_folder || consoleConfig?.device_game_folder;
-            console.log("Mount path:", mountPath);
-            if (mountPath) {
-              setNetworkMount(mountPath);
+            const cfg = await window.emusync.config.load();
+            const recentFolders = cfg?.recent_import_folders?.[found.key];
+            if (recentFolders && recentFolders.length > 0) {
+              setNetworkMount(recentFolders[0]);
             }
           } catch (e) {
-            console.error("Failed to get device consoles:", e);
+            console.error("Failed to get console mount from config:", e);
           }
         }
       } catch (e) {
