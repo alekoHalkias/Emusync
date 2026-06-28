@@ -10,6 +10,7 @@ import {
   getConsoleAbbreviation,
   groupByDir,
   relPathUnder,
+  sanitizeFilename,
   stepIndex,
 } from "./helpers";
 import type {
@@ -290,6 +291,9 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
       const rom = toImport[i];
       try {
         const displayName = names[rom.romPath] ?? rom.name;
+        // Filesystem-safe base name to rename on-disk artifacts to (issue #283).
+        // The display name (with spaces/punctuation) is what the game stores.
+        const safeBase    = sanitizeFilename(displayName);
 
         let romPath      = rom.romPath;
         let savePath     = rom.savePath;
@@ -311,12 +315,23 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
           const lRoot = (localRomRoot || "").replace(/\/$/, "");
           const networkRoots = scanRoots.filter(r => r !== lRoot);
           if (rom.presence === "local") {
-            // Found only on local disk → copy it UP to the share so the share
-            // becomes the master, and keep the local file as the localized copy.
-            const localPath = rom.localRomPath ?? romPath;
-            const rel = relPathUnder(localPath, [localRomRoot]);
+            // Found only on local disk → rename to the cleaned title, then copy it
+            // UP to the share so the share becomes the master, keeping the local
+            // file as the localized copy.
+            let localPath = rom.localRomPath ?? romPath;
             netRoot = networkRoots[0] ?? "";
             if (!netRoot) throw new Error("no network folder configured to upload to");
+            const renamed = await emusync.files.renameGameFiles({
+              romPath: localPath, savePath, stateFolder: statePath,
+              newBase: safeBase, reorganize: false,
+            });
+            if (renamed.ok) {
+              launchCmd = launchCmd.replaceAll(localPath, renamed.newRomPath);
+              localPath = renamed.newRomPath;
+              savePath  = renamed.newSavePath;
+              statePath = renamed.newStateFolder;
+            }
+            const rel = relPathUnder(localPath, [localRomRoot]);
             const masterPath = `${netRoot}/${rel}`;
             const up = await emusync.rom.uploadMaster(localPath, masterPath);
             if (!up.ok) throw new Error(up.error ?? "upload to share failed");
@@ -326,25 +341,37 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
             localCopyPath = localPath;        // existing local file = localized copy
             romSha        = up.sha256 ?? "";
           } else {
-            // network-only or both: romPath is the share master as scanned.
-            romRelPath = relPathUnder(romPath, networkRoots);
+            // network-only or both: romPath is the share master as scanned. Rename
+            // the master (and the local copy, if any) + save/state to the title.
             netRoot = networkRoots.find(r => romPath === r || romPath.startsWith(r + "/")) ?? scanRoot;
-            if (rom.presence === "both") localCopyPath = rom.localRomPath ?? "";
+            const renamed = await emusync.files.renameGameFiles({
+              romPath, savePath, stateFolder: statePath,
+              newBase: safeBase, reorganize: false,
+              secondaryRomPath: rom.presence === "both" ? (rom.localRomPath ?? undefined) : undefined,
+            });
+            if (renamed.ok) {
+              launchCmd = launchCmd.replaceAll(romPath, renamed.newRomPath);
+              romPath   = renamed.newRomPath;
+              savePath  = renamed.newSavePath;
+              statePath = renamed.newStateFolder;
+              if (rom.presence === "both") localCopyPath = renamed.newSecondaryRomPath ?? (rom.localRomPath ?? "");
+            }
+            romRelPath = relPathUnder(romPath, networkRoots);
           }
         } else {
+          // Local import: rename the ROM (+ save/state) to the cleaned title, and
+          // nest a flat ROM into a per-game subfolder. Safe no-op when unchanged.
           const romParent = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
-          if (scanRoot && romParent === scanRoot) {
-            const moved = await emusync.files.moveToSubfolder({
-              romPath, subfolderName: rom.name,
-              newSavePath: savePath,        // scan already returned the canonical target path
-              newStateFolder: statePath,    // scan already returned the canonical state folder
-            });
-            if (moved.ok) {
-              launchCmd  = launchCmd.replaceAll(romPath, moved.newRomPath);
-              romPath    = moved.newRomPath;
-              savePath   = moved.newSavePath;
-              statePath  = moved.newStateFolder;
-            }
+          const flat = !!scanRoot && romParent === scanRoot;
+          const renamed = await emusync.files.renameGameFiles({
+            romPath, savePath, stateFolder: statePath,
+            newBase: safeBase, reorganize: flat,
+          });
+          if (renamed.ok) {
+            launchCmd  = launchCmd.replaceAll(romPath, renamed.newRomPath);
+            romPath    = renamed.newRomPath;
+            savePath   = renamed.newSavePath;
+            statePath  = renamed.newStateFolder;
           }
         }
 

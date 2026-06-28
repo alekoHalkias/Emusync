@@ -61,8 +61,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("files:get-save-time", savePath),
     getLatestInFolder: (dirPath: string): Promise<{ path: string; time: string } | null> =>
       ipcRenderer.invoke("files:get-latest-in-folder", dirPath),
-    moveToSubfolder: (args: { romPath: string; subfolderName: string; newSavePath: string; newStateFolder: string }): Promise<{ ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; error?: string }> =>
-      ipcRenderer.invoke("files:move-to-subfolder", args),
+    renameGameFiles: (args: { romPath: string; savePath: string; stateFolder: string; newBase: string; reorganize: boolean; secondaryRomPath?: string }): Promise<{ ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; newSecondaryRomPath?: string; error?: string }> =>
+      ipcRenderer.invoke("files:rename-game-files", args),
   },
   save: {
     push: (slug: string, savePath: string): Promise<{ ok: boolean; error?: string }> =>
