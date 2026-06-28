@@ -87,14 +87,37 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
     setError(null);
     setBusy(true);
     try {
-      // If we have the game's network source info from another device, use it directly
+      // If we have the game's network source info from another device, use its paths
+      // but detect the launch command for this device's emulator (e.g., Flatpak on Steam Deck)
       if (gameNetworkSource) {
+        let launchCommand = gameNetworkSource.launch_command;
+
+        // Re-detect emulator for this device to get the correct launch command
+        // (e.g., Flatpak RetroArch instead of native RetroArch)
+        if (consoleKey) {
+          try {
+            const { options: emulatorOptions } = await window.emusync.emulator.detect(consoleKey);
+            if (emulatorOptions && emulatorOptions.length > 0) {
+              const emulator = emulatorOptions[0];
+              // Build launch command from detected emulator
+              if (emulator.execPath) {
+                launchCommand = emulator.execPath;
+                if (emulator.corePath) {
+                  launchCommand += ` -L "${emulator.corePath}"`;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to detect emulator, using network source launch command:", e);
+          }
+        }
+
         const config = {
           rom_source: "network",
           rom_path: gameNetworkSource.rom_path,
           save_path: gameNetworkSource.save_path,
           state_path: gameNetworkSource.state_path || "",
-          launch_command: gameNetworkSource.launch_command,
+          launch_command: launchCommand,
           rom_folder_path: gameNetworkSource.rom_folder_path,
         };
         await setGameDevice(slug, config);
