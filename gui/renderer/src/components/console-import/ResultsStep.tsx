@@ -1,11 +1,39 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { groupByDir } from "./helpers";
+import type { RomEntry } from "./types";
 import type { ConsoleImportVM } from "./useConsoleImport";
+
+type StatusFilter = "all" | "new" | "linked" | "save" | "state";
 
 export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
   const {
-    error, allRomDirs, extraPaths, removedDirs, roms, grouped, selected,
+    error, allRomDirs, extraPaths, removedDirs, roms, selected,
     names, selectedCount, pushSaves, pushStates, romSource, localRomRoot, nameWarnings,
   } = vm;
+
+  // Search + filter are local to this step — they only narrow what's shown and
+  // never touch import logic (issue #273).
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  // A rescan delivers a fresh `roms` array — clear the search/filter then.
+  useEffect(() => { setQuery(""); setStatusFilter("all"); }, [roms]);
+
+  const matchesStatus = (r: RomEntry) =>
+    statusFilter === "all"    ? true :
+    statusFilter === "new"    ? !r.linkedSlug :
+    statusFilter === "linked" ? !!r.linkedSlug :
+    statusFilter === "save"   ? r.saveExists :
+    /* state */                 !!r.stateExists;
+
+  const q = query.trim().toLowerCase();
+  const visibleRoms = roms.filter(r =>
+    (names[r.romPath] ?? r.name).toLowerCase().includes(q) && matchesStatus(r)
+  );
+  const visibleGrouped = groupByDir(visibleRoms);
+  const visiblePaths = visibleRoms.map(r => r.romPath);
+  const visibleSelectedCount = visibleRoms.filter(r => selected.has(r.romPath)).length;
+  const allVisibleSelected = visibleRoms.length > 0 && visibleSelectedCount === visibleRoms.length;
 
   return (
     <>
@@ -74,18 +102,43 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
         ))}
       </div>
 
-      {/* ROM list header with bulk select */}
+      {/* Search + filter (issue #273) */}
+      {roms.length > 0 && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search ROMs…"
+            style={{ flex: 1, fontSize: 13, padding: "4px 8px" }}
+          />
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value as StatusFilter)}
+            style={{ fontSize: 12, padding: "4px 6px" }}
+          >
+            <option value="all">All</option>
+            <option value="new">New (not yet imported)</option>
+            <option value="linked">Already imported</option>
+            <option value="save">Has save</option>
+            <option value="state">Has state</option>
+          </select>
+        </div>
+      )}
+
+      {/* ROM list header with bulk select — reflects the visible (filtered) set */}
       {roms.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
-            {selectedCount} of {roms.length} selected
+            {visibleSelectedCount} of {visibleRoms.length} selected
           </span>
           <button
             className="btn btn-ghost"
             style={{ fontSize: 12, padding: "2px 10px" }}
-            onClick={() => vm.toggleAll(roms.map(r => r.romPath))}
+            disabled={visibleRoms.length === 0}
+            onClick={() => vm.toggleAll(visiblePaths)}
           >
-            {selectedCount === roms.length ? "Deselect all" : "Select all"}
+            {allVisibleSelected ? "Deselect all" : "Select all"}
           </button>
         </div>
       )}
@@ -96,7 +149,11 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
             No ROMs found. Try adding a folder above.
           </div>
-        ) : Object.entries(grouped).map(([dir, dirRoms]) => (
+        ) : visibleRoms.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+            No ROMs match your search/filter.
+          </div>
+        ) : Object.entries(visibleGrouped).map(([dir, dirRoms]) => (
               <Fragment key={dir}>
               {dirRoms.map(rom => (
                 <div
@@ -123,27 +180,27 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                       onClick={(e) => e.stopPropagation()}
                       style={{ fontSize: 13, fontWeight: 500, width: "100%" }}
                     />
-                    <div className="truncate" style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                      {rom.romPath}
-                    </div>
                     <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 8, alignItems: "center" }}>
-                      {rom.saveExists && (
-                        <span className="ci-ok">✓ Save found</span>
-                      )}
-                      {rom.statePath && rom.stateExists && (
-                        <span className="ci-ok">✓ State found</span>
-                      )}
-                      {rom.linkedSlug && (
-                        <span style={{ color: "var(--accent, #7c8cf8)" }}>→ Links to {rom.linkedName}</span>
-                      )}
                       {rom.presence === "network" && (
-                        <span title="On the network share">🌐 Network</span>
+                        <span title="On the network share" style={{ flexShrink: 0 }}>🌐</span>
                       )}
                       {rom.presence === "both" && (
-                        <span title="On the share with a local copy already present">💾 Network + local copy</span>
+                        <span title="On the share with a local copy already present" style={{ flexShrink: 0 }}>💾</span>
                       )}
                       {rom.presence === "local" && (
-                        <span title="Only on local disk — will be copied to the share and kept as a local copy">⬆ Local → will upload to share</span>
+                        <span title="Only on local disk — will be copied to the share and kept as a local copy" style={{ flexShrink: 0 }}>⬆</span>
+                      )}
+                      <span className="truncate" style={{ flex: 1, minWidth: 0 }}>
+                        {rom.romPath}
+                      </span>
+                      {rom.saveExists && (
+                        <span className="ci-ok" style={{ flexShrink: 0 }}>✓ Save</span>
+                      )}
+                      {rom.statePath && rom.stateExists && (
+                        <span className="ci-ok" style={{ flexShrink: 0 }}>✓ State</span>
+                      )}
+                      {rom.linkedSlug && (
+                        <span style={{ color: "var(--accent, #7c8cf8)", flexShrink: 0 }}>→ Links to {rom.linkedName}</span>
                       )}
                     </div>
                   </div>

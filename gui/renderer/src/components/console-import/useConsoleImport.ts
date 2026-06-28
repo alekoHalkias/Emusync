@@ -149,7 +149,9 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
 
       setRoms(newRoms);
       setRomDirs(result.romDirs ?? []);
-      setSelected(new Set(newRoms.map(r => r.romPath)));
+      // Start with nothing selected so importing a few from a large scan
+      // doesn't mean unchecking dozens (issue #273).
+      setSelected(new Set());
       setPhase("results");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Scan failed.");
