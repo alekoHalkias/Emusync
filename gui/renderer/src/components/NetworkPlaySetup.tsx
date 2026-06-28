@@ -91,14 +91,16 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
       // Determine which mount to scan
       let mountToScan = networkMount;
       let isConsoleMount = true;
+      let gameRomPath: string | undefined;
 
       // If no local console mount, try to use the game's network source path
       if (!mountToScan && gameNetworkSource?.rom_path) {
-        // Extract the mount point from the full rom_path (e.g., //server/share from //server/share/Game Boy/game.rom)
-        const pathParts = gameNetworkSource.rom_path.split(/[\/\\]/);
-        if (pathParts.length > 3) {
-          // Reconstruct the mount from the first 3 parts (e.g., //, server, share)
-          mountToScan = pathParts.slice(0, 3).join("/");
+        gameRomPath = gameNetworkSource.rom_path;
+        // Use the game's actual rom_path's directory as the scan root
+        const lastSlash = gameRomPath.lastIndexOf(/[\/\\]/);
+        if (lastSlash > 0) {
+          // Get the directory containing the ROM (e.g., //server/share/Game Boy/Pokemon Gold)
+          mountToScan = gameRomPath.substring(0, lastSlash);
           isConsoleMount = false;
         }
       }
@@ -120,25 +122,34 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
 
       // Scan the mount for the game
       const scanResult = await window.emusync.emulator.scan(consoleKey, emulatorOption, [mountToScan]);
-      if (!scanResult?.roms || scanResult.roms.length === 0) {
-        setError(`Game not found on ${mountToScan}`);
-        return;
+
+      // If no ROMs found and we have a specific game path, use that directly
+      let selectedRom = scanResult?.roms?.[0];
+      if (!selectedRom && gameRomPath) {
+        // If scan found nothing but we know the exact game path, use it
+        selectedRom = {
+          name: name,
+          romPath: gameRomPath,
+          romFileName: gameRomPath.split(/[\/\\]/).pop() || "",
+          savePath: gameNetworkSource?.save_path || "",
+          saveExists: false,
+          launchCommand: gameNetworkSource?.launch_command || "",
+          romFolderPath: mountToScan,
+        } as any;
       }
 
-      // Use the first ROM found (assuming it's the game)
-      const rom = scanResult.roms[0];
-      if (!rom.romPath) {
-        setError("Could not determine ROM path");
+      if (!selectedRom?.romPath) {
+        setError(`Game not found on ${mountToScan}`);
         return;
       }
 
       // Configure the game with network ROM source
       const config = {
         rom_source: "network",
-        rom_path: rom.romPath,
-        save_path: rom.savePath,
-        state_path: rom.statePath || "",
-        launch_command: rom.launchCommand,
+        rom_path: selectedRom.romPath,
+        save_path: selectedRom.savePath,
+        state_path: selectedRom.statePath || "",
+        launch_command: selectedRom.launchCommand,
         rom_folder_path: isConsoleMount ? networkMount : mountToScan,
       };
 
