@@ -4,6 +4,7 @@ import {
   getDeviceConsoles,
   getGame,
   listGameDevices,
+  setGameDevice,
   whoami,
   type DeviceForGame,
 } from "../api";
@@ -38,6 +39,8 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   const [status, setStatus] = useState<string | null>(null);
   const [showConsoleImport, setShowConsoleImport] = useState(false);
   const [consoleKey, setConsoleKey] = useState<string | null>(null);
+  const [networkMount, setNetworkMount] = useState<string | null>(null);
+  const [gameConsole, setGameConsole] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -48,6 +51,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
         ]);
         setSources(devs.filter(d => d.rom_path));
         if (game) {
+          setGameConsole(game.console);
           // Resolve the import-wizard console key from the game's stored console.
           const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
           const found = consoles.find(
@@ -55,6 +59,16 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
               c.label === game.console || c.abbr === game.console || c.key === game.console,
           );
           if (found) setConsoleKey(found.key);
+
+          // Check if this console is already configured on this device with a network mount
+          try {
+            const { device_id } = await whoami();
+            const deviceConsoles = await getDeviceConsoles(device_id);
+            const consoleConfig = deviceConsoles.find(c => c.console_name === game.console);
+            if (consoleConfig?.rom_folder_path) {
+              setNetworkMount(consoleConfig.rom_folder_path);
+            }
+          } catch { /* no console config yet */ }
         }
       } catch (e) {
         console.error("NetworkPlaySetup failed to load game info:", e);
@@ -63,6 +77,46 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
       }
     })();
   }, [slug]);
+
+  async function setupAndPlaySilently(): Promise<void> {
+    if (!networkMount || !gameConsole || !consoleKey) return;
+    setError(null);
+    setBusy(true);
+    try {
+      // Scan the network mount for the game
+      const scanResult = await window.emusync.emulator.scan(consoleKey, {}, [networkMount]);
+      if (!scanResult?.roms || scanResult.roms.length === 0) {
+        setError(`Game not found on ${networkMount}`);
+        return;
+      }
+
+      // Use the first ROM found (assuming it's the game)
+      const rom = scanResult.roms[0];
+      if (!rom.romPath) {
+        setError("Could not determine ROM path");
+        return;
+      }
+
+      // Configure the game with network ROM source
+      const config = {
+        rom_source: "network",
+        rom_path: rom.romPath,
+        save_path: rom.savePath,
+        state_path: rom.statePath || "",
+        launch_command: rom.launchCommand,
+        rom_folder_path: networkMount,
+      };
+
+      await setGameDevice(slug, config);
+      onChanged();
+      onClose();
+      onPlay(slug, name);
+    } catch (e: any) {
+      setError(e.message || "Failed to set up game");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function pullToDevice(): Promise<void> {
     setError(null); setStatus(null);
@@ -119,14 +173,16 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
             <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
               <div style={{ fontWeight: 500, fontSize: 14 }}>🌐 Set up this console & play</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
-                Point this device at the network share (or a local copy) for this console, then play.
+                {networkMount
+                  ? <>Search for this game on <code>{networkMount}</code> and play it.</>
+                  : "Point this device at the network share (or a local copy) for this console, then play."}
               </div>
               <button
                 className="btn"
                 disabled={!consoleKey || busy}
-                onClick={() => setShowConsoleImport(true)}
+                onClick={networkMount ? setupAndPlaySilently : () => setShowConsoleImport(true)}
               >
-                Set up & play
+                {busy ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Searching…</> : (networkMount ? "Search & play" : "Set up & play")}
               </button>
             </div>
 
