@@ -5,6 +5,7 @@ import os
 
 import click
 
+from server import config as _cfg
 from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _print_table
@@ -16,6 +17,94 @@ from cli.consoles_data import (
 )
 from cli.detect import _detect_emulators_for_console, _match_save_file, _scan_rom_dir
 from cli.root import cli
+
+
+def _classify_network_roms(
+    entries: list[dict],
+    network_root: str,
+    local_root: str,
+) -> list[dict]:
+    """Tag each entry as 'network', 'local', or 'both'; merge same-filename dupes.
+
+    Mirrors classifyByRoot() in the GUI helper. A ROM under local_root is
+    the local copy; everything else is treated as on the network share. When
+    the same filename appears under both roots, the entries are merged into a
+    single 'both' row keyed off the network copy.
+    """
+    lroot = local_root.rstrip("/").rstrip(os.sep) if local_root else ""
+    by_filename: dict[str, dict] = {}
+    for e in entries:
+        key = os.path.basename(e["rom_path"]).lower()
+        slot = by_filename.setdefault(key, {})
+        if lroot and (
+            e["rom_path"] == lroot
+            or e["rom_path"].startswith(lroot + "/")
+            or e["rom_path"].startswith(lroot + os.sep)
+        ):
+            slot["local"] = e
+        else:
+            slot["network"] = e
+    result: list[dict] = []
+    for slot in by_filename.values():
+        net = slot.get("network")
+        loc = slot.get("local")
+        if net and loc:
+            result.append({**net, "presence": "both", "local_rom_path": loc["rom_path"]})
+        elif net:
+            result.append({**net, "presence": "network", "local_rom_path": ""})
+        elif loc:
+            result.append({**loc, "presence": "local", "local_rom_path": loc["rom_path"]})
+    return result
+
+
+def _build_network_game_device(
+    entry: dict,
+    network_root: str,
+    local_root: str,
+) -> GameDeviceConfig:
+    """Build a GameDeviceConfig for a network-sourced ROM entry.
+
+    - 'local' presence: uploads the local file to the share as the master,
+      records the local path as the already-made localized copy.
+    - 'both' presence: network copy is the master, local copy already exists.
+    - 'network' presence: network-only, no local copy.
+    """
+    from cli.netrom import compute_rel_path, upload_to_master
+
+    presence = entry.get("presence", "network")
+    local_rom_path = entry.get("local_rom_path", "")
+    rom_sha = ""
+
+    if presence == "local":
+        filename = os.path.basename(local_rom_path)
+        master_path = os.path.join(network_root, filename)
+        up = upload_to_master(local_rom_path, master_path)
+        final_rom_path = master_path
+        final_local_rom_path = local_rom_path
+        final_launch_cmd = entry["launch_command"].replace(entry["rom_path"], master_path)
+        rom_sha = up.sha256
+    else:
+        final_rom_path = entry["rom_path"]
+        final_local_rom_path = local_rom_path if presence == "both" else ""
+        final_launch_cmd = entry["launch_command"]
+
+    rom_rel_path = (
+        compute_rel_path(network_root, final_rom_path)
+        or os.path.basename(final_rom_path)
+    )
+    return GameDeviceConfig(
+        rom_path=final_rom_path,
+        save_path=entry["save_path"],
+        launch_command=final_launch_cmd,
+        state_path=entry.get("state_path", ""),
+        rom_folder_path=network_root,
+        rom_source="network",
+        rom_rel_path=rom_rel_path,
+        local_rom_path=final_local_rom_path,
+        rom_sha256=rom_sha,
+        device_network_folder=network_root,
+        device_local_folder=local_root,
+    )
 
 
 @cli.group()
@@ -76,6 +165,7 @@ def console_import() -> None:
         type=click.IntRange(1, len(_IMPORT_CONSOLES)),
     )
     console_def = _IMPORT_CONSOLES[choice - 1]
+    console_key = console_def["key"]
     click.echo(f"\nSelected: {console_def['label']}")
 
     # ── Step 2: detect emulators/cores ───────────────────────────────────────
@@ -103,30 +193,74 @@ def console_import() -> None:
         )
         emu = emulators[emu_choice - 1]
 
-    # ── Step 3: ROM folder ────────────────────────────────────────────────────
+    # ── Step 3: ROM source + folder(s) ───────────────────────────────────────
+    saved_cfg = _cfg.load()
+    last_source = saved_cfg.import_rom_source.get(console_key, "local")
+    last_local_folder = saved_cfg.import_local_folder.get(console_key, "")
     suggested_dirs = emu.get("rom_dirs", [])
-    if suggested_dirs:
-        click.echo(f"\nRetroArch ROM directory: {suggested_dirs[0]}")
 
-    rom_folder = click.prompt(
-        "\nPath to ROM folder",
-        default=suggested_dirs[0] if suggested_dirs else "",
-    ).strip()
+    click.echo("\nROM source:")
+    click.echo("  1. Local folder")
+    click.echo("  2. Network / shared drive")
+    src_default = 2 if last_source == "network" else 1
+    src_choice = click.prompt(
+        "Select source",
+        type=click.IntRange(1, 2),
+        default=src_default,
+    )
+    rom_source = "network" if src_choice == 2 else "local"
 
-    if not rom_folder or not os.path.isdir(rom_folder):
-        click.echo("Error: folder not found.")
-        return
+    network_root = ""
+    local_root = ""
+
+    if rom_source == "local":
+        if suggested_dirs:
+            click.echo(f"\nRetroArch ROM directory: {suggested_dirs[0]}")
+        rom_folder = click.prompt(
+            "\nPath to ROM folder",
+            default=suggested_dirs[0] if suggested_dirs else "",
+        ).strip()
+        if not rom_folder or not os.path.isdir(rom_folder):
+            click.echo("Error: folder not found.")
+            return
+        scan_folders = [rom_folder]
+    else:
+        net_default = suggested_dirs[0] if suggested_dirs else ""
+        network_root = click.prompt(
+            "\nNetwork ROM folder (share path on this device, e.g. /mnt/nas/roms/GBA)",
+            default=net_default,
+        ).strip()
+        if not network_root or not os.path.isdir(network_root):
+            click.echo("Error: network folder not found or not mounted.")
+            return
+
+        local_root = click.prompt(
+            "Local-copy destination for offline play (optional, press Enter to skip)",
+            default=last_local_folder,
+        ).strip()
+        if local_root and not os.path.isdir(local_root):
+            if click.confirm(f"  Folder {local_root!r} doesn't exist — create it?", default=True):
+                os.makedirs(local_root, exist_ok=True)
+            else:
+                local_root = ""
+
+        rom_folder = network_root
+        scan_folders = [network_root]
+        if local_root:
+            scan_folders.append(local_root)
 
     # ── Step 4: scan for ROMs ─────────────────────────────────────────────────
     click.echo("Scanning for ROMs and saves…")
 
     rom_ext_set = set(console_def["system_keys"])
-    all_files = _scan_rom_dir(rom_folder)
+    all_files: list[str] = []
+    for folder in scan_folders:
+        all_files.extend(_scan_rom_dir(folder))
     matching = [p for p in all_files
                 if os.path.splitext(p)[1].lstrip(".").lower() in rom_ext_set]
 
     if not matching:
-        click.echo("No ROMs found in that folder.")
+        click.echo("No ROMs found.")
         return
 
     # Build ROM entries (same logic as main.ts emulator:scan handler)
@@ -172,6 +306,10 @@ def console_import() -> None:
             "rom_folder_path": rom_folder,
         })
 
+    # For network imports, classify each ROM as network/local/both and merge dupes.
+    if rom_source == "network":
+        entries = _classify_network_roms(entries, network_root, local_root)
+
     # Dedup: filter out ROMs already imported on this device
     try:
         client = _client()
@@ -200,11 +338,14 @@ def console_import() -> None:
         return
 
     # ── Step 5: show ROMs, let user deselect ──────────────────────────────────
+    _PRESENCE_TAG = {"network": "  [network]", "local": "  [local→share]", "both": "  [network+local]"}
+
     click.echo(f"\nFound {len(entries)} ROM(s):\n")
     for i, e in enumerate(entries, 1):
         save_tag = "  [save found]" if e["save_exists"] else ""
-        state_tag = "  [state found]" if e["state_path"] else ""
-        click.echo(f"  {i:>3}. {e['name']}{save_tag}{state_tag}")
+        state_tag = "  [state found]" if e.get("state_path") else ""
+        src_tag = _PRESENCE_TAG.get(e.get("presence", ""), "") if rom_source == "network" else ""
+        click.echo(f"  {i:>3}. {e['name']}{save_tag}{state_tag}{src_tag}")
 
     click.echo(
         "\nEnter numbers to exclude (comma-separated), or press Enter to import all:"
@@ -238,18 +379,34 @@ def console_import() -> None:
         try:
             game = client.add_game(entry["name"], console_abbr)
             slug = game["slug"]
-            client.set_game_device(slug, GameDeviceConfig(
-                rom_path=entry["rom_path"],
-                save_path=entry["save_path"],
-                launch_command=entry["launch_command"],
-                state_path=entry["state_path"],
-                rom_folder_path=entry["rom_folder_path"],
-            ))
+            if rom_source == "network":
+                gd_cfg = _build_network_game_device(entry, network_root, local_root)
+            else:
+                gd_cfg = GameDeviceConfig(
+                    rom_path=entry["rom_path"],
+                    save_path=entry["save_path"],
+                    launch_command=entry["launch_command"],
+                    state_path=entry["state_path"],
+                    rom_folder_path=entry["rom_folder_path"],
+                )
+            client.set_game_device(slug, gd_cfg)
             click.echo("ok")
         except Exception as exc:
             click.echo(f"error ({exc})")
             errors.append(entry["name"])
 
+    # ── Persist source preference ─────────────────────────────────────────────
+    try:
+        cfg = _cfg.load()
+        cfg.import_rom_source[console_key] = rom_source
+        if rom_source == "network" and local_root:
+            cfg.import_local_folder[console_key] = local_root
+        _cfg.save(cfg)
+    except Exception:
+        pass
+
     click.echo(f"\nDone. {len(to_import) - len(errors)}/{len(to_import)} imported.")
     if errors:
         click.echo(f"Failed: {', '.join(errors)}")
+    if rom_source == "network":
+        click.echo("Network ROMs aren't copied to peers — every device reads from the share.")
