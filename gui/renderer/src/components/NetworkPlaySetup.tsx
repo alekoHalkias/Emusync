@@ -3,11 +3,9 @@ import {
   createPullRequest,
   getDeviceConsoles,
   getGame,
-  getGameNetworkSource,
   listGameDevices,
   whoami,
   type DeviceForGame,
-  type GameNetworkSource,
 } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
@@ -28,62 +26,47 @@ function basename(p: string): string {
 /**
  * Play-time setup for a game that isn't configured on this device (issue #270).
  * Offers two ways to make it playable here:
- *   A. Point this device at the same network share (its own mount root) and play.
+ *   A. Run the console import wizard pre-seeded with this game's console, so the
+ *      device can point at the same network share (or local copy) and play.
  *   B. Pull the ROM bytes from a device that has it (delivered by sync-daemon).
  */
 export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChanged }: Props): React.ReactElement {
-  const [netSource, setNetSource] = useState<GameNetworkSource | null>(null);
   const [sources, setSources] = useState<DeviceForGame[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"" | "network" | "pull">("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [gameConsole, setGameConsole] = useState<string | null>(null);
   const [showConsoleImport, setShowConsoleImport] = useState(false);
   const [consoleKey, setConsoleKey] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [ns, devs, game] = await Promise.allSettled([getGameNetworkSource(slug), listGameDevices(slug), getGame(slug)]).then(results => [
-          results[0].status === "fulfilled" ? results[0].value : null,
-          results[1].status === "fulfilled" ? results[1].value : null,
-          results[2].status === "fulfilled" ? results[2].value : null,
+        const [devs, game] = await Promise.all([
+          listGameDevices(slug).catch(() => [] as DeviceForGame[]),
+          getGame(slug).catch(() => null),
         ]);
-        if (ns) setNetSource(ns);
-        if (devs) setSources(devs.filter((d: any) => d.rom_path));
+        setSources(devs.filter(d => d.rom_path));
         if (game) {
-          setGameConsole(game.console);
-          // Get the console key for the import wizard
-          const consoles = await window.emusync.emulator.consoles();
-          const found = consoles.find((c: any) => c.label === game.console || c.abbr === game.console || c.key === game.console);
+          // Resolve the import-wizard console key from the game's stored console.
+          const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
+          const found = consoles.find(
+            (c: { key: string; label: string; abbr?: string }) =>
+              c.label === game.console || c.abbr === game.console || c.key === game.console,
+          );
           if (found) setConsoleKey(found.key);
         }
+      } catch (e) {
+        console.error("NetworkPlaySetup failed to load game info:", e);
       } finally {
         setLoading(false);
       }
     })();
   }, [slug]);
 
-  async function useNetworkDrive(): Promise<void> {
-    setError(null); setStatus(null);
-    const mount = await window.emusync.dialog.openFolder();
-    if (!mount) return;
-    setBusy("network");
-    try {
-      const res = await window.emusync.rom.setupNetworkPlay(slug, mount);
-      if (!res.ok) { setError(res.error || "Setup failed"); return; }
-      onChanged();
-      onClose();
-      onPlay(slug, name);
-    } finally {
-      setBusy("");
-    }
-  }
-
   async function pullToDevice(): Promise<void> {
     setError(null); setStatus(null);
-    setBusy("pull");
+    setBusy(true);
     try {
       const source = sources[0];
       if (!source?.rom_path) { setError("No device has this ROM to pull from."); return; }
@@ -99,7 +82,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
       } catch { /* fall through to picker */ }
       if (!folder) {
         const picked = await window.emusync.dialog.openFolder();
-        if (!picked) { setBusy(""); return; }
+        if (!picked) return;
         folder = picked;
       }
 
@@ -114,7 +97,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
     } catch (e: any) {
       setError(e.message || "Pull request failed");
     } finally {
-      setBusy("");
+      setBusy(false);
     }
   }
 
@@ -132,18 +115,18 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
               This game isn’t set up on this device yet. Choose how to make it playable here:
             </p>
 
-            {/* Option A — network drive */}
+            {/* Option A — set up via the console import wizard (network share or local) */}
             <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>🌐 Use the network drive</div>
+              <div style={{ fontWeight: 500, fontSize: 14 }}>🌐 Set up this console & play</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
-                Set up this console to access the game from a network share.
+                Point this device at the network share (or a local copy) for this console, then play.
               </div>
               <button
                 className="btn"
-                disabled={!consoleKey || busy !== ""}
+                disabled={!consoleKey || busy}
                 onClick={() => setShowConsoleImport(true)}
               >
-                Choose mount root & play
+                Set up & play
               </button>
             </div>
 
@@ -157,10 +140,10 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
               </div>
               <button
                 className="btn btn-ghost"
-                disabled={sources.length === 0 || busy !== ""}
+                disabled={sources.length === 0 || busy}
                 onClick={pullToDevice}
               >
-                {busy === "pull" ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Requesting…</> : "Pull ROM here"}
+                {busy ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Requesting…</> : "Pull ROM here"}
               </button>
             </div>
 
