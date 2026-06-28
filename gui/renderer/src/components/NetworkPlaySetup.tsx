@@ -9,6 +9,7 @@ import {
   type DeviceForGame,
   type GameNetworkSource,
 } from "../api";
+import ConsoleImport from "./ConsoleImport";
 
 type Props = {
   slug: string;
@@ -37,14 +38,31 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   const [busy, setBusy] = useState<"" | "network" | "pull">("");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [gameConsole, setGameConsole] = useState<string | null>(null);
+  const [showConsoleImport, setShowConsoleImport] = useState(false);
+  const [consoleKey, setConsoleKey] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.allSettled([getGameNetworkSource(slug), listGameDevices(slug)])
-      .then(([ns, devs]) => {
-        if (ns.status === "fulfilled") setNetSource(ns.value);
-        if (devs.status === "fulfilled") setSources(devs.value.filter(d => d.rom_path));
-      })
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const [ns, devs, game] = await Promise.allSettled([getGameNetworkSource(slug), listGameDevices(slug), getGame(slug)]).then(results => [
+          results[0].status === "fulfilled" ? results[0].value : null,
+          results[1].status === "fulfilled" ? results[1].value : null,
+          results[2].status === "fulfilled" ? results[2].value : null,
+        ]);
+        if (ns) setNetSource(ns);
+        if (devs) setSources(devs.filter((d: any) => d.rom_path));
+        if (game) {
+          setGameConsole(game.console);
+          // Get the console key for the import wizard
+          const consoles = await window.emusync.emulator.consoles();
+          const found = consoles.find((c: any) => c.label === game.console || c.abbr === game.console || c.key === game.console);
+          if (found) setConsoleKey(found.key);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [slug]);
 
   async function useNetworkDrive(): Promise<void> {
@@ -118,16 +136,14 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
             <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
               <div style={{ fontWeight: 500, fontSize: 14 }}>🌐 Use the network drive</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
-                {netSource
-                  ? <>Configured on <b>{netSource.device_name}</b> as <code>{netSource.rom_rel_path}</code>. Point this device at the same share to play from it.</>
-                  : "No device has this game on a network share."}
+                Set up this console to access the game from a network share.
               </div>
               <button
                 className="btn"
-                disabled={!netSource || busy !== ""}
-                onClick={useNetworkDrive}
+                disabled={!consoleKey || busy !== ""}
+                onClick={() => setShowConsoleImport(true)}
               >
-                {busy === "network" ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Verifying…</> : "Choose mount root & play"}
+                Choose mount root & play
               </button>
             </div>
 
@@ -156,6 +172,19 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>
       </div>
+
+      {showConsoleImport && consoleKey && (
+        <ConsoleImport
+          initialConsole={consoleKey}
+          onClose={() => setShowConsoleImport(false)}
+          onImported={() => {
+            setShowConsoleImport(false);
+            onChanged();
+            onClose();
+            onPlay(slug, name);
+          }}
+        />
+      )}
     </div>
   );
 }

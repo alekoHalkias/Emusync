@@ -46,7 +46,7 @@ export type Phase =
   | "importing"  // import in progress
   | "done";      // finished
 
-export type Props = { onClose: () => void; onImported: () => void };
+export type Props = { onClose: () => void; onImported: () => void; initialConsole?: string };
 
 export type ImportedEntry = { slug: string; savePath: string; statePath: string };
 export type PushStatus = "pushing" | "ok" | "offline" | "error";

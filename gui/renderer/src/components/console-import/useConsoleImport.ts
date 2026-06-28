@@ -24,10 +24,10 @@ import type {
 // IPC bridge (typing deferred to the typed-bridge work in #228).
 const emusync = window.emusync;
 
-export function useConsoleImport({ onClose, onImported }: Props) {
-  const [phase, setPhase]         = useState<Phase>("console");
+export function useConsoleImport({ onClose, onImported, initialConsole }: Props) {
+  const [phase, setPhase]         = useState<Phase>(initialConsole ? "detecting" : "console");
   const [consoles, setConsoles]   = useState<ConsoleOption[]>([]);
-  const [consoleSel, setConsoleSel] = useState("");
+  const [consoleSel, setConsoleSel] = useState(initialConsole ?? "");
   const [emulators, setEmulators] = useState<EmulatorOption[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [emuSel, setEmuSel]       = useState<EmulatorOption | null>(null);
@@ -52,6 +52,33 @@ export function useConsoleImport({ onClose, onImported }: Props) {
   useEffect(() => {
     emusync.emulator.consoles().then(setConsoles);
   }, []);
+
+  // If initialConsole was provided, auto-detect emulators for it
+  useEffect(() => {
+    if (initialConsole && consoleSel && phase === "detecting") {
+      (async () => {
+        try {
+          const [{ options, suggestions: sugg }, saved, cfg] = await Promise.all([
+            emusync.emulator.detect(consoleSel),
+            emusync.config.getRecentFolders(consoleSel),
+            emusync.config.load(),
+          ]);
+          setEmulators(options);
+          setSuggestions(sugg);
+          setSavedFolders(saved);
+          setExtraPaths(saved);
+          const lastSource = cfg?.import_rom_source?.[consoleSel];
+          setRomSource(lastSource === "network" ? "network" : "local");
+          setLocalRomRoot(cfg?.import_local_folder?.[consoleSel] ?? "");
+          if (options.length === 1) setEmuSel(options[0]);
+          setPhase("emulator");
+        } catch {
+          setEmulators([]);
+          setPhase("emulator");
+        }
+      })();
+    }
+  }, [initialConsole, consoleSel, phase]);
 
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");
