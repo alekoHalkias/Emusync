@@ -69,13 +69,19 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
           try {
             const { device_id } = await whoami();
             const deviceConsoles = await getDeviceConsoles(device_id);
+            console.log("Device consoles:", deviceConsoles);
+            console.log("Looking for console:", game.console);
             const consoleConfig = deviceConsoles.find(c => c.console_name === game.console);
+            console.log("Console config found:", consoleConfig);
             // Try device_network_folder first (network ROM root), fall back to device_game_folder
             const mountPath = consoleConfig?.device_network_folder || consoleConfig?.device_game_folder;
+            console.log("Mount path:", mountPath);
             if (mountPath) {
               setNetworkMount(mountPath);
             }
-          } catch { /* no console config yet */ }
+          } catch (e) {
+            console.error("Failed to get device consoles:", e);
+          }
         }
       } catch (e) {
         console.error("NetworkPlaySetup failed to load game info:", e);
