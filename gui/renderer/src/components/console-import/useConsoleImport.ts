@@ -409,7 +409,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
   }
 
   function backToEmulator(): void {
-    setRoms([]); setExtraPaths(savedFolders); setRomDirs([]); setRemovedDirs(new Set()); setPhase("emulator");
+    setRoms([]); setNames({}); setExtraPaths(savedFolders); setRomDirs([]); setRemovedDirs(new Set()); setPhase("emulator");
   }
 
   // ── derived ──────────────────────────────────────────────────────────────
