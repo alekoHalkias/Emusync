@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { removeGame } from "../api";
+import { removeGame, setGameDevice } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import NetworkPlaySetup from "./NetworkPlaySetup";
 import { RelTime } from "../time";
@@ -44,6 +44,7 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
   const { games, loading, reload } = useGameList();
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
+  const [searchingSlug, setSearchingSlug] = useState<string | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -56,6 +57,68 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
   const resizingCol = useRef<keyof typeof colWidths | null>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+
+  async function searchAndImportAll(otherGames: GameRow[]): Promise<void> {
+    if (searchingSlug) return;
+    setSearchingSlug("bulk");
+    try {
+      const cfg = await window.emusync.config.load();
+      const allConsoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
+
+      // Group other-device games by console key so we scan each mount once
+      const byConsoleKey = new Map<string, { key: string; mount: string; emulator: any; games: GameRow[] }>();
+      for (const g of otherGames) {
+        const found = allConsoles.find(
+          (c: { key: string; label: string; abbr?: string }) =>
+            c.label === g.console || c.abbr === g.console || c.key === g.console,
+        );
+        if (!found) continue;
+        if (byConsoleKey.has(found.key)) {
+          byConsoleKey.get(found.key)!.games.push(g);
+          continue;
+        }
+        const recentFolders = cfg?.recent_import_folders?.[found.key];
+        if (!recentFolders || recentFolders.length === 0) continue;
+        const mount = recentFolders[0];
+        const { options } = await window.emusync.emulator.detect(found.key).catch(() => ({ options: [] }));
+        if (!options || options.length === 0) continue;
+        byConsoleKey.set(found.key, { key: found.key, mount, emulator: options[0], games: [g] });
+      }
+
+      let imported = 0;
+      for (const { key, mount, emulator, games } of byConsoleKey.values()) {
+        const scanResult = await window.emusync.emulator.scan(key, emulator, [mount]).catch(() => null);
+        if (!scanResult?.roms || scanResult.roms.length === 0) continue;
+
+        for (const g of games) {
+          // Match scanned ROMs to this game by slug or name
+          const rom = scanResult.roms.find((r: any) =>
+            r.romPath && (
+              r.name?.toLowerCase() === g.name.toLowerCase() ||
+              r.romFileName?.toLowerCase().replace(/\.[^.]+$/, "") === g.name.toLowerCase()
+            ),
+          ) || scanResult.roms.find((r: any) => r.romPath);
+
+          if (!rom?.romPath) continue;
+          try {
+            await setGameDevice(g.slug, {
+              rom_source: "network",
+              rom_path: rom.romPath,
+              save_path: rom.savePath,
+              state_path: rom.statePath || "",
+              launch_command: rom.launchCommand,
+              rom_folder_path: mount,
+            });
+            imported++;
+          } catch { /* skip this game */ }
+        }
+      }
+
+      if (imported > 0) reload(true);
+    } finally {
+      setSearchingSlug(null);
+    }
+  }
 
   function openGameModal(g: GameRow, canPlay: boolean): void {
     setGameModal({
@@ -332,6 +395,17 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
                       <span style={{ marginRight: 6, fontSize: 11 }}>{otherCollapsed ? "▶" : "▼"}</span>
                       On other devices
                       <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 400, marginLeft: 8 }}>{otherGames.length} game{otherGames.length !== 1 ? "s" : ""}</span>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ fontSize: 11, padding: "2px 8px", marginLeft: "auto" }}
+                        disabled={!!searchingSlug}
+                        title="Search network drives for all these games and add any found to this device"
+                        onClick={e => { e.stopPropagation(); searchAndImportAll(otherGames); }}
+                      >
+                        {searchingSlug === "bulk"
+                          ? <><span className="spinner" style={{ width: 10, height: 10, marginRight: 4 }} />Searching…</>
+                          : "Search network"}
+                      </button>
                     </div>
                     {!otherCollapsed && renderConsoleGroups(otherGames, "other:", false)}
                   </>
