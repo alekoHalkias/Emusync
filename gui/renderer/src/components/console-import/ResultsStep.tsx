@@ -193,13 +193,16 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                       <span className="truncate" style={{ flex: 1, minWidth: 0 }}>
                         {rom.romPath}
                       </span>
+                      {rom.existingLocal && (
+                        <span title="Already imported here as a local game — will be copied to the share and switched to network play" style={{ color: "var(--accent, #7c8cf8)", flexShrink: 0 }}>↥ Upload to share</span>
+                      )}
                       {rom.saveExists && (
                         <span className="ci-ok" style={{ flexShrink: 0 }}>✓ Save</span>
                       )}
                       {rom.statePath && rom.stateExists && (
                         <span className="ci-ok" style={{ flexShrink: 0 }}>✓ State</span>
                       )}
-                      {rom.linkedSlug && (
+                      {rom.linkedSlug && !rom.existingLocal && (
                         <span style={{ color: "var(--accent, #7c8cf8)", flexShrink: 0 }}>→ Links to {rom.linkedName}</span>
                       )}
                     </div>

@@ -35,6 +35,10 @@ export type RomEntry = {
   // For a local/both ROM, the path of the local copy (used to upload to the
   // master and recorded as local_rom_path so it's treated as localized).
   localRomPath?: string;
+  // Already in the library as a local-source game (issue #281): a network import
+  // will upload its ROM to the share and convert it to network-source in place
+  // (carries `linkedSlug`, so no duplicate game is created).
+  existingLocal?: boolean;
 };
 
 export type Phase =

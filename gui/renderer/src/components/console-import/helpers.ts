@@ -1,6 +1,6 @@
 // Pure helpers for the import wizard — no React, no IPC, no network.
 // Kept side-effect-free so they're trivially unit-testable.
-import type { Game } from "../../api";
+import type { Game, GameOverview } from "../../api";
 import type { ConsoleOption, Phase, RomEntry } from "./types";
 
 export const STEP_LABELS = ["Console", "Emulator", "ROMs"];
@@ -151,6 +151,48 @@ export function classifyByRoot(
     else if (local)       out.push({ ...local, presence: "local", localRomPath: local.romPath });
   }
   return out;
+}
+
+/**
+ * Existing local-source library games for a console that should be copied UP to
+ * the share during a network import (issue #281). Returns one `RomEntry` per
+ * already-imported local game (tagged `presence: "local"`, `existingLocal`, and
+ * `linkedSlug` so `_runImport` converts it in place instead of creating a
+ * duplicate). Games already represented in `alreadyListed` (matched by ROM path)
+ * are skipped so they aren't double-listed.
+ */
+export function existingLocalGamesForConsole(
+  overview: GameOverview[],
+  consoleAbbr: string,
+  alreadyListed: RomEntry[],
+): RomEntry[] {
+  const listedPaths = new Set<string>();
+  for (const r of alreadyListed) {
+    if (r.romPath) listedPaths.add(r.romPath);
+    if (r.localRomPath) listedPaths.add(r.localRomPath);
+  }
+  return overview
+    .filter(o =>
+      o.is_local &&
+      o.rom_source === "local" &&
+      o.console === consoleAbbr &&
+      o.rom_path &&
+      !listedPaths.has(o.rom_path),
+    )
+    .map(o => ({
+      name: o.name,
+      romPath: o.rom_path,
+      romFileName: o.rom_path.split("/").pop() || o.rom_path,
+      savePath: o.save_path,
+      saveExists: false,
+      launchCommand: o.launch_command,
+      statePath: o.state_path,
+      romFolderPath: o.rom_folder_path,
+      linkedSlug: o.slug,
+      presence: "local" as const,
+      localRomPath: o.rom_path,
+      existingLocal: true,
+    }));
 }
 
 /** Group ROMs by their parent directory (for the results list headers). */
