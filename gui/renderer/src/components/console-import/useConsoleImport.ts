@@ -1,7 +1,7 @@
 // State machine + async orchestration for the Add-Console wizard.
 // The presentational step components consume the object this hook returns.
 import { useEffect, useState } from "react";
-import { addGame, setGameDevice, gamesOverview, getDeviceGameDevices, listDevices, type Device } from "../../api";
+import { addGame, setGameDevice, gamesOverview, getDeviceGameDevices, listDevices, type Device, type GameOverview } from "../../api";
 import {
   annotateRoms,
   classifyByRoot,
@@ -48,6 +48,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
   // where local copies should land when a network ROM is localized later.
   const [romSource, setRomSource]       = useState<"local" | "network">("local");
   const [localRomRoot, setLocalRomRoot] = useState("");
+  const [existingGames, setExistingGames] = useState<GameOverview[]>([]);
+  const [nameWarnings, setNameWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     emusync.emulator.consoles().then(setConsoles);
@@ -131,6 +133,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
         // device's rom_path (empty when the game isn't configured here),
         // replacing the old listGames() + per-game getGameDevice() fan-out.
         const overview = await gamesOverview();
+        setExistingGames(overview);
         const thisDeviceConfigs = overview
           .filter(o => o.rom_path)
           .map(o => ({ slug: o.slug, romPath: o.rom_path }));
@@ -232,8 +235,29 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     setNames(prev => ({ ...prev, [romPath]: value }));
   }
 
-  async function doImport(): Promise<void> {
-    const toImport = roms.filter(r => selected.has(r.romPath));
+  function computeNameConflicts(toImport: RomEntry[]): string[] {
+    const displayNames = toImport.map(r => (names[r.romPath] ?? r.name).trim());
+    const lowerNames   = displayNames.map(n => n.toLowerCase());
+    const conflicts    = new Set<string>();
+
+    // Within-selection duplicates
+    const seen = new Set<string>();
+    for (const n of lowerNames) {
+      if (seen.has(n)) conflicts.add(n);
+      seen.add(n);
+    }
+
+    // Against existing server games
+    const serverNames = new Set(existingGames.map(g => g.name.toLowerCase()));
+    for (const n of lowerNames) {
+      if (serverNames.has(n)) conflicts.add(n);
+    }
+
+    // Return original-case names, deduplicated
+    return [...new Set(displayNames.filter(n => conflicts.has(n.toLowerCase())))];
+  }
+
+  async function _runImport(toImport: RomEntry[]): Promise<void> {
     setProgress({ done: 0, total: toImport.length });
     setImportErrors([]);
     setPushResults([]);
@@ -344,6 +368,25 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     if (imported.length > 0 && romSource !== "network") autoPush(imported, consoleAbbr);
   }
 
+  async function doImport(): Promise<void> {
+    const toImport = roms.filter(r => selected.has(r.romPath));
+    const conflicts = computeNameConflicts(toImport);
+    if (conflicts.length > 0) {
+      setNameWarnings(conflicts);
+      return;
+    }
+    await _runImport(toImport);
+  }
+
+  async function forceImport(): Promise<void> {
+    setNameWarnings([]);
+    await _runImport(roms.filter(r => selected.has(r.romPath)));
+  }
+
+  function dismissNameWarnings(): void {
+    setNameWarnings([]);
+  }
+
   async function autoPush(entries: ImportedEntry[], consoleAbbr: string): Promise<void> {
     try {
       const cfg = await emusync.config.load();
@@ -427,7 +470,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     phase, consoles, consoleSel, emulators, suggestions, emuSel,
     extraPaths, removedDirs, roms, selected, names, error, progress,
     importErrors, pushResults, pushSaves, pushStates,
-    romSource, localRomRoot,
+    romSource, localRomRoot, nameWarnings,
     // derived
     grouped, selectedCount, consoleLabel, currentStep, showStepper, allRomDirs,
     // setters used directly by steps
@@ -435,7 +478,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     setRomSource, pickLocalRomRoot,
     // handlers
     detectEmulators, scanRoms, addExtraPath, removeExtraPath, removeRomDir,
-    toggleRom, toggleAll, doImport, backToConsole, backToEmulator,
+    toggleRom, toggleAll, doImport, forceImport, dismissNameWarnings,
+    backToConsole, backToEmulator,
   };
 }
 
