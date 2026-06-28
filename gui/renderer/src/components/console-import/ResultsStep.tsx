@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { groupByDir } from "./helpers";
+import { findReplace, groupByDir, replaceUnderscores } from "./helpers";
 import type { RomEntry } from "./types";
 import type { ConsoleImportVM } from "./useConsoleImport";
 
@@ -15,9 +15,14 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
   // never touch import logic (issue #273).
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  // Find/replace title-cleanup tool (issue #283) — operates on visible titles.
+  const [findText, setFindText] = useState("");
+  const [replaceText, setReplaceText] = useState("");
 
   // A rescan delivers a fresh `roms` array — clear the search/filter then.
-  useEffect(() => { setQuery(""); setStatusFilter("all"); }, [roms]);
+  useEffect(() => {
+    setQuery(""); setStatusFilter("all"); setFindText(""); setReplaceText("");
+  }, [roms]);
 
   const matchesStatus = (r: RomEntry) =>
     statusFilter === "all"    ? true :
@@ -34,6 +39,14 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
   const visiblePaths = visibleRoms.map(r => r.romPath);
   const visibleSelectedCount = visibleRoms.filter(r => selected.has(r.romPath)).length;
   const allVisibleSelected = visibleRoms.length > 0 && visibleSelectedCount === visibleRoms.length;
+
+  // Bulk title cleanup (issue #283) — rewrite the editable titles of the
+  // currently visible rows. The on-import rename keys off these titles.
+  const applyToVisible = (fn: (title: string) => string) => {
+    for (const r of visibleRoms) vm.setName(r.romPath, fn(names[r.romPath] ?? r.name));
+  };
+  const doReplaceUnderscores = () => applyToVisible(replaceUnderscores);
+  const doFindReplace = () => { if (findText) applyToVisible(t => findReplace(t, findText, replaceText)); };
 
   return (
     <>
@@ -123,6 +136,43 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
             <option value="save">Has save</option>
             <option value="state">Has state</option>
           </select>
+        </div>
+      )}
+
+      {/* Title cleanup tools — act on the visible (filtered) rows (issue #283) */}
+      {roms.length > 0 && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: "2px 10px" }}
+            onClick={doReplaceUnderscores}
+            title="Replace underscores with spaces in the visible titles"
+          >
+            Replace _ with space
+          </button>
+          <input
+            type="text"
+            value={findText}
+            onChange={e => setFindText(e.target.value)}
+            placeholder="Find…"
+            style={{ width: 120, fontSize: 12, padding: "4px 8px" }}
+          />
+          <input
+            type="text"
+            value={replaceText}
+            onChange={e => setReplaceText(e.target.value)}
+            placeholder="Replace with…"
+            style={{ width: 120, fontSize: 12, padding: "4px 8px" }}
+          />
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: "2px 10px" }}
+            onClick={doFindReplace}
+            disabled={!findText}
+            title="Find & replace across the visible titles (case-insensitive)"
+          >
+            Replace all
+          </button>
         </div>
       )}
 

@@ -38,7 +38,7 @@ export interface EmusyncBridge {
     ensureSave: (savePath: string) => Promise<{ created: boolean }>;
     getSaveTime: (savePath: string) => Promise<string | null>;
     getLatestInFolder: (dirPath: string) => Promise<{ path: string; time: string } | null>;
-    moveToSubfolder: (args: { romPath: string; subfolderName: string; newSavePath: string; newStateFolder: string }) => Promise<{ ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; error?: string }>;
+    renameGameFiles: (args: { romPath: string; savePath: string; stateFolder: string; newBase: string; reorganize: boolean; secondaryRomPath?: string }) => Promise<{ ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; newSecondaryRomPath?: string; error?: string }>;
   };
   save: {
     push: (slug: string, savePath: string) => Promise<{ ok: boolean; error?: string }>;

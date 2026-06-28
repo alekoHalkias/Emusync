@@ -20,6 +20,41 @@ export function getConsoleAbbreviation(consoleKey: string, consoles: ConsoleOpti
   return consoles.find(c => c.key === consoleKey)?.abbr || consoleKey.toUpperCase();
 }
 
+/**
+ * Filesystem-safe version of a display title (issue #283): strip characters
+ * illegal on Windows/POSIX (`<>:"/\|?*` + control chars), collapse runs of
+ * whitespace, and trim. Falls back to the original (trimmed) title when the
+ * result is empty so we never produce a blank filename.
+ */
+export function sanitizeFilename(title: string): string {
+  const cleaned = title
+    // eslint-disable-next-line no-control-regex
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[. ]+$/, "")   // no trailing dots/spaces (Windows)
+    .trim();
+  return cleaned || title.trim();
+}
+
+/** Replace underscores with spaces and tidy whitespace (issue #283 bulk tool). */
+export function replaceUnderscores(title: string): string {
+  return title.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Escape a literal string for use inside a RegExp. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Case-insensitive, global, literal find/replace over a title (issue #283
+ * find-and-replace tool). An empty `find` returns the title unchanged.
+ */
+export function findReplace(title: string, find: string, replacement: string): string {
+  if (!find) return title;
+  return title.replace(new RegExp(escapeRegExp(find), "gi"), replacement);
+}
+
 /** ROM filename without extension, lowercased (used for fuzzy matching). */
 export function getRomFileName(path: string): string {
   const filename = path.split("/").pop() || "";
