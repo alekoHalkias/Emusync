@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { removeGame } from "../api";
+import { removeGame, setGameDevice, getGame } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import NetworkPlaySetup from "./NetworkPlaySetup";
 import { RelTime } from "../time";
@@ -44,6 +44,7 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
   const { games, loading, reload } = useGameList();
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
+  const [searchingSlug, setSearchingSlug] = useState<string | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -56,6 +57,58 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
   const resizingCol = useRef<keyof typeof colWidths | null>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+
+  async function searchAndImport(g: GameRow): Promise<void> {
+    if (searchingSlug) return;
+    setSearchingSlug(g.slug);
+    try {
+      const game = await getGame(g.slug);
+      const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
+      const found = consoles.find(
+        (c: { key: string; label: string; abbr?: string }) =>
+          c.label === game.console || c.abbr === game.console || c.key === game.console,
+      );
+      if (!found) { setNetPlayTarget({ slug: g.slug, name: g.name }); return; }
+
+      const cfg = await window.emusync.config.load();
+      const recentFolders = cfg?.recent_import_folders?.[found.key];
+      if (!recentFolders || recentFolders.length === 0) {
+        // No network mount configured — fall back to manual setup
+        setNetPlayTarget({ slug: g.slug, name: g.name });
+        return;
+      }
+      const mount = recentFolders[0];
+
+      const { options: emulatorOptions } = await window.emusync.emulator.detect(found.key);
+      if (!emulatorOptions || emulatorOptions.length === 0) {
+        setNetPlayTarget({ slug: g.slug, name: g.name });
+        return;
+      }
+
+      const scanResult = await window.emusync.emulator.scan(found.key, emulatorOptions[0], [mount]);
+      if (!scanResult?.roms || scanResult.roms.length === 0) {
+        setNetPlayTarget({ slug: g.slug, name: g.name });
+        return;
+      }
+
+      const rom = scanResult.roms[0];
+      if (!rom.romPath) { setNetPlayTarget({ slug: g.slug, name: g.name }); return; }
+
+      await setGameDevice(g.slug, {
+        rom_source: "network",
+        rom_path: rom.romPath,
+        save_path: rom.savePath,
+        state_path: rom.statePath || "",
+        launch_command: rom.launchCommand,
+        rom_folder_path: mount,
+      });
+      reload(true);
+    } catch {
+      setNetPlayTarget({ slug: g.slug, name: g.name });
+    } finally {
+      setSearchingSlug(null);
+    }
+  }
 
   function openGameModal(g: GameRow, canPlay: boolean): void {
     setGameModal({
@@ -232,6 +285,18 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
                     )}
                   </div>
                   <div className="game-cell game-cell-actions">
+                    {!canPlay && (
+                      <button
+                        className="btn btn-icon"
+                        title="Search for this game on network drive and add to this device"
+                        disabled={!!searchingSlug}
+                        onClick={() => searchAndImport(g)}
+                      >
+                        {searchingSlug === g.slug
+                          ? <span className="spinner" style={{ width: 12, height: 12 }} />
+                          : "+"}
+                      </button>
+                    )}
                     <button
                       className="btn btn-icon"
                       title={canPlay ? "Play" : "Set up to play on this device"}
