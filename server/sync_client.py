@@ -64,6 +64,9 @@ class GameDeviceConfig:
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
+    # Console-level network/local folder config; transient — populates the console row.
+    device_network_folder: str = ""
+    device_local_folder: str = ""
 
 
 class SyncClient:
@@ -152,7 +155,9 @@ class SyncClient:
             json={"rom_path": cfg.rom_path, "save_path": cfg.save_path, "launch_command": cfg.launch_command,
                   "state_path": cfg.state_path, "rom_folder_path": cfg.rom_folder_path,
                   "rom_source": cfg.rom_source, "rom_rel_path": cfg.rom_rel_path,
-                  "local_rom_path": cfg.local_rom_path, "rom_sha256": cfg.rom_sha256},
+                  "local_rom_path": cfg.local_rom_path, "rom_sha256": cfg.rom_sha256,
+                  "device_network_folder": cfg.device_network_folder,
+                  "device_local_folder": cfg.device_local_folder},
             timeout=10,
         )
         r.raise_for_status()
