@@ -4,7 +4,7 @@ import type { ConsoleImportVM } from "./useConsoleImport";
 export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
   const {
     error, allRomDirs, extraPaths, removedDirs, roms, grouped, selected,
-    names, selectedCount, pushSaves, pushStates, romSource, localRomRoot,
+    names, selectedCount, pushSaves, pushStates, romSource, localRomRoot, nameWarnings,
   } = vm;
 
   return (
@@ -170,11 +170,37 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
         </div>
       )}
 
+      {nameWarnings.length > 0 && (
+        <div style={{
+          marginTop: 12, padding: "10px 12px",
+          background: "var(--warning-bg, rgba(180,120,0,0.15))",
+          border: "1px solid var(--warning-border, rgba(180,120,0,0.5))",
+          borderRadius: 6, fontSize: 12,
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>
+            {nameWarnings.length === 1
+              ? "This name already exists — importing will create a duplicate:"
+              : "These names already exist — importing will create duplicates:"}
+          </div>
+          <ul style={{ margin: "0 0 8px", paddingLeft: 16 }}>
+            {nameWarnings.map(n => <li key={n}>{n}</li>)}
+          </ul>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={vm.dismissNameWarnings}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={vm.forceImport}>
+              Import anyway
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="modal-actions" style={{ marginTop: 12 }}>
         <button className="btn btn-ghost" onClick={vm.backToEmulator}>← Back</button>
         <button
           className="btn btn-primary"
-          disabled={selectedCount === 0}
+          disabled={selectedCount === 0 || nameWarnings.length > 0}
           onClick={vm.doImport}
         >
           Import {selectedCount > 0 ? `${selectedCount} game${selectedCount !== 1 ? "s" : ""}` : "…"}
