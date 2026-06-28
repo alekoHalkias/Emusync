@@ -84,73 +84,60 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   }, [slug]);
 
   async function setupAndPlaySilently(): Promise<void> {
-    if (!gameConsole || !consoleKey) return;
     setError(null);
     setBusy(true);
     try {
-      // Determine which mount to scan
-      let mountToScan = networkMount;
-      let isConsoleMount = true;
-      let gameRomPath: string | undefined;
-
-      // If no local console mount, try to use the game's network source path
-      if (!mountToScan && gameNetworkSource?.rom_path) {
-        gameRomPath = gameNetworkSource.rom_path;
-        // Use the game's actual rom_path's directory as the scan root
-        const lastSlash = gameRomPath.lastIndexOf(/[\/\\]/);
-        if (lastSlash > 0) {
-          // Get the directory containing the ROM (e.g., //server/share/Game Boy/Pokemon Gold)
-          mountToScan = gameRomPath.substring(0, lastSlash);
-          isConsoleMount = false;
-        }
-      }
-
-      if (!mountToScan) {
-        setError("No network mount point found. Please set up the console first.");
+      // If we have the game's network source info from another device, use it directly
+      if (gameNetworkSource) {
+        const config = {
+          rom_source: "network",
+          rom_path: gameNetworkSource.rom_path,
+          save_path: gameNetworkSource.save_path,
+          state_path: gameNetworkSource.state_path || "",
+          launch_command: gameNetworkSource.launch_command,
+          rom_folder_path: gameNetworkSource.rom_folder_path,
+        };
+        await setGameDevice(slug, config);
+        onChanged();
+        onClose();
+        onPlay(slug, name);
         return;
       }
 
-      // Detect emulator for this console so we can scan with the proper configuration
+      // Otherwise, we need a local console mount to search in
+      if (!networkMount || !consoleKey) {
+        setError("Console not configured. Please set it up first.");
+        return;
+      }
+
+      // Detect emulator and scan the local mount
       const { options: emulatorOptions } = await window.emusync.emulator.detect(consoleKey);
       if (!emulatorOptions || emulatorOptions.length === 0) {
         setError("No emulator detected for this console");
         return;
       }
 
-      // Use the first detected emulator
       const emulatorOption = emulatorOptions[0];
+      const scanResult = await window.emusync.emulator.scan(consoleKey, emulatorOption, [networkMount]);
 
-      // Scan the mount for the game
-      const scanResult = await window.emusync.emulator.scan(consoleKey, emulatorOption, [mountToScan]);
-
-      // If no ROMs found and we have a specific game path, use that directly
-      let selectedRom = scanResult?.roms?.[0];
-      if (!selectedRom && gameRomPath) {
-        // If scan found nothing but we know the exact game path, use it
-        selectedRom = {
-          name: name,
-          romPath: gameRomPath,
-          romFileName: gameRomPath.split(/[\/\\]/).pop() || "",
-          savePath: gameNetworkSource?.save_path || "",
-          saveExists: false,
-          launchCommand: gameNetworkSource?.launch_command || "",
-          romFolderPath: mountToScan,
-        } as any;
-      }
-
-      if (!selectedRom?.romPath) {
-        setError(`Game not found on ${mountToScan}`);
+      if (!scanResult?.roms || scanResult.roms.length === 0) {
+        setError(`Game not found on ${networkMount}`);
         return;
       }
 
-      // Configure the game with network ROM source
+      const rom = scanResult.roms[0];
+      if (!rom.romPath) {
+        setError("Could not determine ROM path");
+        return;
+      }
+
       const config = {
         rom_source: "network",
-        rom_path: selectedRom.romPath,
-        save_path: selectedRom.savePath,
-        state_path: selectedRom.statePath || "",
-        launch_command: selectedRom.launchCommand,
-        rom_folder_path: isConsoleMount ? networkMount : mountToScan,
+        rom_path: rom.romPath,
+        save_path: rom.savePath,
+        state_path: rom.statePath || "",
+        launch_command: rom.launchCommand,
+        rom_folder_path: networkMount,
       };
 
       await setGameDevice(slug, config);
