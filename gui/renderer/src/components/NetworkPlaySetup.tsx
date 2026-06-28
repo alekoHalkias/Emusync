@@ -70,8 +70,8 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
             const { device_id } = await whoami();
             const deviceConsoles = await getDeviceConsoles(device_id);
             const consoleConfig = deviceConsoles.find(c => c.console_name === game.console);
-            if (consoleConfig?.device_game_folder) {
-              setNetworkMount(consoleConfig.device_game_folder);
+            if (consoleConfig?.device_network_folder) {
+              setNetworkMount(consoleConfig.device_network_folder);
             }
           } catch { /* no console config yet */ }
         }
