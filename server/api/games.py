@@ -95,6 +95,22 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
             "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256}
 
 
+@router.get("/games/{slug}/network-source")
+def get_game_network_source(slug: str, device_id: str = Depends(_auth)) -> dict:
+    """A network-drive config for this game on any device (issue #270).
+
+    Lets a device that doesn't have the game configured locally reach the same
+    shared drive: it joins the returned ``rom_rel_path`` to its own mount root.
+    404 when no device has the game on a network share.
+    """
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")
+    src = _get_store().get_network_source_for_game(slug)
+    if not src:
+        raise HTTPException(status_code=404, detail="No network-sourced config for this game")
+    return src
+
+
 @router.get("/games/{slug}/devices")
 def list_game_devices(slug: str, device_id: str = Depends(_auth)) -> list[dict]:
     if not _get_store().get_game(slug):

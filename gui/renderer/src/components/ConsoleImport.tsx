@@ -12,8 +12,8 @@ import { EmulatorStep } from "./console-import/EmulatorStep";
 import { ResultsStep } from "./console-import/ResultsStep";
 import { DoneStep } from "./console-import/DoneStep";
 
-export default function ConsoleImport({ onClose, onImported }: Props): ReactElement {
-  const vm = useConsoleImport({ onClose, onImported });
+export default function ConsoleImport({ onClose, onImported, initialConsole }: Props): ReactElement {
+  const vm = useConsoleImport({ onClose, onImported, initialConsole });
 
   return (
     <div className="modal-overlay" onClick={onClose}>

@@ -87,6 +87,10 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("rom:localize", slug, destFolder),
     delocalize: (slug: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:delocalize", slug),
+    uploadMaster: (localPath: string, networkPath: string): Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }> =>
+      ipcRenderer.invoke("rom:uploadMaster", localPath, networkPath),
+    setupNetworkPlay: (slug: string, mountRoot: string): Promise<{ ok: boolean; romPath?: string; error?: string }> =>
+      ipcRenderer.invoke("rom:setupNetworkPlay", slug, mountRoot),
   },
   daemon: {
     start: (): Promise<void> => ipcRenderer.invoke("daemon:start"),

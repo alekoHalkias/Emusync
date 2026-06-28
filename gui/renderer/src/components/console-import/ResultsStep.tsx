@@ -136,6 +136,15 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                       {rom.linkedSlug && (
                         <span style={{ color: "var(--accent, #7c8cf8)" }}>→ Links to {rom.linkedName}</span>
                       )}
+                      {rom.presence === "network" && (
+                        <span title="On the network share">🌐 Network</span>
+                      )}
+                      {rom.presence === "both" && (
+                        <span title="On the share with a local copy already present">💾 Network + local copy</span>
+                      )}
+                      {rom.presence === "local" && (
+                        <span title="Only on local disk — will be copied to the share and kept as a local copy">⬆ Local → will upload to share</span>
+                      )}
                     </div>
                   </div>
                 </div>

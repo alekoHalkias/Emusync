@@ -95,6 +95,22 @@ export const removeGame = (slug: string): Promise<void> => _fetch("DELETE", `/ga
 
 export const getGameDevice = (slug: string): Promise<GameDeviceConfig> =>
   _fetch("GET", `/games/${slug}/device`);
+
+// A network-drive config for this game on any device (issue #270) — lets a
+// device without the game join the rel-path to its own mount root.
+export type GameNetworkSource = {
+  console: string;
+  device_id: string;
+  device_name: string;
+  rom_path: string;
+  rom_rel_path: string;
+  launch_command: string;
+  save_path: string;
+  state_path: string;
+  rom_folder_path: string;
+};
+export const getGameNetworkSource = (slug: string): Promise<GameNetworkSource> =>
+  _fetch("GET", `/games/${slug}/network-source`);
 export const setGameDevice = (slug: string, cfg: GameDeviceConfig): Promise<void> =>
   _fetch("PUT", `/games/${slug}/device`, cfg);
 
@@ -142,7 +158,12 @@ export type ActivityEvent = {
 export const listEvents = (): Promise<ActivityEvent[]> => _fetch("GET", "/events");
 
 
-export const listGameDevices = (slug: string): Promise<Device[]> => _fetch("GET", `/games/${slug}/devices`);
+// Devices that have this game configured, with their ROM/save paths (the
+// `/games/{slug}/devices` payload carries more than a bare Device).
+export type DeviceForGame = Device & {
+  rom_path?: string; save_path?: string; state_path?: string; rom_folder_path?: string;
+};
+export const listGameDevices = (slug: string): Promise<DeviceForGame[]> => _fetch("GET", `/games/${slug}/devices`);
 
 export type SaveVersion = { id: string; device_id: string; hash: string; pushed_at: string; size: number };
 

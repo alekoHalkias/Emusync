@@ -298,7 +298,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
-          {romSource === "network" && !isNew && (
+          {romSource === "network" && (
             <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 13, minWidth: 0 }}>🌐 Network ROM</span>

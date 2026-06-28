@@ -93,6 +93,29 @@ class GameDeviceMixin:
             for row in rows
         ]
 
+    def get_network_source_for_game(self, game_slug: str) -> Optional[dict]:
+        """A network-sourced config for *game_slug* on any device (issue #270).
+
+        Lets a device that doesn't have the game set up reach the same NAS: it
+        joins the returned ``rom_rel_path`` to its own mount root. Returns the
+        most recently-updated network row's portable bits (rel-path, console,
+        a launch-command template + the source device's rom/save/state paths so
+        the receiver can rewrite them), or None if no device has it on a share.
+        """
+        row = self._conn.execute(
+            """SELECT g.console, gd.device_id, d.name AS device_name,
+                      gd.rom_path, gd.rom_rel_path, gd.launch_command,
+                      gd.save_path, gd.state_path, gd.rom_folder_path
+               FROM game_devices gd
+               JOIN games g   ON g.slug = gd.game_slug
+               JOIN devices d ON d.id = gd.device_id
+               WHERE gd.game_slug = ? AND gd.rom_source = 'network'
+                     AND gd.rom_rel_path != ''
+               ORDER BY gd.rowid DESC LIMIT 1""",
+            (game_slug,),
+        ).fetchone()
+        return dict(row) if row else None
+
     def games_overview(self, device_id: str) -> list[dict]:
         """Everything the game list needs for one device, in a single query.
 

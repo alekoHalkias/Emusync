@@ -87,7 +87,9 @@ class ConsoleDefMixin:
                 "key": console_key,
                 "label": row["label"],
                 "abbr": row["abbr"],
-                "suggestions": row["suggestions"],
+                # Stored as a ';'-joined string (see seed_console_defs) — split it
+                # back into a list so the GUI's EmulatorStep can map over it.
+                "suggestions": row["suggestions"].split(";") if row["suggestions"] else [],
                 "systemKeys": system_keys,
                 "standalones": standalones,
             })
