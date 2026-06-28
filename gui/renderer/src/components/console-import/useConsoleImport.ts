@@ -6,6 +6,7 @@ import {
   annotateRoms,
   classifyByRoot,
   dedupeAndLink,
+  existingLocalGamesForConsole,
   getConsoleAbbreviation,
   groupByDir,
   relPathUnder,
@@ -128,6 +129,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
 
       // Dedup: filter already-imported ROMs; detect cross-device links.
       let newRoms = annotated;
+      let existingLocal: RomEntry[] = [];
       try {
         // One batched call gives every game's slug/name/console plus this
         // device's rom_path (empty when the game isn't configured here),
@@ -143,6 +145,14 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
         if (skipCount > 0 && deduped.length === 0) {
           setError(`${skipCount} ROM${skipCount !== 1 ? "s" : ""} found — all already imported on this device.`);
         }
+        // Network import (issue #281): also surface this device's already-imported
+        // local-source games for the console so they get copied UP to the share
+        // and converted to network-source. They're pre-selected (see below).
+        if (scanNetwork) {
+          const consoleAbbr = getConsoleAbbreviation(consoleSel, consoles);
+          existingLocal = existingLocalGamesForConsole(overview, consoleAbbr, newRoms);
+          newRoms = [...newRoms, ...existingLocal];
+        }
       } catch {
         // Dedup unavailable (server not reachable / not paired yet) — show all ROMs
       }
@@ -150,8 +160,9 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
       setRoms(newRoms);
       setRomDirs(result.romDirs ?? []);
       // Start with nothing selected so importing a few from a large scan
-      // doesn't mean unchecking dozens (issue #273).
-      setSelected(new Set());
+      // doesn't mean unchecking dozens (issue #273) — but pre-select the existing
+      // local games being migrated up to the share (issue #281).
+      setSelected(new Set(existingLocal.map(r => r.romPath)));
       setPhase("results");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Scan failed.");
