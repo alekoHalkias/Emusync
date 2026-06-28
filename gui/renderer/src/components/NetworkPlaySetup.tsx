@@ -3,10 +3,12 @@ import {
   createPullRequest,
   getDeviceConsoles,
   getGame,
+  getGameNetworkSource,
   listGameDevices,
   setGameDevice,
   whoami,
   type DeviceForGame,
+  type GameNetworkSource,
 } from "../api";
 import ConsoleImport from "./ConsoleImport";
 
@@ -41,15 +43,18 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   const [consoleKey, setConsoleKey] = useState<string | null>(null);
   const [networkMount, setNetworkMount] = useState<string | null>(null);
   const [gameConsole, setGameConsole] = useState<string | null>(null);
+  const [gameNetworkSource, setGameNetworkSource] = useState<GameNetworkSource | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [devs, game] = await Promise.all([
+        const [devs, game, netSource] = await Promise.all([
           listGameDevices(slug).catch(() => [] as DeviceForGame[]),
           getGame(slug).catch(() => null),
+          getGameNetworkSource(slug).catch(() => null),
         ]);
         setSources(devs.filter(d => d.rom_path));
+        if (netSource) setGameNetworkSource(netSource);
         if (game) {
           setGameConsole(game.console);
           // Resolve the import-wizard console key from the game's stored console.
@@ -79,14 +84,34 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   }, [slug]);
 
   async function setupAndPlaySilently(): Promise<void> {
-    if (!networkMount || !gameConsole || !consoleKey) return;
+    if (!gameConsole || !consoleKey) return;
     setError(null);
     setBusy(true);
     try {
-      // Scan the network mount for the game
-      const scanResult = await window.emusync.emulator.scan(consoleKey, {}, [networkMount]);
+      // Determine which mount to scan
+      let mountToScan = networkMount;
+      let isConsoleMount = true;
+
+      // If no local console mount, try to use the game's network source path
+      if (!mountToScan && gameNetworkSource?.rom_path) {
+        // Extract the mount point from the full rom_path (e.g., //server/share from //server/share/Game Boy/game.rom)
+        const pathParts = gameNetworkSource.rom_path.split(/[\/\\]/);
+        if (pathParts.length > 3) {
+          // Reconstruct the mount from the first 3 parts (e.g., //, server, share)
+          mountToScan = pathParts.slice(0, 3).join("/");
+          isConsoleMount = false;
+        }
+      }
+
+      if (!mountToScan) {
+        setError("No network mount point found. Please set up the console first.");
+        return;
+      }
+
+      // Scan the mount for the game
+      const scanResult = await window.emusync.emulator.scan(consoleKey, {}, [mountToScan]);
       if (!scanResult?.roms || scanResult.roms.length === 0) {
-        setError(`Game not found on ${networkMount}`);
+        setError(`Game not found on ${mountToScan}`);
         return;
       }
 
@@ -104,7 +129,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
         save_path: rom.savePath,
         state_path: rom.statePath || "",
         launch_command: rom.launchCommand,
-        rom_folder_path: networkMount,
+        rom_folder_path: isConsoleMount ? networkMount : mountToScan,
       };
 
       await setGameDevice(slug, config);
@@ -175,14 +200,16 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
                 {networkMount
                   ? <>Search for this game on <code>{networkMount}</code> and play it.</>
+                  : gameNetworkSource?.rom_path
+                  ? <>Search for this game on the network share (<code>{gameNetworkSource.rom_path}</code>) and play it.</>
                   : "Point this device at the network share (or a local copy) for this console, then play."}
               </div>
               <button
                 className="btn"
-                disabled={!consoleKey || busy}
-                onClick={networkMount ? setupAndPlaySilently : () => setShowConsoleImport(true)}
+                disabled={(!consoleKey || busy) || (!networkMount && !gameNetworkSource)}
+                onClick={(networkMount || gameNetworkSource) ? setupAndPlaySilently : () => setShowConsoleImport(true)}
               >
-                {busy ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Searching…</> : (networkMount ? "Search & play" : "Set up & play")}
+                {busy ? <><span className="spinner" style={{ width: 12, height: 12, marginRight: 6 }} />Searching…</> : (networkMount || gameNetworkSource ? "Search & play" : "Set up & play")}
               </button>
             </div>
 
