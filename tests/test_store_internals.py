@@ -225,6 +225,35 @@ def test_seed_console_defs_picks_up_additions():
         assert {c["lib"] for c in store.get_system_defs()["gba"]["cores"]} == {"mgba", "vbam"}
 
 
+def test_get_console_defs_returns_suggestions_as_list():
+    """suggestions is stored ';'-joined but must read back as a list so the GUI
+    can map over it (a string crashed EmulatorStep — issue #270)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs([{
+            "key": "gba", "label": "Game Boy Advance", "abbr": "GBA",
+            "suggestions": ["RetroArch with mGBA core", "mGBA standalone"],
+            "system_keys": ["gba"],
+            "systems": {"gba": {"name": "GBA", "save_exts": ["srm"], "cores": []}},
+            "folder_names": [], "standalones": [],
+        }])
+        defs = {c["key"]: c for c in store.get_console_defs()}
+        assert defs["gba"]["suggestions"] == ["RetroArch with mGBA core", "mGBA standalone"]
+
+
+def test_get_console_defs_empty_suggestions_is_empty_list():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs([{
+            "key": "nes", "label": "NES", "abbr": "NES", "suggestions": [],
+            "system_keys": ["nes"],
+            "systems": {"nes": {"name": "NES", "save_exts": ["srm"], "cores": []}},
+            "folder_names": [], "standalones": [],
+        }])
+        defs = {c["key"]: c for c in store.get_console_defs()}
+        assert defs["nes"]["suggestions"] == []
+
+
 # ── saves→states path helper (#202) ────────────────────────────────────────────
 
 def test_saves_path_to_states_only_swaps_whole_segment():

@@ -1,7 +1,10 @@
 import type { ConsoleImportVM } from "./useConsoleImport";
 
 export function EmulatorStep({ vm }: { vm: ConsoleImportVM }) {
-  const { emulators, suggestions, consoleLabel, emuSel } = vm;
+  const { emulators, consoleLabel, emuSel } = vm;
+  // Guard against a malformed value from the API (suggestions is occasionally a
+  // string, not a list) so the wizard never crashes on .map / .length.
+  const suggestions = Array.isArray(vm.suggestions) ? vm.suggestions : [];
   return (
     <>
       {emulators.length === 0 ? (
