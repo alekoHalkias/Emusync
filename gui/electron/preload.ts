@@ -92,6 +92,14 @@ contextBridge.exposeInMainWorld("emusync", {
     setupNetworkPlay: (slug: string, mountRoot: string): Promise<{ ok: boolean; romPath?: string; error?: string }> =>
       ipcRenderer.invoke("rom:setupNetworkPlay", slug, mountRoot),
   },
+  recovery: {
+    listLocalBackups: (savePath: string, stateFolder: string): Promise<{
+      saves: { path: string; kind: "save" | "state"; size: number; mtime: string; fileName: string }[];
+      states: { path: string; kind: "save" | "state"; size: number; mtime: string; fileName: string }[];
+    }> => ipcRenderer.invoke("recovery:listLocalBackups", savePath, stateFolder),
+    restoreLocalBackup: (bakPath: string, targetPath: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("recovery:restoreLocalBackup", bakPath, targetPath),
+  },
   daemon: {
     start: (): Promise<void> => ipcRenderer.invoke("daemon:start"),
     stop:  (): Promise<void> => ipcRenderer.invoke("daemon:stop"),

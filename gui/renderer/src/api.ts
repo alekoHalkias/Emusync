@@ -174,6 +174,34 @@ export const listSaveHistory = (slug: string): Promise<SaveVersion[]> =>
 export const restoreSave = (slug: string, versionId: string): Promise<{ hash: string; pushed_at: string }> =>
   _fetch("POST", `/games/${slug}/save/restore`, { version_id: versionId });
 
+/** Retained state generations for a game, newest first (issue #7/#285). */
+export const listStateHistory = (slug: string): Promise<SaveVersion[]> =>
+  _fetch("GET", `/games/${slug}/state/history`);
+/** Make a past state version current on the server. */
+export const restoreState = (slug: string, versionId: string): Promise<{ hash: string; pushed_at: string }> =>
+  _fetch("POST", `/games/${slug}/state/restore`, { version_id: versionId });
+
+// ── integrity / recovery (issue #285) ───────────────────────────────────────────
+
+export type IntegrityReason = "zero_byte" | "shrank" | "hash_mismatch" | "file_missing";
+export type BlobIntegrity = {
+  status: "ok" | "damaged" | "missing";
+  reasons: IntegrityReason[];
+  size: number | null;
+  hash: string | null;
+  pushed_at: string | null;
+  prior_size: number | null;
+  last_good_version_id: string | null;
+};
+export type GameIntegrity = { save: BlobIntegrity; state: BlobIntegrity };
+
+/** Integrity verdicts for a game's current save + state blobs (recomputed). */
+export const getGameIntegrity = (slug: string): Promise<GameIntegrity> =>
+  _fetch("GET", `/games/${slug}/integrity`);
+/** Re-run the library-wide integrity sweep and return the damaged blobs. */
+export const rescanIntegrity = (): Promise<{ scanned: number; damaged: Array<{ slug: string; name: string; kind: string; reasons: IntegrityReason[]; last_good_version_id: string | null }> }> =>
+  _fetch("POST", "/integrity/rescan");
+
 export type DeviceConsole = { console_name: string; device_game_folder: string; device_save_folder: string; device_emulator: string; device_network_folder?: string; device_local_folder?: string };
 export type DeviceGameDevice = { slug: string; name: string; console?: string; rom_path: string; save_path: string };
 

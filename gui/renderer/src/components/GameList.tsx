@@ -123,7 +123,7 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
   function openGameModal(g: GameRow, canPlay: boolean): void {
     setGameModal({
       slug: g.slug, name: g.name, gameConsole: g.console || "",
-      gameIsLocal: g.isLocal, savePath: g.savePath, canPlay,
+      gameIsLocal: g.isLocal, savePath: g.savePath, statePath: g.statePath, canPlay,
     });
   }
 
