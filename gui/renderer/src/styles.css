@@ -39,6 +39,10 @@ button, input, select, textarea {
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, opacity 0.15s;
+  /* Stay content-sized: never let flex siblings squeeze a button or wrap its
+     label (e.g. when the topbar bulk-delete button appears, issue #287). */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--accent); color: #fff; }
