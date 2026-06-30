@@ -307,6 +307,41 @@ class SyncClient:
         r.raise_for_status()
         return r.json()["hash"]
 
+    # ── console-scoped shared memory card (issue #295) ──────────────────────────
+    # PS2's single card, shared across all the console's games. Mirrors the save
+    # methods but keyed by console_key so _reconcile_save works against it.
+
+    def get_console_memcard_meta(self, console_key: str) -> Optional[dict]:
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard/meta"), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def pull_console_memcard(self, console_key: str, card_path: str) -> tuple[bool, Optional[str]]:
+        """Write the server's shared card to disk (backing up any existing one)."""
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        card = Path(card_path)
+        if card.exists():
+            shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
+        card.parent.mkdir(parents=True, exist_ok=True)
+        card.write_bytes(r.content)
+        return True, r.headers.get("X-Save-Hash")
+
+    def push_console_memcard(self, console_key: str, card_path: str) -> str:
+        data = Path(card_path).read_bytes()
+        r = self._client.post(
+            self._url(f"/consoles/{console_key}/memcard"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
     def pull_state(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
         """Write server state to disk. Returns (pulled, server_hash). pulled=False if no state exists."""
         r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)

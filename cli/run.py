@@ -211,6 +211,36 @@ def _warn_save_conflict(client, cfg, game_slug: str, winner: str, local_hash: Op
     _notify("EmuSync — save conflict resolved", msg)
 
 
+# Consoles whose "save" is a single memory card shared across every game on the
+# console, so it's reconciled per-console rather than per-game. PS2/PCSX2 (#295).
+_SHARED_MEMCARD_CONSOLES = {"PS2"}
+
+
+class _MemcardClient:
+    """Adapts the per-game save API (used by `_reconcile_save` and the post-game
+    push) onto the console-scoped shared memory-card endpoints, so the shared card
+    reconciles with the exact same newest-wins / `.bak` logic. The `slug` args are
+    the console key (e.g. ``"PS2"``) and are forwarded as the console_key (#295)."""
+
+    def __init__(self, client, console_key: str) -> None:
+        self._client = client
+        self._key = console_key
+
+    def get_save_meta(self, _slug: str):
+        return self._client.get_console_memcard_meta(self._key)
+
+    def push_save(self, _slug: str, path: str) -> str:
+        return self._client.push_console_memcard(self._key, path)
+
+    def pull_save(self, _slug: str, path: str):
+        return self._client.pull_console_memcard(self._key, path)
+
+    def report_conflict(self, *args, **kwargs) -> None:
+        # No game row backs a console artifact, so there's nothing to record in the
+        # per-game Conflicts panel; the local log + notification still happen.
+        return None
+
+
 def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str]:
     """Reconcile the local save with the server's before launch.
 
@@ -567,6 +597,21 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
     save_path = gd.save_path
 
+    # Shared-memory-card consoles (PS2): the per-game "save" is actually one card
+    # shared across the whole console, so route save reconciliation to the
+    # console-scoped endpoints (keyed by console abbr) instead of this game's slug
+    # (issue #295). Everything downstream uses save_client/save_key so the existing
+    # newest-wins/.bak reconcile logic is reused unchanged.
+    console_abbr = ""
+    try:
+        _g = client.get_game(game_slug)
+        console_abbr = (_g or {}).get("console", "") or ""
+    except Exception:
+        console_abbr = ""
+    shared_memcard = console_abbr in _SHARED_MEMCARD_CONSOLES
+    save_client = _MemcardClient(client, console_abbr) if shared_memcard else client
+    save_key = console_abbr if shared_memcard else game_slug
+
     # Block duplicate launches before attempting to acquire the lock
     try:
         lock_info = client.get_lock(game_slug)
@@ -616,7 +661,8 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # Reconcile the save before launch: push if the local save is newer than
         # the server's, pull if the server's is newer (newest wins; loser kept
         # as .bak). server_hash = what's authoritative on the server afterwards.
-        server_hash = _reconcile_save(client, cfg, game_slug, save_path)
+        # For a shared-memcard console this reconciles the console card (#295).
+        server_hash = _reconcile_save(save_client, cfg, save_key, save_path)
 
         # Pull state if configured
         state_path = gd.state_path
@@ -646,9 +692,15 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
         # Detect where RetroArch actually wrote the save/state this session — it
         # may differ in folder and/or extension from what we configured (content
-        # name = ROM filename vs database label) — and adopt that path.
-        actual_save_path = _resolve_written_save(save_path, launch_start)
-        actual_state_path = _resolve_written_state(state_path, launch_start) if state_path else None
+        # name = ROM filename vs database label) — and adopt that path. Skipped for
+        # a shared-memcard console: the card lives at a fixed path, and this
+        # RetroArch content-name heuristic doesn't apply to PCSX2 (issue #295).
+        if shared_memcard:
+            actual_save_path = None
+            actual_state_path = None
+        else:
+            actual_save_path = _resolve_written_save(save_path, launch_start)
+            actual_state_path = _resolve_written_state(state_path, launch_start) if state_path else None
 
         if (actual_save_path and actual_save_path != save_path) or (actual_state_path and actual_state_path != state_path):
             try:
@@ -680,21 +732,22 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             local_hash = hashlib.sha256(local_bytes).hexdigest()
             if local_hash != server_hash:
                 # Guard against pushing a truncated/zero-byte save from a crashed
-                # emulator over the good server copy (issue #213).
+                # emulator over the good server copy (issue #213). For a shared-
+                # memcard console this pushes the console card (issue #295).
                 server_size: Optional[int] = None
                 try:
-                    sm = client.get_save_meta(game_slug)
+                    sm = save_client.get_save_meta(save_key)
                     server_size = sm.get("size") if sm else None
                 except Exception:
                     server_size = None
                 if _save_is_safe_to_push(len(local_bytes), server_size):
                     try:
-                        client.push_save(game_slug, save_path)
-                        click.echo(f"Pushed save for {game_slug}.")
+                        save_client.push_save(save_key, save_path)
+                        click.echo(f"Pushed save for {save_key}.")
                     except Exception as exc:
                         click.echo(f"Warning: failed to push save: {exc}", err=True)
                 else:
-                    _warn_unsafe_save(cfg, game_slug, len(local_bytes), server_size)
+                    _warn_unsafe_save(cfg, save_key, len(local_bytes), server_size)
 
         # Push state if configured
         if state_path and Path(state_path).exists():

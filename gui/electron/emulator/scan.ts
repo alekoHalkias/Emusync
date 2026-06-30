@@ -5,6 +5,11 @@ import { rt } from "../runtime";
 import { findLatestFileInDir } from "../files";
 import { ROM_EXTENSIONS, DEFAULT_SAVE_EXTS, RomEntry, EmulatorScanResult, DetectedEmulatorOption } from "./types";
 
+// Consoles whose save is a single memory card shared across every game on the
+// console (PS2/PCSX2). The card lives at saveRoot/<cardFile> and is reconciled
+// per-console — not per-game — by `emusync run` (issue #295).
+const SHARED_MEMCARD: Record<string, string> = { ps2: "Mcd001.ps2" };
+
 function scanRomDir(dir: string, depth = 0): string[] {
   if (depth > 3) return [];
   try {
@@ -80,26 +85,35 @@ export function runEmulatorScan(params: {
         // Priority: content-dir path first, then legacy core-subfolder / flat root.
         // Target path: savesRoot/GameName/GameName.ext  (no core-name layer)
         const gameFolderName = contentSubfolder ?? base;
-        let m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
-        if (!m.exists) {
-          // saves/mGBA/GameName/base.ext  (core + content-dir)
-          const mCC = matchSaveFile(join(emulatorOption.saveDir, gameFolderName), base, saveExts);
-          if (mCC.exists) m = mCC;
-        }
-        if (!m.exists) {
-          // saves/mGBA/base.ext  (core only, legacy flat)
-          const mFlat = matchSaveFile(emulatorOption.saveDir, base, saveExts);
-          if (mFlat.exists) m = mFlat;
-        }
-        if (!m.exists && emulatorOption.coreFolderName) {
-          // saves/base.ext  (legacy flat root)
-          const mRoot = matchSaveFile(saveRoot, base, saveExts);
-          if (mRoot.exists) m = mRoot;
-        }
-        // Always register the canonical target path (savesRoot/GameName/base.ext)
-        // so the path is correct even before RetroArch creates the file.
-        if (!m.exists) {
-          m = { path: join(saveRoot, gameFolderName, `${base}.${saveExts[0]}`), exists: false };
+        const sharedCard = SHARED_MEMCARD[consoleKey];
+        let m: { path: string; exists: boolean };
+        if (sharedCard) {
+          // Shared-memory-card console (PS2): every game points at the one card,
+          // reconciled per-console by `emusync run` (issue #295).
+          const cardPath = join(saveRoot, sharedCard);
+          m = { path: cardPath, exists: existsSync(cardPath) };
+        } else {
+          m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
+          if (!m.exists) {
+            // saves/mGBA/GameName/base.ext  (core + content-dir)
+            const mCC = matchSaveFile(join(emulatorOption.saveDir, gameFolderName), base, saveExts);
+            if (mCC.exists) m = mCC;
+          }
+          if (!m.exists) {
+            // saves/mGBA/base.ext  (core only, legacy flat)
+            const mFlat = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+            if (mFlat.exists) m = mFlat;
+          }
+          if (!m.exists && emulatorOption.coreFolderName) {
+            // saves/base.ext  (legacy flat root)
+            const mRoot = matchSaveFile(saveRoot, base, saveExts);
+            if (mRoot.exists) m = mRoot;
+          }
+          // Always register the canonical target path (savesRoot/GameName/base.ext)
+          // so the path is correct even before RetroArch creates the file.
+          if (!m.exists) {
+            m = { path: join(saveRoot, gameFolderName, `${base}.${saveExts[0]}`), exists: false };
+          }
         }
 
         // ── State folder lookup ────────────────────────────────────────────────
