@@ -41,6 +41,9 @@ _device_names: dict[str, str] = {}
 _presence_lock = threading.Lock()
 _device_event_queues: dict[str, "asyncio.Queue"] = {}
 _monitor_started: bool = False
+# At-rest snapshot of save/state integrity, refreshed on startup and on demand
+# (issue #285): {slug: {"save": <verdict>, "state": <verdict>}}.
+_integrity_status: dict[str, dict] = {}
 
 
 def _monitor_presence() -> None:
@@ -90,6 +93,7 @@ def init(store: Store, master_pin: str, data_dir: str = "") -> None:
     _online_devices.clear()
     _device_names.clear()
     _sweep_stale_staging()
+    _run_integrity_sweep()
     if not _monitor_started:
         _monitor_started = True
         t = threading.Thread(target=_monitor_presence, daemon=True)
@@ -137,6 +141,31 @@ def _get_store() -> Store:
     if _store is None:
         raise RuntimeError("Store not initialized")
     return _store
+
+
+def _run_integrity_sweep() -> None:
+    """Recompute the integrity snapshot and log any damaged current blobs.
+
+    Runs once on startup and on demand (manual rescan). No per-request or timer
+    cost — the per-game endpoint recomputes a single game when freshness matters
+    (e.g. right after a restore). See issue #285.
+    """
+    global _integrity_status
+    if _store is None:
+        return
+    _integrity_status = _store.sweep_integrity()
+    for slug, kinds in _integrity_status.items():
+        for kind, verdict in kinds.items():
+            if verdict["status"] == "damaged":
+                _print_activity(
+                    f"⚠ integrity: {kind} for {_game_label(slug)} looks damaged "
+                    f"({', '.join(verdict['reasons'])})"
+                )
+
+
+def get_integrity_status() -> dict:
+    """Live accessor for the at-rest integrity snapshot (issue #285)."""
+    return _integrity_status
 
 
 def _print_activity(msg: str) -> None:

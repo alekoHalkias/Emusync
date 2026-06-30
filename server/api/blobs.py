@@ -18,7 +18,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from ..store import SaveMeta
-from ._core import _auth, _get_store, _print_activity, _device_label, _game_label
+from ._core import (
+    _auth, _get_store, _print_activity, _device_label, _game_label,
+    _run_integrity_sweep, get_integrity_status,
+)
 
 router = APIRouter()
 
@@ -177,3 +180,49 @@ def list_state_history(slug: str, device_id: str = Depends(_auth)) -> list[dict]
 def restore_state(slug: str, req: RestoreRequest, device_id: str = Depends(_auth)) -> dict:
     """Make a past state generation current (it becomes the next thing pulled)."""
     return _restore(_STATE, slug, req.version_id, device_id)
+
+
+# ── integrity (issue #285) ──────────────────────────────────────────────────────
+
+@router.get("/games/{slug}/integrity")
+def get_game_integrity(slug: str, device_id: str = Depends(_auth)) -> dict:
+    """Integrity verdicts for a game's current save + state blobs.
+
+    Recomputed on demand (cheap) so the badge is correct immediately after a
+    restore, without waiting for a full sweep. The literal `/integrity` tail
+    keeps this clear of the `/games/overview` vs `/games/{slug}` collision.
+    """
+    store = _get_store()
+    if not store.get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")
+    return store.integrity_for_game(slug)
+
+
+def _damaged_summary() -> list[dict]:
+    out: list[dict] = []
+    for slug, kinds in get_integrity_status().items():
+        for kind, verdict in kinds.items():
+            if verdict["status"] == "damaged":
+                out.append({
+                    "slug": slug,
+                    "name": _game_label(slug),
+                    "kind": kind,
+                    "reasons": verdict["reasons"],
+                    "last_good_version_id": verdict["last_good_version_id"],
+                })
+    return out
+
+
+@router.get("/integrity")
+def list_integrity(device_id: str = Depends(_auth)) -> dict:
+    """Library-wide damaged-blob summary from the at-rest snapshot (no recompute)."""
+    status = get_integrity_status()
+    return {"scanned": len(status), "damaged": _damaged_summary()}
+
+
+@router.post("/integrity/rescan")
+def rescan_integrity(device_id: str = Depends(_auth)) -> dict:
+    """Re-run the integrity sweep across all games and return the damaged ones."""
+    _run_integrity_sweep()
+    status = get_integrity_status()
+    return {"scanned": len(status), "damaged": _damaged_summary()}

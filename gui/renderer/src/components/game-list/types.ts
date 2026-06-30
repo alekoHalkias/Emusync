@@ -7,6 +7,7 @@ export type GameRow = Game & {
   locked?: boolean;
   isLocal: boolean;
   savePath?: string;
+  statePath?: string;          // local state FOLDER (issue #285 recovery view)
   romSource?: string;          // 'local' | 'network' (issue #255)
   hasLocalCopy?: boolean;      // network ROM that's been localized for offline play
 };

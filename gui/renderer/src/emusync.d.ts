@@ -6,6 +6,15 @@
 // on purpose (the config is an open TOML dict, and the emulator result types
 // live in the electron package); tightening those is tracked separately.
 
+/** A `.bak` loser found on local disk (issue #285). */
+export interface LocalBak {
+  path: string;
+  kind: "save" | "state";
+  size: number;
+  mtime: string;
+  fileName: string;
+}
+
 export interface EmusyncBridge {
   config: {
     load: () => Promise<Record<string, any> | null>;
@@ -57,6 +66,13 @@ export interface EmusyncBridge {
     delocalize: (slug: string) => Promise<{ ok: boolean; error?: string }>;
     uploadMaster: (localPath: string, networkPath: string) => Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }>;
     setupNetworkPlay: (slug: string, mountRoot: string) => Promise<{ ok: boolean; romPath?: string; error?: string }>;
+  };
+  recovery: {
+    listLocalBackups: (savePath: string, stateFolder: string) => Promise<{
+      saves: LocalBak[];
+      states: LocalBak[];
+    }>;
+    restoreLocalBackup: (bakPath: string, targetPath: string) => Promise<{ ok: boolean; error?: string }>;
   };
   daemon: {
     start: () => Promise<void>;

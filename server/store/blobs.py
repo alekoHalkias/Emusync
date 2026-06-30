@@ -29,6 +29,12 @@ from server.store.models import SaveMeta
 # on-disk files) are pruned on every push.
 HISTORY_LIMIT = 20
 
+# A current blob that shrank below this fraction of the generation before it is
+# treated as truncated (a crashed/SIGKILLed emulator signal). Mirrors
+# ``cli.run._SAVE_SHRINK_FLOOR`` — kept as a separate server-side copy so the
+# store never imports from the CLI (issue #285).
+_SHRINK_FLOOR = 0.5
+
 
 class SaveStateMixin:
     """Operates on `self._conn` and `self._blob_dir`; mixed into Store."""
@@ -172,6 +178,94 @@ class SaveStateMixin:
         if not src.exists():
             return None
         return self._push_blob(table, game_slug, row["device_id"], src.read_bytes())
+
+    # ── integrity ───────────────────────────────────────────────────────────────
+
+    def _classify_blob(self, table: str, game_slug: str) -> dict:
+        """Classify the *current* generation of a blob as ok / damaged / missing.
+
+        "damaged" = 0-byte OR shrank below ``_SHRINK_FLOOR`` of the prior
+        generation OR the on-disk bytes no longer match the recorded hash OR the
+        backing file is gone (issue #285). The verdict is computed from data that
+        already exists (row metadata + the file), so no schema column is needed.
+
+        ``last_good_version_id`` is the newest generation whose recorded size > 0
+        and whose file still hashes to its recorded hash — the target for a
+        one-click "restore last good" when the current blob is damaged.
+        """
+        row = self._newest_row(table, game_slug)
+        if row is None:
+            return {
+                "status": "missing", "reasons": [], "size": None, "hash": None,
+                "pushed_at": None, "prior_size": None, "last_good_version_id": None,
+            }
+
+        reasons: list[str] = []
+        path = self._blob_path(table, row["id"])
+        actual: Optional[int] = None
+        if not path.exists():
+            reasons.append("file_missing")
+        else:
+            actual = path.stat().st_size
+            if actual == 0:
+                reasons.append("zero_byte")
+            # Compare against the generation immediately before the current one.
+            prior = self._conn.execute(
+                f"SELECT size FROM {table} WHERE game_slug = ? "
+                f"ORDER BY rowid DESC LIMIT 1 OFFSET 1",
+                (game_slug,),
+            ).fetchone()
+            if prior is not None and prior["size"] and actual < prior["size"] * _SHRINK_FLOOR:
+                reasons.append("shrank")
+            if hashlib.sha256(path.read_bytes()).hexdigest() != row["hash"]:
+                reasons.append("hash_mismatch")
+
+        prior_row = self._conn.execute(
+            f"SELECT size FROM {table} WHERE game_slug = ? "
+            f"ORDER BY rowid DESC LIMIT 1 OFFSET 1",
+            (game_slug,),
+        ).fetchone()
+
+        return {
+            "status": "damaged" if reasons else "ok",
+            "reasons": reasons,
+            "size": actual,
+            "hash": row["hash"],
+            "pushed_at": row["pushed_at"],
+            "prior_size": prior_row["size"] if prior_row else None,
+            "last_good_version_id": self._last_good_version(table, game_slug),
+        }
+
+    def _last_good_version(self, table: str, game_slug: str) -> Optional[str]:
+        """The newest generation with a non-empty file that still matches its hash."""
+        for r in self._conn.execute(
+            f"SELECT id, hash, size FROM {table} WHERE game_slug = ? ORDER BY rowid DESC",
+            (game_slug,),
+        ).fetchall():
+            if not r["size"]:
+                continue
+            p = self._blob_path(table, r["id"])
+            if not p.exists():
+                continue
+            if hashlib.sha256(p.read_bytes()).hexdigest() == r["hash"]:
+                return r["id"]
+        return None
+
+    def integrity_for_game(self, game_slug: str) -> dict:
+        """Integrity verdicts for a game's current save and state blobs."""
+        return {
+            "save": self._classify_blob("saves", game_slug),
+            "state": self._classify_blob("states", game_slug),
+        }
+
+    def sweep_integrity(self) -> dict[str, dict]:
+        """Classify every game that has at least one save or state generation."""
+        slugs = {
+            r["game_slug"] for r in self._conn.execute(
+                "SELECT game_slug FROM saves UNION SELECT game_slug FROM states"
+            ).fetchall()
+        }
+        return {slug: self.integrity_for_game(slug) for slug in slugs}
 
     def delete_blobs_for_game(self, game_slug: str) -> None:
         """Unlink every on-disk blob for a game (its rows are dropped by FK cascade
