@@ -269,6 +269,37 @@ def test_real_seed_data_includes_mgba_standalone():
         assert mgba["dirs"]["native"]["save"].startswith("~/")
 
 
+def test_real_seed_data_includes_ps2_pcsx2():
+    """PS2 is a standalone-only console: PCSX2 with launch args, explicit
+    romExtensions, and no RetroArch systemKeys (issue #293)."""
+    from cli.consoles_data import _prepare_console_seed_data
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs(_prepare_console_seed_data())
+        ps2 = {c["key"]: c for c in store.get_console_defs()}.get("ps2")
+        assert ps2 is not None, "PS2 console missing from seed data"
+        # No libretro core → no systemKeys (so PS1 disc cores aren't offered)...
+        assert ps2["systemKeys"] == []
+        # ...but the scannable extensions are declared explicitly.
+        assert set(ps2["romExtensions"]) == {"iso", "chd", "bin"}
+        pcsx2 = next(s for s in ps2["standalones"] if s["label"] == "PCSX2")
+        assert pcsx2["launch_args"] == ["-batch", "-fullscreen"]
+        assert pcsx2["flatpak_id"] == "net.pcsx2.PCSX2"
+        assert pcsx2["dirs"]["native"]["state"].endswith("/sstates")
+        assert pcsx2["dirs"]["native"]["memcard"].endswith("/memcards")
+
+
+def test_console_rom_extensions_default_to_system_keys():
+    """A console without explicit rom_extensions reports its systemKeys (#293)."""
+    from cli.consoles_data import _prepare_console_seed_data
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs(_prepare_console_seed_data())
+        gba = {c["key"]: c for c in store.get_console_defs()}["gba"]
+        assert gba["romExtensions"] == gba["systemKeys"]
+        assert "gba" in gba["romExtensions"]
+
+
 def test_get_console_defs_returns_suggestions_as_list():
     """suggestions is stored ';'-joined but must read back as a list so the GUI
     can map over it (a string crashed EmulatorStep — issue #270)."""

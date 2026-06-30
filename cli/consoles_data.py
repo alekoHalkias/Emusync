@@ -16,6 +16,31 @@ _MGBA = {
     },
 }
 
+# PCSX2 (PS2) — standalone only; no usable libretro core. `-batch -fullscreen`
+# boots the disc straight into fullscreen without the picker UI. The save dir is
+# the shared memory-card folder and state dir the shared save-state folder; PS2
+# save/state sync is handled in later stages (#294/#295). (Issue #293.)
+_PCSX2 = {
+    "id": "pcsx2", "label": "PCSX2",
+    "native_bins": ["/usr/bin/pcsx2-qt", "/usr/bin/pcsx2", "~/.local/bin/pcsx2-qt",
+                    "~/Applications/PCSX2.AppImage", "~/.local/bin/pcsx2.AppImage"],
+    "flatpak_id": "net.pcsx2.PCSX2",
+    "flatpak_exec": "flatpak run net.pcsx2.PCSX2",
+    "launch_args": ["-batch", "-fullscreen"],
+    "dirs": {
+        "native": {
+            "save":    "~/.config/PCSX2/memcards",
+            "state":   "~/.config/PCSX2/sstates",
+            "memcard": "~/.config/PCSX2/memcards",
+        },
+        "flatpak": {
+            "save":    "~/.var/app/net.pcsx2.PCSX2/config/PCSX2/memcards",
+            "state":   "~/.var/app/net.pcsx2.PCSX2/config/PCSX2/sstates",
+            "memcard": "~/.var/app/net.pcsx2.PCSX2/config/PCSX2/memcards",
+        },
+    },
+}
+
 _IMPORT_CONSOLES = [
     {"key": "gba",     "label": "Game Boy Advance",          "abbr": "GBA",
      "system_keys": ["gba"],
@@ -49,6 +74,13 @@ _IMPORT_CONSOLES = [
     {"key": "psx",     "label": "PlayStation",                "abbr": "PSX",
      "system_keys": ["iso", "bin", "cue", "chd", "pbp"],
      "standalones": [], "suggestions": ["RetroArch with PCSX-ReARMed or Beetle PSX core"]},
+    # PS2 is standalone-only (no libretro core), so it has no `system_keys`
+    # (which would otherwise surface PS1's disc cores for shared .iso/.chd). Its
+    # scannable extensions are declared explicitly via `rom_extensions` (#293).
+    {"key": "ps2",     "label": "PlayStation 2",              "abbr": "PS2",
+     "system_keys": [],
+     "rom_extensions": ["iso", "chd", "bin"],
+     "standalones": [_PCSX2], "suggestions": ["PCSX2 standalone"]},
 ]
 
 _IMPORT_SYSTEMS: dict[str, dict] = {
@@ -147,6 +179,7 @@ def _prepare_console_seed_data() -> list[dict]:
             "label": console_def["label"],
             "abbr": console_def.get("abbr", console_def["key"].upper()),
             "suggestions": console_def.get("suggestions", []),
+            "rom_extensions": console_def.get("rom_extensions", []),
             "system_keys": console_def.get("system_keys", []),
             "systems": {},
             "folder_names": [],

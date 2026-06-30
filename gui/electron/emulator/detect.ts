@@ -161,6 +161,7 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
           id: `${s.id}-native`, label: s.label, execPath: expand(bin),
           saveDir: expand(dirs.native?.save ?? s.save_dir_template ?? ""),
           stateDir: dirs.native?.state ? expand(dirs.native.state) : undefined,
+          launchArgs: s.launch_args ?? [],
           romDirs: [],
         });
         found = true; break;
@@ -172,6 +173,7 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
         execPath: s.flatpak_exec,
         saveDir: expand(dirs.flatpak?.save ?? ""),
         stateDir: dirs.flatpak?.state ? expand(dirs.flatpak.state) : undefined,
+        launchArgs: s.launch_args ?? [],
         romDirs: [],
       });
     }

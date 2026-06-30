@@ -64,6 +64,7 @@ export interface StandaloneDef {
   flatpak_exec?: string;
   save_dir_template?: string;
   dirs?: { native?: StandaloneDirs; flatpak?: StandaloneDirs };
+  launch_args?: string[];
 }
 
 export interface DetectedEmulatorOption {
@@ -74,5 +75,6 @@ export interface DetectedEmulatorOption {
   stateDir?: string;
   corePath?: string;
   coreFolderName?: string;
+  launchArgs?: string[];   // standalone-emulator flags, e.g. PCSX2 -batch -fullscreen (#293)
   romDirs: string[];
 }

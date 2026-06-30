@@ -44,7 +44,11 @@ export function runEmulatorScan(params: {
     return { emulators: [], romDirs: [], roms: [] };
   }
 
-  const romExtSet = new Set(consoleDef.systemKeys);
+  // Scannable extensions: a console's explicit romExtensions when set (decoupled
+  // from core-derived systemKeys so a standalone-only console like PS2 scans the
+  // right files), else fall back to systemKeys (issue #293).
+  const romExts: string[] = (consoleDef.romExtensions?.length ? consoleDef.romExtensions : consoleDef.systemKeys) ?? [];
+  const romExtSet = new Set(romExts);
   const romDirs = [...new Set([...emulatorOption.romDirs, ...(extraPaths ?? [])].filter(Boolean))];
   console.error(`[scan] romExtSet=${JSON.stringify([...romExtSet])} romDirs=${JSON.stringify(romDirs)}`);
 
@@ -109,9 +113,10 @@ export function runEmulatorScan(params: {
           sm = { path: stateFolder, exists: hasStateFiles };
         }
 
+        const standaloneArgs = (emulatorOption.launchArgs ?? []).join(" ");
         const launchCommand = emulatorOption.corePath
           ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
-          : `${emulatorOption.execPath} "${romPath}"`;
+          : `${emulatorOption.execPath}${standaloneArgs ? ` ${standaloneArgs}` : ""} "${romPath}"`;
         return {
           name: base, romPath,
           savePath: m.path, saveExists: m.exists,
