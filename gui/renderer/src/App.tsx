@@ -200,13 +200,13 @@ export default function App(): React.ReactElement {
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>
-          {screen.name === "games" && (
-            <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>Bulk import</button>
-          )}
           {screen.name === "games" && selectedGameCount > 0 && (
             <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
               🗑 Delete {selectedGameCount}
             </button>
+          )}
+          {screen.name === "games" && (
+            <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>Bulk import</button>
           )}
           <ConflictsButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
