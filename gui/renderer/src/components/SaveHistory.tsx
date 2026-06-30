@@ -74,11 +74,17 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
 
   async function load(): Promise<void> {
     try {
+      // `recovery` may be absent if the preload bundle is older than the
+      // renderer (it needs an app restart to pick up new contextBridge keys) —
+      // degrade to no local backups rather than throwing on the property access.
+      const listBaks = window.emusync.recovery?.listLocalBackups;
       const [saveHist, stateHist, integ, baks] = await Promise.all([
         listSaveHistory(slug).catch(() => [] as SaveVersion[]),
         listStateHistory(slug).catch(() => [] as SaveVersion[]),
         getGameIntegrity(slug).catch(() => null),
-        window.emusync.recovery.listLocalBackups(savePath ?? "", statePath ?? "").catch(() => ({ saves: [], states: [] })),
+        listBaks
+          ? listBaks(savePath ?? "", statePath ?? "").catch(() => ({ saves: [], states: [] }))
+          : Promise.resolve({ saves: [], states: [] }),
       ]);
       setIntegrity(integ);
 
@@ -148,6 +154,10 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
   /** Recover a local .bak loser that may never have reached the server. */
   async function restoreBak(e: Entry): Promise<void> {
     if (!e.bakPath || !e.targetPath) return;
+    if (!window.emusync.recovery?.restoreLocalBackup) {
+      setStatus("Restart EmuSync to enable local backup recovery.");
+      return;
+    }
     setBusyKey(e.key);
     setStatus(null);
     try {
