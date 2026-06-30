@@ -1,6 +1,21 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { addGame, getGame, getGameDevice, getDeviceConsoles, getSaveMeta, getStateMeta, removeGame, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
+import { sanitizeFilename } from "./console-import/helpers";
 import { RelTime } from "../time";
+
+/**
+ * Swap the basename of a portable ROM rel-path to a new base, keeping the
+ * directory and extension (issue #289). A rename-in-place leaves the master in
+ * the same share folder, so only the filename segment of `rom_rel_path` changes.
+ */
+function swapRelBasename(rel: string, newBase: string): string {
+  const parts = rel.split(/[\\/]/);
+  const last = parts.pop() ?? "";
+  const dot = last.lastIndexOf(".");
+  const ext = dot > 0 ? last.slice(dot) : "";
+  parts.push(newBase + ext);
+  return parts.join("/");
+}
 
 type Props = {
   slug: string | null;
@@ -46,6 +61,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [romMsg, setRomMsg] = useState("");
   // Fields we preserve verbatim across a save (not editable in this form).
   const netExtraRef = useRef<{ rom_rel_path?: string; rom_sha256?: string; rom_folder_path?: string }>({});
+  // The name as last persisted, so we only rename on-disk files when it changes.
+  const originalNameRef = useRef(initialName ?? "");
 
   useEffect(() => {
     if (!slug) return;
@@ -165,21 +182,75 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     setSaving(true);
     try {
       let finalSlug = slug;
+
+      // Paths that may be rewritten by an on-disk rename below.
+      let finalRom = romPath.trim();
+      let finalSave = savePath.trim();
+      let finalState = statePath.trim();
+      let finalLaunch = launchCommand.trim();
+      let finalLocalRom = localRomPath;
+      let finalRel = netExtraRef.current.rom_rel_path;
+
       if (isNew) {
         const game = await addGame(name.trim());
         finalSlug = game.slug;
       } else {
-        await updateGame(slug!, name.trim());
+        const newName = name.trim();
+        const nameChanged = newName !== originalNameRef.current.trim();
+        await updateGame(slug!, newName);
+
+        // Parity with import (issue #289): renaming the game renames its on-disk
+        // ROM/save/state files to the cleaned title. Only when the name actually
+        // changed and the game has a ROM on this device (the rename is keyed off
+        // the ROM's base name); reorganize:false renames in place — settings
+        // never re-nests a ROM into a new per-game subfolder.
+        if (nameChanged && finalRom) {
+          const newBase = sanitizeFilename(newName);
+          const renamed = await window.emusync.files.renameGameFiles({
+            romPath: finalRom,
+            savePath: finalSave,
+            stateFolder: finalState,
+            newBase,
+            reorganize: false,
+            // A network ROM's localized copy is renamed alongside the master.
+            secondaryRomPath: romSource === "network" && finalLocalRom ? finalLocalRom : undefined,
+          });
+          if (!renamed.ok) throw new Error(`File rename failed: ${renamed.error ?? "unknown error"}`);
+
+          if (finalLaunch) {
+            finalLaunch = finalLaunch.split(finalRom).join(renamed.newRomPath);
+            if (finalLocalRom && renamed.newSecondaryRomPath) {
+              finalLaunch = finalLaunch.split(finalLocalRom).join(renamed.newSecondaryRomPath);
+            }
+          }
+          finalRom = renamed.newRomPath;
+          finalSave = renamed.newSavePath;
+          finalState = renamed.newStateFolder;
+          if (renamed.newSecondaryRomPath) finalLocalRom = renamed.newSecondaryRomPath;
+          // Rename keeps the master in the same share folder, so only the
+          // rel-path's basename changes; rom_sha256 is unchanged (same bytes).
+          if (romSource === "network" && finalRel) finalRel = swapRelBasename(finalRel, newBase);
+
+          // Reflect the new paths in the form and remember the persisted name.
+          setRomPath(finalRom);
+          setSavePath(finalSave);
+          setStatePath(finalState);
+          setLaunchCommand(finalLaunch);
+          setLocalRomPath(finalLocalRom);
+          netExtraRef.current.rom_rel_path = finalRel;
+          originalNameRef.current = newName;
+        }
       }
+
       const cfg: GameDeviceConfig = {
-        rom_path: romPath.trim(),
-        save_path: savePath.trim(),
-        launch_command: launchCommand.trim(),
-        state_path: statePath.trim(),
+        rom_path: finalRom,
+        save_path: finalSave,
+        launch_command: finalLaunch,
+        state_path: finalState,
         // Preserve the network-ROM source fields the form doesn't edit (#255).
         rom_source: romSource,
-        rom_rel_path: netExtraRef.current.rom_rel_path,
-        local_rom_path: localRomPath,
+        rom_rel_path: finalRel,
+        local_rom_path: finalLocalRom,
         rom_sha256: netExtraRef.current.rom_sha256,
         rom_folder_path: netExtraRef.current.rom_folder_path,
       };
