@@ -226,3 +226,48 @@ def rescan_integrity(device_id: str = Depends(_auth)) -> dict:
     _run_integrity_sweep()
     status = get_integrity_status()
     return {"scanned": len(status), "damaged": _damaged_summary()}
+
+
+# ── console-scoped shared save (memory card, issue #295) ─────────────────────────
+# One memory card per console (PS2), shared across every game on that console.
+# Mirrors the per-game save routes but keyed by console_key, single generation.
+
+@router.get("/consoles/{console_key}/memcard")
+def pull_console_memcard(console_key: str, device_id: str = Depends(_auth)) -> Response:
+    path, meta = _get_store().pull_console_save_path(console_key)
+    if path is None:
+        return Response(status_code=204)
+    _print_activity(f"memcard pulled: {console_key} by {_device_label(device_id)}")
+    return FileResponse(
+        path,
+        media_type="application/octet-stream",
+        headers={
+            "X-Save-Hash": meta["hash"],
+            "X-Pushed-At": meta["pushed_at"],
+            "X-Device-Id": meta["device_id"],
+        },
+    )
+
+
+@router.post("/consoles/{console_key}/memcard")
+async def push_console_memcard(console_key: str, request: Request, device_id: str = Depends(_auth)) -> dict:
+    tmp, h, size = await _stage_upload(request)
+
+    def _store_it() -> dict:
+        return _get_store().push_console_save_file(console_key, device_id, tmp, h, size)
+
+    meta = await asyncio.to_thread(_store_it)
+    _print_activity(f"memcard pushed: {console_key} from {_device_label(device_id)}")
+    return {"hash": meta["hash"], "pushed_at": meta["pushed_at"]}
+
+
+@router.get("/consoles/{console_key}/memcard/meta")
+def get_console_memcard_meta(console_key: str, device_id: str = Depends(_auth)) -> Response:
+    meta = _get_store().get_console_save_meta(console_key)
+    if not meta:
+        return Response(status_code=204)
+    return Response(
+        content=json.dumps({"hash": meta["hash"], "pushed_at": meta["pushed_at"],
+                            "device_id": meta["device_id"], "size": meta["size"]}),
+        media_type="application/json",
+    )

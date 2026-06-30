@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 12
+_SCHEMA_VERSION = 13
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -149,6 +149,13 @@ CREATE TABLE IF NOT EXISTS standalone_emulators (
     save_dir_template TEXT NOT NULL,
     dirs_json        TEXT NOT NULL DEFAULT '{}',
     launch_args      TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS console_saves (
+    console_key      TEXT PRIMARY KEY,
+    device_id        TEXT NOT NULL,
+    hash             TEXT NOT NULL,
+    pushed_at        TEXT NOT NULL,
+    size             INTEGER NOT NULL
 );
 """
 
@@ -325,4 +332,14 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # args so PCSX2 boots with `-batch -fullscreen`.
         _try(conn, "ALTER TABLE console_defs ADD COLUMN rom_extensions TEXT NOT NULL DEFAULT ''")
         _try(conn, "ALTER TABLE standalone_emulators ADD COLUMN launch_args TEXT NOT NULL DEFAULT ''")
+    if from_version < 13:
+        # Console-scoped shared save: one memory card per console (PS2), shared
+        # across every game on that console, reconciled around any launch (#295).
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_saves (
+            console_key      TEXT PRIMARY KEY,
+            device_id        TEXT NOT NULL,
+            hash             TEXT NOT NULL,
+            pushed_at        TEXT NOT NULL,
+            size             INTEGER NOT NULL
+        )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

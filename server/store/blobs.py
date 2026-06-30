@@ -321,3 +321,48 @@ class SaveStateMixin:
 
     def restore_state(self, game_slug: str, version_id: str) -> Optional[SaveMeta]:
         return self._restore_blob("states", game_slug, version_id)
+
+    # ── console-scoped shared save (one memory card per console, issue #295) ─────
+    #
+    # PS2 uses a single memory card shared across every game on the console, which
+    # doesn't fit the per-game save model. It's stored once per console_key, single
+    # generation (overwrite), bytes on disk under blobs/console_saves/<key>.
+
+    def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int) -> dict:
+        """Store a console's shared memory card, overwriting the previous copy."""
+        now = datetime.now(timezone.utc).isoformat()
+        row = self._conn.execute(
+            "SELECT device_id, hash, pushed_at, size FROM console_saves WHERE console_key = ?",
+            (console_key,),
+        ).fetchone()
+        if row and row["hash"] == h:
+            Path(src).unlink(missing_ok=True)  # identical content — keep what's there
+            return dict(row)
+        dest = self._blob_path("console_saves", console_key)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(src, dest)
+        self._conn.execute(
+            "INSERT INTO console_saves (console_key, device_id, hash, pushed_at, size) "
+            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(console_key) DO UPDATE SET "
+            "device_id=excluded.device_id, hash=excluded.hash, pushed_at=excluded.pushed_at, size=excluded.size",
+            (console_key, device_id, h, now, size),
+        )
+        self._conn.commit()
+        return {"device_id": device_id, "hash": h, "pushed_at": now, "size": size}
+
+    def pull_console_save_path(self, console_key: str) -> tuple[Optional[Path], Optional[dict]]:
+        """The console's shared-card on-disk path + meta, or (None, None)."""
+        meta = self.get_console_save_meta(console_key)
+        if meta is None:
+            return None, None
+        path = self._blob_path("console_saves", console_key)
+        if not path.exists():
+            return None, None
+        return path, meta
+
+    def get_console_save_meta(self, console_key: str) -> Optional[dict]:
+        row = self._conn.execute(
+            "SELECT device_id, hash, pushed_at, size FROM console_saves WHERE console_key = ?",
+            (console_key,),
+        ).fetchone()
+        return dict(row) if row else None
