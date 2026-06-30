@@ -5,6 +5,8 @@ GUI via the /console-defs, /system-defs, etc. endpoints.
 """
 from __future__ import annotations
 
+import json
+
 
 class ConsoleDefMixin:
     """Operates on `self._conn`; mixed into Store."""
@@ -44,13 +46,18 @@ class ConsoleDefMixin:
                     (key, folder_name)
                 )
             for standalone in console.get("standalones", []):
+                dirs = standalone.get("dirs", {})
+                # Keep save_dir_template populated (NOT NULL) for back-compat; the
+                # GUI reads the richer `dirs` blob (save/state/memcard templates).
+                native_save = (dirs.get("native") or {}).get("save", "") or standalone.get("save_dir_template", "")
                 self._conn.execute(
-                    "INSERT OR IGNORE INTO standalone_emulators (id, console_key, label, native_bins, flatpak_id, flatpak_exec, save_dir_template) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO standalone_emulators (id, console_key, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (f"{key}-{standalone['id']}", key, standalone["label"],
                      ";".join(standalone.get("native_bins", [])),
                      standalone.get("flatpak_id", ""),
                      standalone.get("flatpak_exec", ""),
-                     standalone.get("save_dir_template", ""))
+                     native_save,
+                     json.dumps(dirs))
                 )
         self._conn.commit()
 
@@ -69,19 +76,10 @@ class ConsoleDefMixin:
 
             # Get standalone emulators for this console
             standalone_rows = self._conn.execute(
-                "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template FROM standalone_emulators WHERE console_key = ? ORDER BY label",
+                "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json FROM standalone_emulators WHERE console_key = ? ORDER BY label",
                 (console_key,)
             ).fetchall()
-            standalones = []
-            for sr in standalone_rows:
-                standalones.append({
-                    "id": sr["id"],
-                    "label": sr["label"],
-                    "native_bins": sr["native_bins"].split(";") if sr["native_bins"] else [],
-                    "flatpak_id": sr["flatpak_id"],
-                    "flatpak_exec": sr["flatpak_exec"],
-                    "save_dir_template": sr["save_dir_template"],
-                })
+            standalones = [self._standalone_row_to_dict(sr) for sr in standalone_rows]
 
             result.append({
                 "key": console_key,
@@ -125,7 +123,25 @@ class ConsoleDefMixin:
     def get_standalones_for_console(self, console_key: str) -> list[dict]:
         """Return standalone emulator defs for a console."""
         rows = self._conn.execute(
-            "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template FROM standalone_emulators WHERE console_key = ?",
+            "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json FROM standalone_emulators WHERE console_key = ?",
             (console_key,)
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [self._standalone_row_to_dict(r) for r in rows]
+
+    @staticmethod
+    def _standalone_row_to_dict(row) -> dict:
+        """Shape a standalone_emulators row for the API/GUI: split the ';'-joined
+        bins and parse the dir-template blob (issue #292)."""
+        try:
+            dirs = json.loads(row["dirs_json"]) if row["dirs_json"] else {}
+        except (ValueError, TypeError):
+            dirs = {}
+        return {
+            "id": row["id"],
+            "label": row["label"],
+            "native_bins": row["native_bins"].split(";") if row["native_bins"] else [],
+            "flatpak_id": row["flatpak_id"],
+            "flatpak_exec": row["flatpak_exec"],
+            "save_dir_template": row["save_dir_template"],
+            "dirs": dirs,
+        }

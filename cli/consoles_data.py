@@ -2,25 +2,28 @@
 seeded into the server's global definition tables on startup."""
 from __future__ import annotations
 
-from pathlib import Path
+# Standalone-emulator definitions. Dir templates use a leading `~` (the running
+# device's home), expanded client-side in detect.ts — never the server's home —
+# so a save dir resolves correctly on whichever device runs the emulator (#292).
+_MGBA = {
+    "id": "mgba", "label": "mGBA",
+    "native_bins": ["/usr/bin/mgba-qt", "/usr/bin/mgba", "~/.local/bin/mgba-qt"],
+    "flatpak_id": "io.mgba.mGBA",
+    "flatpak_exec": "flatpak run io.mgba.mGBA",
+    "dirs": {
+        "native":  {"save": "~/.local/share/mGBA/saves"},
+        "flatpak": {"save": "~/.var/app/io.mgba.mGBA/data/mGBA/saves"},
+    },
+}
 
 _IMPORT_CONSOLES = [
     {"key": "gba",     "label": "Game Boy Advance",          "abbr": "GBA",
      "system_keys": ["gba"],
-     "standalones": [{"id": "mgba", "label": "mGBA",
-                      "native_bins": ["/usr/bin/mgba-qt", "/usr/bin/mgba",
-                                      str(Path.home() / ".local/bin/mgba-qt")],
-                      "flatpak_id": "io.mgba.mGBA",
-                      "flatpak_exec": "flatpak run io.mgba.mGBA",
-                      "save_dir": str(Path.home() / ".local/share/mGBA/saves")}],
+     "standalones": [_MGBA],
      "suggestions": ["RetroArch with mGBA core", "mGBA standalone"]},
     {"key": "gb",      "label": "Game Boy / Game Boy Color", "abbr": "GB",
      "system_keys": ["gb", "gbc"],
-     "standalones": [{"id": "mgba", "label": "mGBA",
-                      "native_bins": ["/usr/bin/mgba-qt", "/usr/bin/mgba"],
-                      "flatpak_id": "io.mgba.mGBA",
-                      "flatpak_exec": "flatpak run io.mgba.mGBA",
-                      "save_dir": str(Path.home() / ".local/share/mGBA/saves")}],
+     "standalones": [_MGBA],
      "suggestions": ["RetroArch with Gambatte or mGBA core", "mGBA standalone"]},
     {"key": "snes",    "label": "Super Nintendo (SNES)",      "abbr": "SNES",
      "system_keys": ["sfc", "smc"],
@@ -147,7 +150,7 @@ def _prepare_console_seed_data() -> list[dict]:
             "system_keys": console_def.get("system_keys", []),
             "systems": {},
             "folder_names": [],
-            "standalones": [],
+            "standalones": console_def.get("standalones", []),
         }
         for sys_key in console_def.get("system_keys", []):
             if sys_key in _IMPORT_SYSTEMS:

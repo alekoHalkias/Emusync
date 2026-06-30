@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 10
+_SCHEMA_VERSION = 11
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -145,7 +145,8 @@ CREATE TABLE IF NOT EXISTS standalone_emulators (
     native_bins      TEXT NOT NULL DEFAULT '',
     flatpak_id       TEXT,
     flatpak_exec     TEXT,
-    save_dir_template TEXT NOT NULL
+    save_dir_template TEXT NOT NULL,
+    dirs_json        TEXT NOT NULL DEFAULT '{}'
 );
 """
 
@@ -310,4 +311,9 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_rel_path TEXT NOT NULL DEFAULT ''")
         _try(conn, "ALTER TABLE game_devices ADD COLUMN local_rom_path TEXT NOT NULL DEFAULT ''")
         _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_sha256 TEXT NOT NULL DEFAULT ''")
+    if from_version < 11:
+        # Standalone emulators gain an extensible per-emulator dir-template blob
+        # (native/flatpak → save/state/memcard templates) so PCSX2 etc. can carry
+        # their state + memory-card dirs without further migrations (issue #292).
+        _try(conn, "ALTER TABLE standalone_emulators ADD COLUMN dirs_json TEXT NOT NULL DEFAULT '{}'")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
