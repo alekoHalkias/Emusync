@@ -61,6 +61,67 @@ def test_extract_state_folder_legacy_raw_blob(tmp_path):
     assert (folder / "Zelda.state").read_bytes() == b"not-a-tar-archive"
 
 
+# ── shared sstates folder: serial-filtered sync (PS2, #294) ─────────────────────
+
+def test_merge_extract_leaves_other_games_states_untouched(tmp_path):
+    """A pull into the shared sstates folder must only touch the files in the
+    archive — other PS2 games' states must be left exactly as they were."""
+    from server.sync_client import _merge_extract_state_folder
+
+    sstates = tmp_path / "sstates"
+    sstates.mkdir()
+    # Game B's states already in the shared folder.
+    (sstates / "SLES-55555 (DEAD).00.p2s").write_bytes(b"gameB-slot0")
+    # Game A's current state (will be overwritten by the pull).
+    (sstates / "SLUS-20062 (1B2E).00.p2s").write_bytes(b"gameA-old")
+
+    _merge_extract_state_folder(_make_state_archive({
+        "SLUS-20062 (1B2E).00.p2s": b"gameA-new",
+        "SLUS-20062 (1B2E).01.p2s": b"gameA-slot1",
+    }), sstates)
+
+    # Game A overwritten + a new slot extracted; old copy kept as .bak.
+    assert (sstates / "SLUS-20062 (1B2E).00.p2s").read_bytes() == b"gameA-new"
+    assert (sstates / "SLUS-20062 (1B2E).01.p2s").read_bytes() == b"gameA-slot1"
+    assert (sstates / "SLUS-20062 (1B2E).00.p2s.bak").read_bytes() == b"gameA-old"
+    # Game B is completely untouched — not overwritten, not backed up.
+    assert (sstates / "SLES-55555 (DEAD).00.p2s").read_bytes() == b"gameB-slot0"
+    assert not (sstates / "SLES-55555 (DEAD).00.p2s.bak").exists()
+
+
+def test_ps2_serial_prefix_detects_session_writes(tmp_path):
+    """The serial prefix is taken from a .p2s written this session, and selects
+    exactly that game's files in the shared folder (issue #294)."""
+    import os
+    from cli.run import _ps2_state_serial_prefix
+
+    sstates = tmp_path / "sstates"
+    sstates.mkdir()
+    old = sstates / "SLES-55555 (DEAD).00.p2s"
+    old.write_bytes(b"other-game")
+    os.utime(old, (1000, 1000))  # well before the session
+    fresh = sstates / "SLUS-20062 (1B2E).00.p2s"
+    fresh.write_bytes(b"this-game")
+    os.utime(fresh, (9000, 9000))
+
+    prefix = _ps2_state_serial_prefix(str(sstates), since=5000)
+    assert prefix == "SLUS-20062 ("
+    # The prefix selects this game's files and excludes the other game's.
+    assert fresh.name.startswith(prefix)
+    assert not old.name.startswith(prefix)
+
+
+def test_ps2_serial_prefix_none_without_session_writes(tmp_path):
+    import os
+    from cli.run import _ps2_state_serial_prefix
+    sstates = tmp_path / "sstates"
+    sstates.mkdir()
+    f = sstates / "SLUS-20062 (1B2E).00.p2s"
+    f.write_bytes(b"x")
+    os.utime(f, (1000, 1000))
+    assert _ps2_state_serial_prefix(str(sstates), since=5000) is None
+
+
 # ── tar extraction hardening (#202) ────────────────────────────────────────────
 
 def test_safe_extract_tar_rejects_path_traversal(tmp_path):
