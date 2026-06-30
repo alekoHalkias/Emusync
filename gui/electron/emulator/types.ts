@@ -48,6 +48,24 @@ export interface EmulatorScanResult {
   roms: RomEntry[];
 }
 
+/** Per-launch-flavour dir templates for a standalone emulator (`~` = device home). */
+export interface StandaloneDirs {
+  save?: string;
+  state?: string;
+  memcard?: string;
+}
+
+/** A standalone emulator definition as served by the Python API (issue #292). */
+export interface StandaloneDef {
+  id: string;
+  label: string;
+  native_bins?: string[];
+  flatpak_id?: string;
+  flatpak_exec?: string;
+  save_dir_template?: string;
+  dirs?: { native?: StandaloneDirs; flatpak?: StandaloneDirs };
+}
+
 export interface DetectedEmulatorOption {
   id: string;
   label: string;

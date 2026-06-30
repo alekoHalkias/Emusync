@@ -225,6 +225,50 @@ def test_seed_console_defs_picks_up_additions():
         assert {c["lib"] for c in store.get_system_defs()["gba"]["cores"]} == {"mgba", "vbam"}
 
 
+def test_seed_and_serve_standalones():
+    """Standalones round-trip through seed → get_console_defs/get_standalones
+    with split native_bins and a parsed `dirs` blob (issue #292)."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs([{
+            "key": "gba", "label": "Game Boy Advance", "abbr": "GBA",
+            "suggestions": [], "system_keys": ["gba"],
+            "systems": {"gba": {"name": "GBA", "save_exts": ["srm"], "cores": []}},
+            "folder_names": [],
+            "standalones": [{
+                "id": "mgba", "label": "mGBA",
+                "native_bins": ["/usr/bin/mgba-qt", "~/.local/bin/mgba-qt"],
+                "flatpak_id": "io.mgba.mGBA", "flatpak_exec": "flatpak run io.mgba.mGBA",
+                "dirs": {"native": {"save": "~/.local/share/mGBA/saves"},
+                         "flatpak": {"save": "~/.var/app/io.mgba.mGBA/data/mGBA/saves"}},
+            }],
+        }])
+        gba = {c["key"]: c for c in store.get_console_defs()}["gba"]
+        assert len(gba["standalones"]) == 1
+        s = gba["standalones"][0]
+        assert s["native_bins"] == ["/usr/bin/mgba-qt", "~/.local/bin/mgba-qt"]
+        assert s["flatpak_id"] == "io.mgba.mGBA"
+        assert s["dirs"]["native"]["save"] == "~/.local/share/mGBA/saves"
+        assert s["dirs"]["flatpak"]["save"].endswith("/mGBA/saves")
+        # The per-console endpoint helper returns the same parsed shape.
+        viac = store.get_standalones_for_console("gba")
+        assert viac[0]["dirs"]["flatpak"]["save"] == s["dirs"]["flatpak"]["save"]
+
+
+def test_real_seed_data_includes_mgba_standalone():
+    """The actual import seed data must now carry standalones (regression for the
+    empty-standalones bug that made mGBA unselectable — issue #292)."""
+    from cli.consoles_data import _prepare_console_seed_data
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs(_prepare_console_seed_data())
+        gba = {c["key"]: c for c in store.get_console_defs()}["gba"]
+        labels = {s["label"] for s in gba["standalones"]}
+        assert "mGBA" in labels
+        mgba = next(s for s in gba["standalones"] if s["label"] == "mGBA")
+        assert mgba["dirs"]["native"]["save"].startswith("~/")
+
+
 def test_get_console_defs_returns_suggestions_as_list():
     """suggestions is stored ';'-joined but must read back as a list so the GUI
     can map over it (a string crashed EmulatorStep — issue #270)."""

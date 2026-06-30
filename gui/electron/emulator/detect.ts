@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { execSync } from "child_process";
 import { join } from "path";
 import { rt } from "../runtime";
-import type { EmulatorInfo, DetectedEmulatorOption } from "./types";
+import type { EmulatorInfo, DetectedEmulatorOption, StandaloneDef } from "./types";
 
 export function parseRetroArchCfg(cfgPath: string, home: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -148,20 +148,30 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
     return flatpakList;
   };
 
-  for (const s of consoleDef.standalones) {
+  // Standalone defs come from the server as JSON (issue #292): snake_case fields,
+  // `native_bins` is a string[], and `dirs` carries `~`-templated save/state/
+  // memcard dirs per launch flavour. Expand `~` against this device's home.
+  const expand = (p: string): string => !p ? p : p.startsWith("~/") ? join(home, p.slice(2)) : p === "~" ? home : p;
+  for (const s of (consoleDef.standalones ?? []) as StandaloneDef[]) {
+    const dirs = s.dirs ?? {};
     let found = false;
-    for (const bin of s.nativeBins) {
-      if (existsSync(bin)) {
-        options.push({ id: `${s.id}-native`, label: s.label, execPath: bin,
-          saveDir: s.getDefaultSaveDir(home), romDirs: [] });
+    for (const bin of s.native_bins ?? []) {
+      if (existsSync(expand(bin))) {
+        options.push({
+          id: `${s.id}-native`, label: s.label, execPath: expand(bin),
+          saveDir: expand(dirs.native?.save ?? s.save_dir_template ?? ""),
+          stateDir: dirs.native?.state ? expand(dirs.native.state) : undefined,
+          romDirs: [],
+        });
         found = true; break;
       }
     }
-    if (!found && s.flatpakId && s.flatpakExec && getFlatpakList().includes(s.flatpakId)) {
+    if (!found && s.flatpak_id && s.flatpak_exec && getFlatpakList().includes(s.flatpak_id)) {
       options.push({
         id: `${s.id}-flatpak`, label: `${s.label} (Flatpak)`,
-        execPath: s.flatpakExec,
-        saveDir: join(home, `.var/app/${s.flatpakId}/data/${s.id}/saves`),
+        execPath: s.flatpak_exec,
+        saveDir: expand(dirs.flatpak?.save ?? ""),
+        stateDir: dirs.flatpak?.state ? expand(dirs.flatpak.state) : undefined,
         romDirs: [],
       });
     }
