@@ -23,9 +23,10 @@ class ConsoleDefMixin:
         for console in consoles_data:
             key = console["key"]
             self._conn.execute(
-                "INSERT OR IGNORE INTO console_defs (key, label, abbr, suggestions) VALUES (?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO console_defs (key, label, abbr, suggestions, rom_extensions) VALUES (?, ?, ?, ?, ?)",
                 (key, console["label"], console.get("abbr", key.upper()),
-                 ";".join(console.get("suggestions", [])))
+                 ";".join(console.get("suggestions", [])),
+                 ";".join(console.get("rom_extensions", [])))
             )
             for sys_key in console["system_keys"]:
                 sys_info = console["systems"].get(sys_key)
@@ -51,19 +52,20 @@ class ConsoleDefMixin:
                 # GUI reads the richer `dirs` blob (save/state/memcard templates).
                 native_save = (dirs.get("native") or {}).get("save", "") or standalone.get("save_dir_template", "")
                 self._conn.execute(
-                    "INSERT OR IGNORE INTO standalone_emulators (id, console_key, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT OR IGNORE INTO standalone_emulators (id, console_key, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json, launch_args) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (f"{key}-{standalone['id']}", key, standalone["label"],
                      ";".join(standalone.get("native_bins", [])),
                      standalone.get("flatpak_id", ""),
                      standalone.get("flatpak_exec", ""),
                      native_save,
-                     json.dumps(dirs))
+                     json.dumps(dirs),
+                     ";".join(standalone.get("launch_args", [])))
                 )
         self._conn.commit()
 
     def get_console_defs(self) -> list[dict]:
         """Return all console definitions with systemKeys and standalones."""
-        rows = self._conn.execute("SELECT key, label, abbr, suggestions FROM console_defs ORDER BY key").fetchall()
+        rows = self._conn.execute("SELECT key, label, abbr, suggestions, rom_extensions FROM console_defs ORDER BY key").fetchall()
         result = []
         for row in rows:
             console_key = row["key"]
@@ -76,7 +78,7 @@ class ConsoleDefMixin:
 
             # Get standalone emulators for this console
             standalone_rows = self._conn.execute(
-                "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json FROM standalone_emulators WHERE console_key = ? ORDER BY label",
+                "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json, launch_args FROM standalone_emulators WHERE console_key = ? ORDER BY label",
                 (console_key,)
             ).fetchall()
             standalones = [self._standalone_row_to_dict(sr) for sr in standalone_rows]
@@ -89,6 +91,10 @@ class ConsoleDefMixin:
                 # back into a list so the GUI's EmulatorStep can map over it.
                 "suggestions": row["suggestions"].split(";") if row["suggestions"] else [],
                 "systemKeys": system_keys,
+                # Scannable ROM extensions. Decoupled from core-derived systemKeys
+                # so a standalone-only console (PS2) scans the right files even with
+                # no libretro core; falls back to systemKeys when unset (issue #293).
+                "romExtensions": row["rom_extensions"].split(";") if row["rom_extensions"] else system_keys,
                 "standalones": standalones,
             })
         return result
@@ -123,7 +129,7 @@ class ConsoleDefMixin:
     def get_standalones_for_console(self, console_key: str) -> list[dict]:
         """Return standalone emulator defs for a console."""
         rows = self._conn.execute(
-            "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json FROM standalone_emulators WHERE console_key = ?",
+            "SELECT id, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json, launch_args FROM standalone_emulators WHERE console_key = ?",
             (console_key,)
         ).fetchall()
         return [self._standalone_row_to_dict(r) for r in rows]
@@ -131,7 +137,7 @@ class ConsoleDefMixin:
     @staticmethod
     def _standalone_row_to_dict(row) -> dict:
         """Shape a standalone_emulators row for the API/GUI: split the ';'-joined
-        bins and parse the dir-template blob (issue #292)."""
+        bins/args and parse the dir-template blob (issues #292, #293)."""
         try:
             dirs = json.loads(row["dirs_json"]) if row["dirs_json"] else {}
         except (ValueError, TypeError):
@@ -144,4 +150,5 @@ class ConsoleDefMixin:
             "flatpak_exec": row["flatpak_exec"],
             "save_dir_template": row["save_dir_template"],
             "dirs": dirs,
+            "launch_args": row["launch_args"].split(";") if row["launch_args"] else [],
         }

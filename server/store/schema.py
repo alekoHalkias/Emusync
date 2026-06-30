@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 11
+_SCHEMA_VERSION = 12
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -109,7 +109,8 @@ CREATE TABLE IF NOT EXISTS console_defs (
     key              TEXT PRIMARY KEY,
     label            TEXT NOT NULL,
     abbr             TEXT NOT NULL,
-    suggestions      TEXT NOT NULL DEFAULT ''
+    suggestions      TEXT NOT NULL DEFAULT '',
+    rom_extensions   TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS system_defs (
     extension        TEXT PRIMARY KEY,
@@ -146,7 +147,8 @@ CREATE TABLE IF NOT EXISTS standalone_emulators (
     flatpak_id       TEXT,
     flatpak_exec     TEXT,
     save_dir_template TEXT NOT NULL,
-    dirs_json        TEXT NOT NULL DEFAULT '{}'
+    dirs_json        TEXT NOT NULL DEFAULT '{}',
+    launch_args      TEXT NOT NULL DEFAULT ''
 );
 """
 
@@ -316,4 +318,11 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # (native/flatpak → save/state/memcard templates) so PCSX2 etc. can carry
         # their state + memory-card dirs without further migrations (issue #292).
         _try(conn, "ALTER TABLE standalone_emulators ADD COLUMN dirs_json TEXT NOT NULL DEFAULT '{}'")
+    if from_version < 12:
+        # PS2/PCSX2 (issue #293): a console's scannable ROM extensions, decoupled
+        # from core-derived system_keys, so a standalone-only console (no libretro
+        # core, e.g. PS2) still scans the right extensions; and per-emulator launch
+        # args so PCSX2 boots with `-batch -fullscreen`.
+        _try(conn, "ALTER TABLE console_defs ADD COLUMN rom_extensions TEXT NOT NULL DEFAULT ''")
+        _try(conn, "ALTER TABLE standalone_emulators ADD COLUMN launch_args TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
