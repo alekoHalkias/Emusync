@@ -13,6 +13,11 @@ type Props = {
   onPlay: (slug: string, name: string) => void;
   importOpen: boolean;                       // Bulk-import modal, lifted to the topbar
   onImportOpenChange: (open: boolean) => void;
+  // Bulk-delete button is rendered in the topbar (next to Bulk import), so the
+  // selection count + the confirm-modal open state are lifted up (issue #287).
+  onSelectedCountChange: (count: number) => void;
+  confirmBulkDelete: boolean;
+  onConfirmBulkDeleteChange: (open: boolean) => void;
 };
 
 function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
@@ -40,14 +45,16 @@ function ConsoleCheckbox({ games, selectedSlugs, onToggle }: {
   );
 }
 
-export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange }: Props): React.ReactElement {
+export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange, onSelectedCountChange, confirmBulkDelete, onConfirmBulkDeleteChange }: Props): React.ReactElement {
   const { games, loading, reload } = useGameList();
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
   const [searchingSlug, setSearchingSlug] = useState<string | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Report the selection count up so the topbar can show/hide the delete button.
+  useEffect(() => { onSelectedCountChange(selectedSlugs.size); }, [selectedSlugs, onSelectedCountChange]);
   const [collapsedConsoles, setCollapsedConsoles] = useState<Set<string>>(new Set());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [colWidths, setColWidths] = useState({ name: 260, activity: 180 });
@@ -169,7 +176,7 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
       }
     }
     // Close modal and clear state
-    setConfirmBulkDelete(false);
+    onConfirmBulkDeleteChange(false);
     setSelectedSlugs(new Set());
     setBulkDeleting(false);
     // Reload games after deletion
@@ -219,16 +226,8 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
 
   return (
     <>
-      {/* Contextual bulk-delete bar — only shown while games are selected, so
-          there's no persistent header line (Bulk import lives in the topbar). */}
-      {selectedSlugs.size > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-          <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
-            🗑 Delete {selectedSlugs.size}
-          </button>
-        </div>
-      )}
-
+      {/* The bulk-delete button now lives in the topbar next to Bulk import
+          (issue #287); only the confirm modal remains here. */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40 }}>
           <span className="spinner" style={{ width: 24, height: 24 }} />
@@ -443,7 +442,7 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
       )}
 
       {confirmBulkDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmBulkDelete(false)}>
+        <div className="modal-overlay" onClick={() => onConfirmBulkDeleteChange(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Delete {selectedSlugs.size} game{selectedSlugs.size !== 1 ? "s" : ""}?</h3>
             <p>
@@ -451,7 +450,7 @@ export default function GameList({ onAdd, onPlay, importOpen, onImportOpenChange
               devices will <strong>not</strong> be deleted.
             </p>
             <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setConfirmBulkDelete(false)} disabled={bulkDeleting}>
+              <button className="btn btn-ghost" onClick={() => onConfirmBulkDeleteChange(false)} disabled={bulkDeleting}>
                 Cancel
               </button>
               <button className="btn btn-danger" onClick={handleBulkDelete} disabled={bulkDeleting}>

@@ -20,6 +20,8 @@ export default function App(): React.ReactElement {
   const [isServer, setIsServer] = useState(false);
   const [gameListKey, setGameListKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedGameCount, setSelectedGameCount] = useState(0);   // for the topbar bulk-delete button (issue #287)
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [gameRunning, setGameRunning] = useState(false);
   const [gameIsExternal, setGameIsExternal] = useState(false);
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
@@ -201,6 +203,11 @@ export default function App(): React.ReactElement {
           {screen.name === "games" && (
             <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>Bulk import</button>
           )}
+          {screen.name === "games" && selectedGameCount > 0 && (
+            <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
+              🗑 Delete {selectedGameCount}
+            </button>
+          )}
           <ConflictsButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
         </div>
@@ -214,6 +221,9 @@ export default function App(): React.ReactElement {
             onPlay={handlePlay}
             importOpen={importOpen}
             onImportOpenChange={setImportOpen}
+            onSelectedCountChange={setSelectedGameCount}
+            confirmBulkDelete={confirmBulkDelete}
+            onConfirmBulkDeleteChange={setConfirmBulkDelete}
           />
         )}
 
