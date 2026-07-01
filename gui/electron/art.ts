@@ -1,7 +1,8 @@
 // art:cache IPC — downloads a libretro thumbnail and caches it to disk.
-// Returns a file:// URL for the cached image, or null if the fetch fails.
+// Returns a base64 data URL for the cached image, or null if the fetch fails.
+// (file:// URLs are blocked by Chromium when the renderer is served from http://)
 import { ipcMain } from "electron";
-import { createWriteStream, existsSync, mkdirSync } from "fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import https from "https";
@@ -107,6 +108,11 @@ const CONSOLE_LOGO: Record<string, string> = {
 const RETROARCH_ASSETS_BASE =
   "https://raw.githubusercontent.com/libretro/retroarch-assets/master/xmb/monochrome/png";
 
+function toDataUrl(filePath: string): string {
+  const buf = readFileSync(filePath);
+  return `data:image/png;base64,${buf.toString("base64")}`;
+}
+
 export function registerArtIpc(): void {
   ipcMain.handle(
     "art:get",
@@ -114,13 +120,13 @@ export function registerArtIpc(): void {
       try {
         mkdirSync(ART_DIR, { recursive: true });
         const dest = join(ART_DIR, `${slug}.png`);
-        if (existsSync(dest)) return `file://${dest}`;
+        if (existsSync(dest)) return toDataUrl(dest);
 
         const url = buildThumbnailUrl(consoleKey, gameName);
         if (!url) return null;
 
         await download(url, dest);
-        return existsSync(dest) ? `file://${dest}` : null;
+        return existsSync(dest) ? toDataUrl(dest) : null;
       } catch {
         return null;
       }
@@ -133,14 +139,14 @@ export function registerArtIpc(): void {
       try {
         mkdirSync(CONSOLE_DIR, { recursive: true });
         const dest = join(CONSOLE_DIR, `${consoleKey}.png`);
-        if (existsSync(dest)) return `file://${dest}`;
+        if (existsSync(dest)) return toDataUrl(dest);
 
         const logoName = CONSOLE_LOGO[consoleKey.toLowerCase()];
         if (!logoName) return null;
 
         const url = `${RETROARCH_ASSETS_BASE}/${encodeURIComponent(logoName)}.png`;
         await download(url, dest);
-        return existsSync(dest) ? `file://${dest}` : null;
+        return existsSync(dest) ? toDataUrl(dest) : null;
       } catch {
         return null;
       }
