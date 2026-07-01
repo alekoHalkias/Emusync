@@ -518,6 +518,8 @@ dev mode — visible in the `make dev-gui` terminal.
 
 ## Common gotchas
 
+**Shared-save-layout consoles (PS2) — never treat the save/state as per-game** — For consoles where the save (and states) live in ONE shared location across every game (PS2's `memcards/Mcd001.ps2` + `sstates/`, issues #294/#295), the per-game save/state must not be renamed, moved, or pushed per-game. The renderer gates this via `usesSharedSaveLayout(consoleKeyOrAbbr)` in `console-import/helpers.ts` (currently `{ps2}`): the import (`useConsoleImport`) passes empty save/state to `renameGameFiles` and skips the per-game `autoPush` of save/state; `GameConfig` skips the save/state rename on a settings name-change and hides the manual save/state sync panel (a per-game state *pull* there would be destructive — `_extract_state_folder` `.bak`s every game's slots). The CLI mirror is `run.py`'s `_SHARED_MEMCARD_CONSOLES`/`_SHARED_STATE_CONSOLES` and `scan.ts`'s `SHARED_MEMCARD`. Keep all four in sync if you add a shared-layout console.
+
 **Orphaned server processes** — If Electron exits abnormally, the uvicorn server can keep running. The stop handler uses three kill strategies (see Server process lifecycle above). If you see "port already in use", run: `pkill -9 -f "emusync.py server start"`. Note: `emusync server start` now detects running servers and exits gracefully instead of attempting to start a duplicate.
 
 **SIGKILL skips Python finally blocks** — `.server_pid` and `.server_token` files may not be cleaned up after a hard kill. The stop handler manually deletes them.
