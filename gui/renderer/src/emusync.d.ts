@@ -75,6 +75,9 @@ export interface EmusyncBridge {
     }>;
     restoreLocalBackup: (bakPath: string, targetPath: string) => Promise<{ ok: boolean; error?: string }>;
   };
+  art: {
+    get: (slug: string, gameName: string, consoleKey: string) => Promise<string | null>;
+  };
   daemon: {
     start: () => Promise<void>;
     stop: () => Promise<void>;

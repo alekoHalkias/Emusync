@@ -106,6 +106,10 @@ contextBridge.exposeInMainWorld("emusync", {
     start: (): Promise<void> => ipcRenderer.invoke("daemon:start"),
     stop:  (): Promise<void> => ipcRenderer.invoke("daemon:stop"),
   },
+  art: {
+    get: (slug: string, gameName: string, consoleKey: string): Promise<string | null> =>
+      ipcRenderer.invoke("art:get", slug, gameName, consoleKey),
+  },
   game: {
     launch: (slug: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke("game:launch", slug),

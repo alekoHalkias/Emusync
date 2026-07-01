@@ -2,31 +2,35 @@ import React, { useEffect, useState } from "react";
 import { configure, configureDevice, health, gamesOverview, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
-import GameList from "./components/GameList";
 import GameConfig from "./components/GameConfig";
 import ServerStatusButton from "./components/ServerStatusButton";
 import ConflictsButton from "./components/ConflictsButton";
-
+import ConsoleGrid from "./components/ConsoleGrid";
+import GameGrid from "./components/GameGrid";
+import ConsoleImport from "./components/ConsoleImport";
+import { useGameList } from "./components/game-list/useGameList";
 
 type Screen =
   | { name: "loading" }
   | { name: "setup" }
   | { name: "games" }
+  | { name: "console"; key: string; label: string; abbr: string }
   | { name: "config-new" };
 
 export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
   const [loadingMessage, setLoadingMessage] = useState("Loading…");
   const [isServer, setIsServer] = useState(false);
-  const [gameListKey, setGameListKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
-  const [selectedGameCount, setSelectedGameCount] = useState(0);   // for the topbar bulk-delete button (issue #287)
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [gameRunning, setGameRunning] = useState(false);
   const [gameIsExternal, setGameIsExternal] = useState(false);
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
   const [runningGameSlug, setRunningGameSlug] = useState<string | null>(null);
   const [myDeviceId, setMyDeviceId] = useState<string | null>(null);
+
+  // Shared game list — data source for both ConsoleGrid and GameGrid.
+  // Only active after setup is complete; the hook starts polling on mount.
+  const { games, loading, reload } = useGameList();
 
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
@@ -47,9 +51,10 @@ export default function App(): React.ReactElement {
 
   // Poll for locks held by this device to detect games launched outside the app (e.g. Steam)
   useEffect(() => {
-    if (screen.name !== "games" || !myDeviceId) return;
+    const onGameScreen = screen.name === "games" || screen.name === "console";
+    if (!onGameScreen || !myDeviceId) return;
     async function checkLocks(): Promise<void> {
-      if (await window.emusync.game.isRunning()) return; // already tracked via gameProcess
+      if (await window.emusync.game.isRunning()) return;
       const pidFileActive = await window.emusync.game.hasPidFile();
       try {
         const overview = await gamesOverview();
@@ -77,14 +82,17 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     window.emusync.game.isRunning().then(setGameRunning);
-    const onExited = (): void => { setGameRunning(false); setGameIsExternal(false); setRunningGameName(null); };
+    const onExited = (): void => {
+      setGameRunning(false);
+      setGameIsExternal(false);
+      setRunningGameName(null);
+    };
     window.emusync.game.onExited(onExited);
     return () => window.emusync.game.offExited(onExited);
   }, []);
 
   useEffect(() => {
     async function init(): Promise<void> {
-      // config.load() returns null when absent — no need for a separate exists() call.
       const cfg = await window.emusync.config.load();
       if (!cfg) {
         setScreen({ name: "setup" });
@@ -108,10 +116,8 @@ export default function App(): React.ReactElement {
           await new Promise<void>((r) => setTimeout(r, 100));
         }
       } else {
-        // Client devices: start sync daemon to receive incoming ROM transfers
         window.emusync.daemon.start();
       }
-      // Show games immediately; release stale locks in the background.
       setScreen({ name: "games" });
       if (deviceId) releaseStaleLocks(deviceId);
     }
@@ -142,13 +148,11 @@ export default function App(): React.ReactElement {
         (cfg.server_pin  as string) || "",
       );
       configureDevice((cfg.device_id as string) || "", (cfg.device_name as string) || "");
-      setGameListKey((k) => k + 1);
+      reload(true);
     });
   }
 
   async function handlePlay(slug: string, name?: string): Promise<void> {
-    // Quick play / Run tab: launch immediately (emusync run derives the command
-    // server-side). The topbar then reflects the running game (issue #260).
     if (name) setRunningGameName(name);
     setRunningGameSlug(slug);
     await window.emusync.game.launch(slug);
@@ -170,8 +174,9 @@ export default function App(): React.ReactElement {
   if (screen.name === "loading") {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 16 }}>
+        <div className="loading-logo">EmuSync</div>
         <span className="spinner" style={{ width: 32, height: 32 }} />
-        <span style={{ color: "var(--muted, #888)", fontSize: 13 }}>{loadingMessage}</span>
+        <span style={{ color: "var(--text-muted)", fontSize: 13 }}>{loadingMessage}</span>
       </div>
     );
   }
@@ -180,33 +185,50 @@ export default function App(): React.ReactElement {
     return <Setup onDone={handleSetupDone} />;
   }
 
+  // Determine which games belong to the currently-selected console
+  const consoleGames = screen.name === "console"
+    ? games.filter((g) => {
+        const stored = (g.console ?? "").toUpperCase();
+        return stored === screen.abbr.toUpperCase() || stored === screen.key.toUpperCase();
+      })
+    : [];
+
   return (
     <DeviceProvider>
     <div className="layout">
       <header className="topbar">
-        <span className="topbar-title">EmuSync</span>
+        {/* Left: back breadcrumb or app title */}
+        {screen.name === "console" ? (
+          <button
+            className="topbar-back"
+            onClick={() => setScreen({ name: "games" })}
+          >
+            ‹ EmuSync
+          </button>
+        ) : (
+          <span className="topbar-title">EmuSync</span>
+        )}
+
+        {/* Centre: running game indicator */}
         {gameRunning && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 8 }}>
-            <span style={{ color: "#4ade80", fontWeight: 600, fontSize: 13 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
+            <span className="topbar-game-running">
               {gameIsExternal
                 ? `● Playing ${runningGameName ?? "game"} on Steam`
                 : `● ${runningGameName ?? "Game"} running`}
             </span>
             {!gameIsExternal && (
-              <button className="btn btn-danger" onClick={handleStop}>
-                ■ Stop
-              </button>
+              <button className="btn btn-danger" onClick={handleStop}>■ Stop</button>
             )}
           </div>
         )}
-        <div style={{ display: "flex", gap: 8 }}>
-          {screen.name === "games" && selectedGameCount > 0 && (
-            <button className="btn btn-danger" onClick={() => setConfirmBulkDelete(true)}>
-              🗑 Delete {selectedGameCount}
+
+        {/* Right: topbar actions */}
+        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+          {(screen.name === "games" || screen.name === "console") && (
+            <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>
+              + Import
             </button>
-          )}
-          {screen.name === "games" && (
-            <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>Bulk import</button>
           )}
           <ConflictsButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
@@ -214,28 +236,52 @@ export default function App(): React.ReactElement {
       </header>
 
       <main className="content">
+        {/* Console home: grid of console cards */}
         {screen.name === "games" && (
-          <GameList
-            key={gameListKey}
-            onAdd={() => setScreen({ name: "config-new" })}
+          loading ? (
+            <div style={{ textAlign: "center", padding: 60 }}>
+              <span className="spinner" style={{ width: 28, height: 28 }} />
+            </div>
+          ) : (
+            <ConsoleGrid
+              games={games}
+              onSelectConsole={(key, label, abbr) =>
+                setScreen({ name: "console", key, label, abbr })
+              }
+            />
+          )
+        )}
+
+        {/* Per-console game grid */}
+        {screen.name === "console" && (
+          <GameGrid
+            consoleKey={screen.key}
+            consoleLabel={screen.label}
+            consoleAbbr={screen.abbr}
+            games={consoleGames}
+            onBack={() => setScreen({ name: "games" })}
             onPlay={handlePlay}
-            importOpen={importOpen}
-            onImportOpenChange={setImportOpen}
-            onSelectedCountChange={setSelectedGameCount}
-            confirmBulkDelete={confirmBulkDelete}
-            onConfirmBulkDeleteChange={setConfirmBulkDelete}
+            onChanged={() => reload(true)}
           />
         )}
 
+        {/* Add game form */}
         {screen.name === "config-new" && (
           <GameConfig
             slug={null}
             onBack={() => setScreen({ name: "games" })}
-            onSaved={() => setScreen({ name: "games" })}
+            onSaved={() => { setScreen({ name: "games" }); reload(true); }}
           />
         )}
       </main>
 
+      {/* Console import modal — accessible from anywhere via topbar button */}
+      {importOpen && (
+        <ConsoleImport
+          onClose={() => setImportOpen(false)}
+          onImported={() => reload(true)}
+        />
+      )}
     </div>
     </DeviceProvider>
   );
