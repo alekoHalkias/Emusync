@@ -6,11 +6,13 @@ type Props = {
   game: GameRow;
   consoleKey: string;
   consoleAccent: string;
+  selected: boolean;
+  onToggleSelect: () => void;
   onPlay: (slug: string, name: string) => void;
   onSettings: (game: GameRow) => void;
 };
 
-export default function GameCard({ game, consoleKey, consoleAccent, onPlay, onSettings }: Props): React.ReactElement {
+export default function GameCard({ game, consoleKey, consoleAccent, selected, onToggleSelect, onPlay, onSettings }: Props): React.ReactElement {
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [artFailed, setArtFailed] = useState(false);
   const fetchedRef = useRef(false);
@@ -28,7 +30,10 @@ export default function GameCard({ game, consoleKey, consoleAccent, onPlay, onSe
   const lastActivity = game.lastSave ?? game.lastPush ?? null;
 
   return (
-    <div className="game-card" style={{ "--card-accent": consoleAccent } as React.CSSProperties}>
+    <div
+      className={`game-card${selected ? " game-card-selected" : ""}`}
+      style={{ "--card-accent": consoleAccent } as React.CSSProperties}
+    >
       {/* Art area */}
       <div className="game-card-art">
         {artUrl && !artFailed ? (
@@ -43,6 +48,16 @@ export default function GameCard({ game, consoleKey, consoleAccent, onPlay, onSe
             <span className="game-card-placeholder-text">{game.name}</span>
           </div>
         )}
+
+        {/* Selection checkbox — top-right corner */}
+        <input
+          type="checkbox"
+          className="game-card-checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          onClick={(e) => e.stopPropagation()}
+          title={selected ? "Deselect" : "Select for deletion"}
+        />
 
         {/* Overlay badges */}
         <div className="game-card-badges">

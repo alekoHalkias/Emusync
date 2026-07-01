@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { removeGame } from "../api";
 import type { GameRow } from "./game-list/types";
 import type { GameModalTarget } from "./GameModal";
 import GameCard from "./GameCard";
@@ -42,6 +43,28 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
   const [search, setSearch] = useState("");
+  const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  function toggleSelect(slug: string): void {
+    setSelectedSlugs((prev) => {
+      const next = new Set(prev);
+      next.has(slug) ? next.delete(slug) : next.add(slug);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete(): Promise<void> {
+    setDeleting(true);
+    for (const slug of Array.from(selectedSlugs)) {
+      try { await removeGame(slug); } catch { /* skip */ }
+    }
+    setSelectedSlugs(new Set());
+    setConfirmDelete(false);
+    setDeleting(false);
+    onChanged();
+  }
 
   const accent = CONSOLE_ACCENT[consoleKey] ?? DEFAULT_ACCENT;
 
@@ -84,6 +107,15 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
           <span className="game-grid-label">{consoleLabel}</span>
           <span className="game-grid-total">{games.length} game{games.length !== 1 ? "s" : ""}</span>
         </div>
+        {selectedSlugs.size > 0 && (
+          <button
+            className="btn btn-danger"
+            style={{ flexShrink: 0 }}
+            onClick={() => setConfirmDelete(true)}
+          >
+            🗑 Delete {selectedSlugs.size}
+          </button>
+        )}
         <input
           className="game-grid-search"
           type="text"
@@ -111,6 +143,8 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
                     game={g}
                     consoleKey={consoleKey}
                     consoleAccent={accent}
+                    selected={selectedSlugs.has(g.slug)}
+                    onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}
                     onSettings={() => openSettings(g)}
                   />
@@ -131,6 +165,8 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
                     game={g}
                     consoleKey={consoleKey}
                     consoleAccent={accent}
+                    selected={selectedSlugs.has(g.slug)}
+                    onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}
                     onSettings={() => openSettings(g)}
                   />
@@ -158,6 +194,21 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
           onPlay={onPlay}
           onChanged={onChanged}
         />
+      )}
+
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete {selectedSlugs.size} game{selectedSlugs.size !== 1 ? "s" : ""}?</h3>
+            <p>This removes the selected games from EmuSync. Save files on your devices will <strong>not</strong> be deleted.</p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleBulkDelete} disabled={deleting}>
+                {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -528,6 +528,36 @@ input.error { border-color: var(--red); }
   border-radius: 4px;
   line-height: 1.4;
 }
+/* Checkbox in top-right corner of art area */
+.game-card-checkbox {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  accent-color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+  -webkit-app-region: no-drag;
+}
+.game-card:hover .game-card-checkbox,
+.game-card-checkbox:checked { opacity: 1; }
+
+/* Selected card: accent border + subtle tint */
+.game-card-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.35);
+}
+.game-card-selected .game-card-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(233, 69, 96, 0.12);
+  pointer-events: none;
+}
+
 .game-card-badge-locked { background: rgba(248,113,113,0.85); color: #fff; }
 .game-card-badge-other  { background: rgba(0,0,0,0.65); color: var(--text-muted); }
 .game-card-badge-net    { background: rgba(0,0,0,0.55); font-size: 12px; padding: 2px 4px; }
