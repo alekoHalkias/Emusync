@@ -139,8 +139,6 @@ export function registerServerIpc(): void {
     return true;
   });
 
-  ipcMain.handle("server:token", () => null); // deprecated — PIN auth no longer uses per-device tokens
-
   ipcMain.handle("server:discover", () => {
     return new Promise<Array<{ name: string; host: string; port: number }>>((resolve) => {
       const proc = spawn(PYTHON, [SCRIPT, "server", "discover-json"], {

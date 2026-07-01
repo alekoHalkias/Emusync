@@ -26,7 +26,6 @@ export interface EmusyncBridge {
   server: {
     start: () => Promise<{ ok: boolean; token: string | null }>;
     stop: () => Promise<boolean>;
-    token: () => Promise<string | null>;
     changePin: (pin: string | null) => Promise<{ ok: boolean; token: string | null }>;
     discover: () => Promise<Array<{ name: string; host: string; port: number }>>;
     localIp: () => Promise<string | null>;
