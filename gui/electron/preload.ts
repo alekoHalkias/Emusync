@@ -109,6 +109,8 @@ contextBridge.exposeInMainWorld("emusync", {
   art: {
     get: (slug: string, gameName: string, consoleKey: string): Promise<string | null> =>
       ipcRenderer.invoke("art:get", slug, gameName, consoleKey),
+    getConsoleIcon: (consoleKey: string): Promise<string | null> =>
+      ipcRenderer.invoke("art:getConsoleIcon", consoleKey),
   },
   game: {
     launch: (slug: string): Promise<{ ok: boolean }> =>

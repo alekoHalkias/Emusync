@@ -1,29 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { GameRow } from "./game-list/types";
 
-// Visual identity per console key: accent color + emoji icon
-const CONSOLE_STYLE: Record<string, { color: string; icon: string }> = {
-  snes:      { color: "#7c3aed", icon: "🎮" },
-  nes:       { color: "#dc2626", icon: "🎮" },
-  n64:       { color: "#2563eb", icon: "🕹" },
-  nds:       { color: "#0891b2", icon: "📺" },
-  "3ds":     { color: "#0284c7", icon: "📺" },
-  gba:       { color: "#8b5cf6", icon: "🎮" },
-  gb:        { color: "#6b7280", icon: "🎮" },
-  gbc:       { color: "#059669", icon: "🎮" },
-  genesis:   { color: "#1d4ed8", icon: "🕹" },
-  sms:       { color: "#1e40af", icon: "🕹" },
-  pce:       { color: "#b45309", icon: "🕹" },
-  psx:       { color: "#4b5563", icon: "🎮" },
-  ps2:       { color: "#1e3a8a", icon: "🎮" },
-  psp:       { color: "#0f172a", icon: "📟" },
-  saturn:    { color: "#7f1d1d", icon: "🕹" },
-  gg:        { color: "#064e3b", icon: "📟" },
-  atari2600: { color: "#78350f", icon: "🕹" },
-  lynx:      { color: "#92400e", icon: "📟" },
+// Accent colour per console key (no more emoji — logo fetched from retroarch-assets)
+const CONSOLE_COLOR: Record<string, string> = {
+  snes:      "#7c3aed",
+  nes:       "#dc2626",
+  n64:       "#2563eb",
+  nds:       "#0891b2",
+  "3ds":     "#0284c7",
+  gba:       "#8b5cf6",
+  gb:        "#6b7280",
+  gbc:       "#059669",
+  genesis:   "#1d4ed8",
+  sms:       "#1e40af",
+  pce:       "#b45309",
+  psx:       "#4b5563",
+  ps2:       "#1e3a8a",
+  psp:       "#334155",
+  saturn:    "#7f1d1d",
+  gg:        "#064e3b",
+  atari2600: "#78350f",
+  lynx:      "#92400e",
 };
 
-const DEFAULT_STYLE = { color: "#374151", icon: "🎮" };
+const DEFAULT_COLOR = "#374151";
 
 export type ConsoleDef = { key: string; label: string; abbr: string };
 
@@ -34,6 +34,33 @@ type ConsoleCard = {
   totalGames: number;
   localGames: number;
 };
+
+/** Fetches the console logo once and renders it; shows the abbr text as fallback. */
+function ConsoleIcon({ consoleKey, abbr }: { consoleKey: string; abbr: string }): React.ReactElement {
+  const [iconUrl, setIconUrl] = useState<string | null>(null);
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    window.emusync.art.getConsoleIcon(consoleKey)
+      .then((url) => { if (url) setIconUrl(url); })
+      .catch(() => {/* stay on text fallback */});
+  }, [consoleKey]);
+
+  if (iconUrl) {
+    return (
+      <img
+        src={iconUrl}
+        alt={abbr}
+        className="console-card-logo"
+      />
+    );
+  }
+
+  // Fallback: styled abbr text while logo loads (or if unavailable)
+  return <div className="console-card-abbr-fallback">{abbr}</div>;
+}
 
 type Props = {
   games: GameRow[];
@@ -46,11 +73,9 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
   useEffect(() => {
     window.emusync.emulator.consoles()
       .then((list) => setConsoleDefs(list as ConsoleDef[]))
-      .catch(() => {/* server offline — will show placeholder labels */});
+      .catch(() => {/* server offline */});
   }, []);
 
-  // Build abbr → def lookup. Falls back to treating the stored console value
-  // as an abbr when no matching def is found (e.g. custom / unknown console).
   const abbrToDef = new Map<string, ConsoleDef>();
   for (const def of consoleDefs) {
     if (def.abbr) abbrToDef.set(def.abbr.toUpperCase(), def);
@@ -58,7 +83,6 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
     abbrToDef.set(def.label.toUpperCase(), def);
   }
 
-  // Group games by console
   const cardMap = new Map<string, ConsoleCard>();
   for (const g of games) {
     const stored = (g.console ?? "").toUpperCase();
@@ -90,16 +114,17 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
   return (
     <div className="console-grid">
       {cards.map((c) => {
-        const style = CONSOLE_STYLE[c.key] ?? DEFAULT_STYLE;
+        const color = CONSOLE_COLOR[c.key] ?? DEFAULT_COLOR;
         return (
           <button
             key={c.key}
             className="console-card"
             onClick={() => onSelectConsole(c.key, c.label, c.abbr)}
-            style={{ "--console-accent": style.color } as React.CSSProperties}
+            style={{ "--console-accent": color } as React.CSSProperties}
           >
-            <div className="console-card-icon">{style.icon}</div>
-            <div className="console-card-abbr">{c.abbr}</div>
+            <div className="console-card-icon-wrap">
+              <ConsoleIcon consoleKey={c.key} abbr={c.abbr} />
+            </div>
             <div className="console-card-label">{c.label}</div>
             <div className="console-card-count">
               {c.localGames > 0 && c.localGames < c.totalGames

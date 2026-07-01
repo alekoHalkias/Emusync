@@ -77,6 +77,7 @@ export interface EmusyncBridge {
   };
   art: {
     get: (slug: string, gameName: string, consoleKey: string) => Promise<string | null>;
+    getConsoleIcon: (consoleKey: string) => Promise<string | null>;
   };
   daemon: {
     start: () => Promise<void>;

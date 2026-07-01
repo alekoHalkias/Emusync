@@ -6,9 +6,10 @@ import { join } from "path";
 import { homedir } from "os";
 import https from "https";
 
-const ART_DIR = join(homedir(), ".emusync", "art");
+const ART_DIR        = join(homedir(), ".emusync", "art");
+const CONSOLE_DIR    = join(homedir(), ".emusync", "art", "consoles");
 
-// EmuSync console key → libretro-thumbnails system folder name
+// EmuSync console key → libretro-thumbnails system folder name (used for boxart)
 const LIBRETRO_SYSTEM: Record<string, string> = {
   gba:     "Nintendo_-_Game_Boy_Advance",
   gb:      "Nintendo_-_Game_Boy",
@@ -78,6 +79,34 @@ function download(url: string, dest: string): Promise<void> {
   });
 }
 
+// EmuSync console key → RetroArch XMB monochrome logo filename (spaces, not underscores)
+const CONSOLE_LOGO: Record<string, string> = {
+  gba:       "Nintendo - Game Boy Advance",
+  gb:        "Nintendo - Game Boy",
+  gbc:       "Nintendo - Game Boy Color",
+  snes:      "Nintendo - Super Nintendo Entertainment System",
+  nes:       "Nintendo - Nintendo Entertainment System",
+  n64:       "Nintendo - Nintendo 64",
+  nds:       "Nintendo - Nintendo DS",
+  "3ds":     "Nintendo - Nintendo 3DS",
+  genesis:   "Sega - Mega Drive - Genesis",
+  sms:       "Sega - Master System - Mark III",
+  pce:       "NEC - PC Engine - TurboGrafx 16",
+  psx:       "Sony - PlayStation",
+  ps2:       "Sony - PlayStation 2",
+  psp:       "Sony - PlayStation Portable",
+  saturn:    "Sega - Saturn",
+  gg:        "Sega - Game Gear",
+  msx:       "Microsoft - MSX",
+  atari2600: "Atari - 2600",
+  lynx:      "Atari - Lynx",
+  ws:        "Bandai - WonderSwan",
+  wsc:       "Bandai - WonderSwan Color",
+};
+
+const RETROARCH_ASSETS_BASE =
+  "https://raw.githubusercontent.com/libretro/retroarch-assets/master/xmb/monochrome/png";
+
 export function registerArtIpc(): void {
   ipcMain.handle(
     "art:get",
@@ -90,6 +119,26 @@ export function registerArtIpc(): void {
         const url = buildThumbnailUrl(consoleKey, gameName);
         if (!url) return null;
 
+        await download(url, dest);
+        return existsSync(dest) ? `file://${dest}` : null;
+      } catch {
+        return null;
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "art:getConsoleIcon",
+    async (_event, consoleKey: string): Promise<string | null> => {
+      try {
+        mkdirSync(CONSOLE_DIR, { recursive: true });
+        const dest = join(CONSOLE_DIR, `${consoleKey}.png`);
+        if (existsSync(dest)) return `file://${dest}`;
+
+        const logoName = CONSOLE_LOGO[consoleKey.toLowerCase()];
+        if (!logoName) return null;
+
+        const url = `${RETROARCH_ASSETS_BASE}/${encodeURIComponent(logoName)}.png`;
         await download(url, dest);
         return existsSync(dest) ? `file://${dest}` : null;
       } catch {

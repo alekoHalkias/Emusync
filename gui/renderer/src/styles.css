@@ -364,13 +364,33 @@ input.error { border-color: var(--red); }
 }
 .console-card:hover::before { opacity: 0.22; }
 
-.console-card-icon { font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
-.console-card-abbr {
-  font-size: 18px;
+.console-card-icon-wrap {
+  width: 72px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Actual logo image: white monochrome, tinted by the console accent on hover */
+.console-card-logo {
+  max-width: 72px;
+  max-height: 52px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.85;
+  transition: opacity 0.15s, filter 0.15s;
+}
+.console-card:hover .console-card-logo {
+  opacity: 1;
+  filter: brightness(0) invert(1) drop-shadow(0 0 6px var(--console-accent, #fff));
+}
+/* Text fallback while logo loads or for unknown consoles */
+.console-card-abbr-fallback {
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--text);
-  line-height: 1;
+  opacity: 0.85;
 }
 .console-card-label {
   font-size: 11px;

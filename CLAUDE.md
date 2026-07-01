@@ -166,6 +166,7 @@ window.emusync.game.onExited(cb)           // subscribe to game:exited event
 window.emusync.game.offExited(cb)          // unsubscribe
 
 window.emusync.art.get(slug, gameName, consoleKey) // fetch boxart for a game: checks ~/.emusync/art/<slug>.png first; on miss, downloads from the public libretro-thumbnails GitHub repo (Named_Boxarts/<GameName>.png, keyed by consoleKey → libretro system name); caches to disk; returns a file:// URL or null when no art is available (issue #304)
+window.emusync.art.getConsoleIcon(consoleKey) // fetch the white monochrome system logo for a console: checks ~/.emusync/art/consoles/<key>.png; on miss, downloads from libretro/retroarch-assets (xmb/monochrome/png/<SystemName>.png); caches to disk; returns a file:// URL or null (issue #304)
 
 window.emusync.daemon.start()              // spawn emusync sync-daemon (client devices only; no-op on server or if already running)
 window.emusync.daemon.stop()               // kill the sync daemon if running
