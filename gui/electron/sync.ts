@@ -6,8 +6,6 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlink
 import { createHash } from "crypto";
 import { request as httpRequest } from "http";
 import { join, dirname, basename, resolve as resolvePath } from "path";
-import { parse as parseTOML } from "smol-toml";
-import { CONFIG_PATH } from "./runtime";
 import { loadServerCfg } from "./config-store";
 
 export function registerSyncIpc(): void {
@@ -141,21 +139,7 @@ export function registerSyncIpc(): void {
     "rom:push",
     async (_event, slug: string, toDeviceId: string, consoleName: string): Promise<{ ok: boolean; targetOnline?: boolean; error?: string }> => {
       try {
-        // Read server config from TOML
-        let cfg: Record<string, any> = {};
-        if (existsSync(CONFIG_PATH)) {
-          cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, any>;
-        }
-        const host = (cfg.server_host as string) || "localhost";
-        const port = Number(cfg.server_port) || 8765;
-        const pin  = (cfg.server_pin as string) || "";
-        const deviceId   = (cfg.device_id as string) || "";
-        const deviceName = (cfg.device_name as string) || "";
-        const authHeaders: Record<string, string> = {
-          "Authorization": `Bearer ${pin}`,
-          "X-Device-ID": deviceId,
-          "X-Device-Name": deviceName,
-        };
+        const { host, port, authHeaders } = loadServerCfg();
 
         // 1. Get local game device config to find rom_path
         const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
