@@ -103,10 +103,6 @@ class SyncClient:
         }
         self._client = httpx.Client(headers=self._headers)
 
-    def __del__(self) -> None:
-        if hasattr(self, "_client"):
-            self._client.close()
-
     def close(self) -> None:
         self._client.close()
 

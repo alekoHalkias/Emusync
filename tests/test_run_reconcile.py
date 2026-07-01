@@ -13,13 +13,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from cli.common import _parse_iso_utc as _parse_iso
 from cli.run import (
     _cache_game_device,
     _decide_save_action,
     _load_cached_game_device,
     _log_offline_play,
     _log_save_conflict,
-    _parse_iso,
     _reconcile_save,
     _resolve_written_save,
     _resolve_written_state,
