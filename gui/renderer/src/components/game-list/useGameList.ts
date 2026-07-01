@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { gamesOverview } from "../../api";
+import { usesSharedSaveLayout } from "../console-import/helpers";
 import type { GameRow } from "./types";
 
 export type UseGameList = {
@@ -29,10 +30,16 @@ export function useGameList(): UseGameList {
       // One batched request replaces the old per-game fan-out (save meta + lock +
       // device config). getSaveTime stays — it's a local fs stat, not a server call.
       const overview = await gamesOverview();
+      // PS2 games share one memory card, so its mtime is meaningless per-game.
+      // Use PCSX2's real per-game last-played (playtime.dat) as their activity (#301).
+      const ps2LastPlayed = await window.emusync.files.getPs2LastPlayed().catch(() => ({} as Record<string, string>));
       const enriched = await Promise.all(
         overview.map(async (g): Promise<GameRow> => {
+          const sharedLayout = usesSharedSaveLayout(g.console);
           let lastSave: string | null = null;
-          if (g.is_local && g.save_path) {
+          if (sharedLayout) {
+            lastSave = ps2LastPlayed[g.slug] ?? null;   // shared card → PCSX2 last-played
+          } else if (g.is_local && g.save_path) {
             lastSave = await window.emusync.files.getSaveTime(g.save_path);
           }
           return {
