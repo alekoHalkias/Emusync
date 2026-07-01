@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { configure, configureDevice, health, gamesOverview, releaseLock } from "./api";
+import { configure, configureDevice, gamesOverview, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
 import GameConfig from "./components/GameConfig";
@@ -19,7 +19,6 @@ type Screen =
 
 export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
-  const [loadingMessage, setLoadingMessage] = useState("Loading…");
   const [isServer, setIsServer] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [gameRunning, setGameRunning] = useState(false);
@@ -108,13 +107,9 @@ export default function App(): React.ReactElement {
       configureDevice(deviceId, deviceName);
       setIsServer(!!(cfg.is_server as boolean));
       if (cfg.is_server) {
-        setLoadingMessage("Starting server…");
-        await window.emusync.server.start();
-        setLoadingMessage("Waiting for server…");
-        for (let i = 0; i < 100; i++) {
-          if (await health()) break;
-          await new Promise<void>((r) => setTimeout(r, 100));
-        }
+        // Fire-and-forget: don't block the UI on Python startup. useGameList
+        // retries every 1 s until the server is ready, then switches to 5 s polling.
+        window.emusync.server.start();
       } else {
         window.emusync.daemon.start();
       }
@@ -176,7 +171,6 @@ export default function App(): React.ReactElement {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 16 }}>
         <div className="loading-logo">EmuSync</div>
         <span className="spinner" style={{ width: 32, height: 32 }} />
-        <span style={{ color: "var(--text-muted)", fontSize: 13 }}>{loadingMessage}</span>
       </div>
     );
   }
