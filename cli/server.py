@@ -1,6 +1,7 @@
 """`server` command group — server lifecycle, mDNS, and the embedded transfer daemon."""
 from __future__ import annotations
 
+import logging
 import os
 import re
 import signal
@@ -18,6 +19,13 @@ from cli.common import _client
 from cli.consoles_data import _prepare_console_seed_data
 from cli.root import cli
 from cli.transfer import _run_transfer_daemon
+
+
+def _suppress_sse_cancel_log(record: logging.LogRecord) -> bool:
+    """Drop uvicorn's noisy CancelledError log when an SSE stream is force-closed
+    on graceful shutdown (issue #268) — expected, not an error."""
+    msg = record.getMessage() + str(record.exc_info or "")
+    return "CancelledError" not in msg
 
 
 @cli.group()
@@ -302,14 +310,7 @@ def _do_start_server() -> None:
     daemon_thread = threading.Thread(target=_start_daemon_for_server, daemon=True)
     daemon_thread.start()
 
-    import logging
-
-    class _SuppressSSECancelFilter(logging.Filter):
-        def filter(self, record: logging.LogRecord) -> bool:
-            msg = record.getMessage() + str(record.exc_info or "")
-            return "CancelledError" not in msg
-
-    logging.getLogger("uvicorn.error").addFilter(_SuppressSSECancelFilter())
+    logging.getLogger("uvicorn.error").addFilter(_suppress_sse_cancel_log)
 
     try:
         # timeout_graceful_shutdown lets a single Ctrl+C exit cleanly: uvicorn

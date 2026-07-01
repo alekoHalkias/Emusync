@@ -115,7 +115,6 @@ def pull_rom() -> None:
         sys.exit(1)
 
     source = others[source_idx]
-    source_is_online = source.get("is_online", False)
 
     # Step 2: list games on source device that have a ROM configured
     try:
@@ -245,7 +244,6 @@ def push_rom() -> None:
         sys.exit(1)
 
     target = others[target_idx]
-    target_is_online = target.get("is_online", False)
 
     # Step 3: for each selected game, confirm destination and upload
     for game in selected_games:
