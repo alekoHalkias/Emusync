@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { addGame, getGame, getGameDevice, getDeviceConsoles, getSaveMeta, getStateMeta, removeGame, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
-import { sanitizeFilename } from "./console-import/helpers";
+import { sanitizeFilename, usesSharedSaveLayout } from "./console-import/helpers";
 import { RelTime } from "../time";
 
 /**
@@ -63,9 +63,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const netExtraRef = useRef<{ rom_rel_path?: string; rom_sha256?: string; rom_folder_path?: string }>({});
   // The name as last persisted, so we only rename on-disk files when it changes.
   const originalNameRef = useRef(initialName ?? "");
+  // This game's console abbr. For a PS2-style console the save (memory card) and
+  // states are shared across all games, so they must not be renamed per-game and
+  // have no meaningful per-game manual push/pull (#294/#295).
+  const [gameConsole, setGameConsole] = useState("");
+  const sharedLayout = usesSharedSaveLayout(gameConsole);
 
   useEffect(() => {
     if (!slug) return;
+    getGame(slug).then(g => setGameConsole(g.console ?? "")).catch(() => {});
     getGameDevice(slug)
       .then((cfg) => {
         setRomPath(cfg.rom_path);
@@ -206,10 +212,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         // never re-nests a ROM into a new per-game subfolder.
         if (nameChanged && finalRom) {
           const newBase = sanitizeFilename(newName);
+          // PS2-style consoles share one memory card + sstates folder across all
+          // games, so those must never be renamed per-game (#294/#295) — rename
+          // only the ROM and keep the shared save/state paths.
           const renamed = await window.emusync.files.renameGameFiles({
             romPath: finalRom,
-            savePath: finalSave,
-            stateFolder: finalState,
+            savePath: sharedLayout ? "" : finalSave,
+            stateFolder: sharedLayout ? "" : finalState,
             newBase,
             reorganize: false,
             // A network ROM's localized copy is renamed alongside the master.
@@ -224,8 +233,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             }
           }
           finalRom = renamed.newRomPath;
-          finalSave = renamed.newSavePath;
-          finalState = renamed.newStateFolder;
+          if (!sharedLayout) {
+            finalSave = renamed.newSavePath;
+            finalState = renamed.newStateFolder;
+          }
           if (renamed.newSecondaryRomPath) finalLocalRom = renamed.newSecondaryRomPath;
           // Rename keeps the master in the same share folder, so only the
           // rel-path's basename changes; rom_sha256 is unchanged (same bytes).
@@ -326,7 +337,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   }
 
 
-  const showSyncPanel = !isNew && !!savePath;
+  // A shared-layout console (PS2) has no per-game save/state to push or pull —
+  // its card + states sync automatically as shared artifacts via `emusync run`,
+  // and a per-game pull here would be wrong (and, for states, destructive to
+  // other games' slots). Hide the manual sync rows for those consoles (#294/#295).
+  const showSyncPanel = !isNew && !!savePath && !sharedLayout;
 
   return (
     <div>
@@ -421,6 +436,12 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               pullDisabled={!serverSaveMeta}
             />
           )}
+          {!isNew && sharedLayout && (
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+              This is a shared {gameConsole} memory card — its saves and states sync
+              automatically for the whole console when you play, not per-game.
+            </p>
+          )}
         </div>
 
         <div className="input-group">
@@ -439,7 +460,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
-          {!isNew && statePath && (
+          {!isNew && statePath && !sharedLayout && (
             <SyncLine
               localTime={latestStateFile?.time ?? null}
               serverTime={serverStateMeta?.pushed_at ?? null}

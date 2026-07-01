@@ -11,6 +11,7 @@ import {
   groupByDir,
   relPathUnder,
   sanitizeFilename,
+  usesSharedSaveLayout,
   stepIndex,
 } from "./helpers";
 import type {
@@ -279,6 +280,9 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     const errs: string[] = [];
     const imported: ImportedEntry[] = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel, consoles);
+    // PS2-style consoles share one memory card + sstates folder across all games,
+    // so the per-game save/state must not be renamed/moved on import (#294/#295).
+    const sharedLayout = usesSharedSaveLayout(consoleSel);
     const scanRoots = [...new Set([...romDirs, ...extraPaths])].map(p => p.replace(/\/$/, ""));
     // Persist the chosen source + local destination for next time (issue #255).
     try {
@@ -322,14 +326,14 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
             netRoot = networkRoots[0] ?? "";
             if (!netRoot) throw new Error("no network folder configured to upload to");
             const renamed = await emusync.files.renameGameFiles({
-              romPath: localPath, savePath, stateFolder: statePath,
+              romPath: localPath, savePath: sharedLayout ? "" : savePath,
+              stateFolder: sharedLayout ? "" : statePath,
               newBase: safeBase, reorganize: false,
             });
             if (renamed.ok) {
               launchCmd = launchCmd.replaceAll(localPath, renamed.newRomPath);
               localPath = renamed.newRomPath;
-              savePath  = renamed.newSavePath;
-              statePath = renamed.newStateFolder;
+              if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
             }
             const rel = relPathUnder(localPath, [localRomRoot]);
             const masterPath = `${netRoot}/${rel}`;
@@ -345,15 +349,15 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
             // the master (and the local copy, if any) + save/state to the title.
             netRoot = networkRoots.find(r => romPath === r || romPath.startsWith(r + "/")) ?? scanRoot;
             const renamed = await emusync.files.renameGameFiles({
-              romPath, savePath, stateFolder: statePath,
+              romPath, savePath: sharedLayout ? "" : savePath,
+              stateFolder: sharedLayout ? "" : statePath,
               newBase: safeBase, reorganize: false,
               secondaryRomPath: rom.presence === "both" ? (rom.localRomPath ?? undefined) : undefined,
             });
             if (renamed.ok) {
               launchCmd = launchCmd.replaceAll(romPath, renamed.newRomPath);
               romPath   = renamed.newRomPath;
-              savePath  = renamed.newSavePath;
-              statePath = renamed.newStateFolder;
+              if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
               if (rom.presence === "both") localCopyPath = renamed.newSecondaryRomPath ?? (rom.localRomPath ?? "");
             }
             romRelPath = relPathUnder(romPath, networkRoots);
@@ -364,14 +368,14 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
           const romParent = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
           const flat = !!scanRoot && romParent === scanRoot;
           const renamed = await emusync.files.renameGameFiles({
-            romPath, savePath, stateFolder: statePath,
+            romPath, savePath: sharedLayout ? "" : savePath,
+            stateFolder: sharedLayout ? "" : statePath,
             newBase: safeBase, reorganize: flat,
           });
           if (renamed.ok) {
             launchCmd  = launchCmd.replaceAll(romPath, renamed.newRomPath);
             romPath    = renamed.newRomPath;
-            savePath   = renamed.newSavePath;
-            statePath  = renamed.newStateFolder;
+            if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
           }
         }
 
@@ -428,6 +432,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
   }
 
   async function autoPush(entries: ImportedEntry[], consoleAbbr: string): Promise<void> {
+    const sharedLayout = usesSharedSaveLayout(consoleAbbr);
     try {
       const cfg = await emusync.config.load();
       const myDeviceId: string = cfg?.device_id ?? "";
@@ -454,8 +459,11 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
           if (!romResult.ok) { ok = false; errMsg = romResult.error ?? "Push failed"; break; }
           if (romResult.targetOnline === false) offline = true;
 
-          // Push save if user opted in and save file exists
-          if (pushSaves) {
+          // Push save if user opted in and save file exists. Skipped for a
+          // shared-layout console (PS2): the card/states aren't per-game, so a
+          // per-game save/state push would store the wrong thing — they sync via
+          // `emusync run`'s console-card + serial-filtered paths (#294/#295).
+          if (pushSaves && !sharedLayout) {
             const saveTime = await emusync.files.getSaveTime(entry.savePath);
             if (saveTime) {
               try { await emusync.save.push(entry.slug, entry.savePath); } catch { /* non-fatal */ }
@@ -463,7 +471,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
           }
 
           // Push state if user opted in and state folder has files
-          if (pushStates && entry.statePath) {
+          if (pushStates && !sharedLayout && entry.statePath) {
             const latest = await emusync.files.getLatestInFolder(entry.statePath);
             if (latest) {
               try { await emusync.state.push(entry.slug, entry.statePath); } catch { /* non-fatal */ }

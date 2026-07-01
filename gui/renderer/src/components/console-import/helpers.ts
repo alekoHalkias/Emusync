@@ -5,6 +5,16 @@ import type { ConsoleOption, Phase, RomEntry } from "./types";
 
 export const STEP_LABELS = ["Console", "Emulator", "ROMs"];
 
+// Consoles whose save (and save states) live in ONE shared location across every
+// game on the console — PS2's memory card + sstates folder (issues #294/#295).
+// For these the per-game on-disk save/state must never be renamed, moved, or
+// pushed per-game; the shared card/states are synced by `emusync run`. Accepts a
+// console key ("ps2") or stored abbreviation ("PS2").
+const _SHARED_SAVE_LAYOUT = new Set(["ps2"]);
+export function usesSharedSaveLayout(consoleKeyOrAbbr: string): boolean {
+  return _SHARED_SAVE_LAYOUT.has((consoleKeyOrAbbr || "").toLowerCase());
+}
+
 export function stepIndex(phase: Phase): number {
   if (phase === "console" || phase === "detecting") return 0;
   if (phase === "emulator") return 1;
