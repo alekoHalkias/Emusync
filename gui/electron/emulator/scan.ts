@@ -122,9 +122,15 @@ export function runEmulatorScan(params: {
         let sm: { path: string; exists: boolean } | undefined;
         if (emulatorOption.stateDir) {
           const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
-          const stateFolder = join(stateRoot, gameFolderName);
-          const hasStateFiles = !!findLatestFileInDir(stateFolder);
-          sm = { path: stateFolder, exists: hasStateFiles };
+          if (sharedCard) {
+            // Shared sstates folder (PS2): every game's states live flat in one
+            // folder, named per serial — point at the folder itself; `emusync run`
+            // syncs only this game's serial files (issue #294).
+            sm = { path: stateRoot, exists: !!findLatestFileInDir(stateRoot) };
+          } else {
+            const stateFolder = join(stateRoot, gameFolderName);
+            sm = { path: stateFolder, exists: !!findLatestFileInDir(stateFolder) };
+          }
         }
 
         const standaloneArgs = (emulatorOption.launchArgs ?? []).join(" ");

@@ -34,6 +34,30 @@ def _extract_state_folder(content: bytes, folder: Path) -> None:
         (folder / f"{folder.name}.state").write_bytes(content)
 
 
+def _merge_extract_state_folder(content: bytes, folder: Path) -> None:
+    """Extract a state tar.gz into *folder*, backing up only the files the archive
+    overwrites and leaving every other file untouched.
+
+    Unlike `_extract_state_folder` (which `.bak`s every file first), this is for a
+    SHARED states directory — PCSX2's `sstates/`, which holds every PS2 game's
+    states — so a pull for one game must not disturb other games' state files
+    (issue #294)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    try:
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
+            for member in tar.getmembers():
+                if not member.isfile():
+                    continue
+                target = folder / Path(member.name).name
+                if target.exists():  # back up only what we're about to overwrite
+                    os.replace(str(target), str(target) + ".bak")
+            _safe_extract_tar(tar, folder)
+    except tarfile.TarError:
+        # A shared folder has no single canonical filename, so a legacy raw blob
+        # can't be placed safely — ignore it (PS2 states are always tar archives).
+        pass
+
+
 def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
     """Extract a tar archive, refusing any member that resolves outside *dest*.
 
@@ -360,16 +384,31 @@ class SyncClient:
             p.write_bytes(r.content)
         return True, r.headers.get("X-State-Hash")
 
-    def push_state(self, slug: str, state_path: str) -> str:
+    def pull_state_merge(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
+        """Pull state into a SHARED states folder, overwriting only this game's
+        files (PCSX2 sstates/, issue #294). Returns (pulled, server_hash)."""
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        _merge_extract_state_folder(r.content, Path(state_path))
+        return True, r.headers.get("X-State-Hash")
+
+    def push_state(self, slug: str, state_path: str, name_prefix: Optional[str] = None) -> str:
         p = Path(state_path)
         if p.is_dir():
-            # Pack all files in the states folder as a tar.gz archive.
+            # Pack the states folder as a tar.gz. When name_prefix is set, only
+            # files whose name starts with it are packed — for a SHARED states dir
+            # (PCSX2 sstates/) this selects just this game's serial files (#294).
             buf = io.BytesIO()
             with tarfile.open(fileobj=buf, mode="w:gz") as tar:
                 for f in sorted(p.iterdir()):
                     # Skip .bak backups so they don't propagate to the server/peers.
-                    if f.is_file() and not f.name.endswith(".bak"):
-                        tar.add(str(f), arcname=f.name)
+                    if not (f.is_file() and not f.name.endswith(".bak")):
+                        continue
+                    if name_prefix is not None and not f.name.startswith(name_prefix):
+                        continue
+                    tar.add(str(f), arcname=f.name)
             data = buf.getvalue()
         else:
             data = p.read_bytes()

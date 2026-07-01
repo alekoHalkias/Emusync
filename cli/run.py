@@ -215,6 +215,26 @@ def _warn_save_conflict(client, cfg, game_slug: str, winner: str, local_hash: Op
 # console, so it's reconciled per-console rather than per-game. PS2/PCSX2 (#295).
 _SHARED_MEMCARD_CONSOLES = {"PS2"}
 
+# Consoles that keep save states in one SHARED folder, named per game serial
+# (PCSX2 sstates/<SERIAL> (<CRC>).<slot>.p2s) — synced filtered by serial (#294).
+_SHARED_STATE_CONSOLES = {"PS2"}
+
+
+def _ps2_state_serial_prefix(state_folder: str, since: float) -> Optional[str]:
+    """The PCSX2 state-serial prefix for the .p2s written this session, e.g.
+    ``"SLUS-20062 ("`` — files starting with it are exactly this game's states in
+    the shared sstates folder, so we can pack just them (issue #294). None when no
+    state was written this session (nothing changed to push)."""
+    folder = Path(state_folder)
+    if not folder.is_dir():
+        return None
+    written = [f for f in folder.glob("*.p2s") if _mtime(f) >= since]
+    if not written:
+        return None
+    newest = max(written, key=_mtime)
+    serial = newest.name.split(" (", 1)[0]
+    return f"{serial} ("
+
 
 class _MemcardClient:
     """Adapts the per-game save API (used by `_reconcile_save` and the post-game
@@ -611,6 +631,9 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     shared_memcard = console_abbr in _SHARED_MEMCARD_CONSOLES
     save_client = _MemcardClient(client, console_abbr) if shared_memcard else client
     save_key = console_abbr if shared_memcard else game_slug
+    # Whether save states live in a shared, serial-named folder (PS2 sstates/) and
+    # so must be synced filtered by serial rather than as a whole folder (#294).
+    shared_state = console_abbr in _SHARED_STATE_CONSOLES
 
     # Block duplicate launches before attempting to acquire the lock
     try:
@@ -664,11 +687,15 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # For a shared-memcard console this reconciles the console card (#295).
         server_hash = _reconcile_save(save_client, cfg, save_key, save_path)
 
-        # Pull state if configured
+        # Pull state if configured. For a shared sstates folder (PS2) use the
+        # merge pull so other games' states in the folder aren't disturbed (#294).
         state_path = gd.state_path
         server_state_hash = None
         if state_path:
-            pulled, server_state_hash = client.pull_state(game_slug, state_path)
+            if shared_state:
+                pulled, server_state_hash = client.pull_state_merge(game_slug, state_path)
+            else:
+                pulled, server_state_hash = client.pull_state(game_slug, state_path)
             if pulled:
                 click.echo(f"Pulled state for {game_slug}.")
 
@@ -752,7 +779,17 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # Push state if configured
         if state_path and Path(state_path).exists():
             sp = Path(state_path)
-            if sp.is_dir():
+            if shared_state:
+                # Shared sstates folder (PS2): push only THIS game's serial files,
+                # and only when a state was written this session (#294).
+                prefix = _ps2_state_serial_prefix(state_path, launch_start)
+                if prefix:
+                    try:
+                        client.push_state(game_slug, state_path, name_prefix=prefix)
+                        click.echo(f"Pushed state for {game_slug}.")
+                    except Exception as exc:
+                        click.echo(f"Warning: failed to push state: {exc}", err=True)
+            elif sp.is_dir():
                 # For folder-based states, always push after the game exits so
                 # all slots (game.state, game.state1, …) are synced.
                 try:
