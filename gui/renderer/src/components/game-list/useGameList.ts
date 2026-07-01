@@ -22,6 +22,8 @@ export function useGameList(): UseGameList {
   const [games, setGames] = useState<GameRow[]>([]);
   const [loading, setLoading] = useState(true);
   const loadIdRef = useRef(0);
+  // Flips to true after the first successful fetch; drives the poll cadence.
+  const everLoadedRef = useRef(false);
 
   const reload = useCallback(async (silent = false) => {
     const thisId = ++loadIdRef.current;
@@ -38,7 +40,7 @@ export function useGameList(): UseGameList {
           const sharedLayout = usesSharedSaveLayout(g.console);
           let lastSave: string | null = null;
           if (sharedLayout) {
-            lastSave = ps2LastPlayed[g.slug] ?? null;   // shared card → PCSX2 last-played
+            lastSave = ps2LastPlayed[g.slug] ?? null;
           } else if (g.is_local && g.save_path) {
             lastSave = await window.emusync.files.getSaveTime(g.save_path);
           }
@@ -57,24 +59,40 @@ export function useGameList(): UseGameList {
           };
         })
       );
-      // Discard results from a superseded load (a newer call started while this was in flight)
       if (loadIdRef.current !== thisId) return;
+      everLoadedRef.current = true;
       setGames(enriched);
+      if (!silent) setLoading(false);
     } catch {
       if (loadIdRef.current !== thisId) return;
-      // Server offline — show empty list, StatusBadge shows the offline indicator
-      if (!silent) setGames([]);
-    } finally {
-      if (loadIdRef.current !== thisId) return;
-      if (!silent) setLoading(false);
+      if (silent) return; // background poll failed — keep showing current data
+      if (!everLoadedRef.current) {
+        // Server not yet ready during startup. Stay in loading=true; the
+        // self-scheduling poll below retries in 1 s.
+        setLoading(true);
+        return;
+      }
+      // Server went offline after we had data — show empty / offline state.
+      setGames([]);
+      setLoading(false);
     }
   }, []);
 
+  // Initial load on mount.
   useEffect(() => { reload(); }, [reload]);
 
+  // Self-scheduling poll: 1 s until first success, then 5 s.
+  // Using setTimeout (not setInterval) so the delay adapts after each tick.
   useEffect(() => {
-    const id = setInterval(() => reload(true), 5000);
-    return () => clearInterval(id);
+    let timer: ReturnType<typeof setTimeout>;
+    function tick(): void {
+      timer = setTimeout(async () => {
+        await reload(everLoadedRef.current);
+        tick();
+      }, everLoadedRef.current ? 5000 : 1000);
+    }
+    tick();
+    return () => clearTimeout(timer);
   }, [reload]);
 
   return { games, loading, reload };

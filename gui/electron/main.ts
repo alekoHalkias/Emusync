@@ -12,6 +12,7 @@ import { registerGameIpc } from "./game";
 import { registerFilesIpc } from "./files";
 import { registerSyncIpc } from "./sync";
 import { registerEmulatorIpc } from "./emulator/ipc";
+import { registerArtIpc } from "./art";
 
 // Register all IPC handlers up front (renderer can only call them once a window
 // has loaded, which happens after app.whenReady below).
@@ -21,6 +22,7 @@ registerGameIpc();
 registerFilesIpc();
 registerSyncIpc();
 registerEmulatorIpc();
+registerArtIpc();
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 
