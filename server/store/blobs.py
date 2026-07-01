@@ -203,28 +203,22 @@ class SaveStateMixin:
         reasons: list[str] = []
         path = self._blob_path(table, row["id"])
         actual: Optional[int] = None
+        # Compare against the generation immediately before the current one.
+        prior = self._conn.execute(
+            f"SELECT size FROM {table} WHERE game_slug = ? "
+            f"ORDER BY rowid DESC LIMIT 1 OFFSET 1",
+            (game_slug,),
+        ).fetchone()
         if not path.exists():
             reasons.append("file_missing")
         else:
             actual = path.stat().st_size
             if actual == 0:
                 reasons.append("zero_byte")
-            # Compare against the generation immediately before the current one.
-            prior = self._conn.execute(
-                f"SELECT size FROM {table} WHERE game_slug = ? "
-                f"ORDER BY rowid DESC LIMIT 1 OFFSET 1",
-                (game_slug,),
-            ).fetchone()
             if prior is not None and prior["size"] and actual < prior["size"] * _SHRINK_FLOOR:
                 reasons.append("shrank")
             if hashlib.sha256(path.read_bytes()).hexdigest() != row["hash"]:
                 reasons.append("hash_mismatch")
-
-        prior_row = self._conn.execute(
-            f"SELECT size FROM {table} WHERE game_slug = ? "
-            f"ORDER BY rowid DESC LIMIT 1 OFFSET 1",
-            (game_slug,),
-        ).fetchone()
 
         return {
             "status": "damaged" if reasons else "ok",
@@ -232,7 +226,7 @@ class SaveStateMixin:
             "size": actual,
             "hash": row["hash"],
             "pushed_at": row["pushed_at"],
-            "prior_size": prior_row["size"] if prior_row else None,
+            "prior_size": prior["size"] if prior else None,
             "last_good_version_id": self._last_good_version(table, game_slug),
         }
 

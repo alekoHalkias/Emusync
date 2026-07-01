@@ -25,7 +25,7 @@ import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
 from server.sync_client import GameDeviceConfig
 
-from cli.common import _client, _get_device_name, _show_game_running_popup
+from cli.common import _client, _get_device_name, _parse_iso_utc, _show_game_running_popup
 from cli.netrom import resolve_rom_path
 from cli.root import cli
 
@@ -63,17 +63,6 @@ def _sigterm_handler(*_) -> None:
 signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
-def _parse_iso(value: Optional[str]) -> Optional[datetime]:
-    """Parse an ISO-8601 timestamp to an aware UTC datetime, or None."""
-    if not value:
-        return None
-    try:
-        dt = datetime.fromisoformat(value)
-    except ValueError:
-        return None
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
-
-
 def _decide_save_action(
     local_hash: Optional[str],
     local_mtime: Optional[datetime],
@@ -93,7 +82,7 @@ def _decide_save_action(
         return "push"  # server has no save — local is authoritative
     if local_hash == server_meta.get("hash"):
         return "noop"  # identical content
-    server_time = _parse_iso(server_meta.get("pushed_at"))
+    server_time = _parse_iso_utc(server_meta.get("pushed_at"))
     if server_time is None or (local_mtime is not None and local_mtime > server_time):
         return "push"
     return "pull"
