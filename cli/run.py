@@ -241,6 +241,67 @@ class _MemcardClient:
         return None
 
 
+# PCSX2 records per-game play data in inis/playtime.dat, keyed by disc serial:
+#   <SERIAL>   <total_seconds>   <last_played_unix>
+# We use it to learn a PS2 game's serial (the row it freshly timestamps after a
+# session) so the GUI can show a real per-game last-played despite the shared
+# memory card (issue #301).
+_PCSX2_PLAYTIME_FILES = (
+    Path.home() / ".config/PCSX2/inis/playtime.dat",
+    Path.home() / ".var/app/net.pcsx2.PCSX2/config/PCSX2/inis/playtime.dat",
+)
+
+
+def _read_pcsx2_playtime() -> dict[str, dict]:
+    """serial → {'seconds': int, 'last_played': int} from PCSX2's playtime.dat."""
+    out: dict[str, dict] = {}
+    for f in _PCSX2_PLAYTIME_FILES:
+        if not f.exists():
+            continue
+        try:
+            for line in f.read_text().splitlines():
+                parts = line.split()
+                if len(parts) >= 3:
+                    try:
+                        out[parts[0]] = {"seconds": int(parts[1]), "last_played": int(parts[2])}
+                    except ValueError:
+                        continue
+        except Exception:
+            logger.debug("could not read PCSX2 playtime file %s", f, exc_info=True)
+        break
+    return out
+
+
+def _learn_ps2_serial(cfg, game_slug: str, since: float) -> None:
+    """Map this PS2 game to the serial PCSX2 just played, so the GUI can show its
+    last-played (issue #301). The freshly-played game is the playtime.dat row with
+    the newest ``last_played`` at/after this session's launch. Persisted to
+    ``ps2_serials.json`` (slug → serial); a no-op if PCSX2 recorded nothing."""
+    played = [
+        (serial, d["last_played"])
+        for serial, d in _read_pcsx2_playtime().items()
+        if d["last_played"] >= since
+    ]
+    if not played:
+        return
+    serial = max(played, key=lambda x: x[1])[0]
+    path = Path(cfg.data_dir) / "ps2_serials.json"
+    try:
+        data = json.loads(path.read_text()) if path.exists() else {}
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        data = {}
+    if data.get(game_slug) == serial:
+        return
+    data[game_slug] = serial
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2))
+    except Exception:
+        logger.warning("failed to write %s", path, exc_info=True)
+
+
 def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str]:
     """Reconcile the local save with the server's before launch.
 
@@ -768,6 +829,11 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                         click.echo(f"Pushed state for {game_slug}.")
                     except Exception as exc:
                         click.echo(f"Warning: failed to push state: {exc}", err=True)
+
+        # Learn this PS2 game's serial from PCSX2's freshly-updated playtime.dat so
+        # the GUI can show a real per-game last-played despite the shared card (#301).
+        if shared_memcard:
+            _learn_ps2_serial(cfg, game_slug, launch_start)
     finally:
         _release()
         game_pid_file.unlink(missing_ok=True)

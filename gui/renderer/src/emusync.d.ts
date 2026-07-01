@@ -47,6 +47,7 @@ export interface EmusyncBridge {
     ensureSave: (savePath: string) => Promise<{ created: boolean }>;
     getSaveTime: (savePath: string) => Promise<string | null>;
     getLatestInFolder: (dirPath: string) => Promise<{ path: string; time: string } | null>;
+    getPs2LastPlayed: () => Promise<Record<string, string>>;
     renameGameFiles: (args: { romPath: string; savePath: string; stateFolder: string; newBase: string; reorganize: boolean; secondaryRomPath?: string }) => Promise<{ ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; newSecondaryRomPath?: string; error?: string }>;
   };
   save: {

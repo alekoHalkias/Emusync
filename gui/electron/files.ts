@@ -1,7 +1,8 @@
 // Filesystem IPC: dialogs, save-file helpers, the rename-game-files migration,
 // and a TCP reachability probe.
 import { ipcMain, dialog } from "electron";
-import { existsSync, writeFileSync, mkdirSync, readdirSync, statSync, renameSync } from "fs";
+import { existsSync, writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, renameSync } from "fs";
+import { homedir } from "os";
 import { join, dirname, basename, extname } from "path";
 import { rt } from "./runtime";
 
@@ -59,6 +60,40 @@ export function registerFilesIpc(): void {
   ipcMain.handle("files:get-latest-in-folder", (_event, dirPath: string) =>
     findLatestFileInDir(dirPath)
   );
+
+  // PS2 per-game last-played from PCSX2's playtime.dat (issue #301). `emusync run`
+  // learns each game's disc serial into ~/.emusync/ps2_serials.json; here we join
+  // that with the live playtime.dat (serial → last-played) so the game list can
+  // show a real per-game date despite the shared memory card. Returns {slug: ISO}.
+  ipcMain.handle("files:get-ps2-last-played", (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    try {
+      const home = homedir();
+      const mapPath = join(home, ".emusync", "ps2_serials.json");
+      if (!existsSync(mapPath)) return out;
+      const map = JSON.parse(readFileSync(mapPath, "utf-8")) as Record<string, string>;
+
+      const ptFile = [
+        join(home, ".config/PCSX2/inis/playtime.dat"),
+        join(home, ".var/app/net.pcsx2.PCSX2/config/PCSX2/inis/playtime.dat"),
+      ].find(p => existsSync(p));
+      if (!ptFile) return out;
+
+      const lastPlayed: Record<string, number> = {};
+      for (const line of readFileSync(ptFile, "utf-8").split("\n")) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 3) {
+          const lp = parseInt(parts[2], 10);
+          if (!isNaN(lp)) lastPlayed[parts[0]] = lp;
+        }
+      }
+      for (const [slug, serial] of Object.entries(map)) {
+        const lp = lastPlayed[serial];
+        if (lp) out[slug] = new Date(lp * 1000).toISOString();
+      }
+    } catch { /* best effort — no PS2 activity shown */ }
+    return out;
+  });
 
   // TCP probe — resolves true if a TCP connection to ip:port succeeds within 2 s
   ipcMain.handle("device:probe", (_event, ip: string, port: number): Promise<boolean> => {

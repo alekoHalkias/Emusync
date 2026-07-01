@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("files:get-save-time", savePath),
     getLatestInFolder: (dirPath: string): Promise<{ path: string; time: string } | null> =>
       ipcRenderer.invoke("files:get-latest-in-folder", dirPath),
+    getPs2LastPlayed: (): Promise<Record<string, string>> =>
+      ipcRenderer.invoke("files:get-ps2-last-played"),
     renameGameFiles: (args: { romPath: string; savePath: string; stateFolder: string; newBase: string; reorganize: boolean; secondaryRomPath?: string }): Promise<{ ok: boolean; newRomPath: string; newSavePath: string; newStateFolder: string; newSecondaryRomPath?: string; error?: string }> =>
       ipcRenderer.invoke("files:rename-game-files", args),
   },
