@@ -68,7 +68,21 @@ export function registerSyncIpc(): void {
     try {
       if (!existsSync(cardPath)) return { ok: false, error: "Memory card file not found" };
       const { host, port, authHeaders } = loadServerCfg();
-      const data = readFileSync(cardPath);
+      let data: Buffer;
+      if (statSync(cardPath).isDirectory()) {
+        // Folder-based memcard (PCSX2 .ps2 dir) — pack as plain tar, matching
+        // the Python memcard_bytes() serialisation so the server hash is stable.
+        const tarResult = spawnSync("tar", ["-cf", "-", "--exclude=*.bak", "-C", cardPath, "."], {
+          maxBuffer: 512 * 1024 * 1024,
+        });
+        if (tarResult.error || tarResult.status !== 0) {
+          return { ok: false, error: `Failed to pack memory card folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
+        }
+        data = tarResult.stdout as Buffer;
+        if (!data || data.length === 0) return { ok: false, error: "Memory card folder is empty" };
+      } else {
+        data = readFileSync(cardPath);
+      }
       const res = await fetch(`http://${host}:${port}/consoles/${consoleKey}/memcard`, {
         method: "POST",
         headers: { ...authHeaders, "Content-Type": "application/octet-stream" },

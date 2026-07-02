@@ -131,7 +131,9 @@ def _write_memcard(card: Path, data: bytes) -> None:
             card.unlink()
         card.mkdir(parents=True, exist_ok=True)
         for member in members:
-            dest = card / member.name
+            if not member.isfile():
+                continue
+            dest = card / Path(member.name).name
             if dest.exists():
                 shutil.copy2(dest, dest.with_suffix(dest.suffix + ".bak"))
         tf.extractall(path=str(card))
