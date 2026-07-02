@@ -23,7 +23,7 @@ import click
 
 import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
-from server.sync_client import GameDeviceConfig
+from server.sync_client import GameDeviceConfig, memcard_bytes
 
 from cli.common import _client, _get_device_name, _parse_iso_utc, _show_game_running_popup
 from cli.netrom import resolve_rom_path
@@ -327,8 +327,9 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
     local_hash: Optional[str] = None
     local_mtime: Optional[datetime] = None
     if p.exists():
-        local_hash = hashlib.sha256(p.read_bytes()).hexdigest()
-        local_mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
+        local_hash = hashlib.sha256(memcard_bytes(p)).hexdigest()
+        mtime_src = max((f.stat().st_mtime for f in p.iterdir() if f.is_file()), default=p.stat().st_mtime) if p.is_dir() else p.stat().st_mtime
+        local_mtime = datetime.fromtimestamp(mtime_src, tz=timezone.utc)
 
     # A true divergence = both sides have a save and they differ.
     diverged = local_hash is not None and meta is not None and local_hash != meta.get("hash")
@@ -805,7 +806,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
 
         if Path(save_path).exists():
-            local_bytes = Path(save_path).read_bytes()
+            local_bytes = memcard_bytes(Path(save_path))
             local_hash = hashlib.sha256(local_bytes).hexdigest()
             if local_hash != server_hash:
                 # Guard against pushing a truncated/zero-byte save from a crashed

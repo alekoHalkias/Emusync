@@ -93,6 +93,56 @@ class GameDeviceConfig:
     device_local_folder: str = ""
 
 
+def memcard_bytes(card_path: Path) -> bytes:
+    """Serialize a memcard for network transfer and local hashing.
+
+    Folder-based memcards (PCSX2 .ps2 folders) are packed as a deterministic
+    plain tar archive (sorted entries, mtime=0) so the SHA-256 is stable across
+    calls for unchanged content — required for _reconcile_save's hash comparison.
+    File-based memcards are returned as raw bytes.
+    """
+    if card_path.is_dir():
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tar:
+            for f in sorted(card_path.iterdir()):
+                if not f.is_file() or f.name.endswith(".bak"):
+                    continue
+                data = f.read_bytes()
+                info = tarfile.TarInfo(name=f.name)
+                info.size = len(data)
+                info.mtime = 0
+                tar.addfile(info, io.BytesIO(data))
+        return buf.getvalue()
+    return card_path.read_bytes()
+
+
+def _write_memcard(card: Path, data: bytes) -> None:
+    """Write received memcard bytes to disk.
+
+    Detects tar archives (folder-based memcards) by attempting to open the
+    bytes as a tar; falls back to writing raw bytes (file-based memcard).
+    Backs up any existing card before overwriting.
+    """
+    try:
+        tf = tarfile.open(fileobj=io.BytesIO(data))
+        members = tf.getmembers()
+        if card.is_file():
+            shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
+            card.unlink()
+        card.mkdir(parents=True, exist_ok=True)
+        for member in members:
+            dest = card / member.name
+            if dest.exists():
+                shutil.copy2(dest, dest.with_suffix(dest.suffix + ".bak"))
+        tf.extractall(path=str(card))
+        tf.close()
+    except tarfile.TarError:
+        if card.exists():
+            shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
+        card.parent.mkdir(parents=True, exist_ok=True)
+        card.write_bytes(data)
+
+
 class SyncClient:
     def __init__(self, host: str, port: int, pin: str, device_id: str, device_name: str) -> None:
         self._base = f"http://{host}:{port}"
@@ -339,20 +389,20 @@ class SyncClient:
         return r.json()
 
     def pull_console_memcard(self, console_key: str, card_path: str) -> tuple[bool, Optional[str]]:
-        """Write the server's shared card to disk (backing up any existing one)."""
+        """Write the server's shared card to disk (backing up any existing one).
+
+        Folder-based memcards arrive as a plain tar archive; file-based cards
+        arrive as raw bytes. _write_memcard detects which and handles both.
+        """
         r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=30)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
-        card = Path(card_path)
-        if card.exists():
-            shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
-        card.parent.mkdir(parents=True, exist_ok=True)
-        card.write_bytes(r.content)
+        _write_memcard(Path(card_path), r.content)
         return True, r.headers.get("X-Save-Hash")
 
     def push_console_memcard(self, console_key: str, card_path: str) -> str:
-        data = Path(card_path).read_bytes()
+        data = memcard_bytes(Path(card_path))
         r = self._client.post(
             self._url(f"/consoles/{console_key}/memcard"),
             content=data,
