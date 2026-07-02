@@ -112,11 +112,39 @@ export function registerSyncIpc(): void {
         return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
       }
       const buf = Buffer.from(await res.arrayBuffer());
-      if (existsSync(cardPath)) {
-        writeFileSync(`${cardPath}.bak`, readFileSync(cardPath));
+
+      // Write to a temp file so we can probe it with tar before deciding where it goes.
+      const tmpPath = `${cardPath}.pull.tmp`;
+      writeFileSync(tmpPath, buf);
+      try {
+        const probe = spawnSync("tar", ["-tf", tmpPath], { stdio: "pipe" });
+        if (probe.status === 0) {
+          // Folder-based memcard — received a tar archive. If a file exists at
+          // cardPath, back it up and remove it before creating the directory.
+          if (existsSync(cardPath) && statSync(cardPath).isFile()) {
+            writeFileSync(`${cardPath}.bak`, readFileSync(cardPath));
+            unlinkSync(cardPath);
+          }
+          mkdirSync(cardPath, { recursive: true });
+          const extract = spawnSync("tar", ["-xf", tmpPath, "-C", cardPath]);
+          if (extract.status !== 0) {
+            return { ok: false, pulled: false, error: `Failed to extract memory card: ${extract.stderr?.toString().trim() ?? ""}` };
+          }
+        } else {
+          // File-based memcard — write raw bytes directly.
+          if (existsSync(cardPath)) {
+            if (statSync(cardPath).isFile()) {
+              writeFileSync(`${cardPath}.bak`, readFileSync(cardPath));
+            }
+            // If it's a directory we leave it alone and just write the file alongside it.
+          }
+          mkdirSync(dirname(cardPath), { recursive: true });
+          renameSync(tmpPath, cardPath);
+          return { ok: true, pulled: true };
+        }
+      } finally {
+        try { if (existsSync(tmpPath)) unlinkSync(tmpPath); } catch {}
       }
-      mkdirSync(dirname(cardPath), { recursive: true });
-      writeFileSync(cardPath, buf);
       return { ok: true, pulled: true };
     } catch (e: any) {
       return { ok: false, pulled: false, error: e.message || "Pull failed" };
