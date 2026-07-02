@@ -59,8 +59,31 @@ export function registerSyncIpc(): void {
   // ── console-scoped shared memory card (issue #295) ──────────────────────────
   // One card per console (PS2), shared across every game on that console. Pull
   // is used by the import wizard to bring a newly-imported shared-layout
-  // console's card in from the server (issue #316) — the normal per-game push
-  // via emusync run doesn't apply here since there's no per-game card.
+  // console's card in from the server (issue #316); push backs the manual
+  // "Push memory card" button in GameConfig (issue #319) — the automatic push
+  // only happens post-launch via emusync run, with no on-demand equivalent
+  // until now (e.g. for a card edited/copied in outside of a play session).
+
+  ipcMain.handle("memcard:push", async (_event, consoleKey: string, cardPath: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      if (!existsSync(cardPath)) return { ok: false, error: "Memory card file not found" };
+      const { host, port, authHeaders } = loadServerCfg();
+      const data = readFileSync(cardPath);
+      const res = await fetch(`http://${host}:${port}/consoles/${consoleKey}/memcard`, {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
+        body: data,
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }));
+        return { ok: false, error: (body as any).detail ?? res.statusText };
+      }
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.message || "Push failed" };
+    }
+  });
 
   ipcMain.handle("memcard:pull", async (_event, consoleKey: string, cardPath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> => {
     try {

@@ -58,6 +58,7 @@ export interface EmusyncBridge {
     pull: (slug: string, statePath: string) => Promise<{ ok: boolean; pulled: boolean; error?: string }>;
   };
   memcard: {
+    push: (consoleKey: string, cardPath: string) => Promise<{ ok: boolean; error?: string }>;
     pull: (consoleKey: string, cardPath: string) => Promise<{ ok: boolean; pulled: boolean; error?: string }>;
   };
   device: {
