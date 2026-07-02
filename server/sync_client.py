@@ -99,16 +99,21 @@ def memcard_bytes(card_path: Path) -> bytes:
     Folder-based memcards (PCSX2 .ps2 folders) are packed as a deterministic
     plain tar archive (sorted entries, mtime=0) so the SHA-256 is stable across
     calls for unchanged content — required for _reconcile_save's hash comparison.
-    File-based memcards are returned as raw bytes.
+    Walks the whole tree (``rglob``, not a single-level ``iterdir``): PCSX2
+    nests each game's saves one level down in its own subfolder, so a
+    top-level-only walk would silently drop every game's data and push just
+    the loose top-level files (e.g. ``_pcsx2_superblock``). File-based
+    memcards are returned as raw bytes.
     """
     if card_path.is_dir():
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w") as tar:
-            for f in sorted(card_path.iterdir()):
+            for f in sorted(card_path.rglob("*")):
                 if not f.is_file() or f.name.endswith(".bak"):
                     continue
+                rel = f.relative_to(card_path).as_posix()
                 data = f.read_bytes()
-                info = tarfile.TarInfo(name=f.name)
+                info = tarfile.TarInfo(name=rel)
                 info.size = len(data)
                 info.mtime = 0
                 tar.addfile(info, io.BytesIO(data))
@@ -121,28 +126,36 @@ def _write_memcard(card: Path, data: bytes) -> None:
 
     Detects tar archives (folder-based memcards) by attempting to open the
     bytes as a tar; falls back to writing raw bytes (file-based memcard).
-    Backs up any existing card before overwriting.
+    Backs up any existing file before overwriting, preserving the tar's
+    relative subfolder structure — PCSX2 nests each game's saves under its
+    own subfolder (e.g. ``GAME1/GAME1``, ``GAME1/icon.sys``), so backing up
+    by basename alone collides with the subfolder itself (a directory, not
+    a file) and crashes. Extraction goes through ``_safe_extract_tar`` so a
+    member can't escape *card* the same way a state archive can't.
     """
     try:
         tf = tarfile.open(fileobj=io.BytesIO(data))
-        members = tf.getmembers()
         if card.is_file():
             shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
             card.unlink()
         card.mkdir(parents=True, exist_ok=True)
-        for member in members:
+        card_root = card.resolve()
+        for member in tf.getmembers():
             if not member.isfile():
                 continue
-            dest = card / Path(member.name).name
-            if dest.exists():
+            dest = (card_root / member.name).resolve()
+            if dest != card_root and card_root not in dest.parents:
+                continue  # outside card — _safe_extract_tar rejects it below
+            if dest.exists() and dest.is_file():
                 shutil.copy2(dest, dest.with_suffix(dest.suffix + ".bak"))
-        tf.extractall(path=str(card))
+        _safe_extract_tar(tf, card)
         tf.close()
     except tarfile.TarError:
-        if card.exists():
+        if card.exists() and card.is_file():
             shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
-        card.parent.mkdir(parents=True, exist_ok=True)
-        card.write_bytes(data)
+        if not card.exists() or card.is_file():
+            card.parent.mkdir(parents=True, exist_ok=True)
+            card.write_bytes(data)
 
 
 class SyncClient:
