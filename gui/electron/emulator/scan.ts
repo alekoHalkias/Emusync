@@ -8,7 +8,20 @@ import { ROM_EXTENSIONS, DEFAULT_SAVE_EXTS, RomEntry, EmulatorScanResult, Detect
 // Consoles whose save is a single memory card shared across every game on the
 // console (PS2/PCSX2). The card lives at saveRoot/<cardFile> and is reconciled
 // per-console — not per-game — by `emusync run` (issue #295).
-const SHARED_MEMCARD: Record<string, string> = { ps2: "Mcd001.ps2" };
+// Fallback filename used when the memcards folder can't be scanned (issue #314).
+const SHARED_MEMCARD_CONSOLES = new Set(["ps2"]);
+const SHARED_MEMCARD_FALLBACK: Record<string, string> = { ps2: "Mcd001.ps2" };
+
+/** Scan dir for the first entry (file or folder) ending in ext; returns its full path or null. */
+function findFirstByExt(dir: string, ext: string): string | null {
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.name.toLowerCase().endsWith(ext)) return join(dir, e.name);
+    }
+  } catch { /* unreadable dir */ }
+  return null;
+}
 
 function scanRomDir(dir: string, depth = 0): string[] {
   if (depth > 3) return [];
@@ -85,12 +98,13 @@ export function runEmulatorScan(params: {
         // Priority: content-dir path first, then legacy core-subfolder / flat root.
         // Target path: savesRoot/GameName/GameName.ext  (no core-name layer)
         const gameFolderName = contentSubfolder ?? base;
-        const sharedCard = SHARED_MEMCARD[consoleKey];
+        const isSharedMemcard = SHARED_MEMCARD_CONSOLES.has(consoleKey);
         let m: { path: string; exists: boolean };
-        if (sharedCard) {
-          // Shared-memory-card console (PS2): every game points at the one card,
-          // reconciled per-console by `emusync run` (issue #295).
-          const cardPath = join(saveRoot, sharedCard);
+        if (isSharedMemcard) {
+          // Shared-memory-card console (PS2): scan the memcards dir for the first
+          // .ps2 entry (file or folder); fall back to Mcd001.ps2 (issue #314).
+          const found = findFirstByExt(saveRoot, ".ps2");
+          const cardPath = found ?? join(saveRoot, SHARED_MEMCARD_FALLBACK[consoleKey] ?? "Mcd001.ps2");
           m = { path: cardPath, exists: existsSync(cardPath) };
         } else {
           m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
@@ -122,7 +136,7 @@ export function runEmulatorScan(params: {
         let sm: { path: string; exists: boolean } | undefined;
         if (emulatorOption.stateDir) {
           const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
-          if (sharedCard) {
+          if (isSharedMemcard) {
             // Shared sstates folder (PS2): every game's states live flat in one
             // folder, named per serial — point at the folder itself; `emusync run`
             // syncs only this game's serial files (issue #294).
