@@ -142,6 +142,19 @@ export const getStateMeta = async (slug: string): Promise<SaveMeta> => {
   return res.json();
 };
 
+export const getConsoleMemcardMeta = async (consoleKey: string): Promise<SaveMeta> => {
+  const res = await fetch(`${_base}/consoles/${consoleKey}/memcard/meta`, {
+    headers: {
+      "Authorization": `Bearer ${_pin}`,
+      "X-Device-ID": _deviceId,
+      "X-Device-Name": _deviceName,
+    },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (res.status === 204 || !res.ok) return null;
+  return res.json();
+};
+
 export const listDevices = (): Promise<Device[]> => _fetch("GET", "/devices");
 export const whoami = (): Promise<{ device_id: string }> => _fetch("GET", "/whoami");
 export const removeDevice = (deviceId: string): Promise<void> => _fetch("DELETE", `/devices/${deviceId}`);

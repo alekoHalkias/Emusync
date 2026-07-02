@@ -1,7 +1,7 @@
 // State machine + async orchestration for the Add-Console wizard.
 // The presentational step components consume the object this hook returns.
 import { useEffect, useState } from "react";
-import { addGame, setGameDevice, gamesOverview, getDeviceGameDevices, listDevices, type Device, type GameOverview } from "../../api";
+import { addGame, setGameDevice, gamesOverview, getConsoleMemcardMeta, getDeviceGameDevices, getSaveMeta, getStateMeta, listDevices, type Device, type GameOverview, type SaveMeta } from "../../api";
 import {
   annotateRoms,
   classifyByRoot,
@@ -23,6 +23,7 @@ import type {
   PushResult,
   RomEntry,
 } from "./types";
+import { parseUtc } from "../../time";
 
 // IPC bridge (typing deferred to the typed-bridge work in #228).
 const emusync = window.emusync;
@@ -410,6 +411,71 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // copy — cross-device config broadcast is tracked as a follow-up (#255).
     // Local ROMs auto-push their bytes to peers as before.
     if (imported.length > 0 && romSource !== "network") autoPush(imported, consoleAbbr);
+    // If another device already has save/state data for these games (or, for a
+    // shared-layout console, the console's memory card), pull it down to this
+    // device now — otherwise a fresh import shows up empty until the first
+    // EmuSync-wrapped launch (issue #316). Runs regardless of rom source: a
+    // network import has no ROM to copy, but still benefits from an existing
+    // save. Best-effort; a pull failure here shouldn't block the import.
+    if (imported.length > 0) pullFromServerIfNewer(imported, sharedLayout, consoleAbbr);
+  }
+
+  /** Whether `serverMeta`'s data is newer than the local file at `localTime`
+   * (or there's no local file yet, in which case the server copy always wins).
+   * Both timestamps are tz-less UTC strings — must go through parseUtc, not a
+   * raw `new Date()`, or they're misread as local time (see time.tsx). */
+  function _serverIsNewer(localTime: string | null, serverMeta: SaveMeta): boolean {
+    if (!serverMeta) return false;
+    const local = parseUtc(localTime);
+    const server = parseUtc(serverMeta.pushed_at);
+    return !local || (!!server && server > local);
+  }
+
+  async function pullFromServerIfNewer(entries: ImportedEntry[], sharedLayout: boolean, consoleAbbr: string): Promise<void> {
+    if (sharedLayout) {
+      // One card shared by every game on the console — pull it once. Every
+      // entry's savePath resolves to the same physical card file (#295).
+      const cardPath = entries[0].savePath;
+      if (!cardPath) return;
+      try {
+        const [meta, localTime] = await Promise.all([
+          getConsoleMemcardMeta(consoleAbbr),
+          emusync.files.getSaveTime(cardPath).catch(() => null),
+        ]);
+        if (_serverIsNewer(localTime, meta)) {
+          await emusync.memcard.pull(consoleAbbr, cardPath);
+        }
+      } catch { /* best-effort */ }
+      // Shared save STATES aren't pulled here: they live in one folder keyed by
+      // game serial (sstates/), and there's no console-scoped state endpoint to
+      // pull the whole thing from — only emusync run's per-launch, serial-
+      // filtered sync touches them (#294).
+      return;
+    }
+    for (const entry of entries) {
+      try {
+        if (entry.savePath) {
+          const [saveMeta, localTime] = await Promise.all([
+            getSaveMeta(entry.slug),
+            emusync.files.getSaveTime(entry.savePath).catch(() => null),
+          ]);
+          if (_serverIsNewer(localTime, saveMeta)) {
+            await emusync.save.pull(entry.slug, entry.savePath);
+          }
+        }
+        if (entry.statePath) {
+          // state_path is a FOLDER (RetroArch content-dir layout) — its newest
+          // file's time is the meaningful "local time", not the folder's own.
+          const [stateMeta, latest] = await Promise.all([
+            getStateMeta(entry.slug),
+            emusync.files.getLatestInFolder(entry.statePath).catch(() => null),
+          ]);
+          if (_serverIsNewer(latest?.time ?? null, stateMeta)) {
+            await emusync.state.pull(entry.slug, entry.statePath);
+          }
+        }
+      } catch { /* best-effort — one game's pull failing shouldn't stop the rest */ }
+    }
   }
 
   async function doImport(): Promise<void> {

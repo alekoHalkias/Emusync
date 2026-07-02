@@ -56,6 +56,36 @@ export function registerSyncIpc(): void {
     }
   });
 
+  // ── console-scoped shared memory card (issue #295) ──────────────────────────
+  // One card per console (PS2), shared across every game on that console. Pull
+  // is used by the import wizard to bring a newly-imported shared-layout
+  // console's card in from the server (issue #316) — the normal per-game push
+  // via emusync run doesn't apply here since there's no per-game card.
+
+  ipcMain.handle("memcard:pull", async (_event, consoleKey: string, cardPath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> => {
+    try {
+      const { host, port, authHeaders } = loadServerCfg();
+      const res = await fetch(`http://${host}:${port}/consoles/${consoleKey}/memcard`, {
+        headers: authHeaders,
+        signal: AbortSignal.timeout(30000),
+      });
+      if (res.status === 204) return { ok: true, pulled: false };
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }));
+        return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (existsSync(cardPath)) {
+        writeFileSync(`${cardPath}.bak`, readFileSync(cardPath));
+      }
+      mkdirSync(dirname(cardPath), { recursive: true });
+      writeFileSync(cardPath, buf);
+      return { ok: true, pulled: true };
+    } catch (e: any) {
+      return { ok: false, pulled: false, error: e.message || "Pull failed" };
+    }
+  });
+
   // ── state sync ────────────────────────────────────────────────────────────────
 
   ipcMain.handle("state:push", async (_event, slug: string, statePath: string): Promise<{ ok: boolean; error?: string }> => {
