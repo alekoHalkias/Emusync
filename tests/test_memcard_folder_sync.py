@@ -45,11 +45,9 @@ def test_memcard_bytes_is_deterministic_for_unchanged_content(tmp_path):
     assert memcard_bytes(card) == memcard_bytes(card)
 
 
-def test_write_memcard_extracts_nested_files_without_crashing(tmp_path):
-    """Previously crashed with IsADirectoryError: the backup-if-exists check
-    used the tar member's basename only, so a nested file like GAME1/GAME1
-    collided with the pre-existing GAME1/ subfolder (a directory, not a
-    file) once written by an earlier pull."""
+def test_write_memcard_backs_up_whole_folder_and_extracts(tmp_path):
+    """On pull, the entire existing memcard folder is copied to <name>.bak
+    before the new content is extracted — not individual files inside it."""
     src = tmp_path / "src"
     _make_folder_card(src)
     data = memcard_bytes(src)
@@ -60,10 +58,16 @@ def test_write_memcard_extracts_nested_files_without_crashing(tmp_path):
 
     _write_memcard(dest, data)
 
+    # New content extracted correctly
     assert (dest / "GAME1" / "GAME1").read_text() == "save1"
-    assert (dest / "GAME1" / "GAME1.bak").read_text() == "old-save"
     assert (dest / "GAME1" / "icon.sys").read_text() == "icon"
     assert (dest / "_pcsx2_superblock").read_text() == "topfile"
+
+    # Backup is the whole folder, not per-file .bak suffixes inside
+    bak = dest.parent / (dest.name + ".bak")
+    assert bak.is_dir()
+    assert (bak / "GAME1" / "GAME1").read_text() == "old-save"
+    assert not (dest / "GAME1" / "GAME1.bak").exists()
 
 
 def test_write_memcard_legacy_raw_file_fallback(tmp_path):

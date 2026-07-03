@@ -135,24 +135,20 @@ def _write_memcard(card: Path, data: bytes) -> None:
     """
     try:
         tf = tarfile.open(fileobj=io.BytesIO(data))
-        if card.is_file():
-            shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
+        bak = card.parent / (card.name + ".bak")
+        if card.is_dir():
+            if bak.exists():
+                shutil.rmtree(bak)
+            shutil.copytree(card, bak)
+        elif card.is_file():
+            shutil.copy2(card, bak)
             card.unlink()
         card.mkdir(parents=True, exist_ok=True)
-        card_root = card.resolve()
-        for member in tf.getmembers():
-            if not member.isfile():
-                continue
-            dest = (card_root / member.name).resolve()
-            if dest != card_root and card_root not in dest.parents:
-                continue  # outside card — _safe_extract_tar rejects it below
-            if dest.exists() and dest.is_file():
-                shutil.copy2(dest, dest.with_suffix(dest.suffix + ".bak"))
         _safe_extract_tar(tf, card)
         tf.close()
     except tarfile.TarError:
         if card.exists() and card.is_file():
-            shutil.copy2(card, card.with_suffix(card.suffix + ".bak"))
+            shutil.copy2(card, card.parent / (card.name + ".bak"))
         if not card.exists() or card.is_file():
             card.parent.mkdir(parents=True, exist_ok=True)
             card.write_bytes(data)

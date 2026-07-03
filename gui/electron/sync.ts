@@ -119,11 +119,17 @@ export function registerSyncIpc(): void {
       try {
         const probe = spawnSync("tar", ["-tf", tmpPath], { stdio: "pipe" });
         if (probe.status === 0) {
-          // Folder-based memcard — received a tar archive. If a file exists at
-          // cardPath, back it up and remove it before creating the directory.
-          if (existsSync(cardPath) && statSync(cardPath).isFile()) {
-            writeFileSync(`${cardPath}.bak`, readFileSync(cardPath));
-            unlinkSync(cardPath);
+          // Folder-based memcard — received a tar archive. Back up the whole
+          // existing memcard (file or folder) as a single <name>.bak sibling.
+          const bakPath = `${cardPath}.bak`;
+          if (existsSync(cardPath)) {
+            if (existsSync(bakPath)) spawnSync("rm", ["-rf", bakPath]);
+            if (statSync(cardPath).isDirectory()) {
+              spawnSync("cp", ["-r", cardPath, bakPath]);
+            } else {
+              writeFileSync(bakPath, readFileSync(cardPath));
+              unlinkSync(cardPath);
+            }
           }
           mkdirSync(cardPath, { recursive: true });
           const extract = spawnSync("tar", ["-xf", tmpPath, "-C", cardPath]);
