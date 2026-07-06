@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { addGame, getGame, getGameDevice, getDeviceConsoles, getSaveMeta, getStateMeta, removeGame, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
+import { addGame, getGame, getGameDevice, getDeviceConsoles, getConsoleMemcardMeta, getSaveMeta, getStateMeta, removeGame, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
 import { sanitizeFilename, usesSharedSaveLayout } from "./console-import/helpers";
 import { RelTime } from "../time";
 
@@ -52,6 +52,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [serverStateMeta, setServerStateMeta] = useState<SaveMeta>(null);
   const [saveOp, setSaveOp] = useState<SyncOp>(IDLE_OP);
   const [stateOp, setStateOp] = useState<SyncOp>(IDLE_OP);
+  const [serverMemcardMeta, setServerMemcardMeta] = useState<SaveMeta>(null);
+  const [memcardOp, setMemcardOp] = useState<SyncOp>(IDLE_OP);
 
   // Network-ROM source (issue #255): source + the on-demand local copy.
   const [romSource, setRomSource] = useState("local");
@@ -110,7 +112,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     const [sm, ss] = await Promise.allSettled([getSaveMeta(slug), getStateMeta(slug)]);
     if (sm.status === "fulfilled") setServerSaveMeta(sm.value);
     if (ss.status === "fulfilled") setServerStateMeta(ss.value);
-  }, [slug]);
+    if (sharedLayout) {
+      const mc = await getConsoleMemcardMeta(gameConsole).catch(() => null);
+      setServerMemcardMeta(mc);
+    }
+  }, [slug, sharedLayout, gameConsole]);
 
   useEffect(() => {
     if (!savePath) return;
@@ -305,6 +311,35 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     }
   }
 
+  async function handlePushMemcard(): Promise<void> {
+    if (!savePath || !gameConsole) return;
+    setMemcardOp({ status: "busy", action: "push", msg: "" });
+    const result = await window.emusync.memcard.push(gameConsole, savePath);
+    if (result.ok) {
+      setMemcardOp({ status: "ok", action: "push", msg: "Pushed to server" });
+      await loadSyncInfo();
+    } else {
+      setMemcardOp({ status: "error", action: "push", msg: result.error || "Push failed" });
+    }
+  }
+
+  async function handlePullMemcard(): Promise<void> {
+    if (!savePath || !gameConsole) return;
+    setMemcardOp({ status: "busy", action: "pull", msg: "" });
+    const result = await window.emusync.memcard.pull(gameConsole, savePath);
+    if (result.ok) {
+      if (result.pulled) {
+        setMemcardOp({ status: "ok", action: "pull", msg: "Pulled — previous card backed up to .bak" });
+        const t = await window.emusync.files.getSaveTime(savePath).catch(() => null);
+        setLocalSaveTime(t);
+      } else {
+        setMemcardOp({ status: "ok", action: "pull", msg: "No server card yet" });
+      }
+    } else {
+      setMemcardOp({ status: "error", action: "pull", msg: result.error || "Pull failed" });
+    }
+  }
+
   async function handlePushState(): Promise<void> {
     if (!slug || !statePath) return;
     setStateOp({ status: "busy", action: "push", msg: "" });
@@ -437,10 +472,22 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             />
           )}
           {!isNew && sharedLayout && (
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
-              This is a shared {gameConsole} memory card — its saves and states sync
-              automatically for the whole console when you play, not per-game.
-            </p>
+            <>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+                This is a shared {gameConsole} memory card — it syncs automatically for
+                the whole console when you play. Use these if you need to sync it
+                on demand, e.g. after editing the card outside EmuSync.
+              </p>
+              <SyncLine
+                localTime={localSaveTime}
+                serverTime={serverMemcardMeta?.pushed_at ?? null}
+                op={memcardOp}
+                onPush={handlePushMemcard}
+                onPull={handlePullMemcard}
+                pushDisabled={!localSaveTime}
+                pullDisabled={!serverMemcardMeta}
+              />
+            </>
           )}
         </div>
 

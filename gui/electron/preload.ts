@@ -77,6 +77,12 @@ contextBridge.exposeInMainWorld("emusync", {
     pull: (slug: string, statePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> =>
       ipcRenderer.invoke("state:pull", slug, statePath),
   },
+  memcard: {
+    push: (consoleKey: string, cardPath: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("memcard:push", consoleKey, cardPath),
+    pull: (consoleKey: string, cardPath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> =>
+      ipcRenderer.invoke("memcard:pull", consoleKey, cardPath),
+  },
   device: {
     probe: (ip: string, port: number): Promise<boolean> =>
       ipcRenderer.invoke("device:probe", ip, port),
