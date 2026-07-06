@@ -28,4 +28,15 @@ export function createWindow(): void {
     shell.openExternal(url);
     return { action: "deny" };
   });
+
+  // Electron's default zoom-in accelerator is CmdOrCtrl+Plus, which on a US
+  // keyboard means Shift+= — the bare Ctrl+= (same physical key, no shift)
+  // isn't bound, unlike Ctrl+- (zoom out) and Ctrl+0 (reset). Add just that
+  // missing case; Shift+= keeps working via the default menu as before.
+  rt.mainWindow.webContents.on("before-input-event", (_event, input) => {
+    if (input.control && input.key === "=" && input.type === "keyDown") {
+      const wc = rt.mainWindow?.webContents;
+      if (wc) wc.setZoomLevel(wc.getZoomLevel() + 0.5);
+    }
+  });
 }
