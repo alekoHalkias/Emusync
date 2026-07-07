@@ -98,6 +98,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("rom:uploadMaster", localPath, networkPath),
     setupNetworkPlay: (slug: string, mountRoot: string): Promise<{ ok: boolean; romPath?: string; error?: string }> =>
       ipcRenderer.invoke("rom:setupNetworkPlay", slug, mountRoot),
+    deleteFile: (absolutePath: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("rom:deleteFile", absolutePath),
   },
   recovery: {
     listLocalBackups: (savePath: string, stateFolder: string): Promise<{

@@ -70,6 +70,7 @@ export interface EmusyncBridge {
     delocalize: (slug: string) => Promise<{ ok: boolean; error?: string }>;
     uploadMaster: (localPath: string, networkPath: string) => Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }>;
     setupNetworkPlay: (slug: string, mountRoot: string) => Promise<{ ok: boolean; romPath?: string; error?: string }>;
+    deleteFile: (absolutePath: string) => Promise<{ ok: boolean; error?: string }>;
   };
   recovery: {
     listLocalBackups: (savePath: string, stateFolder: string) => Promise<{

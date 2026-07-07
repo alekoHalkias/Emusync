@@ -92,6 +92,9 @@ export const addGame = (name: string, console?: string): Promise<Game> => _fetch
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
 export const removeGame = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}`);
+// Unlinks the game from this device only — the game, its saves/states, and
+// every other device's config are untouched (issue #343, tier 1 of delete).
+export const removeGameDevice = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}/device`);
 
 // Persists a manually-picked SteamGridDB game match (issue #325), shared
 // across every device via this same server-side row. The PUT route requires

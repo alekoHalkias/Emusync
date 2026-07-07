@@ -422,6 +422,23 @@ export function registerSyncIpc(): void {
     }
   );
 
+  // ── tiered game delete (issue #343) ─────────────────────────────────────────
+  // A bare file delete for the two delete-tier cases that have no cleanup logic
+  // of their own: a local-source ROM (delocalize already handles a network
+  // ROM's localized copy, with empty-dir cleanup) and a network master.
+
+  ipcMain.handle(
+    "rom:deleteFile",
+    async (_event, absolutePath: string): Promise<{ ok: boolean; error?: string }> => {
+      try {
+        if (absolutePath && existsSync(absolutePath)) unlinkSync(absolutePath);
+        return { ok: true };
+      } catch (e: any) {
+        return { ok: false, error: e.message || "Delete failed" };
+      }
+    }
+  );
+
   // ── network ROM upload-to-master (issue #270) ───────────────────────────────
   // Copy a local-only ROM UP to the network share so the share becomes the
   // canonical master. Mirror of rom:localize in reverse. Never overwrites an

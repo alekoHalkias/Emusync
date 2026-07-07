@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import AUTH
+from tests.conftest import AUTH, _device_auth
 
 
 # ── games ─────────────────────────────────────────────────────────────────────
@@ -134,6 +134,64 @@ async def test_set_device_config_nonexistent_game(client):
     }, headers=AUTH)
     # Should not silently succeed — foreign key constraint on game_slug
     assert r.status_code in (404, 422, 500)
+
+
+# ── per-device unlink (issue #343) ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_remove_game_device_unlinks_only_calling_device(client):
+    """DELETE /games/:slug/device removes only the calling device's config —
+    the game, its other devices, and its saves must be untouched."""
+    auth1 = _device_auth("d1", "PC")
+    auth2 = _device_auth("d2", "Steam Deck")
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=auth1)
+    await client.put("/games/pokemon-emerald/device", json={
+        "rom_path": "/pc/emerald.gba", "save_path": "/pc/emerald.srm", "launch_command": "retroarch",
+    }, headers=auth1)
+    await client.put("/games/pokemon-emerald/device", json={
+        "rom_path": "/deck/emerald.gba", "save_path": "/deck/emerald.srm", "launch_command": "retroarch",
+    }, headers=auth2)
+    await client.post("/games/pokemon-emerald/save", content=b"save-data", headers=auth1)
+
+    r = await client.delete("/games/pokemon-emerald/device", headers=auth1)
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+    # d1's config is gone
+    r = await client.get("/games/pokemon-emerald/device", headers=auth1)
+    assert r.status_code == 404
+
+    # d2's config, the game, and the save are untouched
+    r = await client.get("/games/pokemon-emerald/device", headers=auth2)
+    assert r.status_code == 200
+    assert r.json()["rom_path"] == "/deck/emerald.gba"
+
+    r = await client.get("/games/pokemon-emerald", headers=auth1)
+    assert r.status_code == 200
+
+    save_meta = await client.get("/games/pokemon-emerald/save/meta", headers=auth1)
+    assert save_meta.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_remove_game_device_idempotent_when_no_config(client):
+    """Calling it twice (or with no device config to begin with) is a no-op ok,
+    not an error — mirrors DELETE semantics elsewhere in the API."""
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+
+    r = await client.delete("/games/test-game/device", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+    r = await client.delete("/games/test-game/device", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_remove_game_device_nonexistent_game_returns_404(client):
+    r = await client.delete("/games/does-not-exist/device", headers=AUTH)
+    assert r.status_code == 404
 
 
 # ── game rename ───────────────────────────────────────────────────────────────

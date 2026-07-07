@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { removeGame } from "../api";
+import { deleteGame } from "../gameDelete";
 import type { GameRow } from "./game-list/types";
 import type { GameModalTarget } from "./GameModal";
 import GameCard from "./GameCard";
@@ -52,6 +52,10 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Tier 2/3 bulk-delete options (issue #343), applied uniformly to every
+  // selected game — mirrors GameConfig.tsx's single-game delete confirm.
+  const [bulkDeleteLocalRom, setBulkDeleteLocalRom] = useState(false);
+  const [bulkRemoveEverywhere, setBulkRemoveEverywhere] = useState(false);
   const [artType, setArtType] = useState<ArtType>("grid");
   // Bumped per-slug when the settings modal closes, so that game's GameCard
   // remounts and re-fetches art (it may have just been edited in the
@@ -93,10 +97,14 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   async function handleBulkDelete(): Promise<void> {
     setDeleting(true);
     for (const slug of Array.from(selectedSlugs)) {
-      try { await removeGame(slug); } catch { /* skip */ }
+      try {
+        await deleteGame(slug, { deleteLocalRom: bulkDeleteLocalRom, removeEverywhere: bulkRemoveEverywhere });
+      } catch { /* skip */ }
     }
     setSelectedSlugs(new Set());
     setConfirmDelete(false);
+    setBulkDeleteLocalRom(false);
+    setBulkRemoveEverywhere(false);
     setDeleting(false);
     onChanged();
   }
@@ -254,10 +262,24 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
       {confirmDelete && (
         <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete {selectedSlugs.size} game{selectedSlugs.size !== 1 ? "s" : ""}?</h3>
-            <p>This removes the selected games from EmuSync. Save files on your devices will <strong>not</strong> be deleted.</p>
+            <h3>Remove {selectedSlugs.size} game{selectedSlugs.size !== 1 ? "s" : ""} from this device?</h3>
+            <p>This unlinks the selected games from this device. Save files and other devices' configs are <strong>not</strong> touched unless selected below.</p>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 8 }}>
+              <input type="checkbox" checked={bulkDeleteLocalRom} onChange={(e) => setBulkDeleteLocalRom(e.target.checked)} disabled={deleting} />
+              Also delete the ROM from local folders
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 8 }}>
+              <input type="checkbox" checked={bulkRemoveEverywhere} onChange={(e) => setBulkRemoveEverywhere(e.target.checked)} disabled={deleting} />
+              Also remove from all devices and delete the network ROM
+            </label>
             <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>Cancel</button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => { setConfirmDelete(false); setBulkDeleteLocalRom(false); setBulkRemoveEverywhere(false); }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
               <button className="btn btn-danger" onClick={handleBulkDelete} disabled={deleting}>
                 {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
               </button>
