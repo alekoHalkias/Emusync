@@ -1,26 +1,26 @@
 // Filter popover for GameGrid's search row (issue #345): checkbox filters
-// for artwork presence, save presence, and ROM source. Checkboxes combine
-// OR-within-group, AND-across-groups — an empty group applies no filter.
+// for artwork presence, save presence, and local-ROM availability. Checkboxes
+// combine OR-within-group, AND-across-groups — an empty group applies no filter.
 import React, { useEffect, useRef, useState } from "react";
 
 export type ArtworkFilterValue = "with" | "without";
 export type SavesFilterValue = "on" | "off";
-export type RomSourceFilterValue = "network" | "local";
+export type LocalizedFilterValue = "yes" | "no";
 
 export type GameFilters = {
   artwork: Set<ArtworkFilterValue>;
   saves: Set<SavesFilterValue>;
-  romSource: Set<RomSourceFilterValue>;
+  localized: Set<LocalizedFilterValue>;
 };
 
 export const EMPTY_FILTERS: GameFilters = {
   artwork: new Set(),
   saves: new Set(),
-  romSource: new Set(),
+  localized: new Set(),
 };
 
 export function activeFilterCount(filters: GameFilters): number {
-  return filters.artwork.size + filters.saves.size + filters.romSource.size;
+  return filters.artwork.size + filters.saves.size + filters.localized.size;
 }
 
 type Props = {
@@ -75,10 +75,10 @@ export default function GameFilterButton({ filters, onChange }: Props): React.Re
             onToggle={(v) => onChange({ ...filters, saves: toggle(filters.saves, v as SavesFilterValue) })}
           />
           <FilterGroup
-            label="ROM source"
-            options={[["network", "Network ROM"], ["local", "Local ROM"]]}
-            selected={filters.romSource}
-            onToggle={(v) => onChange({ ...filters, romSource: toggle(filters.romSource, v as RomSourceFilterValue) })}
+            label="ROM availability"
+            options={[["yes", "Localized (playable offline)"], ["no", "Not localized (network only)"]]}
+            selected={filters.localized}
+            onToggle={(v) => onChange({ ...filters, localized: toggle(filters.localized, v as LocalizedFilterValue) })}
           />
           {count > 0 && (
             <button className="btn btn-ghost" style={{ fontSize: 12, width: "100%", marginTop: 4 }} onClick={() => onChange(EMPTY_FILTERS)}>
@@ -112,11 +112,18 @@ function FilterGroup({ label, options, selected, onToggle }: {
   );
 }
 
-/** OR-within-group, AND-across-groups; an empty group applies no filter. */
+/**
+ * OR-within-group, AND-across-groups; an empty group applies no filter.
+ * `isLocalized` = the ROM's bytes are actually on this device's disk right
+ * now — true for a local-source game (trivially) or a network-source game
+ * with a local copy (`hasLocalCopy`), false for a network game with no local
+ * copy. This is deliberately not "romSource === network" — that only says
+ * where the ROM originates, not whether it's playable offline right now.
+ */
 export function matchesFilters(
   filters: GameFilters,
   hasSave: boolean,
-  isNetworkRom: boolean,
+  isLocalized: boolean,
   hasArt: boolean | undefined,
 ): boolean {
   if (filters.artwork.size > 0 && hasArt !== undefined) {
@@ -127,8 +134,8 @@ export function matchesFilters(
     const matches = (filters.saves.has("on") && hasSave) || (filters.saves.has("off") && !hasSave);
     if (!matches) return false;
   }
-  if (filters.romSource.size > 0) {
-    const matches = (filters.romSource.has("network") && isNetworkRom) || (filters.romSource.has("local") && !isNetworkRom);
+  if (filters.localized.size > 0) {
+    const matches = (filters.localized.has("yes") && isLocalized) || (filters.localized.has("no") && !isLocalized);
     if (!matches) return false;
   }
   return true;

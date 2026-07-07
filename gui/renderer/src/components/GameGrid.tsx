@@ -121,7 +121,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
     ? games.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : games;
   const filtered = searched.filter((g) =>
-    matchesFilters(filters, !!g.lastSave, g.romSource === "network", hasArt[g.slug])
+    matchesFilters(filters, !!g.lastSave, g.romSource !== "network" || !!g.hasLocalCopy, hasArt[g.slug])
   );
 
   const local  = filtered.filter((g) => g.isLocal);
