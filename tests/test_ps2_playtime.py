@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-import cli.run as run
+import cli.run_ps2 as run
 
 
 def test_read_pcsx2_playtime_parses_columns(tmp_path, monkeypatch):

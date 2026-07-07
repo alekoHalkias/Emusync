@@ -111,7 +111,7 @@ def test_mild_shrink_within_floor_is_safe():
 # ── _notify (auto-dismissing desktop toast, issue #218) ──────────────────────────
 
 def test_notify_sends_expiring_non_critical_toast(monkeypatch):
-    import cli.run as run_module
+    import cli.run_conflicts as conflicts_module
 
     captured = {}
 
@@ -119,8 +119,8 @@ def test_notify_sends_expiring_non_critical_toast(monkeypatch):
         captured["cmd"] = cmd
         return SimpleNamespace()
 
-    monkeypatch.setattr(run_module.subprocess, "Popen", fake_popen)
-    run_module._notify("title", "message")
+    monkeypatch.setattr(conflicts_module.subprocess, "Popen", fake_popen)
+    conflicts_module._notify("title", "message")
 
     cmd = captured["cmd"]
     # 3-second expiry so the toast auto-hides, and NOT critical (which would

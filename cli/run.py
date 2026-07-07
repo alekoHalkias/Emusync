@@ -2,17 +2,20 @@
 
 Also owns the SIGTERM handler that kills the emulator child before exiting; the
 handler is registered at import time so it is active for the running process.
+
+Split (issue #368) into: cli.run_reconcile (save/state reconcile + written-path
+detection), cli.run_ps2 (PS2/PCSX2 shared-memcard/state adapter),
+cli.run_conflicts (save-safety checks + conflict logging/notification),
+cli.run_offline (offline fallback + game-device cache). Everything moved is
+re-exported here so `from cli.run import X` keeps working for existing callers
+and tests.
 """
 from __future__ import annotations
 
 import hashlib
-import json
-import logging
 import os
-import re
 import shlex
 import signal
-import subprocess
 import sys
 import threading
 from datetime import datetime, timezone
@@ -25,11 +28,46 @@ import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
 from server.sync_client import GameDeviceConfig, memcard_bytes
 
-from cli.common import _client, _get_device_name, _parse_iso_utc, _show_game_running_popup
+from cli.common import _client, _get_device_name, _show_game_running_popup
 from cli.netrom import resolve_rom_path
 from cli.root import cli
 
-logger = logging.getLogger("emusync.run")
+from cli import run_offline as _run_offline_mod
+from cli.run_conflicts import (  # noqa: F401 — re-exported for existing callers/tests
+    _log_save_conflict,
+    _notify,
+    _report_conflict_to_server,
+    _save_is_safe_to_push,
+    _warn_save_conflict,
+    _warn_unsafe_save,
+    _SAVE_SHRINK_FLOOR,
+)
+from cli.run_offline import (  # noqa: F401 — re-exported for existing callers/tests
+    _cache_game_device,
+    _launch_and_wait,
+    _load_cached_game_device,
+    _log_offline_play,
+    _run_offline,
+)
+from cli.run_ps2 import (  # noqa: F401 — re-exported for existing callers/tests
+    _MemcardClient,
+    _learn_ps2_serial,
+    _ps2_state_serial_prefix,
+    _read_pcsx2_playtime,
+    _SHARED_MEMCARD_CONSOLES,
+    _SHARED_STATE_CONSOLES,
+)
+from cli.run_reconcile import (  # noqa: F401 — re-exported for existing callers/tests
+    _decide_save_action,
+    _mtime,
+    _newest_matching,
+    _reconcile_save,
+    _resolve_written_save,
+    _resolve_written_state,
+    _saves_root,
+    _SAVE_EXTS,
+    _STATE_RE,
+)
 
 
 def _resolve_launch_command(gd) -> Optional[str]:
@@ -50,366 +88,15 @@ def _resolve_launch_command(gd) -> Optional[str]:
         cmd = cmd.replace(gd.rom_path, effective)
     return cmd
 
-# Track the emulator child process so SIGTERM can kill it before exiting
-_child_proc: subprocess.Popen | None = None  # type: ignore[type-arg]
-
 
 def _sigterm_handler(*_) -> None:
-    if _child_proc is not None and _child_proc.poll() is None:
-        _child_proc.kill()
+    child = _run_offline_mod._child_proc
+    if child is not None and child.poll() is None:
+        child.kill()
     sys.exit(0)
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)
-
-
-def _decide_save_action(
-    local_hash: Optional[str],
-    local_mtime: Optional[datetime],
-    server_meta: Optional[dict],
-) -> str:
-    """Pre-launch save reconciliation policy — returns 'push' | 'pull' | 'noop'.
-
-    `local_hash` is None when there is no local save; `server_meta` is the
-    `get_save_meta` dict ({hash, pushed_at}) or None. On a true divergence
-    (both sides changed) the newer timestamp wins — the loser is preserved as a
-    `.bak` by pull_save's caller — so a newer local save is never clobbered by an
-    older server one (issue #5).
-    """
-    if local_hash is None:
-        return "pull" if server_meta else "noop"
-    if not server_meta:
-        return "push"  # server has no save — local is authoritative
-    if local_hash == server_meta.get("hash"):
-        return "noop"  # identical content
-    server_time = _parse_iso_utc(server_meta.get("pushed_at"))
-    if server_time is None or (local_mtime is not None and local_mtime > server_time):
-        return "push"
-    return "pull"
-
-
-def _notify(title: str, msg: str) -> None:
-    """Best-effort, non-blocking desktop notification (so a Steam launch, which
-    shows no terminal, still surfaces a conflict). Silently no-ops if unavailable.
-
-    Uses normal urgency + a 3 s expire time so the toast auto-dismisses (issue
-    #218) — `critical` urgency would make compositors keep it on screen forever.
-    """
-    try:
-        subprocess.Popen(
-            ["notify-send", "--app-name=EmuSync", "--urgency=normal", "-t", "3000", title, msg],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-    except Exception:
-        pass
-
-
-def _log_save_conflict(cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
-    """Append a record of an auto-resolved save divergence to save_conflicts.json."""
-    entry = {
-        "slug": game_slug,
-        "resolved_at": datetime.now(timezone.utc).isoformat(),
-        "winner": winner,  # "local" or "server"
-        "local_hash": local_hash,
-        "server_hash": server_meta.get("hash") if server_meta else None,
-        "server_pushed_at": server_meta.get("pushed_at") if server_meta else None,
-    }
-    path = Path(cfg.data_dir) / "save_conflicts.json"
-    try:
-        existing = json.loads(path.read_text()) if path.exists() else []
-        if not isinstance(existing, list):
-            existing = []
-    except Exception:
-        logger.debug("could not read existing %s; starting fresh", path, exc_info=True)
-        existing = []
-    existing.append(entry)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(existing, indent=2))
-    except Exception:
-        logger.warning("failed to write save conflict log %s", path, exc_info=True)
-
-
-# A post-game save that is empty, or has shrunk to below this fraction of the
-# previous server copy, is treated as corruption (e.g. a crashed/force-killed
-# emulator left a truncated file) and is NOT pushed, so it can't destroy the good
-# server copy (issue #213). SRAM is fixed-size, so a legitimate save never trips
-# this; the floor is deliberately generous to avoid false positives.
-_SAVE_SHRINK_FLOOR = 0.5
-
-
-def _save_is_safe_to_push(local_size: int, server_size: Optional[int], floor: float = _SAVE_SHRINK_FLOOR) -> bool:
-    """Whether a freshly-written save is safe to push over the server's copy.
-
-    Refuses a 0-byte save outright, and refuses one that has shrunk below *floor*
-    of the previous server save (a strong truncation signal). When the server has
-    no prior save, any non-empty save is allowed (it's the first one).
-    """
-    if local_size <= 0:
-        return False
-    if not server_size or server_size <= 0:
-        return True
-    return local_size >= server_size * floor
-
-
-def _warn_unsafe_save(cfg, game_slug: str, local_size: int, server_size: Optional[int]) -> None:
-    """Surface a refused (likely-truncated) save: stderr + desktop notification."""
-    detail = (
-        f"the save written this session is {local_size} bytes"
-        + (f" (was {server_size} bytes)" if server_size else "")
-        + " — it looks truncated/corrupt, so it was NOT pushed. The good server copy "
-        "was kept. If this was intentional, re-save in the emulator and play again."
-    )
-    msg = f"Refused to sync save for '{game_slug}': {detail}"
-    click.echo(f"⚠ {msg}", err=True)
-    _notify("EmuSync — save not synced", msg)
-
-
-def _report_conflict_to_server(client, cfg, game_slug: str, winner: str,
-                               local_hash: Optional[str], server_meta: Optional[dict]) -> None:
-    """Record the resolved divergence on the server so the GUI Conflicts panel can
-    show it from any device (issue #243). Best-effort — local logging already
-    happened, so a failure here is non-fatal."""
-    try:
-        server_device = (server_meta or {}).get("device_id", "")
-        server_hash = (server_meta or {}).get("hash", "")
-        this_device = getattr(cfg, "device_id", "")
-        if winner == "local":
-            winner_device, loser_device = this_device, server_device
-            winner_hash, loser_hash = local_hash or "", server_hash
-        else:
-            winner_device, loser_device = server_device, this_device
-            winner_hash, loser_hash = server_hash, local_hash or ""
-        client.report_conflict(game_slug, winner_device, loser_device, winner_hash, loser_hash)
-    except Exception:
-        logger.warning("failed to report save conflict for '%s' to server", game_slug, exc_info=True)
-
-
-def _warn_save_conflict(client, cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
-    """Surface an auto-resolved divergence: stderr + notification + local log + server record."""
-    if winner == "local":
-        detail = ("this device's save is newer, so it was kept and pushed; the server's "
-                  "older copy was replaced (its hash is recorded in save_conflicts.json)")
-    else:
-        detail = ("the server's save is newer, so it was pulled; this device's previous "
-                  "save was backed up to a .bak file next to it")
-    msg = (f"Save conflict for '{game_slug}': both copies changed since the last sync — {detail}.")
-    click.echo(f"⚠ {msg}", err=True)
-    _log_save_conflict(cfg, game_slug, winner, local_hash, server_meta)
-    _report_conflict_to_server(client, cfg, game_slug, winner, local_hash, server_meta)
-    _notify("EmuSync — save conflict resolved", msg)
-
-
-# Consoles whose "save" is a single memory card shared across every game on the
-# console, so it's reconciled per-console rather than per-game. PS2/PCSX2 (#295).
-_SHARED_MEMCARD_CONSOLES = {"PS2"}
-
-# Consoles that keep save states in one SHARED folder, named per game serial
-# (PCSX2 sstates/<SERIAL> (<CRC>).<slot>.p2s) — synced filtered by serial (#294).
-_SHARED_STATE_CONSOLES = {"PS2"}
-
-
-def _ps2_state_serial_prefix(state_folder: str, since: float) -> Optional[str]:
-    """The PCSX2 state-serial prefix for the .p2s written this session, e.g.
-    ``"SLUS-20062 ("`` — files starting with it are exactly this game's states in
-    the shared sstates folder, so we can pack just them (issue #294). None when no
-    state was written this session (nothing changed to push)."""
-    folder = Path(state_folder)
-    if not folder.is_dir():
-        return None
-    written = [f for f in folder.glob("*.p2s") if _mtime(f) >= since]
-    if not written:
-        return None
-    newest = max(written, key=_mtime)
-    serial = newest.name.split(" (", 1)[0]
-    return f"{serial} ("
-
-
-class _MemcardClient:
-    """Adapts the per-game save API (used by `_reconcile_save` and the post-game
-    push) onto the console-scoped shared memory-card endpoints, so the shared card
-    reconciles with the exact same newest-wins / `.bak` logic. The `slug` args are
-    the console key (e.g. ``"PS2"``) and are forwarded as the console_key (#295)."""
-
-    def __init__(self, client, console_key: str) -> None:
-        self._client = client
-        self._key = console_key
-
-    def get_save_meta(self, _slug: str):
-        return self._client.get_console_memcard_meta(self._key)
-
-    def push_save(self, _slug: str, path: str) -> str:
-        return self._client.push_console_memcard(self._key, path)
-
-    def pull_save(self, _slug: str, path: str):
-        return self._client.pull_console_memcard(self._key, path)
-
-    def report_conflict(self, *args, **kwargs) -> None:
-        # No game row backs a console artifact, so there's nothing to record in the
-        # per-game Conflicts panel; the local log + notification still happen.
-        return None
-
-
-# PCSX2 records per-game play data in inis/playtime.dat, keyed by disc serial:
-#   <SERIAL>   <total_seconds>   <last_played_unix>
-# We use it to learn a PS2 game's serial (the row it freshly timestamps after a
-# session) so the GUI can show a real per-game last-played despite the shared
-# memory card (issue #301).
-_PCSX2_PLAYTIME_FILES = (
-    Path.home() / ".config/PCSX2/inis/playtime.dat",
-    Path.home() / ".var/app/net.pcsx2.PCSX2/config/PCSX2/inis/playtime.dat",
-)
-
-
-def _read_pcsx2_playtime() -> dict[str, dict]:
-    """serial → {'seconds': int, 'last_played': int} from PCSX2's playtime.dat."""
-    out: dict[str, dict] = {}
-    for f in _PCSX2_PLAYTIME_FILES:
-        if not f.exists():
-            continue
-        try:
-            for line in f.read_text().splitlines():
-                parts = line.split()
-                if len(parts) >= 3:
-                    try:
-                        out[parts[0]] = {"seconds": int(parts[1]), "last_played": int(parts[2])}
-                    except ValueError:
-                        continue
-        except Exception:
-            logger.debug("could not read PCSX2 playtime file %s", f, exc_info=True)
-        break
-    return out
-
-
-def _learn_ps2_serial(cfg, game_slug: str, since: float) -> None:
-    """Map this PS2 game to the serial PCSX2 just played, so the GUI can show its
-    last-played (issue #301). The freshly-played game is the playtime.dat row with
-    the newest ``last_played`` at/after this session's launch. Persisted to
-    ``ps2_serials.json`` (slug → serial); a no-op if PCSX2 recorded nothing."""
-    played = [
-        (serial, d["last_played"])
-        for serial, d in _read_pcsx2_playtime().items()
-        if d["last_played"] >= since
-    ]
-    if not played:
-        return
-    serial = max(played, key=lambda x: x[1])[0]
-    path = Path(cfg.data_dir) / "ps2_serials.json"
-    try:
-        data = json.loads(path.read_text()) if path.exists() else {}
-        if not isinstance(data, dict):
-            data = {}
-    except Exception:
-        data = {}
-    if data.get(game_slug) == serial:
-        return
-    data[game_slug] = serial
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2))
-    except Exception:
-        logger.warning("failed to write %s", path, exc_info=True)
-
-
-def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str]:
-    """Reconcile the local save with the server's before launch.
-
-    Returns the hash now authoritative on the server, for the post-game
-    push-if-changed comparison. When both copies diverged (a true conflict) the
-    auto-resolution is surfaced loudly via _warn_save_conflict.
-    """
-    p = Path(save_path)
-    try:
-        meta = client.get_save_meta(game_slug)
-    except Exception:
-        meta = None
-
-    local_hash: Optional[str] = None
-    local_mtime: Optional[datetime] = None
-    if p.exists():
-        local_hash = hashlib.sha256(memcard_bytes(p)).hexdigest()
-        mtime_src = max((f.stat().st_mtime for f in p.iterdir() if f.is_file()), default=p.stat().st_mtime) if p.is_dir() else p.stat().st_mtime
-        local_mtime = datetime.fromtimestamp(mtime_src, tz=timezone.utc)
-
-    # A true divergence = both sides have a save and they differ.
-    diverged = local_hash is not None and meta is not None and local_hash != meta.get("hash")
-
-    action = _decide_save_action(local_hash, local_mtime, meta)
-    if action == "push":
-        client.push_save(game_slug, save_path)
-        if diverged:
-            _warn_save_conflict(client, cfg, game_slug, "local", local_hash, meta)
-        else:
-            click.echo(f"Local save is newer — pushed {game_slug} to server.")
-        return local_hash
-    if action == "pull":
-        pulled, server_hash = client.pull_save(game_slug, save_path)
-        if diverged:
-            _warn_save_conflict(client, cfg, game_slug, "server", local_hash, meta)
-        elif pulled:
-            click.echo(f"Pulled save for {game_slug}.")
-        return server_hash
-    return meta.get("hash") if meta else local_hash
-
-
-def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig) -> None:
-    """Persist this device's game config so an offline launch knows the paths
-    (the authoritative config lives on the server)."""
-    try:
-        path = Path(cfg.data_dir) / "game_cache" / f"{game_slug}.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "rom_path": gd.rom_path,
-            "save_path": gd.save_path,
-            "launch_command": gd.launch_command,
-            "state_path": gd.state_path,
-            "rom_folder_path": gd.rom_folder_path,
-            "rom_source": gd.rom_source,
-            "rom_rel_path": gd.rom_rel_path,
-            "local_rom_path": gd.local_rom_path,
-            "rom_sha256": gd.rom_sha256,
-        }))
-    except Exception:
-        # Non-fatal: a missing cache only means a later offline launch can't
-        # resolve this game's paths (issue #241).
-        logger.warning("failed to cache game config for '%s'", game_slug, exc_info=True)
-
-
-def _load_cached_game_device(cfg, game_slug: str) -> Optional[GameDeviceConfig]:
-    try:
-        path = Path(cfg.data_dir) / "game_cache" / f"{game_slug}.json"
-        if path.exists():
-            return GameDeviceConfig(**json.loads(path.read_text()))
-    except Exception:
-        logger.debug("could not load cached game config for '%s'", game_slug, exc_info=True)
-    return None
-
-
-def _log_offline_play(cfg, game_slug: str, started_at: str, ended_at: str, save_path: str) -> None:
-    """Append a record of an offline play to ~/.emusync/offline_plays.json so a
-    later online sync has a timestamped trail for conflict resolution (issue #5)."""
-    entry = {"slug": game_slug, "started_at": started_at, "ended_at": ended_at, "offline": True}
-    try:
-        sp = Path(save_path) if save_path else None
-        if sp and sp.exists():
-            entry["save_mtime"] = datetime.fromtimestamp(sp.stat().st_mtime, tz=timezone.utc).isoformat()
-            entry["save_hash"] = hashlib.sha256(sp.read_bytes()).hexdigest()
-    except Exception:
-        logger.debug("could not stat/hash offline save %s", save_path, exc_info=True)
-    log_path = Path(cfg.data_dir) / "offline_plays.json"
-    try:
-        existing = json.loads(log_path.read_text()) if log_path.exists() else []
-        if not isinstance(existing, list):
-            existing = []
-    except Exception:
-        logger.debug("could not read existing %s; starting fresh", log_path, exc_info=True)
-        existing = []
-    existing.append(entry)
-    try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text(json.dumps(existing, indent=2))
-    except Exception:
-        logger.warning("failed to write offline play log %s", log_path, exc_info=True)
 
 
 # Refresh the lock at a quarter of the TTL so a play session longer than the TTL
@@ -433,156 +120,6 @@ def _start_lock_heartbeat(client, game_slug: str, stop: threading.Event) -> thre
     t = threading.Thread(target=_beat, daemon=True)
     t.start()
     return t
-
-
-def _launch_and_wait(command: tuple[str, ...], game_pid_file: Path) -> int:
-    """Spawn the emulator, record its PID, and block until it exits."""
-    global _child_proc
-    _child_proc = subprocess.Popen(list(command))
-    game_pid_file.write_text(f"{os.getpid()}\n{_child_proc.pid}")
-    code = _child_proc.wait()
-    _child_proc = None
-    return code
-
-
-def _run_offline(cfg, game_slug: str, game_pid_file: Path, command: tuple[str, ...] = ()) -> None:
-    """Server unreachable: launch the game anyway and record the play window so a
-    newer offline save can win the next time the device is online.
-
-    Offline, "imported" means a config was cached on a previous online launch — so
-    a game never played online (and thus unknown to EmuSync here) is refused, just
-    like the online path. The launch command comes from the cached config, unless
-    an explicit `command` is passed (the old-method fallback), which then wins.
-    """
-    cached = _load_cached_game_device(cfg, game_slug)
-    if not cached or not cached.save_path:
-        click.echo(
-            f"EmuSync server unreachable and '{game_slug}' has no cached config "
-            f"(it hasn't been imported / played online here), so it won't be launched.",
-            err=True,
-        )
-        sys.exit(1)
-    if command:
-        launch_argv = command
-    elif cached.launch_command:
-        launch_command = _resolve_launch_command(cached)
-        if launch_command is None:
-            click.echo(
-                f"Offline and the ROM for '{game_slug}' is unavailable: the network "
-                f"share is unreachable and there's no local copy. Localize it while "
-                f"on the network so it can be played offline.",
-                err=True,
-            )
-            sys.exit(1)
-        launch_argv = tuple(shlex.split(launch_command))
-    else:
-        click.echo(
-            f"EmuSync server unreachable and no cached launch command for '{game_slug}'. "
-            f"Launch it once while online first so the command can be cached.",
-            err=True,
-        )
-        sys.exit(1)
-    click.echo(
-        "EmuSync server unreachable — launching offline. Your save will sync on the next online launch.",
-        err=True,
-    )
-    save_path = cached.save_path
-    started_at = datetime.now(timezone.utc).isoformat()
-    game_pid_file.write_text(str(os.getpid()))
-    exit_code = 0
-    try:
-        exit_code = _launch_and_wait(launch_argv, game_pid_file)
-    except Exception as exc:
-        click.echo(f"Emulator error: {exc}", err=True)
-        game_pid_file.unlink(missing_ok=True)
-        sys.exit(1)
-    ended_at = datetime.now(timezone.utc).isoformat()
-    _log_offline_play(cfg, game_slug, started_at, ended_at, save_path)
-    game_pid_file.unlink(missing_ok=True)
-    sys.exit(exit_code)
-
-
-# RetroArch names save/state files after the *content name*, which differs by
-# launch method: the ROM filename when loaded by path, or the database/playlist
-# label when loaded from a scanned playlist (e.g. "Pokémon Pinball_ Ruby &
-# Sapphire [2003]"). So the real save/state may sit in a different folder AND/OR
-# under a different extension than we configured. After the emulator exits we
-# detect where it actually wrote *this session* and adopt that path (issue #210).
-_SAVE_EXTS = {"srm", "sav", "save", "fla", "eep", "mcr", "rtc", "dsv", "ss0"}
-_STATE_RE = re.compile(r"\.state(\d+|\.auto)?$", re.IGNORECASE)
-
-
-def _mtime(p: Path) -> float:
-    try:
-        return p.stat().st_mtime
-    except OSError:
-        return 0.0
-
-
-def _saves_root(save_path: str) -> Path:
-    """Directory tree to search for the real save. Saves use the content-dir
-    layout savesRoot/<content>/<content>.<ext>, so the root is two levels up;
-    fall back to one level for flat layouts."""
-    parent = Path(save_path).parent
-    grand = parent.parent
-    return grand if grand != parent else parent
-
-
-def _newest_matching(root: Path, since: float, match) -> Optional[Path]:
-    """Newest file under *root* (recursively) modified at/after *since* for which
-    match(file) is truthy, or None."""
-    if not root.exists():
-        return None
-    best: Optional[Path] = None
-    best_m = since
-    for f in root.rglob("*"):
-        try:
-            if not f.is_file() or not match(f):
-                continue
-            m = _mtime(f)
-        except OSError:
-            continue
-        if m >= since and (best is None or m > best_m):
-            best, best_m = f, m
-    return best
-
-
-def _resolve_written_save(configured: str, since: float) -> Optional[str]:
-    """The save file RetroArch actually wrote this session, or None if none was.
-
-    Conservative: if our configured save was written this session, keep it. Only
-    when it was *not* (RetroArch used a different content name) do we adopt the
-    newest save written elsewhere under the saves root — so a working config is
-    never disturbed. Also catches a same-folder extension change for free.
-    """
-    if not configured:
-        return None
-    p = Path(configured)
-    if p.exists() and _mtime(p) >= since:
-        return configured
-    found = _newest_matching(
-        _saves_root(configured), since,
-        lambda f: f.suffix.lstrip(".").lower() in _SAVE_EXTS and ".bak" not in f.suffixes,
-    )
-    return str(found) if found else None
-
-
-def _resolve_written_state(configured: str, since: float) -> Optional[str]:
-    """The state FOLDER RetroArch actually wrote this session, or None.
-
-    States are synced as a whole folder, so this returns a directory. Same
-    conservative policy as _resolve_written_save: keep the configured folder if it
-    was written, else adopt the folder containing the newest state file.
-    """
-    if not configured:
-        return None
-    folder = Path(configured)
-    if folder.is_dir() and any(
-        _mtime(f) >= since for f in folder.rglob("*") if f.is_file()
-    ):
-        return configured
-    found = _newest_matching(folder.parent, since, lambda f: bool(_STATE_RE.search(f.name)))
-    return str(found.parent) if found else None
 
 
 @cli.command("run")
