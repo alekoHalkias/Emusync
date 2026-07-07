@@ -6,8 +6,15 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import https from "https";
-import SGDB from "steamgriddb";
+import SGDBImport from "steamgriddb";
 import { getSteamGridDbKey } from "./steamgriddb";
+
+// steamgriddb is a pure-ESM package ("type": "module"); the Electron main
+// bundle is CJS and externalizes it as a plain require(), which resolves to
+// the module namespace ({ default: SGDB }) rather than the class itself —
+// unwrap .default defensively so `new SGDB(...)` gets the actual class either
+// way the bundler happens to expose it.
+const SGDB: typeof SGDBImport = (SGDBImport as any).default ?? SGDBImport;
 
 const ART_DIR        = join(homedir(), ".emusync", "art");
 const CONSOLE_DIR    = join(homedir(), ".emusync", "art", "consoles");
@@ -136,8 +143,11 @@ export function registerArtIpc(): void {
     "art:get",
     async (_event, slug: string, gameName: string, consoleKey: string): Promise<string | null> => {
       try {
-        mkdirSync(ART_DIR, { recursive: true });
-        const dest = join(ART_DIR, `${slug}.png`);
+        // One folder per console, one subfolder per game (issue #304 follow-up)
+        // — e.g. ~/.emusync/art/gba/pokemon-emerald/boxart.png.
+        const gameDir = join(ART_DIR, consoleKey, slug);
+        mkdirSync(gameDir, { recursive: true });
+        const dest = join(gameDir, "boxart.png");
         if (existsSync(dest)) return toDataUrl(dest);
 
         // SteamGridDB's fuzzy title search finds far more games than the
