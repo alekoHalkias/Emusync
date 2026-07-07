@@ -207,6 +207,12 @@ class SyncClient:
         r = self._client.delete(self._url(f"/games/{slug}"), timeout=10)
         r.raise_for_status()
 
+    def remove_game_device(self, slug: str) -> None:
+        """Unlink a game from this device only (issue #343) — the game itself,
+        its saves/states, and every other device's config are untouched."""
+        r = self._client.delete(self._url(f"/games/{slug}/device"), timeout=10)
+        r.raise_for_status()
+
     def list_game_devices(self, slug: str) -> list[dict]:
         r = self._client.get(self._url(f"/games/{slug}/devices"), timeout=10)
         r.raise_for_status()
