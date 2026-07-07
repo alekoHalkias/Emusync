@@ -459,7 +459,10 @@ input.error { border-color: var(--red); }
 }
 .game-grid-header .game-grid-search:focus { border-color: var(--accent); flex-basis: 55px; }
 
-.game-grid-art-type {
+/* Shared look for the artwork-type dropdown and the filter button, so the
+   two sit as visually matching controls in the header row. */
+.game-grid-art-type,
+.game-grid-filter-btn {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -471,6 +474,7 @@ input.error { border-color: var(--red); }
   flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
+.game-grid-filter-btn:hover { background: var(--surface2); }
 
 /* Match the dropdown/search box model exactly (padding + border + a fixed
    height) so the header buttons (select-all, delete) aren't visibly taller
