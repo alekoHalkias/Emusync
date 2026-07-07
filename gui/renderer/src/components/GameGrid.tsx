@@ -38,15 +38,12 @@ const DEFAULT_ACCENT = "#374151";
 
 type Props = {
   consoleKey: string;
-  consoleLabel: string;
-  consoleAbbr: string;
   games: GameRow[];
-  onBack: () => void;
   onPlay: (slug: string, name: string) => void;
   onChanged: () => void;
 };
 
-export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games, onBack, onPlay, onChanged }: Props): React.ReactElement {
+export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props): React.ReactElement {
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -106,6 +103,12 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
     });
   }
 
+  // Selects/deselects every currently-visible game — i.e. after search and
+  // the GameFilterButton filters, not the console's full game list.
+  function toggleSelectAll(): void {
+    setSelectedSlugs(allFilteredSelected ? new Set() : new Set(filtered.map((g) => g.slug)));
+  }
+
   async function handleBulkDelete(): Promise<void> {
     setDeleting(true);
     for (const slug of Array.from(selectedSlugs)) {
@@ -129,6 +132,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   const filtered = searched.filter((g) =>
     matchesFilters(filters, !!g.lastSave, g.romSource !== "network" || !!g.hasLocalCopy, hasArt[g.slug])
   );
+  const allFilteredSelected = filtered.length > 0 && filtered.every((g) => selectedSlugs.has(g.slug));
 
   const local  = filtered.filter((g) => g.isLocal);
   const remote = filtered.filter((g) => !g.isLocal);
@@ -169,33 +173,6 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
     <>
       {/* Header */}
       <div className="game-grid-header" style={{ "--grid-accent": accent } as React.CSSProperties}>
-        <button className="game-grid-back" onClick={onBack} title="Back to consoles">
-          ‹ Back
-        </button>
-        <div className="game-grid-title">
-          <span className="game-grid-abbr">{consoleAbbr}</span>
-          <span className="game-grid-label">{consoleLabel}</span>
-          <span className="game-grid-total">{games.length} game{games.length !== 1 ? "s" : ""}</span>
-        </div>
-        {selectedSlugs.size > 0 && (
-          <button
-            className="btn btn-danger"
-            style={{ flexShrink: 0 }}
-            onClick={() => setConfirmDelete(true)}
-          >
-            🗑 Delete {selectedSlugs.size}
-          </button>
-        )}
-        <select
-          className="game-grid-art-type"
-          value={artType}
-          onChange={(e) => changeArtType(e.target.value as ArtType)}
-          title="Artwork type"
-        >
-          {(Object.keys(ART_TYPE_LABELS) as ArtType[]).map((t) => (
-            <option key={t} value={t}>{ART_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
         <input
           className="game-grid-search"
           type="text"
@@ -204,6 +181,34 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
           onChange={(e) => setSearch(e.target.value)}
         />
         <GameFilterButton filters={filters} onChange={setFilters} />
+        <div className="game-grid-select-wrap">
+          <select
+            className="game-grid-art-type"
+            value={artType}
+            onChange={(e) => changeArtType(e.target.value as ArtType)}
+            title="Artwork type"
+          >
+            {(Object.keys(ART_TYPE_LABELS) as ArtType[]).map((t) => (
+              <option key={t} value={t}>{ART_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button
+          className="btn btn-ghost game-grid-header-btn"
+          disabled={filtered.length === 0}
+          onClick={toggleSelectAll}
+          title={allFilteredSelected ? "Deselect all visible games" : "Select all visible games"}
+        >
+          {allFilteredSelected ? "☑ Deselect All" : "☐ Select All"}
+        </button>
+        <button
+          className="btn btn-danger game-grid-header-btn"
+          disabled={selectedSlugs.size === 0}
+          onClick={() => setConfirmDelete(true)}
+        >
+          🗑 Delete{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
+        </button>
       </div>
 
       {filtered.length === 0 ? (

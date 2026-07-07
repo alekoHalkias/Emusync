@@ -410,29 +410,14 @@ input.error { border-color: var(--red); }
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  /* Pulls up into .content's 24px top padding (shared by every screen, so
+     not reduced globally) — the header row used to be much taller and
+     absorbed that space visually; now that it's compact the gap above it
+     reads as excess whitespace. */
+  margin-top: -14px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
-}
-.game-grid-back {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
-}
-.game-grid-back:hover { color: var(--text); border-color: var(--text-muted); }
-.game-grid-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
 }
 .game-grid-abbr {
   font-size: 20px;
@@ -454,7 +439,12 @@ input.error { border-color: var(--red); }
   color: var(--text-muted);
   flex-shrink: 0;
 }
-.game-grid-search {
+/* input[type="text"] (line ~67) sets `flex: 1`, which — via its higher
+   attribute-selector specificity — overrides this class's plain width and
+   makes the box grow to fill the row regardless of the width set below.
+   `.game-grid-header .game-grid-search` outranks it so the explicit
+   `flex: 0 0 <width>` below actually controls the size. */
+.game-grid-header .game-grid-search {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -462,14 +452,19 @@ input.error { border-color: var(--red); }
   padding: 7px 12px;
   font-size: 13px;
   outline: none;
-  width: 180px;
-  flex-shrink: 0;
+  flex: 0 0 45px;
+  height: 32px;
   -webkit-app-region: no-drag;
-  transition: border-color 0.15s, width 0.2s;
+  transition: border-color 0.15s, flex-basis 0.2s;
 }
-.game-grid-search:focus { border-color: var(--accent); width: 220px; }
+.game-grid-header .game-grid-search:focus { border-color: var(--accent); flex-basis: 55px; }
 
-.game-grid-art-type {
+/* Shared look for the artwork-type dropdown and the filter button, so the
+   two sit as visually matching controls in the header row. */
+.game-grid-art-type,
+.game-grid-filter-btn {
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -477,8 +472,38 @@ input.error { border-color: var(--red); }
   padding: 7px 10px;
   font-size: 13px;
   outline: none;
+  height: 32px;
   flex-shrink: 0;
+  cursor: pointer;
   -webkit-app-region: no-drag;
+}
+
+/* appearance: none above strips the <select>'s native arrow, so redraw it
+   as the same "⏷" glyph the filter button uses, in the same position (left
+   of the label, same size/color) for a truly matching look. */
+.game-grid-select-wrap { position: relative; flex-shrink: 0; }
+.game-grid-select-wrap .game-grid-art-type { padding-left: 24px; }
+.game-grid-select-wrap::before {
+  content: "⏷";
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  color: var(--text);
+  pointer-events: none;
+}
+.game-grid-filter-btn:hover { background: var(--surface2); }
+
+/* Match the dropdown/search box model exactly (padding + border + a fixed
+   height) so the header buttons (select-all, delete) aren't visibly taller
+   than their dropdown/search siblings — the generic .btn class uses more
+   padding and no border, and an emoji glyph's line-box is taller than the
+   13px text, which grows a button's inline-flex height past its siblings
+   even once padding matches (issue #347). */
+.game-grid-header-btn {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  height: 32px;
 }
 
 .game-grid-body { }
