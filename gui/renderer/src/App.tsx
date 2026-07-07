@@ -90,6 +90,18 @@ export default function App(): React.ReactElement {
     return () => window.emusync.game.offExited(onExited);
   }, []);
 
+  // Mouse "back" side button (issue #354) — mirrors the topbar's "‹ Back"
+  // link. Only registered while on the console screen, since that's the
+  // only place it currently has anything to navigate back out of.
+  useEffect(() => {
+    if (screen.name !== "console") return;
+    function handleMouseBack(e: MouseEvent): void {
+      if (e.button === 3) setScreen({ name: "games" });
+    }
+    window.addEventListener("mouseup", handleMouseBack);
+    return () => window.removeEventListener("mouseup", handleMouseBack);
+  }, [screen]);
+
   useEffect(() => {
     async function init(): Promise<void> {
       const cfg = await window.emusync.config.load();
