@@ -181,16 +181,18 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           onChange={(e) => setSearch(e.target.value)}
         />
         <GameFilterButton filters={filters} onChange={setFilters} />
-        <select
-          className="game-grid-art-type"
-          value={artType}
-          onChange={(e) => changeArtType(e.target.value as ArtType)}
-          title="Artwork type"
-        >
-          {(Object.keys(ART_TYPE_LABELS) as ArtType[]).map((t) => (
-            <option key={t} value={t}>{ART_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
+        <div className="game-grid-select-wrap">
+          <select
+            className="game-grid-art-type"
+            value={artType}
+            onChange={(e) => changeArtType(e.target.value as ArtType)}
+            title="Artwork type"
+          >
+            {(Object.keys(ART_TYPE_LABELS) as ArtType[]).map((t) => (
+              <option key={t} value={t}>{ART_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+        </div>
         <div style={{ flex: 1 }} />
         <button
           className="btn btn-ghost game-grid-header-btn"
