@@ -36,7 +36,9 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
   return (
     <div
       className={`game-card${selected ? " game-card-selected" : ""}`}
-      style={{ "--card-accent": consoleAccent } as React.CSSProperties}
+      style={{ "--card-accent": consoleAccent, cursor: "pointer" } as React.CSSProperties}
+      onClick={() => onSettings(game)}
+      title="Settings, history & devices"
     >
       {/* Art area */}
       <div className={`game-card-art game-card-art-${artType}`}>
@@ -105,13 +107,6 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
           onClick={(e) => { e.stopPropagation(); if (canPlay) onPlay(game.slug, game.name); }}
         >
           ▶
-        </button>
-        <button
-          className="game-card-btn game-card-btn-settings"
-          title="Settings, history & devices"
-          onClick={(e) => { e.stopPropagation(); onSettings(game); }}
-        >
-          ⚙
         </button>
       </div>
     </div>
