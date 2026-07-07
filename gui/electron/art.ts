@@ -117,23 +117,28 @@ export function makeSteamGridDbClient(key: string): SGDBImport {
 }
 
 // Shared with gui/electron/artwork.ts (issue #325) — the one place that knows
-// which SGDB method each artwork type maps to. Grid/Wide Grid keep the
-// existing boxart-shaped filters (portrait 600x900 vs. landscape "header
-// capsule" 460x215, issue #333); Hero/Logo/Icon take SteamGridDB's results
-// as-is — there's no single "right" size to filter to for those.
+// which SGDB method each artwork type maps to. Grid keeps its boxart-shaped
+// portrait filter (600x900); Hero/Logo/Icon take SteamGridDB's results as-is
+// — there's no single "right" size to filter to for those. Wide Grid (issue
+// #333) has no single "right" dimension either — SteamGridDB serves landscape
+// grid art at several sizes (460x215, 920x430, 700x200, ...) — so instead of
+// an exact `dimensions` filter (which under-populated results, issue #341) it
+// fetches every grid and keeps whichever are landscape-oriented by actual
+// width/height.
 // Hardcoded off, no setting exposed to turn them on (issue #326).
 const SAFE_FILTER = { nsfw: "false", humor: "false" };
 
 export async function getSgdbImagesForType(client: SGDBImport, sgdbGameId: number, artType: ArtType) {
-  return artType === "grid"
-    ? client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["600x900"], ...SAFE_FILTER })
-    : artType === "wide_grid"
-    ? client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["460x215"], ...SAFE_FILTER })
-    : artType === "hero"
-    ? client.getHeroes({ id: sgdbGameId, type: "game", ...SAFE_FILTER })
-    : artType === "logo"
-    ? client.getLogos({ id: sgdbGameId, type: "game", ...SAFE_FILTER })
-    : client.getIcons({ id: sgdbGameId, type: "game", ...SAFE_FILTER });
+  if (artType === "grid") {
+    return client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["600x900"], ...SAFE_FILTER });
+  }
+  if (artType === "wide_grid") {
+    const images = await client.getGrids({ id: sgdbGameId, type: "game", ...SAFE_FILTER });
+    return images.filter((img) => img.width > img.height);
+  }
+  if (artType === "hero") return client.getHeroes({ id: sgdbGameId, type: "game", ...SAFE_FILTER });
+  if (artType === "logo") return client.getLogos({ id: sgdbGameId, type: "game", ...SAFE_FILTER });
+  return client.getIcons({ id: sgdbGameId, type: "game", ...SAFE_FILTER });
 }
 
 // Shared with gui/electron/artwork.ts (issue #339) — resolves which SGDB game
