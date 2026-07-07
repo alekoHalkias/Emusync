@@ -671,9 +671,3 @@ input.error { border-color: var(--red); }
   border-color: var(--green);
 }
 .game-card-btn-play:disabled { opacity: 0.35; cursor: not-allowed; }
-.game-card-btn-settings {
-  background: transparent;
-  color: var(--text-muted);
-  flex: 0 0 36px;
-}
-.game-card-btn-settings:hover { background: var(--surface2); color: var(--text); }
