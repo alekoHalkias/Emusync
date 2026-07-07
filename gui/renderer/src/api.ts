@@ -17,7 +17,7 @@ export type GameDeviceConfig = {
   device_local_folder?: string;
 };
 
-export type Game = { slug: string; name: string; console?: string };
+export type Game = { slug: string; name: string; console?: string; sgdb_game_id?: number | null };
 export type Device = { id: string; name: string; last_ip?: string | null; last_seen_at?: string | null };
 export type LockInfo = { locked: boolean; device_id?: string; acquired_at?: string };
 export type SaveMeta = { hash: string; pushed_at: string; device_id: string } | null;
@@ -92,6 +92,15 @@ export const addGame = (name: string, console?: string): Promise<Game> => _fetch
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
 export const removeGame = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}`);
+
+// Persists a manually-picked SteamGridDB game match (issue #325), shared
+// across every device via this same server-side row. The PUT route requires
+// `name`, so fetch the game's current name first rather than widen the route
+// to allow a partial update.
+export const setGameSgdbId = async (slug: string, sgdbGameId: number): Promise<Game> => {
+  const game = await getGame(slug);
+  return _fetch("PUT", `/games/${slug}`, { name: game.name, sgdb_game_id: sgdbGameId });
+};
 
 export const getGameDevice = (slug: string): Promise<GameDeviceConfig> =>
   _fetch("GET", `/games/${slug}/device`);

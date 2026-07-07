@@ -82,6 +82,14 @@ export interface EmusyncBridge {
     get: (slug: string, gameName: string, consoleKey: string) => Promise<string | null>;
     getConsoleIcon: (consoleKey: string) => Promise<string | null>;
   };
+  artwork: {
+    searchGames: (name: string) => Promise<{ id: number; name: string; release_date: number; verified: boolean }[]>;
+    listCandidates: (sgdbGameId: number, type: "grid" | "hero" | "logo" | "icon") => Promise<{ id: number; thumb: string; url: string }[]>;
+    setArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon", url: string) => Promise<{ ok: boolean; error?: string }>;
+    clearArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon") => Promise<{ ok: boolean }>;
+    getCurrent: (slug: string, consoleKey: string) => Promise<Record<"grid" | "hero" | "logo" | "icon", string | null>>;
+    refreshAll: (slug: string, gameName: string, consoleKey: string, sgdbGameId: number | null) => Promise<Record<"grid" | "hero" | "logo" | "icon", boolean>>;
+  };
   steamgriddb: {
     getKey: () => Promise<string | null>;
     setKey: (key: string) => Promise<{ ok: boolean; error?: string }>;

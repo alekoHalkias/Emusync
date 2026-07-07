@@ -74,6 +74,34 @@ async def test_update_game_console(client):
     assert r.json()["console"] == "GB"
 
 
+@pytest.mark.asyncio
+async def test_update_game_sgdb_id(client):
+    """A picked SteamGridDB match (issue #325) persists and round-trips."""
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+
+    r = await client.get("/games/test-game", headers=AUTH)
+    assert r.json()["sgdb_game_id"] is None
+
+    r = await client.put("/games/test-game", json={"name": "Test Game", "sgdb_game_id": 12345}, headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["sgdb_game_id"] == 12345
+
+    r = await client.get("/games/test-game", headers=AUTH)
+    assert r.json()["sgdb_game_id"] == 12345
+
+
+@pytest.mark.asyncio
+async def test_update_game_without_sgdb_id_leaves_existing_value(client):
+    """A plain rename (no sgdb_game_id in the request) must not clear a
+    previously-picked match — mirrors how a plain rename doesn't clear console."""
+    await client.post("/games", json={"name": "Test Game"}, headers=AUTH)
+    await client.put("/games/test-game", json={"name": "Test Game", "sgdb_game_id": 12345}, headers=AUTH)
+
+    r = await client.put("/games/test-game", json={"name": "Renamed"}, headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["sgdb_game_id"] == 12345
+
+
 # ── game device config ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio

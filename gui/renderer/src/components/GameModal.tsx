@@ -1,6 +1,7 @@
 // One tabbed modal consolidating all per-game actions (issue #260): Settings
 // (the GameConfig editor, with Delete), Devices, Save history, and Run.
 import React, { useEffect, useState } from "react";
+import ArtworkTab from "./ArtworkTab";
 import GameConfig from "./GameConfig";
 import GameDeviceModal from "./game-list/GameDeviceModal";
 import SaveHistory from "./SaveHistory";
@@ -15,7 +16,7 @@ export type GameModalTarget = {
   canPlay: boolean;
 };
 
-type Tab = "settings" | "devices" | "history" | "run";
+type Tab = "settings" | "artwork" | "devices" | "history" | "run";
 
 export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   target: GameModalTarget;
@@ -28,6 +29,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
 
   const tabs: { key: Tab; label: string; disabled?: boolean }[] = [
     { key: "settings", label: "Settings" },
+    { key: "artwork", label: "Artwork" },
     { key: "devices", label: "Devices" },
     { key: "history", label: "Save history" },
     { key: "run", label: "Run", disabled: !canPlay },
@@ -70,6 +72,9 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
               onSaved={() => { onChanged(); onClose(); }}
               onRemoved={() => { onChanged(); onClose(); }}
             />
+          )}
+          {tab === "artwork" && (
+            <ArtworkTab slug={slug} name={name} gameConsole={gameConsole} />
           )}
           {tab === "devices" && (
             <GameDeviceModal embedded slug={slug} name={name} gameConsole={gameConsole} gameIsLocal={gameIsLocal} onClose={onClose} />

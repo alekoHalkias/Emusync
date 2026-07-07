@@ -18,7 +18,7 @@ import { CONFIG_PATH } from "./runtime";
 // way the bundler happens to expose it.
 const SGDB: typeof SGDBImport = (SGDBImport as any).default ?? SGDBImport;
 
-const ART_DIR        = join(homedir(), ".emusync", "art");
+export const ART_DIR = join(homedir(), ".emusync", "art");
 const CONSOLE_DIR    = join(homedir(), ".emusync", "art", "consoles");
 
 // EmuSync console key → libretro-thumbnails system folder name (used for boxart)
@@ -48,7 +48,7 @@ const LIBRETRO_SYSTEM: Record<string, string> = {
 };
 
 export type ArtType = "grid" | "hero" | "logo" | "icon";
-const ART_TYPES: ArtType[] = ["grid", "hero", "logo", "icon"];
+export const ART_TYPES: ArtType[] = ["grid", "hero", "logo", "icon"];
 
 // Per-console artwork type preference (issue #324) — read directly from the
 // shared config file rather than passed through art:get's args, so the IPC
@@ -80,7 +80,7 @@ function buildThumbnailUrl(consoleKey: string, gameName: string): string | null 
   return `https://raw.githubusercontent.com/libretro-thumbnails/${system}/master/Named_Boxarts/${encoded}.png`;
 }
 
-function download(url: string, dest: string): Promise<void> {
+export function download(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tmp = dest + ".tmp";
     const file = createWriteStream(tmp);
@@ -109,24 +109,35 @@ function download(url: string, dest: string): Promise<void> {
   });
 }
 
+// Shared with gui/electron/artwork.ts (issue #325) so the ESM/CJS interop
+// workaround above lives in exactly one place.
+export function makeSteamGridDbClient(key: string): SGDBImport {
+  return new SGDB({ key });
+}
+
+// Shared with gui/electron/artwork.ts (issue #325) — the one place that knows
+// which SGDB method each artwork type maps to. Grid keeps the existing
+// boxart-shaped filter; Hero/Logo/Icon take SteamGridDB's results as-is —
+// there's no single "right" size to filter to for those the way 600x900 is
+// the standard boxart aspect.
+export async function getSgdbImagesForType(client: SGDBImport, sgdbGameId: number, artType: ArtType) {
+  return artType === "grid"
+    ? client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["600x900"] })
+    : artType === "hero"
+    ? client.getHeroes({ id: sgdbGameId, type: "game" })
+    : artType === "logo"
+    ? client.getLogos({ id: sgdbGameId, type: "game" })
+    : client.getIcons({ id: sgdbGameId, type: "game" });
+}
+
 async function fetchFromSteamGridDb(gameName: string, dest: string, artType: ArtType): Promise<boolean> {
   const key = await getSteamGridDbKey();
   if (!key) return false;
   try {
-    const client = new SGDB({ key });
+    const client = makeSteamGridDbClient(key);
     const games = await client.searchGame(gameName);
     if (!games.length) return false;
-    const gameId = games[0].id;
-    // Grid keeps the existing boxart-shaped filter; Hero/Logo/Icon take
-    // SteamGridDB's first result as-is — there's no single "right" size to
-    // filter to for those the way 600x900 is the standard boxart aspect.
-    const images = artType === "grid"
-      ? await client.getGrids({ id: gameId, type: "game", dimensions: ["600x900"] })
-      : artType === "hero"
-      ? await client.getHeroes({ id: gameId, type: "game" })
-      : artType === "logo"
-      ? await client.getLogos({ id: gameId, type: "game" })
-      : await client.getIcons({ id: gameId, type: "game" });
+    const images = await getSgdbImagesForType(client, games[0].id, artType);
     if (!images.length) return false;
     await download(String(images[0].url), dest);
     return existsSync(dest);
@@ -163,7 +174,7 @@ const CONSOLE_LOGO: Record<string, string> = {
 const RETROARCH_ASSETS_BASE =
   "https://raw.githubusercontent.com/libretro/retroarch-assets/master/xmb/monochrome/png";
 
-function toDataUrl(filePath: string): string {
+export function toDataUrl(filePath: string): string {
   const buf = readFileSync(filePath);
   return `data:image/png;base64,${buf.toString("base64")}`;
 }
