@@ -169,6 +169,10 @@ window.emusync.game.offExited(cb)          // unsubscribe
 window.emusync.art.get(slug, gameName, consoleKey) // fetch boxart for a game: checks ~/.emusync/art/<slug>.png first; on miss, downloads from the public libretro-thumbnails GitHub repo (Named_Boxarts/<GameName>.png, keyed by consoleKey → libretro system name); caches to disk; returns a file:// URL or null when no art is available (issue #304)
 window.emusync.art.getConsoleIcon(consoleKey) // fetch the white monochrome system logo for a console: checks ~/.emusync/art/consoles/<key>.png; on miss, downloads from libretro/retroarch-assets (xmb/monochrome/png/<SystemName>.png); caches to disk; returns a file:// URL or null (issue #304)
 
+window.emusync.steamgriddb.getKey()      // fetch the SteamGridDB API key from the server (cached for this process's lifetime); returns a string or null (issue #322)
+window.emusync.steamgriddb.setKey(key)   // save a SteamGridDB API key to the server via PUT; returns {ok: boolean, error?: string} (issue #322)
+window.emusync.steamgriddb.openKeyPage() // open the SteamGridDB preferences page in the default browser; returns Promise<void> (issue #322)
+
 window.emusync.daemon.start()              // spawn emusync sync-daemon (client devices only; no-op on server or if already running)
 window.emusync.daemon.stop()               // kill the sync daemon if running
 ```
