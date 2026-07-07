@@ -12,6 +12,7 @@
       "Bash(cd *)",
       "Bash(export *)",
       "Bash(gh issue create *)",
+      "Bash(gh pr create *)",
       "Bash(python3 -c *)",
       "Bash(git status)",
       "Bash(git status *)",
