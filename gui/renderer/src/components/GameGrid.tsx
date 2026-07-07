@@ -3,6 +3,7 @@ import { deleteGame } from "../gameDelete";
 import type { GameRow } from "./game-list/types";
 import type { GameModalTarget } from "./GameModal";
 import GameCard from "./GameCard";
+import GameFilterButton, { EMPTY_FILTERS, matchesFilters, type GameFilters } from "./GameFilterButton";
 import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
 
@@ -61,6 +62,17 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   // remounts and re-fetches art (it may have just been edited in the
   // Artwork tab) without refetching every other card on the screen.
   const [artRefresh, setArtRefresh] = useState<Record<string, number>>({});
+  // Lifted from each GameCard's own art:get fetch (issue #345) rather than a
+  // duplicate lookup — undefined until that card resolves, so the "with/
+  // without artwork" filter doesn't hide everything while cards are loading.
+  const [hasArt, setHasArt] = useState<Record<string, boolean>>({});
+  const [filters, setFilters] = useState<GameFilters>(EMPTY_FILTERS);
+
+  // hasArt is keyed only by slug, not by artType — a stale entry from the
+  // previous type would otherwise keep a game wrongly filtered in/out of the
+  // artwork filter forever, since a game the filter excludes never mounts
+  // its GameCard to refresh the check for the new type (issue #345 follow-up).
+  useEffect(() => { setHasArt({}); }, [artType]);
 
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
@@ -111,9 +123,12 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
 
   const accent = CONSOLE_ACCENT[consoleKey] ?? DEFAULT_ACCENT;
 
-  const filtered = search.trim()
+  const searched = search.trim()
     ? games.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : games;
+  const filtered = searched.filter((g) =>
+    matchesFilters(filters, !!g.lastSave, g.romSource !== "network" || !!g.hasLocalCopy, hasArt[g.slug])
+  );
 
   const local  = filtered.filter((g) => g.isLocal);
   const remote = filtered.filter((g) => !g.isLocal);
@@ -136,6 +151,10 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
       setArtRefresh((prev) => ({ ...prev, [slug]: (prev[slug] ?? 0) + 1 }));
     }
     setGameModal(null);
+  }
+
+  function handleArtStatus(slug: string, found: boolean): void {
+    setHasArt((prev) => (prev[slug] === found ? prev : { ...prev, [slug]: found }));
   }
 
   function handlePlay(g: GameRow): void {
@@ -184,11 +203,12 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <GameFilterButton filters={filters} onChange={setFilters} />
       </div>
 
       {filtered.length === 0 ? (
         <div className="empty-state" style={{ padding: "40px 20px" }}>
-          <p>No games match "{search}".</p>
+          <p>{search.trim() ? `No games match "${search}".` : "No games match the active filters."}</p>
         </div>
       ) : (
         <div className="game-grid-body">
@@ -209,6 +229,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
                     onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}
                     onSettings={() => openSettings(g)}
+                    onArtStatus={handleArtStatus}
                   />
                 ))}
               </div>
@@ -232,6 +253,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
                     onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}
                     onSettings={() => openSettings(g)}
+                    onArtStatus={handleArtStatus}
                   />
                 ))}
               </div>
