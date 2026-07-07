@@ -414,19 +414,6 @@ input.error { border-color: var(--red); }
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
-.game-grid-back {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
-}
-.game-grid-back:hover { color: var(--text); border-color: var(--text-muted); }
 .game-grid-abbr {
   font-size: 20px;
   font-weight: 800;

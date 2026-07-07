@@ -39,12 +39,11 @@ const DEFAULT_ACCENT = "#374151";
 type Props = {
   consoleKey: string;
   games: GameRow[];
-  onBack: () => void;
   onPlay: (slug: string, name: string) => void;
   onChanged: () => void;
 };
 
-export default function GameGrid({ consoleKey, games, onBack, onPlay, onChanged }: Props): React.ReactElement {
+export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props): React.ReactElement {
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -167,9 +166,6 @@ export default function GameGrid({ consoleKey, games, onBack, onPlay, onChanged 
     <>
       {/* Header */}
       <div className="game-grid-header" style={{ "--grid-accent": accent } as React.CSSProperties}>
-        <button className="game-grid-back" onClick={onBack} title="Back to consoles">
-          ‹ Back
-        </button>
         <div style={{ flex: 1 }} />
         <button
           className="btn btn-danger game-grid-delete-btn"

@@ -263,7 +263,6 @@ export default function App(): React.ReactElement {
           <GameGrid
             consoleKey={screen.key}
             games={consoleGames}
-            onBack={() => setScreen({ name: "games" })}
             onPlay={handlePlay}
             onChanged={() => reload(true)}
           />
