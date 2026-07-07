@@ -7,9 +7,9 @@ import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
-type ArtType = "grid" | "hero" | "logo" | "icon";
+type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
 const ART_TYPE_LABELS: Record<ArtType, string> = {
-  grid: "Grid", hero: "Hero", logo: "Logo", icon: "Icon",
+  grid: "Grid", wide_grid: "Wide", hero: "Hero", logo: "Logo", icon: "Icon",
 };
 
 // Accent color per console key (mirrors ConsoleGrid)
@@ -62,7 +62,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
     window.emusync.config.load().then((cfg) => {
       const byConsole = (cfg?.art_type_by_console as Record<string, string>) ?? {};
       const stored = byConsole[consoleKey];
-      if (stored === "grid" || stored === "hero" || stored === "logo" || stored === "icon") {
+      if (stored === "grid" || stored === "hero" || stored === "logo" || stored === "icon" || stored === "wide_grid") {
         setArtType(stored);
       } else {
         setArtType("grid");

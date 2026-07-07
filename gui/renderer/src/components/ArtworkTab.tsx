@@ -4,12 +4,12 @@
 import React, { useEffect, useState } from "react";
 import { getGame, setGameSgdbId } from "../api";
 
-type ArtType = "grid" | "hero" | "logo" | "icon";
-const ART_TYPES: ArtType[] = ["grid", "hero", "logo", "icon"];
+type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
+const ART_TYPES: ArtType[] = ["grid", "wide_grid", "hero", "logo", "icon"];
 const ART_TYPE_LABELS: Record<ArtType, string> = {
-  grid: "Grid", hero: "Hero", logo: "Logo", icon: "Icon",
+  grid: "Grid", wide_grid: "Wide", hero: "Hero", logo: "Logo", icon: "Icon",
 };
-const EMPTY_CURRENT: Record<ArtType, string | null> = { grid: null, hero: null, logo: null, icon: null };
+const EMPTY_CURRENT: Record<ArtType, string | null> = { grid: null, wide_grid: null, hero: null, logo: null, icon: null };
 
 type SgdbGameResult = { id: number; name: string; release_date: number; verified: boolean };
 type SgdbCandidate = { id: number; thumb: string; url: string };
@@ -166,12 +166,12 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
           {refreshing ? <><span className="spinner" /> Refreshing…</> : "↻ Refresh all"}
         </button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
         {ART_TYPES.map((type) => (
           <div key={type} onClick={() => openPicker(type)} style={{ cursor: "pointer", textAlign: "center" }}>
             <div
               style={{
-                aspectRatio: type === "hero" ? "16 / 6" : type === "grid" ? "3 / 4" : "1 / 1",
+                aspectRatio: type === "hero" ? "16 / 6" : type === "wide_grid" ? "460 / 215" : type === "grid" ? "3 / 4" : "1 / 1",
                 background: "#0a0a0a",
                 borderRadius: "var(--radius)",
                 overflow: "hidden",

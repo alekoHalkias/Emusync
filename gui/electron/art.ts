@@ -47,8 +47,8 @@ const LIBRETRO_SYSTEM: Record<string, string> = {
   wsc:     "Bandai_-_WonderSwan_Color",
 };
 
-export type ArtType = "grid" | "hero" | "logo" | "icon";
-export const ART_TYPES: ArtType[] = ["grid", "hero", "logo", "icon"];
+export type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
+export const ART_TYPES: ArtType[] = ["grid", "hero", "logo", "icon", "wide_grid"];
 
 // Per-console artwork type preference (issue #324) — read directly from the
 // shared config file rather than passed through art:get's args, so the IPC
@@ -116,16 +116,18 @@ export function makeSteamGridDbClient(key: string): SGDBImport {
 }
 
 // Shared with gui/electron/artwork.ts (issue #325) — the one place that knows
-// which SGDB method each artwork type maps to. Grid keeps the existing
-// boxart-shaped filter; Hero/Logo/Icon take SteamGridDB's results as-is —
-// there's no single "right" size to filter to for those the way 600x900 is
-// the standard boxart aspect.
+// which SGDB method each artwork type maps to. Grid/Wide Grid keep the
+// existing boxart-shaped filters (portrait 600x900 vs. landscape "header
+// capsule" 460x215, issue #333); Hero/Logo/Icon take SteamGridDB's results
+// as-is — there's no single "right" size to filter to for those.
 // Hardcoded off, no setting exposed to turn them on (issue #326).
 const SAFE_FILTER = { nsfw: "false", humor: "false" };
 
 export async function getSgdbImagesForType(client: SGDBImport, sgdbGameId: number, artType: ArtType) {
   return artType === "grid"
     ? client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["600x900"], ...SAFE_FILTER })
+    : artType === "wide_grid"
+    ? client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["460x215"], ...SAFE_FILTER })
     : artType === "hero"
     ? client.getHeroes({ id: sgdbGameId, type: "game", ...SAFE_FILTER })
     : artType === "logo"

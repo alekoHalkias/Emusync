@@ -120,15 +120,15 @@ contextBridge.exposeInMainWorld("emusync", {
   artwork: {
     searchGames: (name: string): Promise<{ id: number; name: string; release_date: number; verified: boolean }[]> =>
       ipcRenderer.invoke("artwork:searchGames", name),
-    listCandidates: (sgdbGameId: number, type: "grid" | "hero" | "logo" | "icon"): Promise<{ id: number; thumb: string; url: string }[]> =>
+    listCandidates: (sgdbGameId: number, type: "grid" | "hero" | "logo" | "icon" | "wide_grid"): Promise<{ id: number; thumb: string; url: string }[]> =>
       ipcRenderer.invoke("artwork:listCandidates", sgdbGameId, type),
-    setArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon", url: string): Promise<{ ok: boolean; error?: string }> =>
+    setArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon" | "wide_grid", url: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("artwork:setArt", slug, consoleKey, type, url),
-    clearArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon"): Promise<{ ok: boolean }> =>
+    clearArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon" | "wide_grid"): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke("artwork:clearArt", slug, consoleKey, type),
-    getCurrent: (slug: string, consoleKey: string): Promise<Record<"grid" | "hero" | "logo" | "icon", string | null>> =>
+    getCurrent: (slug: string, consoleKey: string): Promise<Record<"grid" | "hero" | "logo" | "icon" | "wide_grid", string | null>> =>
       ipcRenderer.invoke("artwork:getCurrent", slug, consoleKey),
-    refreshAll: (slug: string, gameName: string, consoleKey: string, sgdbGameId: number | null): Promise<Record<"grid" | "hero" | "logo" | "icon", boolean>> =>
+    refreshAll: (slug: string, gameName: string, consoleKey: string, sgdbGameId: number | null): Promise<Record<"grid" | "hero" | "logo" | "icon" | "wide_grid", boolean>> =>
       ipcRenderer.invoke("artwork:refreshAll", slug, gameName, consoleKey, sgdbGameId),
   },
   steamgriddb: {
