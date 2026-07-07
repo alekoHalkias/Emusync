@@ -2,17 +2,21 @@ import React, { useEffect, useRef, useState } from "react";
 import type { GameRow } from "./game-list/types";
 import { RelTime } from "../time";
 
+// Mirrors the ArtType union in gui/electron/art.ts (issue #324).
+type ArtType = "grid" | "hero" | "logo" | "icon";
+
 type Props = {
   game: GameRow;
   consoleKey: string;
   consoleAccent: string;
+  artType: ArtType;
   selected: boolean;
   onToggleSelect: () => void;
   onPlay: (slug: string, name: string) => void;
   onSettings: (game: GameRow) => void;
 };
 
-export default function GameCard({ game, consoleKey, consoleAccent, selected, onToggleSelect, onPlay, onSettings }: Props): React.ReactElement {
+export default function GameCard({ game, consoleKey, consoleAccent, artType, selected, onToggleSelect, onPlay, onSettings }: Props): React.ReactElement {
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [artFailed, setArtFailed] = useState(false);
   const fetchedRef = useRef(false);
@@ -35,7 +39,7 @@ export default function GameCard({ game, consoleKey, consoleAccent, selected, on
       style={{ "--card-accent": consoleAccent } as React.CSSProperties}
     >
       {/* Art area */}
-      <div className="game-card-art">
+      <div className={`game-card-art game-card-art-${artType}`}>
         {artUrl && !artFailed ? (
           <img
             src={artUrl}

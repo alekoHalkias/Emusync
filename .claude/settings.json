@@ -18,7 +18,12 @@
       "Bash(git fetch *)",
       "Bash(git branch -r)",
       "Bash(git branch -r *)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(make lint)",
+      "Bash(make lint *)",
+      "Bash(git diff *)",
+      "Bash(git diff)"
     ]
   }
 }

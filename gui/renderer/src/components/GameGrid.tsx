@@ -1,10 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { removeGame } from "../api";
 import type { GameRow } from "./game-list/types";
 import type { GameModalTarget } from "./GameModal";
 import GameCard from "./GameCard";
 import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
+
+// Mirrors the ArtType union in gui/electron/art.ts (issue #324).
+type ArtType = "grid" | "hero" | "logo" | "icon";
+const ART_TYPE_LABELS: Record<ArtType, string> = {
+  grid: "Grid", hero: "Hero", logo: "Logo", icon: "Icon",
+};
 
 // Accent color per console key (mirrors ConsoleGrid)
 const CONSOLE_ACCENT: Record<string, string> = {
@@ -46,6 +52,26 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [artType, setArtType] = useState<ArtType>("grid");
+
+  useEffect(() => {
+    window.emusync.config.load().then((cfg) => {
+      const byConsole = (cfg?.art_type_by_console as Record<string, string>) ?? {};
+      const stored = byConsole[consoleKey];
+      if (stored === "grid" || stored === "hero" || stored === "logo" || stored === "icon") {
+        setArtType(stored);
+      } else {
+        setArtType("grid");
+      }
+    });
+  }, [consoleKey]);
+
+  async function changeArtType(type: ArtType): Promise<void> {
+    setArtType(type);
+    const cfg = (await window.emusync.config.load()) ?? {};
+    const byConsole = { ...((cfg.art_type_by_console as Record<string, string>) ?? {}), [consoleKey]: type };
+    await window.emusync.config.save({ ...cfg, art_type_by_console: byConsole });
+  }
 
   function toggleSelect(slug: string): void {
     setSelectedSlugs((prev) => {
@@ -116,6 +142,16 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
             🗑 Delete {selectedSlugs.size}
           </button>
         )}
+        <select
+          className="game-grid-art-type"
+          value={artType}
+          onChange={(e) => changeArtType(e.target.value as ArtType)}
+          title="Artwork type"
+        >
+          {(Object.keys(ART_TYPE_LABELS) as ArtType[]).map((t) => (
+            <option key={t} value={t}>{ART_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
         <input
           className="game-grid-search"
           type="text"
@@ -139,10 +175,11 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
               <div className="game-grid-cards">
                 {local.map((g) => (
                   <GameCard
-                    key={g.slug}
+                    key={`${g.slug}:${artType}`}
                     game={g}
                     consoleKey={consoleKey}
                     consoleAccent={accent}
+                    artType={artType}
                     selected={selectedSlugs.has(g.slug)}
                     onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}
@@ -161,10 +198,11 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
               <div className="game-grid-cards">
                 {remote.map((g) => (
                   <GameCard
-                    key={g.slug}
+                    key={`${g.slug}:${artType}`}
                     game={g}
                     consoleKey={consoleKey}
                     consoleAccent={accent}
+                    artType={artType}
                     selected={selectedSlugs.has(g.slug)}
                     onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}

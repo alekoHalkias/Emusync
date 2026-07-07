@@ -6,8 +6,10 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import https from "https";
+import { parse as parseTOML } from "smol-toml";
 import SGDBImport from "steamgriddb";
 import { getSteamGridDbKey } from "./steamgriddb";
+import { CONFIG_PATH } from "./runtime";
 
 // steamgriddb is a pure-ESM package ("type": "module"); the Electron main
 // bundle is CJS and externalizes it as a plain require(), which resolves to
@@ -44,6 +46,24 @@ const LIBRETRO_SYSTEM: Record<string, string> = {
   ws:      "Bandai_-_WonderSwan",
   wsc:     "Bandai_-_WonderSwan_Color",
 };
+
+export type ArtType = "grid" | "hero" | "logo" | "icon";
+const ART_TYPES: ArtType[] = ["grid", "hero", "logo", "icon"];
+
+// Per-console artwork type preference (issue #324) — read directly from the
+// shared config file rather than passed through art:get's args, so the IPC
+// signature stays unchanged and every caller automatically picks up a change.
+function getArtType(consoleKey: string): ArtType {
+  try {
+    if (!existsSync(CONFIG_PATH)) return "grid";
+    const cfg = parseTOML(readFileSync(CONFIG_PATH, "utf-8")) as Record<string, any>;
+    const byConsole = (cfg.art_type_by_console ?? {}) as Record<string, string>;
+    const type = byConsole[consoleKey];
+    return (ART_TYPES as string[]).includes(type) ? (type as ArtType) : "grid";
+  } catch {
+    return "grid";
+  }
+}
 
 function sanitizeGameName(name: string): string {
   // libretro thumbnail filenames replace certain chars with underscores
@@ -89,16 +109,26 @@ function download(url: string, dest: string): Promise<void> {
   });
 }
 
-async function fetchFromSteamGridDb(gameName: string, dest: string): Promise<boolean> {
+async function fetchFromSteamGridDb(gameName: string, dest: string, artType: ArtType): Promise<boolean> {
   const key = await getSteamGridDbKey();
   if (!key) return false;
   try {
     const client = new SGDB({ key });
     const games = await client.searchGame(gameName);
     if (!games.length) return false;
-    const grids = await client.getGrids({ id: games[0].id, type: "game", dimensions: ["600x900"] });
-    if (!grids.length) return false;
-    await download(String(grids[0].url), dest);
+    const gameId = games[0].id;
+    // Grid keeps the existing boxart-shaped filter; Hero/Logo/Icon take
+    // SteamGridDB's first result as-is — there's no single "right" size to
+    // filter to for those the way 600x900 is the standard boxart aspect.
+    const images = artType === "grid"
+      ? await client.getGrids({ id: gameId, type: "game", dimensions: ["600x900"] })
+      : artType === "hero"
+      ? await client.getHeroes({ id: gameId, type: "game" })
+      : artType === "logo"
+      ? await client.getLogos({ id: gameId, type: "game" })
+      : await client.getIcons({ id: gameId, type: "game" });
+    if (!images.length) return false;
+    await download(String(images[0].url), dest);
     return existsSync(dest);
   } catch {
     return false;
@@ -143,17 +173,27 @@ export function registerArtIpc(): void {
     "art:get",
     async (_event, slug: string, gameName: string, consoleKey: string): Promise<string | null> => {
       try {
-        // One folder per console, one subfolder per game (issue #304 follow-up)
-        // — e.g. ~/.emusync/art/gba/pokemon-emerald/boxart.png.
+        // One folder per console, one subfolder per game (issue #304 follow-up),
+        // one file per artwork type within it (issue #324) — e.g.
+        // ~/.emusync/art/gba/pokemon-emerald/grid.png. Each type is cached
+        // independently and permanently once fetched; switching a console's
+        // configured type never deletes another type's cached file, it just
+        // changes which one this device looks for/fetches next.
+        const artType = getArtType(consoleKey);
         const gameDir = join(ART_DIR, consoleKey, slug);
         mkdirSync(gameDir, { recursive: true });
-        const dest = join(gameDir, "boxart.png");
+        const dest = join(gameDir, `${artType}.png`);
         if (existsSync(dest)) return toDataUrl(dest);
 
         // SteamGridDB's fuzzy title search finds far more games than the
         // exact-filename libretro-thumbnails lookup below; try it first when
         // a shared key is configured (issue #322).
-        if (await fetchFromSteamGridDb(gameName, dest)) return toDataUrl(dest);
+        if (await fetchFromSteamGridDb(gameName, dest, artType)) return toDataUrl(dest);
+
+        // The libretro-thumbnails fallback is boxart-shaped only — there's no
+        // equivalent for hero/logo/icon art, so those just show the
+        // placeholder if SteamGridDB has no key/no match.
+        if (artType !== "grid") return null;
 
         const url = buildThumbnailUrl(consoleKey, gameName);
         if (!url) return null;
