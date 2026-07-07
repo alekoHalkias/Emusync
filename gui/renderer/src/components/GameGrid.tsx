@@ -177,15 +177,13 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
           <span className="game-grid-label">{consoleLabel}</span>
           <span className="game-grid-total">{games.length} game{games.length !== 1 ? "s" : ""}</span>
         </div>
-        {selectedSlugs.size > 0 && (
-          <button
-            className="btn btn-danger"
-            style={{ flexShrink: 0 }}
-            onClick={() => setConfirmDelete(true)}
-          >
-            🗑 Delete {selectedSlugs.size}
-          </button>
-        )}
+        <button
+          className="btn btn-danger game-grid-delete-btn"
+          disabled={selectedSlugs.size === 0}
+          onClick={() => setConfirmDelete(true)}
+        >
+          🗑 Delete{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
+        </button>
         <select
           className="game-grid-art-type"
           value={artType}

@@ -462,12 +462,12 @@ input.error { border-color: var(--red); }
   padding: 7px 12px;
   font-size: 13px;
   outline: none;
-  width: 180px;
+  width: 90px;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
   transition: border-color 0.15s, width 0.2s;
 }
-.game-grid-search:focus { border-color: var(--accent); width: 220px; }
+.game-grid-search:focus { border-color: var(--accent); width: 110px; }
 
 .game-grid-art-type {
   background: var(--bg);
@@ -479,6 +479,14 @@ input.error { border-color: var(--red); }
   outline: none;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
+}
+
+/* Match the dropdown/search box model exactly (padding + border) so the
+   bulk-delete button isn't visibly taller than its header siblings — the
+   generic .btn class uses more padding and no border (issue #347). */
+.game-grid-delete-btn {
+  padding: 7px 12px;
+  border: 1px solid transparent;
 }
 
 .game-grid-body { }
