@@ -99,6 +99,19 @@ def _find_installed_core(cores_dir: str, system: dict) -> dict | None:
     return None
 
 
+def _expand_home(path: str) -> str:
+    """Expand a leading `~/` or bare `~`, mirroring detect.ts's `expand()` — os.path
+    functions never do shell-style expansion on their own."""
+    if not path:
+        return path
+    home = str(Path.home())
+    if path == "~":
+        return home
+    if path.startswith("~/"):
+        return os.path.join(home, path[2:])
+    return path
+
+
 def _detect_emulators_for_console(console_def: dict) -> list[dict]:
     """Detect installed emulators/cores for a console. Mirrors detectEmulatorsForConsole in main.ts."""
     home = str(Path.home())
@@ -128,18 +141,22 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
                 "rom_dirs": ra["rom_dirs"],
             })
 
-    # Standalone emulators
+    # Standalone emulators. `dirs` carries `~`-templated save/state/memcard paths
+    # per launch flavour (native/flatpak) — mirrors detect.ts's `expand()` handling
+    # of StandaloneDef.dirs (issue #292).
     flatpak_list: str | None = None
     for s in console_def.get("standalones", []):
+        dirs = s.get("dirs", {})
         found = False
         for bin_path in s["native_bins"]:
-            if os.path.exists(bin_path):
+            if os.path.exists(_expand_home(bin_path)):
+                native_dirs = dirs.get("native", {})
                 options.append({
                     "id": f"{s['id']}-native",
                     "label": s["label"],
-                    "exec_path": bin_path,
-                    "save_dir": s["save_dir"],
-                    "state_dir": None,
+                    "exec_path": _expand_home(bin_path),
+                    "save_dir": _expand_home(native_dirs.get("save", "")),
+                    "state_dir": _expand_home(native_dirs["state"]) if native_dirs.get("state") else None,
                     "core_path": None,
                     "core_folder": None,
                     "rom_dirs": [],
@@ -157,13 +174,14 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
                 except Exception:
                     flatpak_list = ""
             if s["flatpak_id"] in flatpak_list:
+                flatpak_dirs = dirs.get("flatpak", {})
+                default_save = os.path.join(home, f".var/app/{s['flatpak_id']}/data/{s['id']}/saves")
                 options.append({
                     "id": f"{s['id']}-flatpak",
                     "label": f"{s['label']} (Flatpak)",
                     "exec_path": s["flatpak_exec"],
-                    "save_dir": os.path.join(
-                        home, f".var/app/{s['flatpak_id']}/data/{s['id']}/saves"),
-                    "state_dir": None,
+                    "save_dir": _expand_home(flatpak_dirs.get("save", "")) or default_save,
+                    "state_dir": _expand_home(flatpak_dirs["state"]) if flatpak_dirs.get("state") else None,
                     "core_path": None,
                     "core_folder": None,
                     "rom_dirs": [],
@@ -198,3 +216,47 @@ def _match_save_file(save_dir: str, base_name: str, exts: list[str]) -> dict:
         if os.path.exists(p):
             return {"path": p, "exists": True}
     return {"path": os.path.join(save_dir, f"{base_name}.{exts[0]}"), "exists": False}
+
+
+# Fallback filename per shared-memcard console when the memcards folder can't be
+# scanned or is empty (mirrors scan.ts's SHARED_MEMCARD_FALLBACK, issue #314).
+_SHARED_MEMCARD_FALLBACK: dict[str, str] = {"PS2": "Mcd001.ps2"}
+
+
+def _find_first_by_ext(dir_path: str, ext: str) -> str | None:
+    """First entry (file or folder) in dir_path whose name ends in ext, or None.
+    Mirrors scan.ts's findFirstByExt()."""
+    try:
+        with os.scandir(dir_path) as it:
+            for entry in it:
+                if entry.name.lower().endswith(ext):
+                    return entry.path
+    except OSError:
+        pass
+    return None
+
+
+def _dir_has_any_file(dir_path: str) -> bool:
+    """True if dir_path contains at least one file. Mirrors scan.ts's use of
+    findLatestFileInDir() as an existence check."""
+    try:
+        with os.scandir(dir_path) as it:
+            return any(entry.is_file() for entry in it)
+    except OSError:
+        return False
+
+
+def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[dict, dict | None]:
+    """Resolve the shared save/state location for a shared-memcard console (PS2):
+    the memcard is one file/folder per console, not one per game. Mirrors the
+    `isSharedMemcard` branch in scan.ts (issue #295)."""
+    save_dir = emu["save_dir"]
+    found = _find_first_by_ext(save_dir, ".ps2")
+    card_path = found or os.path.join(save_dir, _SHARED_MEMCARD_FALLBACK.get(console_abbr, "Mcd001.ps2"))
+    save_match = {"path": card_path, "exists": os.path.exists(card_path)}
+
+    state_match: dict | None = None
+    if emu.get("state_dir"):
+        state_dir = emu["state_dir"]
+        state_match = {"path": state_dir, "exists": _dir_has_any_file(state_dir)}
+    return save_match, state_match
