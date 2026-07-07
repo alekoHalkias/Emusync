@@ -80,6 +80,15 @@ class GameDeviceMixin:
         ).fetchone()
         return GameDevice(**dict(row)) if row else None
 
+    def remove_game_device(self, game_slug: str, device_id: str) -> None:
+        """Unlink a game from one device only (issue #343) — the game itself,
+        its saves/states, and every other device's config are untouched."""
+        self._conn.execute(
+            "DELETE FROM game_devices WHERE game_slug = ? AND device_id = ?",
+            (game_slug, device_id),
+        )
+        self._conn.commit()
+
     def list_devices_for_game(self, game_slug: str) -> list[dict]:
         rows = self._conn.execute(
             """SELECT d.id, d.name, gd.rom_path, gd.save_path, gd.state_path, gd.rom_folder_path

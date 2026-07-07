@@ -106,6 +106,17 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
             "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256}
 
 
+@router.delete("/games/{slug}/device")
+def remove_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
+    """Unlink a game from the calling device only (issue #343) — the game
+    itself, its saves/states, and every other device's config are untouched.
+    Idempotent: a device with no config for this game just gets {"ok": True}."""
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")
+    _get_store().remove_game_device(slug, device_id)
+    return {"ok": True}
+
+
 @router.get("/games/{slug}/network-source")
 def get_game_network_source(slug: str, device_id: str = Depends(_auth)) -> dict:
     """A network-drive config for this game on any device (issue #270).

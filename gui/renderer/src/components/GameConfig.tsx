@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { addGame, getGame, getGameDevice, getDeviceConsoles, getConsoleMemcardMeta, getSaveMeta, getStateMeta, removeGame, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
+import { addGame, getGame, getGameDevice, getDeviceConsoles, getConsoleMemcardMeta, getSaveMeta, getStateMeta, setGameDevice, updateGame, whoami, type GameDeviceConfig, type SaveMeta } from "../api";
+import { deleteGame } from "../gameDelete";
 import { sanitizeFilename, usesSharedSaveLayout } from "./console-import/helpers";
 import { RelTime } from "../time";
 
@@ -36,6 +37,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const isNew = slug === null;
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Tier 2/3 delete options (issue #343) — tier 1 (unlink this device) always
+  // happens; these two layer additional destructive steps on top of it.
+  const [deleteLocalRom, setDeleteLocalRom] = useState(false);
+  const [removeEverywhere, setRemoveEverywhere] = useState(false);
   const [name, setName] = useState(initialName ?? "");
   const [romPath, setRomPath] = useState("");
   const [savePath, setSavePath] = useState("");
@@ -140,7 +145,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     if (!slug) return;
     setDeleting(true);
     try {
-      await removeGame(slug);
+      await deleteGame(slug, { deleteLocalRom, removeEverywhere });
       onRemoved?.();
     } catch (e: unknown) {
       setErrors({ _global: e instanceof Error ? e.message : "Failed to delete game." });
@@ -530,16 +535,32 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           />
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
           <div>
             {!isNew && (deleteConfirm ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                Delete this game?
-                <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
-                  {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
-                </button>
-                <button className="btn btn-ghost" onClick={() => setDeleteConfirm(false)} disabled={deleting}>Cancel</button>
-              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, alignItems: "flex-start" }}>
+                <span>Remove this game from this device?</span>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
+                  <input type="checkbox" checked={deleteLocalRom} onChange={(e) => setDeleteLocalRom(e.target.checked)} disabled={deleting} />
+                  Also delete the ROM from local folders
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
+                  <input type="checkbox" checked={removeEverywhere} onChange={(e) => setRemoveEverywhere(e.target.checked)} disabled={deleting} />
+                  Also remove from all devices and delete the network ROM
+                </label>
+                <span style={{ display: "flex", gap: 8 }}>
+                  <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                    {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => { setDeleteConfirm(false); setDeleteLocalRom(false); setRemoveEverywhere(false); }}
+                    disabled={deleting}
+                  >
+                    Cancel
+                  </button>
+                </span>
+              </div>
             ) : (
               <button className="btn btn-danger" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
             ))}
