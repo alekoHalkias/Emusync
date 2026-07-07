@@ -1,7 +1,7 @@
 // State machine + async orchestration for the Add-Console wizard.
 // The presentational step components consume the object this hook returns.
 import { useEffect, useState } from "react";
-import { addGame, setGameDevice, gamesOverview, getConsoleMemcardMeta, getDeviceGameDevices, getSaveMeta, getStateMeta, listDevices, type Device, type GameOverview, type SaveMeta } from "../../api";
+import { addGame, setGameDevice, gamesOverview, type GameOverview } from "../../api";
 import {
   annotateRoms,
   classifyByRoot,
@@ -9,11 +9,12 @@ import {
   existingLocalGamesForConsole,
   getConsoleAbbreviation,
   groupByDir,
-  relPathUnder,
   sanitizeFilename,
   usesSharedSaveLayout,
   stepIndex,
 } from "./helpers";
+import { autoPush, prefetchArt, pullFromServerIfNewer } from "./postImport";
+import { resolveImportPaths } from "./resolveRomPaths";
 import type {
   ConsoleOption,
   EmulatorOption,
@@ -23,7 +24,6 @@ import type {
   PushResult,
   RomEntry,
 } from "./types";
-import { parseUtc } from "../../time";
 
 // IPC bridge (typing deferred to the typed-bridge work in #228).
 const emusync = window.emusync;
@@ -301,85 +301,10 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
         // The display name (with spaces/punctuation) is what the game stores.
         const safeBase    = sanitizeFilename(displayName);
 
-        let romPath      = rom.romPath;
-        let savePath     = rom.savePath;
-        let statePath    = rom.statePath ?? "";
-        let launchCmd    = rom.launchCommand;
         const scanRoot   = (rom.romFolderPath ?? "").replace(/\/$/, "");
 
-        // Network ROMs: never reorganise the share — store the master path as-is
-        // plus a portable rel-path. local_rom_path is EMPTY for a network-only
-        // ROM, but holds the existing local file when the ROM was also found on
-        // local disk (presence "both") or was uploaded from local disk
-        // (presence "local") — in both cases the game is treated as already
-        // localized. Local-source ROMs: organise into a per-game subfolder.
-        let romRelPath = "";
-        let netRoot = "";
-        let localCopyPath = "";
-        let romSha = "";
-        if (romSource === "network") {
-          const lRoot = (localRomRoot || "").replace(/\/$/, "");
-          const networkRoots = scanRoots.filter(r => r !== lRoot);
-          if (rom.presence === "local") {
-            // Found only on local disk → rename to the cleaned title, then copy it
-            // UP to the share so the share becomes the master, keeping the local
-            // file as the localized copy.
-            let localPath = rom.localRomPath ?? romPath;
-            netRoot = networkRoots[0] ?? "";
-            if (!netRoot) throw new Error("no network folder configured to upload to");
-            const renamed = await emusync.files.renameGameFiles({
-              romPath: localPath, savePath: sharedLayout ? "" : savePath,
-              stateFolder: sharedLayout ? "" : statePath,
-              newBase: safeBase, reorganize: false,
-            });
-            if (renamed.ok) {
-              launchCmd = launchCmd.replaceAll(localPath, renamed.newRomPath);
-              localPath = renamed.newRomPath;
-              if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
-            }
-            const rel = relPathUnder(localPath, [localRomRoot]);
-            const masterPath = `${netRoot}/${rel}`;
-            const up = await emusync.rom.uploadMaster(localPath, masterPath);
-            if (!up.ok) throw new Error(up.error ?? "upload to share failed");
-            launchCmd     = launchCmd.replaceAll(localPath, masterPath);
-            romPath       = masterPath;       // master is now the canonical ROM
-            romRelPath    = rel;
-            localCopyPath = localPath;        // existing local file = localized copy
-            romSha        = up.sha256 ?? "";
-          } else {
-            // network-only or both: romPath is the share master as scanned. Rename
-            // the master (and the local copy, if any) + save/state to the title.
-            netRoot = networkRoots.find(r => romPath === r || romPath.startsWith(r + "/")) ?? scanRoot;
-            const renamed = await emusync.files.renameGameFiles({
-              romPath, savePath: sharedLayout ? "" : savePath,
-              stateFolder: sharedLayout ? "" : statePath,
-              newBase: safeBase, reorganize: false,
-              secondaryRomPath: rom.presence === "both" ? (rom.localRomPath ?? undefined) : undefined,
-            });
-            if (renamed.ok) {
-              launchCmd = launchCmd.replaceAll(romPath, renamed.newRomPath);
-              romPath   = renamed.newRomPath;
-              if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
-              if (rom.presence === "both") localCopyPath = renamed.newSecondaryRomPath ?? (rom.localRomPath ?? "");
-            }
-            romRelPath = relPathUnder(romPath, networkRoots);
-          }
-        } else {
-          // Local import: rename the ROM (+ save/state) to the cleaned title, and
-          // nest a flat ROM into a per-game subfolder. Safe no-op when unchanged.
-          const romParent = romPath.includes("/") ? romPath.substring(0, romPath.lastIndexOf("/")) : "";
-          const flat = !!scanRoot && romParent === scanRoot;
-          const renamed = await emusync.files.renameGameFiles({
-            romPath, savePath: sharedLayout ? "" : savePath,
-            stateFolder: sharedLayout ? "" : statePath,
-            newBase: safeBase, reorganize: flat,
-          });
-          if (renamed.ok) {
-            launchCmd  = launchCmd.replaceAll(romPath, renamed.newRomPath);
-            romPath    = renamed.newRomPath;
-            if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
-          }
-        }
+        const { romPath, savePath, statePath, launchCmd, romRelPath, netRoot, localCopyPath, romSha } =
+          await resolveImportPaths(rom, { romSource, localRomRoot, scanRoots, scanRoot, safeBase, sharedLayout });
 
         const slug = rom.linkedSlug ?? (await addGame(displayName, consoleAbbr)).slug;
         await setGameDevice(slug, {
@@ -411,7 +336,9 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // Network ROMs live on a share every device reaches, so there's nothing to
     // copy — cross-device config broadcast is tracked as a follow-up (#255).
     // Local ROMs auto-push their bytes to peers as before.
-    if (imported.length > 0 && romSource !== "network") autoPush(imported, consoleAbbr);
+    if (imported.length > 0 && romSource !== "network") {
+      autoPush(imported, consoleAbbr, { pushSaves, pushStates }, setPushResults);
+    }
     // If another device already has save/state data for these games (or, for a
     // shared-layout console, the console's memory card), pull it down to this
     // device now — otherwise a fresh import shows up empty until the first
@@ -422,74 +349,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // Pre-fetch art for every imported game now, reusing the same art:get
     // IPC/cache GameCard uses lazily, so the game grid isn't blank-then-
     // populated tile-by-tile the first time it's opened (issue #327).
-    if (imported.length > 0) prefetchArt(imported, consoleAbbr);
-  }
-
-  async function prefetchArt(entries: ImportedEntry[], consoleAbbr: string): Promise<void> {
-    const consoleKey = consoleAbbr.toLowerCase();
-    setArtProgress({ done: 0, total: entries.length });
-    for (let i = 0; i < entries.length; i++) {
-      try { await emusync.art.get(entries[i].slug, entries[i].name, consoleKey); } catch { /* best-effort */ }
-      setArtProgress({ done: i + 1, total: entries.length });
-    }
-  }
-
-  /** Whether `serverMeta`'s data is newer than the local file at `localTime`
-   * (or there's no local file yet, in which case the server copy always wins).
-   * Both timestamps are tz-less UTC strings — must go through parseUtc, not a
-   * raw `new Date()`, or they're misread as local time (see time.tsx). */
-  function _serverIsNewer(localTime: string | null, serverMeta: SaveMeta): boolean {
-    if (!serverMeta) return false;
-    const local = parseUtc(localTime);
-    const server = parseUtc(serverMeta.pushed_at);
-    return !local || (!!server && server > local);
-  }
-
-  async function pullFromServerIfNewer(entries: ImportedEntry[], sharedLayout: boolean, consoleAbbr: string): Promise<void> {
-    if (sharedLayout) {
-      // One card shared by every game on the console — pull it once. Every
-      // entry's savePath resolves to the same physical card file (#295).
-      const cardPath = entries[0].savePath;
-      if (!cardPath) return;
-      try {
-        const [meta, localTime] = await Promise.all([
-          getConsoleMemcardMeta(consoleAbbr),
-          emusync.files.getSaveTime(cardPath).catch(() => null),
-        ]);
-        if (_serverIsNewer(localTime, meta)) {
-          await emusync.memcard.pull(consoleAbbr, cardPath);
-        }
-      } catch { /* best-effort */ }
-      // Shared save STATES aren't pulled here: they live in one folder keyed by
-      // game serial (sstates/), and there's no console-scoped state endpoint to
-      // pull the whole thing from — only emusync run's per-launch, serial-
-      // filtered sync touches them (#294).
-      return;
-    }
-    for (const entry of entries) {
-      try {
-        if (entry.savePath) {
-          const [saveMeta, localTime] = await Promise.all([
-            getSaveMeta(entry.slug),
-            emusync.files.getSaveTime(entry.savePath).catch(() => null),
-          ]);
-          if (_serverIsNewer(localTime, saveMeta)) {
-            await emusync.save.pull(entry.slug, entry.savePath);
-          }
-        }
-        if (entry.statePath) {
-          // state_path is a FOLDER (RetroArch content-dir layout) — its newest
-          // file's time is the meaningful "local time", not the folder's own.
-          const [stateMeta, latest] = await Promise.all([
-            getStateMeta(entry.slug),
-            emusync.files.getLatestInFolder(entry.statePath).catch(() => null),
-          ]);
-          if (_serverIsNewer(latest?.time ?? null, stateMeta)) {
-            await emusync.state.pull(entry.slug, entry.statePath);
-          }
-        }
-      } catch { /* best-effort — one game's pull failing shouldn't stop the rest */ }
-    }
+    if (imported.length > 0) prefetchArt(imported, consoleAbbr, setArtProgress);
   }
 
   async function doImport(): Promise<void> {
@@ -509,65 +369,6 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
 
   function dismissNameWarnings(): void {
     setNameWarnings([]);
-  }
-
-  async function autoPush(entries: ImportedEntry[], consoleAbbr: string): Promise<void> {
-    const sharedLayout = usesSharedSaveLayout(consoleAbbr);
-    try {
-      const cfg = await emusync.config.load();
-      const myDeviceId: string = cfg?.device_id ?? "";
-      const allDevices: Device[] = await listDevices();
-      const others = allDevices.filter(d => d.id !== myDeviceId);
-      if (others.length === 0) return;
-
-      for (const device of others) {
-        setPushResults(prev => [...prev, { deviceName: device.name, status: "pushing" }]);
-        let ok = true;
-        let offline = false;
-        let errMsg = "";
-
-        // Fetch this device's existing games once instead of per-entry.
-        const deviceSlugs = new Set((await getDeviceGameDevices(device.id)).map(g => g.slug));
-
-        for (const entry of entries) {
-          // Skip if this device already has the game
-          if (deviceSlugs.has(entry.slug)) continue;
-
-          // Push ROM
-          const romResult: { ok: boolean; targetOnline?: boolean; error?: string } =
-            await emusync.rom.push(entry.slug, device.id, consoleAbbr);
-          if (!romResult.ok) { ok = false; errMsg = romResult.error ?? "Push failed"; break; }
-          if (romResult.targetOnline === false) offline = true;
-
-          // Push save if user opted in and save file exists. Skipped for a
-          // shared-layout console (PS2): the card/states aren't per-game, so a
-          // per-game save/state push would store the wrong thing — they sync via
-          // `emusync run`'s console-card + serial-filtered paths (#294/#295).
-          if (pushSaves && !sharedLayout) {
-            const saveTime = await emusync.files.getSaveTime(entry.savePath);
-            if (saveTime) {
-              try { await emusync.save.push(entry.slug, entry.savePath); } catch { /* non-fatal */ }
-            }
-          }
-
-          // Push state if user opted in and state folder has files
-          if (pushStates && !sharedLayout && entry.statePath) {
-            const latest = await emusync.files.getLatestInFolder(entry.statePath);
-            if (latest) {
-              try { await emusync.state.push(entry.slug, entry.statePath); } catch { /* non-fatal */ }
-            }
-          }
-        }
-
-        setPushResults(prev => prev.map(r =>
-          r.deviceName === device.name
-            ? { ...r, status: ok ? (offline ? "offline" : "ok") : "error", error: errMsg }
-            : r
-        ));
-      }
-    } catch {
-      // Server unreachable — silently skip auto-push
-    }
   }
 
   async function pickLocalRomRoot(): Promise<void> {
