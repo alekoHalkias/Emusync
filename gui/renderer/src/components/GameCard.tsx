@@ -14,9 +14,10 @@ type Props = {
   onToggleSelect: () => void;
   onPlay: (slug: string, name: string) => void;
   onSettings: (game: GameRow) => void;
+  onArtStatus?: (slug: string, hasArt: boolean) => void;
 };
 
-export default function GameCard({ game, consoleKey, consoleAccent, artType, selected, onToggleSelect, onPlay, onSettings }: Props): React.ReactElement {
+export default function GameCard({ game, consoleKey, consoleAccent, artType, selected, onToggleSelect, onPlay, onSettings, onArtStatus }: Props): React.ReactElement {
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [artFailed, setArtFailed] = useState(false);
   const fetchedRef = useRef(false);
@@ -27,7 +28,8 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
     window.emusync.art.get(game.slug, game.name, consoleKey).then((url) => {
       if (url) setArtUrl(url);
       else setArtFailed(true);
-    }).catch(() => setArtFailed(true));
+      onArtStatus?.(game.slug, !!url);
+    }).catch(() => { setArtFailed(true); onArtStatus?.(game.slug, false); });
   }, [game.slug, game.name, consoleKey]);
 
   const canPlay = game.isLocal && !game.locked;
