@@ -18,6 +18,7 @@ class Game:
     slug: str
     name: str
     console: str = ""
+    sgdb_game_id: Optional[int] = None
 
 
 @dataclass

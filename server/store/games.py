@@ -30,6 +30,14 @@ class GameMixin:
         )
         self._conn.commit()
 
+    def update_game_sgdb_id(self, slug: str, sgdb_game_id: Optional[int]) -> None:
+        """Remember a manually-picked SteamGridDB game match (issue #325), shared
+        across every device via this same server-side row."""
+        self._conn.execute(
+            "UPDATE games SET sgdb_game_id = ? WHERE slug = ?", (sgdb_game_id, slug)
+        )
+        self._conn.commit()
+
     def remove_game(self, slug: str) -> None:
         # Drop on-disk save/state blobs first; the rows go via FK cascade, but the
         # files would otherwise be orphaned (issue #239).
@@ -38,12 +46,12 @@ class GameMixin:
         self._conn.commit()
 
     def list_games(self) -> list[Game]:
-        rows = self._conn.execute("SELECT slug, name, console FROM games").fetchall()
+        rows = self._conn.execute("SELECT slug, name, console, sgdb_game_id FROM games").fetchall()
         return [Game(**dict(r)) for r in rows]
 
     def get_game(self, slug: str) -> Optional[Game]:
         row = self._conn.execute(
-            "SELECT slug, name, console FROM games WHERE slug = ?", (slug,)
+            "SELECT slug, name, console, sgdb_game_id FROM games WHERE slug = ?", (slug,)
         ).fetchone()
         return Game(**dict(row)) if row else None
 

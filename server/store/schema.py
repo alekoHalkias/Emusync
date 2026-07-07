@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 14
+_SCHEMA_VERSION = 15
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -22,9 +22,10 @@ CREATE TABLE IF NOT EXISTS devices (
     last_seen_at TEXT
 );
 CREATE TABLE IF NOT EXISTS games (
-    slug    TEXT PRIMARY KEY,
-    name    TEXT NOT NULL,
-    console TEXT DEFAULT ''
+    slug          TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    console       TEXT DEFAULT '',
+    sgdb_game_id  INTEGER
 );
 CREATE TABLE IF NOT EXISTS consoles (
     id                    TEXT PRIMARY KEY,
@@ -355,4 +356,9 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             key   TEXT PRIMARY KEY,
             value TEXT
         )""")
+    if from_version < 15:
+        # A manually-picked SteamGridDB game match, remembered per game so
+        # every device sees the same pinned artwork source instead of each
+        # re-searching independently (issue #325).
+        _try(conn, "ALTER TABLE games ADD COLUMN sgdb_game_id INTEGER")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

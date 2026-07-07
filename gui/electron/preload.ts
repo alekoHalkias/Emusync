@@ -117,6 +117,20 @@ contextBridge.exposeInMainWorld("emusync", {
     getConsoleIcon: (consoleKey: string): Promise<string | null> =>
       ipcRenderer.invoke("art:getConsoleIcon", consoleKey),
   },
+  artwork: {
+    searchGames: (name: string): Promise<{ id: number; name: string; release_date: number; verified: boolean }[]> =>
+      ipcRenderer.invoke("artwork:searchGames", name),
+    listCandidates: (sgdbGameId: number, type: "grid" | "hero" | "logo" | "icon"): Promise<{ id: number; thumb: string; url: string }[]> =>
+      ipcRenderer.invoke("artwork:listCandidates", sgdbGameId, type),
+    setArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon", url: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("artwork:setArt", slug, consoleKey, type, url),
+    clearArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon"): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke("artwork:clearArt", slug, consoleKey, type),
+    getCurrent: (slug: string, consoleKey: string): Promise<Record<"grid" | "hero" | "logo" | "icon", string | null>> =>
+      ipcRenderer.invoke("artwork:getCurrent", slug, consoleKey),
+    refreshAll: (slug: string, gameName: string, consoleKey: string, sgdbGameId: number | null): Promise<Record<"grid" | "hero" | "logo" | "icon", boolean>> =>
+      ipcRenderer.invoke("artwork:refreshAll", slug, gameName, consoleKey, sgdbGameId),
+  },
   steamgriddb: {
     getKey: (): Promise<string | null> => ipcRenderer.invoke("steamgriddb:getKey"),
     setKey: (key: string): Promise<{ ok: boolean; error?: string }> =>

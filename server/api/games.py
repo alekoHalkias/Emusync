@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -15,6 +17,10 @@ router = APIRouter()
 class GameRequest(BaseModel):
     name: str
     console: str = ""
+    # A manually-picked SteamGridDB game match (issue #325), shared across
+    # devices. Omitted/None on a plain rename leaves the existing value alone —
+    # see update_game below.
+    sgdb_game_id: Optional[int] = None
 
 
 class GameDeviceRequest(BaseModel):
@@ -35,14 +41,17 @@ class GameDeviceRequest(BaseModel):
 
 @router.get("/games")
 def list_games(device_id: str = Depends(_auth)) -> list[dict]:
-    return [{"slug": g.slug, "name": g.name, "console": g.console} for g in _get_store().list_games()]
+    return [
+        {"slug": g.slug, "name": g.name, "console": g.console, "sgdb_game_id": g.sgdb_game_id}
+        for g in _get_store().list_games()
+    ]
 
 
 @router.post("/games")
 def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
     slug = re.sub(r"[^a-z0-9]+", "-", req.name.lower()).strip("-")
     game = _get_store().add_game(slug, req.name, req.console)
-    return {"slug": game.slug, "name": game.name, "console": game.console}
+    return {"slug": game.slug, "name": game.name, "console": game.console, "sgdb_game_id": game.sgdb_game_id}
 
 
 @router.get("/games/overview")
@@ -59,7 +68,7 @@ def get_game(slug: str, device_id: str = Depends(_auth)) -> dict:
     game = _get_store().get_game(slug)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    return {"slug": game.slug, "name": game.name, "console": game.console}
+    return {"slug": game.slug, "name": game.name, "console": game.console, "sgdb_game_id": game.sgdb_game_id}
 
 
 @router.put("/games/{slug}")
@@ -70,8 +79,10 @@ def update_game(slug: str, req: GameRequest, device_id: str = Depends(_auth)) ->
     store.update_game_name(slug, req.name)
     if req.console:
         store.update_game_console(slug, req.console)
+    if req.sgdb_game_id:
+        store.update_game_sgdb_id(slug, req.sgdb_game_id)
     game = store.get_game(slug)
-    return {"slug": slug, "name": game.name, "console": game.console}
+    return {"slug": slug, "name": game.name, "console": game.console, "sgdb_game_id": game.sgdb_game_id}
 
 
 @router.delete("/games/{slug}")
