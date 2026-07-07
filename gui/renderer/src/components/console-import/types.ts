@@ -52,6 +52,6 @@ export type Phase =
 
 export type Props = { onClose: () => void; onImported: () => void; initialConsole?: string };
 
-export type ImportedEntry = { slug: string; savePath: string; statePath: string };
+export type ImportedEntry = { slug: string; name: string; savePath: string; statePath: string };
 export type PushStatus = "pushing" | "ok" | "offline" | "error";
 export type PushResult = { deviceName: string; status: PushStatus; error?: string };
