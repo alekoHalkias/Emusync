@@ -410,6 +410,11 @@ input.error { border-color: var(--red); }
   display: flex;
   align-items: center;
   gap: 12px;
+  /* Pulls up into .content's 24px top padding (shared by every screen, so
+     not reduced globally) — the header row used to be much taller and
+     absorbed that space visually; now that it's compact the gap above it
+     reads as excess whitespace. */
+  margin-top: -14px;
   margin-bottom: 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
