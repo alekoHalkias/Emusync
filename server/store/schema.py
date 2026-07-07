@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 13
+_SCHEMA_VERSION = 14
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -156,6 +156,10 @@ CREATE TABLE IF NOT EXISTS console_saves (
     hash             TEXT NOT NULL,
     pushed_at        TEXT NOT NULL,
     size             INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS server_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT
 );
 """
 
@@ -341,5 +345,14 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             hash             TEXT NOT NULL,
             pushed_at        TEXT NOT NULL,
             size             INTEGER NOT NULL
+        )""")
+    if from_version < 14:
+        # Generic single-value server-wide settings (issue #322) — currently
+        # used for the shared SteamGridDB API key (entered once on the server
+        # device, fetched by every connected device), but kept generic so a
+        # future single server-wide setting doesn't need its own migration.
+        _try(conn, """CREATE TABLE IF NOT EXISTS server_settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT
         )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

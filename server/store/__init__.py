@@ -26,6 +26,7 @@ from server.store.models import (
     RomTransfer,
     SaveMeta,
 )
+from server.store.settings import SettingsMixin
 from server.store.transfers import TransferMixin
 
 
@@ -40,6 +41,7 @@ class Store(
     TransferMixin,
     ConsoleDefMixin,
     ConflictMixin,
+    SettingsMixin,
     StoreBase,
 ):
     """SQLite-backed store. CRUD is split across the mixins above; connection and
