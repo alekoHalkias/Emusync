@@ -30,6 +30,10 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SgdbGameResult[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Shown next to the search box so a previously-picked match (persisted
+  // server-side via sgdb_game_id) is still visible on a fresh mount, even
+  // though the search-results list itself starts empty (issue #335).
+  const [matchedName, setMatchedName] = useState<string | null>(null);
   const [current, setCurrent] = useState<Record<ArtType, string | null>>(EMPTY_CURRENT);
   const [pickerType, setPickerType] = useState<ArtType | null>(null);
   const [candidates, setCandidates] = useState<SgdbCandidate[]>([]);
@@ -38,7 +42,13 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getGame(slug).then((g) => { if (g.sgdb_game_id) setSelectedId(g.sgdb_game_id); }).catch(() => {});
+    getGame(slug).then((g) => {
+      if (!g.sgdb_game_id) return;
+      setSelectedId(g.sgdb_game_id);
+      window.emusync.artwork.getMatchedGame(g.sgdb_game_id).then((match) => {
+        if (match) setMatchedName(match.name);
+      }).catch(() => {});
+    }).catch(() => {});
     window.emusync.artwork.getCurrent(slug, consoleKey).then(setCurrent).catch(() => {});
   }, [slug, consoleKey]);
 
@@ -64,13 +74,14 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
     }
   }
 
-  async function pickGame(id: number): Promise<void> {
-    setSelectedId(id);
-    try { await setGameSgdbId(slug, id); } catch { /* best-effort — local selection still works this session */ }
+  async function pickGame(game: SgdbGameResult): Promise<void> {
+    setSelectedId(game.id);
+    setMatchedName(game.name);
+    try { await setGameSgdbId(slug, game.id); } catch { /* best-effort — local selection still works this session */ }
     // Pull the id directly rather than through selectedId's state — a
     // just-clicked setSelectedId hasn't re-rendered yet, so reading the
     // state var here would still see the previous selection.
-    await doRefreshAll(id);
+    await doRefreshAll(game.id);
   }
 
   async function openPicker(type: ArtType): Promise<void> {
@@ -128,6 +139,11 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
             {searching ? <span className="spinner" /> : "Search"}
           </button>
         </div>
+        {matchedName && (
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+            ✓ Matched: {matchedName}
+          </p>
+        )}
       </div>
 
       {/* Results list — ~4 rows visible, scrolls for more */}
@@ -136,7 +152,7 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
           {results.map((r) => (
             <div
               key={r.id}
-              onClick={() => pickGame(r.id)}
+              onClick={() => pickGame(r)}
               style={{
                 padding: "4px 10px", cursor: "pointer", fontSize: 12, lineHeight: 1.5,
                 background: selectedId === r.id ? "var(--surface2)" : "transparent",
