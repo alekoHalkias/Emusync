@@ -473,12 +473,12 @@ input.error { border-color: var(--red); }
 }
 
 /* Match the dropdown/search box model exactly (padding + border + a fixed
-   height) so the bulk-delete button isn't visibly taller than its header
-   siblings — the generic .btn class uses more padding and no border, and the
-   🗑 emoji's glyph line-box is taller than the 13px text, which grows the
-   button's inline-flex height past its siblings even once padding matches
-   (issue #347). */
-.game-grid-delete-btn {
+   height) so the header buttons (select-all, delete) aren't visibly taller
+   than their dropdown/search siblings — the generic .btn class uses more
+   padding and no border, and an emoji glyph's line-box is taller than the
+   13px text, which grows a button's inline-flex height past its siblings
+   even once padding matches (issue #347). */
+.game-grid-header-btn {
   padding: 7px 12px;
   border: 1px solid transparent;
   height: 32px;

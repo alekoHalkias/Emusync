@@ -103,6 +103,12 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     });
   }
 
+  // Selects/deselects every currently-visible game — i.e. after search and
+  // the GameFilterButton filters, not the console's full game list.
+  function toggleSelectAll(): void {
+    setSelectedSlugs(allFilteredSelected ? new Set() : new Set(filtered.map((g) => g.slug)));
+  }
+
   async function handleBulkDelete(): Promise<void> {
     setDeleting(true);
     for (const slug of Array.from(selectedSlugs)) {
@@ -126,6 +132,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   const filtered = searched.filter((g) =>
     matchesFilters(filters, !!g.lastSave, g.romSource !== "network" || !!g.hasLocalCopy, hasArt[g.slug])
   );
+  const allFilteredSelected = filtered.length > 0 && filtered.every((g) => selectedSlugs.has(g.slug));
 
   const local  = filtered.filter((g) => g.isLocal);
   const remote = filtered.filter((g) => !g.isLocal);
@@ -168,7 +175,15 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
       <div className="game-grid-header" style={{ "--grid-accent": accent } as React.CSSProperties}>
         <div style={{ flex: 1 }} />
         <button
-          className="btn btn-danger game-grid-delete-btn"
+          className="btn btn-ghost game-grid-header-btn"
+          disabled={filtered.length === 0}
+          onClick={toggleSelectAll}
+          title={allFilteredSelected ? "Deselect all visible games" : "Select all visible games"}
+        >
+          {allFilteredSelected ? "☑ Deselect All" : "☐ Select All"}
+        </button>
+        <button
+          className="btn btn-danger game-grid-header-btn"
           disabled={selectedSlugs.size === 0}
           onClick={() => setConfirmDelete(true)}
         >
