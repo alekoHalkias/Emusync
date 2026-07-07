@@ -463,6 +463,8 @@ input.error { border-color: var(--red); }
    two sit as visually matching controls in the header row. */
 .game-grid-art-type,
 .game-grid-filter-btn {
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -472,6 +474,7 @@ input.error { border-color: var(--red); }
   outline: none;
   height: 32px;
   flex-shrink: 0;
+  cursor: pointer;
   -webkit-app-region: no-drag;
 }
 .game-grid-filter-btn:hover { background: var(--surface2); }

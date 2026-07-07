@@ -53,7 +53,6 @@ export default function GameFilterButton({ filters, onChange }: Props): React.Re
       <button
         className="game-grid-filter-btn"
         onClick={() => setOpen((v) => !v)}
-        style={{ cursor: "pointer" }}
       >
         ⏷ Filter{count > 0 ? ` (${count})` : ""}
       </button>
