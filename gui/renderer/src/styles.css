@@ -480,7 +480,7 @@ input.error { border-color: var(--red); }
    even once padding matches (issue #347). */
 .game-grid-header-btn {
   padding: 7px 12px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   height: 32px;
 }
 
