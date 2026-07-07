@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { configure, configureDevice, gamesOverview, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
@@ -90,17 +90,28 @@ export default function App(): React.ReactElement {
     return () => window.emusync.game.offExited(onExited);
   }, []);
 
-  // Mouse "back" side button (issue #354) — mirrors the topbar's "‹ Back"
-  // link. Only registered while on the console screen, since that's the
-  // only place it currently has anything to navigate back out of.
+  // Mouse back/forward side buttons (issues #354/#356). Back mirrors the
+  // topbar's "‹ Back" link (console -> games); forward re-enters whichever
+  // console you most recently left, one level deep — there's no multi-page
+  // history here, just games <-> console. Refs (not state) so the listener
+  // is registered once instead of re-subscribing on every screen change.
+  const screenRef = useRef(screen);
+  const lastConsoleRef = useRef<Screen | null>(null);
   useEffect(() => {
-    if (screen.name !== "console") return;
-    function handleMouseBack(e: MouseEvent): void {
-      if (e.button === 3) setScreen({ name: "games" });
-    }
-    window.addEventListener("mouseup", handleMouseBack);
-    return () => window.removeEventListener("mouseup", handleMouseBack);
+    if (screenRef.current.name === "console") lastConsoleRef.current = screenRef.current;
+    screenRef.current = screen;
   }, [screen]);
+  useEffect(() => {
+    function handleMouseNav(e: MouseEvent): void {
+      if (e.button === 3 && screenRef.current.name === "console") {
+        setScreen({ name: "games" });
+      } else if (e.button === 4 && screenRef.current.name === "games" && lastConsoleRef.current) {
+        setScreen(lastConsoleRef.current);
+      }
+    }
+    window.addEventListener("mouseup", handleMouseNav);
+    return () => window.removeEventListener("mouseup", handleMouseNav);
+  }, []);
 
   useEffect(() => {
     async function init(): Promise<void> {
