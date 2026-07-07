@@ -201,7 +201,7 @@ export default function App(): React.ReactElement {
               className="topbar-back"
               onClick={() => setScreen({ name: "games" })}
             >
-              ‹ EmuSync
+              ‹ Back
             </button>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
               <span className="game-grid-abbr">{screen.abbr}</span>
