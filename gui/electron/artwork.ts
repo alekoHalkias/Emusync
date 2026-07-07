@@ -30,6 +30,20 @@ export function registerArtworkIpc(): void {
   });
 
   ipcMain.handle(
+    "artwork:getMatchedGame",
+    async (_event, sgdbGameId: number): Promise<{ id: number; name: string } | null> => {
+      const key = await getSteamGridDbKey();
+      if (!key) return null;
+      try {
+        const game = await makeSteamGridDbClient(key).getGameById(sgdbGameId);
+        return { id: game.id, name: game.name };
+      } catch {
+        return null;
+      }
+    },
+  );
+
+  ipcMain.handle(
     "artwork:listCandidates",
     async (_event, sgdbGameId: number, type: ArtType): Promise<SgdbCandidate[]> => {
       const key = await getSteamGridDbKey();

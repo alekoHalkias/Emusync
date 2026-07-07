@@ -84,6 +84,7 @@ export interface EmusyncBridge {
   };
   artwork: {
     searchGames: (name: string) => Promise<{ id: number; name: string; release_date: number; verified: boolean }[]>;
+    getMatchedGame: (sgdbGameId: number) => Promise<{ id: number; name: string } | null>;
     listCandidates: (sgdbGameId: number, type: "grid" | "hero" | "logo" | "icon" | "wide_grid") => Promise<{ id: number; thumb: string; url: string }[]>;
     setArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon" | "wide_grid", url: string) => Promise<{ ok: boolean; error?: string }>;
     clearArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon" | "wide_grid") => Promise<{ ok: boolean }>;
