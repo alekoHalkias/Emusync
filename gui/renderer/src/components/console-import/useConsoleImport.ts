@@ -46,6 +46,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [savedFolders, setSavedFolders] = useState<string[]>([]);
   const [pushResults, setPushResults]   = useState<PushResult[]>([]);
+  const [artProgress, setArtProgress]   = useState({ done: 0, total: 0 });
   const [pushSaves, setPushSaves]       = useState(true);
   const [pushStates, setPushStates]     = useState(true);
   // ROM source (issue #255): import from a local folder or a network share, and
@@ -398,7 +399,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
             device_local_folder: localRomRoot,
           } : {}),
         });
-        imported.push({ slug, savePath, statePath });
+        imported.push({ slug, name: displayName, savePath, statePath });
       } catch (e: unknown) {
         const reason = e instanceof Error ? e.message : "import failed";
         errs.push(`${names[rom.romPath] ?? rom.name} (${reason})`);
@@ -418,6 +419,19 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // network import has no ROM to copy, but still benefits from an existing
     // save. Best-effort; a pull failure here shouldn't block the import.
     if (imported.length > 0) pullFromServerIfNewer(imported, sharedLayout, consoleAbbr);
+    // Pre-fetch art for every imported game now, reusing the same art:get
+    // IPC/cache GameCard uses lazily, so the game grid isn't blank-then-
+    // populated tile-by-tile the first time it's opened (issue #327).
+    if (imported.length > 0) prefetchArt(imported, consoleAbbr);
+  }
+
+  async function prefetchArt(entries: ImportedEntry[], consoleAbbr: string): Promise<void> {
+    const consoleKey = consoleAbbr.toLowerCase();
+    setArtProgress({ done: 0, total: entries.length });
+    for (let i = 0; i < entries.length; i++) {
+      try { await emusync.art.get(entries[i].slug, entries[i].name, consoleKey); } catch { /* best-effort */ }
+      setArtProgress({ done: i + 1, total: entries.length });
+    }
   }
 
   /** Whether `serverMeta`'s data is newer than the local file at `localTime`
@@ -583,7 +597,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // state
     phase, consoles, consoleSel, emulators, suggestions, emuSel,
     extraPaths, removedDirs, roms, selected, names, error, progress,
-    importErrors, pushResults, pushSaves, pushStates,
+    importErrors, pushResults, pushSaves, pushStates, artProgress,
     romSource, localRomRoot, nameWarnings,
     // derived
     grouped, selectedCount, consoleLabel, currentStep, showStepper, allRomDirs,

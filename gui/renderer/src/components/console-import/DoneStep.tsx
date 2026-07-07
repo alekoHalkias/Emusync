@@ -1,7 +1,8 @@
 import type { ConsoleImportVM } from "./useConsoleImport";
 
 export function DoneStep({ vm }: { vm: ConsoleImportVM }) {
-  const { progress, importErrors, pushResults } = vm;
+  const { progress, importErrors, pushResults, artProgress } = vm;
+  const fetchingArt = artProgress.total > 0 && artProgress.done < artProgress.total;
   return (
     <>
       <div style={{ padding: "24px 0 12px", textAlign: "center" }}>
@@ -12,6 +13,12 @@ export function DoneStep({ vm }: { vm: ConsoleImportVM }) {
         {importErrors.length > 0 && (
           <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
             Failed: {importErrors.join(", ")}
+          </p>
+        )}
+        {fetchingArt && (
+          <p style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6 }}>
+            <span className="spinner" style={{ width: 12, height: 12, flexShrink: 0 }} />
+            Fetching artwork… {artProgress.done}/{artProgress.total}
           </p>
         )}
       </div>
