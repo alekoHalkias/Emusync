@@ -3,7 +3,7 @@ import type { GameRow } from "./game-list/types";
 import { RelTime } from "../time";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
-type ArtType = "grid" | "hero" | "logo" | "icon";
+type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
 
 type Props = {
   game: GameRow;

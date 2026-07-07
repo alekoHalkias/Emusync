@@ -527,11 +527,16 @@ input.error { border-color: var(--red); }
 }
 
 /* Per artwork-type tile shape (issue #324). Grid keeps the default portrait
-   3/4 + cover above. Hero is a wide banner; Logo/Icon are transparent-friendly
-   assets that should never be cropped, so they get a neutral backdrop and
-   object-fit: contain instead of cover. */
+   3/4 + cover above. Hero is a wide banner; Wide Grid is SteamGridDB's
+   landscape "header capsule" format (460x215, issue #333) — both are
+   photographic boxart, so they keep object-fit: cover. Logo/Icon are
+   transparent-friendly assets that should never be cropped, so they get a
+   neutral backdrop and object-fit: contain instead of cover. */
 .game-card-art-hero {
   aspect-ratio: 16 / 6;
+}
+.game-card-art-wide_grid {
+  aspect-ratio: 460 / 215;
 }
 .game-card-art-logo,
 .game-card-art-icon {
