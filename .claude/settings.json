@@ -23,7 +23,10 @@
       "Bash(make lint)",
       "Bash(make lint *)",
       "Bash(git diff *)",
-      "Bash(git diff)"
+      "Bash(git diff)",
+      "Bash(gh issue view *)",
+      "Bash(gh pr view *)",
+      "Bash(cat *)"
     ]
   }
 }
