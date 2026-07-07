@@ -44,6 +44,28 @@ export function registerArtworkIpc(): void {
   );
 
   ipcMain.handle(
+    "artwork:resolveMatch",
+    async (_event, slug: string, gameName: string): Promise<{ id: number; name: string } | null> => {
+      const key = await getSteamGridDbKey();
+      if (!key) return null;
+      try {
+        const client = makeSteamGridDbClient(key);
+        // Persists the found (or already-set) sgdb_game_id, same as the
+        // automatic art:get path — but callable on demand for a game whose
+        // art was cached before that persistence existed, so opening the
+        // picker never has to say "search first" for a game that already has
+        // an obvious best match (issue #339 follow-up).
+        const id = await resolveSgdbGameId(client, slug, gameName);
+        if (!id) return null;
+        const game = await client.getGameById(id);
+        return { id: game.id, name: game.name };
+      } catch {
+        return null;
+      }
+    },
+  );
+
+  ipcMain.handle(
     "artwork:listCandidates",
     async (_event, sgdbGameId: number, type: ArtType): Promise<SgdbCandidate[]> => {
       const key = await getSteamGridDbKey();

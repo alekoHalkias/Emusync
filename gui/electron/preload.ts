@@ -122,6 +122,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("artwork:searchGames", name),
     getMatchedGame: (sgdbGameId: number): Promise<{ id: number; name: string } | null> =>
       ipcRenderer.invoke("artwork:getMatchedGame", sgdbGameId),
+    resolveMatch: (slug: string, gameName: string): Promise<{ id: number; name: string } | null> =>
+      ipcRenderer.invoke("artwork:resolveMatch", slug, gameName),
     listCandidates: (sgdbGameId: number, type: "grid" | "hero" | "logo" | "icon" | "wide_grid"): Promise<{ id: number; thumb: string; url: string }[]> =>
       ipcRenderer.invoke("artwork:listCandidates", sgdbGameId, type),
     setArt: (slug: string, consoleKey: string, type: "grid" | "hero" | "logo" | "icon" | "wide_grid", url: string): Promise<{ ok: boolean; error?: string }> =>
