@@ -120,14 +120,17 @@ export function makeSteamGridDbClient(key: string): SGDBImport {
 // boxart-shaped filter; Hero/Logo/Icon take SteamGridDB's results as-is —
 // there's no single "right" size to filter to for those the way 600x900 is
 // the standard boxart aspect.
+// Hardcoded off, no setting exposed to turn them on (issue #326).
+const SAFE_FILTER = { nsfw: "false", humor: "false" };
+
 export async function getSgdbImagesForType(client: SGDBImport, sgdbGameId: number, artType: ArtType) {
   return artType === "grid"
-    ? client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["600x900"] })
+    ? client.getGrids({ id: sgdbGameId, type: "game", dimensions: ["600x900"], ...SAFE_FILTER })
     : artType === "hero"
-    ? client.getHeroes({ id: sgdbGameId, type: "game" })
+    ? client.getHeroes({ id: sgdbGameId, type: "game", ...SAFE_FILTER })
     : artType === "logo"
-    ? client.getLogos({ id: sgdbGameId, type: "game" })
-    : client.getIcons({ id: sgdbGameId, type: "game" });
+    ? client.getLogos({ id: sgdbGameId, type: "game", ...SAFE_FILTER })
+    : client.getIcons({ id: sgdbGameId, type: "game", ...SAFE_FILTER });
 }
 
 async function fetchFromSteamGridDb(gameName: string, dest: string, artType: ArtType): Promise<boolean> {
