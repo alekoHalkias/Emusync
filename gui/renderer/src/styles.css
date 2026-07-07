@@ -469,6 +469,18 @@ input.error { border-color: var(--red); }
 }
 .game-grid-search:focus { border-color: var(--accent); width: 220px; }
 
+.game-grid-art-type {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
 .game-grid-body { }
 .game-grid-section-label {
   font-size: 11px;
@@ -512,6 +524,30 @@ input.error { border-color: var(--red); }
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Per artwork-type tile shape (issue #324). Grid keeps the default portrait
+   3/4 + cover above. Hero is a wide banner; Logo/Icon are transparent-friendly
+   assets that should never be cropped, so they get a neutral backdrop and
+   object-fit: contain instead of cover. */
+.game-card-art-hero {
+  aspect-ratio: 16 / 6;
+}
+.game-card-art-logo,
+.game-card-art-icon {
+  background: #0a0a0a;
+}
+.game-card-art-logo {
+  aspect-ratio: 3 / 2;
+}
+.game-card-art-icon {
+  aspect-ratio: 1 / 1;
+}
+.game-card-art-logo .game-card-img,
+.game-card-art-icon .game-card-img {
+  object-fit: contain;
+  padding: 14px;
+  box-sizing: border-box;
 }
 .game-card-placeholder {
   width: 100%;
