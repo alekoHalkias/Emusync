@@ -5,6 +5,8 @@ type Step =
   | "choose"
   | "server-starting"
   | "server-ready"
+  | "art-prompt"
+  | "art-key-paste"
   | "join-scanning"
   | "join-select"
   | "join-pin"
@@ -24,6 +26,9 @@ export default function Setup({ onDone }: Props): React.ReactElement {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deviceName, setDeviceName] = useState("");
+  const [artKey, setArtKey] = useState("");
+  const [artKeyError, setArtKeyError] = useState("");
+  const [artKeyBusy, setArtKeyBusy] = useState(false);
 
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
@@ -163,9 +168,80 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               To require a PIN, open the server settings from the top-right button after continuing.
               If no PIN is set, any device on your LAN can connect.
             </p>
-            <button className="btn btn-primary" onClick={onDone} style={{ width: "100%" }}>
-              Continue to game list
+            <button className="btn btn-primary" onClick={() => setStep("art-prompt")} style={{ width: "100%" }}>
+              Continue
             </button>
+          </>
+        )}
+
+        {step === "art-prompt" && (
+          <>
+            <h1>Game art</h1>
+            <p style={{ marginBottom: 24 }}>
+              Would you like to use SteamGridDB to fetch box art for your games?
+              This is configured once here and shared with every device that
+              connects to this server.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onDone}>
+                Skip for now
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={async () => {
+                  await window.emusync.steamgriddb.openKeyPage();
+                  setStep("art-key-paste");
+                }}
+              >
+                Yes
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === "art-key-paste" && (
+          <>
+            <h1>Paste your SteamGridDB API key</h1>
+            <p style={{ marginBottom: 16 }}>
+              Log in with Steam on the page that just opened, then copy your
+              API key from the "API" tab and paste it below.
+            </p>
+            <div className="input-group" style={{ marginBottom: 16 }}>
+              <label>API key</label>
+              <input
+                type="text"
+                value={artKey}
+                onChange={(e) => { setArtKey(e.target.value); setArtKeyError(""); }}
+                placeholder="Paste your key here"
+                className={artKeyError ? "error" : ""}
+                autoFocus
+              />
+              {artKeyError && <span className="error-msg">{artKeyError}</span>}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-ghost" onClick={onDone} disabled={artKeyBusy}>
+                Skip
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                disabled={artKeyBusy || !artKey.trim()}
+                onClick={async () => {
+                  setArtKeyBusy(true);
+                  setArtKeyError("");
+                  const result = await window.emusync.steamgriddb.setKey(artKey.trim());
+                  setArtKeyBusy(false);
+                  if (result.ok) {
+                    onDone();
+                  } else {
+                    setArtKeyError(result.error || "Failed to save key.");
+                  }
+                }}
+              >
+                {artKeyBusy ? <><span className="spinner" /> Saving…</> : "Save"}
+              </button>
+            </div>
           </>
         )}
 

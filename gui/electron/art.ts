@@ -6,6 +6,15 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import https from "https";
+import SGDBImport from "steamgriddb";
+import { getSteamGridDbKey } from "./steamgriddb";
+
+// steamgriddb is a pure-ESM package ("type": "module"); the Electron main
+// bundle is CJS and externalizes it as a plain require(), which resolves to
+// the module namespace ({ default: SGDB }) rather than the class itself —
+// unwrap .default defensively so `new SGDB(...)` gets the actual class either
+// way the bundler happens to expose it.
+const SGDB: typeof SGDBImport = (SGDBImport as any).default ?? SGDBImport;
 
 const ART_DIR        = join(homedir(), ".emusync", "art");
 const CONSOLE_DIR    = join(homedir(), ".emusync", "art", "consoles");
@@ -80,6 +89,22 @@ function download(url: string, dest: string): Promise<void> {
   });
 }
 
+async function fetchFromSteamGridDb(gameName: string, dest: string): Promise<boolean> {
+  const key = await getSteamGridDbKey();
+  if (!key) return false;
+  try {
+    const client = new SGDB({ key });
+    const games = await client.searchGame(gameName);
+    if (!games.length) return false;
+    const grids = await client.getGrids({ id: games[0].id, type: "game", dimensions: ["600x900"] });
+    if (!grids.length) return false;
+    await download(String(grids[0].url), dest);
+    return existsSync(dest);
+  } catch {
+    return false;
+  }
+}
+
 // EmuSync console key → RetroArch XMB monochrome logo filename (spaces, not underscores)
 const CONSOLE_LOGO: Record<string, string> = {
   gba:       "Nintendo - Game Boy Advance",
@@ -118,9 +143,17 @@ export function registerArtIpc(): void {
     "art:get",
     async (_event, slug: string, gameName: string, consoleKey: string): Promise<string | null> => {
       try {
-        mkdirSync(ART_DIR, { recursive: true });
-        const dest = join(ART_DIR, `${slug}.png`);
+        // One folder per console, one subfolder per game (issue #304 follow-up)
+        // — e.g. ~/.emusync/art/gba/pokemon-emerald/boxart.png.
+        const gameDir = join(ART_DIR, consoleKey, slug);
+        mkdirSync(gameDir, { recursive: true });
+        const dest = join(gameDir, "boxart.png");
         if (existsSync(dest)) return toDataUrl(dest);
+
+        // SteamGridDB's fuzzy title search finds far more games than the
+        // exact-filename libretro-thumbnails lookup below; try it first when
+        // a shared key is configured (issue #322).
+        if (await fetchFromSteamGridDb(gameName, dest)) return toDataUrl(dest);
 
         const url = buildThumbnailUrl(consoleKey, gameName);
         if (!url) return null;

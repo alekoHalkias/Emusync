@@ -82,6 +82,11 @@ export interface EmusyncBridge {
     get: (slug: string, gameName: string, consoleKey: string) => Promise<string | null>;
     getConsoleIcon: (consoleKey: string) => Promise<string | null>;
   };
+  steamgriddb: {
+    getKey: () => Promise<string | null>;
+    setKey: (key: string) => Promise<{ ok: boolean; error?: string }>;
+    openKeyPage: () => Promise<void>;
+  };
   daemon: {
     start: () => Promise<void>;
     stop: () => Promise<void>;

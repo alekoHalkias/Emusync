@@ -117,6 +117,12 @@ contextBridge.exposeInMainWorld("emusync", {
     getConsoleIcon: (consoleKey: string): Promise<string | null> =>
       ipcRenderer.invoke("art:getConsoleIcon", consoleKey),
   },
+  steamgriddb: {
+    getKey: (): Promise<string | null> => ipcRenderer.invoke("steamgriddb:getKey"),
+    setKey: (key: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("steamgriddb:setKey", key),
+    openKeyPage: (): Promise<void> => ipcRenderer.invoke("steamgriddb:openKeyPage"),
+  },
   game: {
     launch: (slug: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke("game:launch", slug),
