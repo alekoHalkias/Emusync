@@ -136,22 +136,48 @@ def game_edit(slug: str, name: str | None, rom_path: str | None, save_path: str 
 
 @game.command("remove")
 @click.argument("slug")
-def game_remove(slug: str) -> None:
-    """Remove a game from EmuSync management (does not delete files)."""
+@click.option(
+    "--everywhere", is_flag=True, default=False,
+    help="Fully purge the game — every paired device's config plus save/state "
+         "history — instead of just unlinking it from this device.",
+)
+def game_remove(slug: str, everywhere: bool) -> None:
+    """Remove a game from EmuSync management (does not delete files).
+
+    By default this only unlinks the game from this device — other paired
+    devices, and the game's save/state history, are untouched. Pass
+    --everywhere to fully purge the game from every device instead (issue #343).
+    """
     client = _client()
     game_data = client.get_game(slug)
     if not game_data:
         click.echo(f"Game '{slug}' not found.", err=True)
         sys.exit(1)
 
+    if everywhere:
+        confirmed = click.confirm(
+            f"Permanently remove {game_data['name']} from EmuSync EVERYWHERE — "
+            "every paired device's config and this game's full save/state "
+            "history will be deleted. Files already on disk will NOT be "
+            "deleted. Continue?",
+            default=False,
+        )
+        if not confirmed:
+            click.echo("Cancelled.")
+            return
+        client.remove_game(slug)
+        click.echo(f"Removed {slug} from every device.")
+        return
+
     confirmed = click.confirm(
-        f"Remove {game_data['name']} from EmuSync management? "
-        "Save file on disk will NOT be deleted.",
+        f"Remove {game_data['name']} from EmuSync on this device only? "
+        "Other paired devices and this game's save/state history will NOT be "
+        "touched. Save file on disk will NOT be deleted.",
         default=False,
     )
     if not confirmed:
         click.echo("Cancelled.")
         return
 
-    client.remove_game(slug)
-    click.echo(f"Removed: {slug}")
+    client.remove_game_device(slug)
+    click.echo(f"Removed: {slug} (this device only)")
