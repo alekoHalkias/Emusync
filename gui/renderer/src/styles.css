@@ -479,17 +479,17 @@ input.error { border-color: var(--red); }
 }
 
 /* appearance: none above strips the <select>'s native arrow, so redraw it
-   as the same "⏷" glyph the filter button uses, for a matching look. */
+   as the same "⏷" glyph the filter button uses, in the same position (left
+   of the label, same size/color) for a truly matching look. */
 .game-grid-select-wrap { position: relative; flex-shrink: 0; }
-.game-grid-select-wrap .game-grid-art-type { padding-right: 26px; }
-.game-grid-select-wrap::after {
+.game-grid-select-wrap .game-grid-art-type { padding-left: 24px; }
+.game-grid-select-wrap::before {
   content: "⏷";
   position: absolute;
   top: 50%;
-  right: 10px;
+  left: 10px;
   transform: translateY(-50%);
-  font-size: 10px;
-  color: var(--text-muted);
+  color: var(--text);
   pointer-events: none;
 }
 .game-grid-filter-btn:hover { background: var(--surface2); }
