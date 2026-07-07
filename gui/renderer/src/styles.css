@@ -462,13 +462,13 @@ input.error { border-color: var(--red); }
   padding: 7px 12px;
   font-size: 13px;
   outline: none;
-  width: 90px;
+  width: 45px;
   height: 32px;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
   transition: border-color 0.15s, width 0.2s;
 }
-.game-grid-search:focus { border-color: var(--accent); width: 110px; }
+.game-grid-search:focus { border-color: var(--accent); width: 55px; }
 
 .game-grid-art-type {
   background: var(--bg);
