@@ -53,6 +53,10 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [artType, setArtType] = useState<ArtType>("grid");
+  // Bumped per-slug when the settings modal closes, so that game's GameCard
+  // remounts and re-fetches art (it may have just been edited in the
+  // Artwork tab) without refetching every other card on the screen.
+  const [artRefresh, setArtRefresh] = useState<Record<string, number>>({});
 
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
@@ -118,6 +122,14 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
     });
   }
 
+  function closeGameModal(): void {
+    if (gameModal) {
+      const slug = gameModal.slug;
+      setArtRefresh((prev) => ({ ...prev, [slug]: (prev[slug] ?? 0) + 1 }));
+    }
+    setGameModal(null);
+  }
+
   function handlePlay(g: GameRow): void {
     if (!g.isLocal) {
       setNetPlayTarget({ slug: g.slug, name: g.name });
@@ -180,7 +192,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
               <div className="game-grid-cards">
                 {local.map((g) => (
                   <GameCard
-                    key={`${g.slug}:${artType}`}
+                    key={`${g.slug}:${artType}:${artRefresh[g.slug] ?? 0}`}
                     game={g}
                     consoleKey={consoleKey}
                     consoleAccent={accent}
@@ -203,7 +215,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
               <div className="game-grid-cards">
                 {remote.map((g) => (
                   <GameCard
-                    key={`${g.slug}:${artType}`}
+                    key={`${g.slug}:${artType}:${artRefresh[g.slug] ?? 0}`}
                     game={g}
                     consoleKey={consoleKey}
                     consoleAccent={accent}
@@ -223,8 +235,8 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
       {gameModal && (
         <GameModal
           target={gameModal}
-          onClose={() => setGameModal(null)}
-          onChanged={() => { setGameModal(null); onChanged(); }}
+          onClose={closeGameModal}
+          onChanged={() => { closeGameModal(); onChanged(); }}
           onLaunch={onPlay}
         />
       )}
