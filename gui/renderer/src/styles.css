@@ -463,6 +463,7 @@ input.error { border-color: var(--red); }
   font-size: 13px;
   outline: none;
   width: 90px;
+  height: 32px;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
   transition: border-color 0.15s, width 0.2s;
@@ -477,16 +478,21 @@ input.error { border-color: var(--red); }
   padding: 7px 10px;
   font-size: 13px;
   outline: none;
+  height: 32px;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 
-/* Match the dropdown/search box model exactly (padding + border) so the
-   bulk-delete button isn't visibly taller than its header siblings — the
-   generic .btn class uses more padding and no border (issue #347). */
+/* Match the dropdown/search box model exactly (padding + border + a fixed
+   height) so the bulk-delete button isn't visibly taller than its header
+   siblings — the generic .btn class uses more padding and no border, and the
+   🗑 emoji's glyph line-box is taller than the 13px text, which grows the
+   button's inline-flex height past its siblings even once padding matches
+   (issue #347). */
 .game-grid-delete-btn {
   padding: 7px 12px;
   border: 1px solid transparent;
+  height: 32px;
 }
 
 .game-grid-body { }
