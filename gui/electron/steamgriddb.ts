@@ -22,12 +22,11 @@ export async function getSteamGridDbKey(): Promise<string | null> {
       headers: authHeaders,
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) { cachedKey = null; return null; }
+    if (!res.ok) return null;
     const body = await res.json() as { api_key: string | null };
     cachedKey = body.api_key || null;
     return cachedKey;
   } catch {
-    cachedKey = null;
     return null;
   }
 }

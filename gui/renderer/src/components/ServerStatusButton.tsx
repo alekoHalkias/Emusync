@@ -35,6 +35,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   const [artKeyInput, setArtKeyInput] = useState("");
   const [artKeyBusy, setArtKeyBusy] = useState(false);
   const [artKeySaved, setArtKeySaved] = useState(false);
+  const [artKeyError, setArtKeyError] = useState("");
 
   // Connect-to-server form
   const [pairHost, setPairHost] = useState("");
@@ -120,6 +121,8 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       setArtKey(artKeyInput.trim());
       setArtKeySaved(true);
       setTimeout(() => setArtKeySaved(false), 2000);
+    } else {
+      setArtKeyError(result.error || "Failed to save key.");
     }
   }
 
@@ -420,7 +423,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                       <input
                         type="text"
                         value={artKeyInput}
-                        onChange={(e) => setArtKeyInput(e.target.value)}
+                        onChange={(e) => { setArtKeyInput(e.target.value); setArtKeyError(""); }}
                         placeholder="Paste your SteamGridDB API key"
                       />
                     </div>
@@ -428,6 +431,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                       {artKeySaved ? "Saved" : artKeyBusy ? <span className="spinner" /> : "Save"}
                     </button>
                   </div>
+                  {artKeyError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{artKeyError}</span>}
                   <button className="btn btn-ghost" onClick={() => window.emusync.steamgriddb.openKeyPage()} style={{ fontSize: 12 }}>
                     Get a key from SteamGridDB →
                   </button>
