@@ -173,6 +173,24 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     <>
       {/* Header */}
       <div className="game-grid-header" style={{ "--grid-accent": accent } as React.CSSProperties}>
+        <input
+          className="game-grid-search"
+          type="text"
+          placeholder="Search…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <GameFilterButton filters={filters} onChange={setFilters} />
+        <select
+          className="game-grid-art-type"
+          value={artType}
+          onChange={(e) => changeArtType(e.target.value as ArtType)}
+          title="Artwork type"
+        >
+          {(Object.keys(ART_TYPE_LABELS) as ArtType[]).map((t) => (
+            <option key={t} value={t}>{ART_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
         <div style={{ flex: 1 }} />
         <button
           className="btn btn-ghost game-grid-header-btn"
@@ -189,24 +207,6 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         >
           🗑 Delete{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
         </button>
-        <select
-          className="game-grid-art-type"
-          value={artType}
-          onChange={(e) => changeArtType(e.target.value as ArtType)}
-          title="Artwork type"
-        >
-          {(Object.keys(ART_TYPE_LABELS) as ArtType[]).map((t) => (
-            <option key={t} value={t}>{ART_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-        <input
-          className="game-grid-search"
-          type="text"
-          placeholder="Search…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <GameFilterButton filters={filters} onChange={setFilters} />
       </div>
 
       {filtered.length === 0 ? (
