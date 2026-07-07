@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import {
   ART_DIR, ART_TYPES, ArtType,
-  download, getSgdbImagesForType, makeSteamGridDbClient, toDataUrl,
+  download, getSgdbImagesForType, makeSteamGridDbClient, resolveSgdbGameId, toDataUrl,
 } from "./art";
 import { getSteamGridDbKey } from "./steamgriddb";
 
@@ -36,6 +36,28 @@ export function registerArtworkIpc(): void {
       if (!key) return null;
       try {
         const game = await makeSteamGridDbClient(key).getGameById(sgdbGameId);
+        return { id: game.id, name: game.name };
+      } catch {
+        return null;
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "artwork:resolveMatch",
+    async (_event, slug: string, gameName: string): Promise<{ id: number; name: string } | null> => {
+      const key = await getSteamGridDbKey();
+      if (!key) return null;
+      try {
+        const client = makeSteamGridDbClient(key);
+        // Persists the found (or already-set) sgdb_game_id, same as the
+        // automatic art:get path — but callable on demand for a game whose
+        // art was cached before that persistence existed, so opening the
+        // picker never has to say "search first" for a game that already has
+        // an obvious best match (issue #339 follow-up).
+        const id = await resolveSgdbGameId(client, slug, gameName);
+        if (!id) return null;
+        const game = await client.getGameById(id);
         return { id: game.id, name: game.name };
       } catch {
         return null;
@@ -111,11 +133,10 @@ export function registerArtworkIpc(): void {
       }
       try {
         const client = makeSteamGridDbClient(key);
-        let resolvedId = sgdbGameId;
-        if (!resolvedId) {
-          const games = await client.searchGame(gameName);
-          resolvedId = games.length ? games[0].id : null;
-        }
+        // Persists the top search result as the game's sgdb_game_id if
+        // nothing's been chosen yet (manually or automatically), so it stays
+        // the same match on future refreshes instead of re-searching (#339).
+        const resolvedId = sgdbGameId ?? await resolveSgdbGameId(client, slug, gameName);
         if (!resolvedId) {
           for (const type of ART_TYPES) result[type] = false;
           return result;

@@ -10,6 +10,7 @@ import { parse as parseTOML } from "smol-toml";
 import SGDBImport from "steamgriddb";
 import { getSteamGridDbKey } from "./steamgriddb";
 import { CONFIG_PATH } from "./runtime";
+import { loadServerCfg } from "./config-store";
 
 // steamgriddb is a pure-ESM package ("type": "module"); the Electron main
 // bundle is CJS and externalizes it as a plain require(), which resolves to
@@ -135,14 +136,50 @@ export async function getSgdbImagesForType(client: SGDBImport, sgdbGameId: numbe
     : client.getIcons({ id: sgdbGameId, type: "game", ...SAFE_FILTER });
 }
 
-async function fetchFromSteamGridDb(gameName: string, dest: string, artType: ArtType): Promise<boolean> {
+// Shared with gui/electron/artwork.ts (issue #339) — resolves which SGDB game
+// id to use: the already-picked/persisted `sgdb_game_id` if there is one,
+// otherwise the top fuzzy-search result, which then gets persisted as the
+// game's "first choice" so later fetches (on this device or any other) reuse
+// it instead of re-searching and potentially landing on a different game. A
+// manual pick in the Artwork tab overwrites `sgdb_game_id` directly and
+// always wins — this only fills the gap while nothing has been chosen yet.
+export async function resolveSgdbGameId(
+  client: SGDBImport, slug: string, gameName: string,
+): Promise<number | null> {
+  try {
+    const { host, port, authHeaders } = loadServerCfg();
+    const res = await fetch(`http://${host}:${port}/games/${slug}`, {
+      headers: authHeaders, signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const game = await res.json() as { name: string; sgdb_game_id: number | null };
+      if (game.sgdb_game_id) return game.sgdb_game_id;
+      const games = await client.searchGame(gameName);
+      if (!games.length) return null;
+      const found = games[0].id;
+      try {
+        await fetch(`http://${host}:${port}/games/${slug}`, {
+          method: "PUT",
+          headers: { ...authHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify({ name: game.name, sgdb_game_id: found }),
+          signal: AbortSignal.timeout(5000),
+        });
+      } catch { /* best-effort — the fetched art is still correct this session */ }
+      return found;
+    }
+  } catch { /* server unreachable — fall through to a one-off search below */ }
+  const games = await client.searchGame(gameName);
+  return games.length ? games[0].id : null;
+}
+
+async function fetchFromSteamGridDb(slug: string, gameName: string, dest: string, artType: ArtType): Promise<boolean> {
   const key = await getSteamGridDbKey();
   if (!key) return false;
   try {
     const client = makeSteamGridDbClient(key);
-    const games = await client.searchGame(gameName);
-    if (!games.length) return false;
-    const images = await getSgdbImagesForType(client, games[0].id, artType);
+    const sgdbId = await resolveSgdbGameId(client, slug, gameName);
+    if (!sgdbId) return false;
+    const images = await getSgdbImagesForType(client, sgdbId, artType);
     if (!images.length) return false;
     await download(String(images[0].url), dest);
     return existsSync(dest);
@@ -204,7 +241,7 @@ export function registerArtIpc(): void {
         // SteamGridDB's fuzzy title search finds far more games than the
         // exact-filename libretro-thumbnails lookup below; try it first when
         // a shared key is configured (issue #322).
-        if (await fetchFromSteamGridDb(gameName, dest, artType)) return toDataUrl(dest);
+        if (await fetchFromSteamGridDb(slug, gameName, dest, artType)) return toDataUrl(dest);
 
         // The libretro-thumbnails fallback is boxart-shaped only — there's no
         // equivalent for hero/logo/icon art, so those just show the

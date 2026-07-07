@@ -85,15 +85,29 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
   }
 
   async function openPicker(type: ArtType): Promise<void> {
-    if (!selectedId) {
-      setError("Search and pick a SteamGridDB match first.");
-      return;
-    }
     setError("");
     setPickerType(type);
     setLoadingCandidates(true);
     try {
-      setCandidates(await window.emusync.artwork.listCandidates(selectedId, type));
+      let id = selectedId;
+      if (!id) {
+        // No match picked yet this session — this game's art may have been
+        // cached before sgdb_game_id persistence existed, so fall back to an
+        // on-demand resolve (same fuzzy-search-and-persist path art:get
+        // uses) instead of just telling the user to search manually (#339).
+        const match = await window.emusync.artwork.resolveMatch(slug, name);
+        if (match) {
+          id = match.id;
+          setSelectedId(match.id);
+          setMatchedName(match.name);
+        }
+      }
+      if (!id) {
+        setPickerType(null);
+        setError("No SteamGridDB match found — try searching manually.");
+        return;
+      }
+      setCandidates(await window.emusync.artwork.listCandidates(id, type));
     } finally {
       setLoadingCandidates(false);
     }
