@@ -427,13 +427,6 @@ input.error { border-color: var(--red); }
   -webkit-app-region: no-drag;
 }
 .game-grid-back:hover { color: var(--text); border-color: var(--text-muted); }
-.game-grid-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
 .game-grid-abbr {
   font-size: 20px;
   font-weight: 800;

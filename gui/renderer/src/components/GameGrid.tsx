@@ -38,15 +38,13 @@ const DEFAULT_ACCENT = "#374151";
 
 type Props = {
   consoleKey: string;
-  consoleLabel: string;
-  consoleAbbr: string;
   games: GameRow[];
   onBack: () => void;
   onPlay: (slug: string, name: string) => void;
   onChanged: () => void;
 };
 
-export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games, onBack, onPlay, onChanged }: Props): React.ReactElement {
+export default function GameGrid({ consoleKey, games, onBack, onPlay, onChanged }: Props): React.ReactElement {
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -172,11 +170,7 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
         <button className="game-grid-back" onClick={onBack} title="Back to consoles">
           ‹ Back
         </button>
-        <div className="game-grid-title">
-          <span className="game-grid-abbr">{consoleAbbr}</span>
-          <span className="game-grid-label">{consoleLabel}</span>
-          <span className="game-grid-total">{games.length} game{games.length !== 1 ? "s" : ""}</span>
-        </div>
+        <div style={{ flex: 1 }} />
         <button
           className="btn btn-danger game-grid-delete-btn"
           disabled={selectedSlugs.size === 0}

@@ -193,12 +193,24 @@ export default function App(): React.ReactElement {
       <header className="topbar">
         {/* Left: back breadcrumb or app title */}
         {screen.name === "console" ? (
-          <button
-            className="topbar-back"
-            onClick={() => setScreen({ name: "games" })}
-          >
-            ‹ EmuSync
-          </button>
+          // Grouped in one flex item — .topbar uses justify-content:
+          // space-between, so an ungrouped sibling here would drift toward
+          // the middle instead of sitting next to the back button.
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <button
+              className="topbar-back"
+              onClick={() => setScreen({ name: "games" })}
+            >
+              ‹ EmuSync
+            </button>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+              <span className="game-grid-abbr">{screen.abbr}</span>
+              <span className="game-grid-label">{screen.label}</span>
+              <span className="game-grid-total">
+                {consoleGames.length} game{consoleGames.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
         ) : (
           <span className="topbar-title">EmuSync</span>
         )}
@@ -250,8 +262,6 @@ export default function App(): React.ReactElement {
         {screen.name === "console" && (
           <GameGrid
             consoleKey={screen.key}
-            consoleLabel={screen.label}
-            consoleAbbr={screen.abbr}
             games={consoleGames}
             onBack={() => setScreen({ name: "games" })}
             onPlay={handlePlay}
