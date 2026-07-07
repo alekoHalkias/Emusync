@@ -15,8 +15,14 @@ from cli.consoles_data import (
     _IMPORT_CONSOLES,
     _IMPORT_SYSTEMS,
 )
-from cli.detect import _detect_emulators_for_console, _match_save_file, _scan_rom_dir
+from cli.detect import (
+    _detect_emulators_for_console,
+    _match_save_file,
+    _resolve_shared_memcard_save_state,
+    _scan_rom_dir,
+)
 from cli.root import cli
+from cli.run import _SHARED_MEMCARD_CONSOLES
 
 
 def _classify_network_roms(
@@ -166,6 +172,10 @@ def console_import() -> None:
     )
     console_def = _IMPORT_CONSOLES[choice - 1]
     console_key = console_def["key"]
+    # PS2-style consoles share one memory card + sstates folder across every game,
+    # so the per-game save/state is resolved to that shared location rather than
+    # matched by ROM filename (issue #295, #361).
+    shared_layout = console_def["abbr"] in _SHARED_MEMCARD_CONSOLES
     click.echo(f"\nSelected: {console_def['label']}")
 
     # ── Step 2: detect emulators/cores ───────────────────────────────────────
@@ -252,7 +262,10 @@ def console_import() -> None:
     # ── Step 4: scan for ROMs ─────────────────────────────────────────────────
     click.echo("Scanning for ROMs and saves…")
 
-    rom_ext_set = set(console_def["system_keys"])
+    # `rom_extensions` is the explicit scannable-extension list for a standalone-
+    # only console with no libretro core (PS2, #293); fall back to `system_keys`
+    # for a RetroArch-backed console, which uses its core-derived extensions.
+    rom_ext_set = set(console_def.get("rom_extensions") or console_def["system_keys"])
     all_files: list[str] = []
     for folder in scan_folders:
         all_files.extend(_scan_rom_dir(folder))
@@ -264,32 +277,40 @@ def console_import() -> None:
         return
 
     # Build ROM entries (same logic as main.ts emulator:scan handler)
-    first_sys_key = console_def["system_keys"][0]
+    first_sys_key = console_def["system_keys"][0] if console_def["system_keys"] else None
     default_save_exts = _IMPORT_SYSTEMS.get(first_sys_key, {}).get("save_exts", _DEFAULT_SAVE_EXTS)
+    # Console-wide, not per-game — resolve once for a shared-memcard console.
+    shared_save_match, shared_state_match = (
+        _resolve_shared_memcard_save_state(emu, console_def["abbr"]) if shared_layout else (None, None)
+    )
 
     entries: list[dict] = []
     for rom_path in sorted(matching):
         ext = os.path.splitext(rom_path)[1].lstrip(".").lower()
-        system = _IMPORT_SYSTEMS.get(ext, {})
-        save_exts = system.get("save_exts", default_save_exts)
         base = os.path.splitext(os.path.basename(rom_path))[0]
 
-        save_match = _match_save_file(emu["save_dir"], base, save_exts)
-        # Fallback: check root saves dir for pre-core-organisation saves
-        if not save_match["exists"] and emu.get("core_folder"):
-            root_save_dir = os.path.dirname(emu["save_dir"])
-            root_match = _match_save_file(root_save_dir, base, save_exts)
-            if root_match["exists"]:
-                save_match = root_match
+        if shared_layout:
+            save_match, state_match = shared_save_match, shared_state_match
+        else:
+            system = _IMPORT_SYSTEMS.get(ext, {})
+            save_exts = system.get("save_exts", default_save_exts)
 
-        state_match: dict | None = None
-        if emu.get("state_dir"):
-            state_match = _match_save_file(emu["state_dir"], base, _DEFAULT_STATE_EXTS)
-            if not state_match["exists"] and emu.get("core_folder"):
-                root_state_dir = os.path.dirname(emu["state_dir"])
-                root_sm = _match_save_file(root_state_dir, base, _DEFAULT_STATE_EXTS)
-                if root_sm["exists"]:
-                    state_match = root_sm
+            save_match = _match_save_file(emu["save_dir"], base, save_exts)
+            # Fallback: check root saves dir for pre-core-organisation saves
+            if not save_match["exists"] and emu.get("core_folder"):
+                root_save_dir = os.path.dirname(emu["save_dir"])
+                root_match = _match_save_file(root_save_dir, base, save_exts)
+                if root_match["exists"]:
+                    save_match = root_match
+
+            state_match = None
+            if emu.get("state_dir"):
+                state_match = _match_save_file(emu["state_dir"], base, _DEFAULT_STATE_EXTS)
+                if not state_match["exists"] and emu.get("core_folder"):
+                    root_state_dir = os.path.dirname(emu["state_dir"])
+                    root_sm = _match_save_file(root_state_dir, base, _DEFAULT_STATE_EXTS)
+                    if root_sm["exists"]:
+                        state_match = root_sm
 
         if emu.get("core_path"):
             launch_cmd = f'{emu["exec_path"]} -L "{emu["core_path"]}" "{rom_path}"'
