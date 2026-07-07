@@ -67,10 +67,15 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   }, [consoleKey]);
 
   async function changeArtType(type: ArtType): Promise<void> {
-    setArtType(type);
+    // Write the config BEFORE flipping local state — art.ts's getArtType()
+    // reads the config file straight off disk on every art:get call, so if
+    // the remount (triggered by setArtType below) fires before this save
+    // lands, the newly-mounted GameCard would still read the old type and
+    // return the previous type's already-cached file (issue #324 follow-up).
     const cfg = (await window.emusync.config.load()) ?? {};
     const byConsole = { ...((cfg.art_type_by_console as Record<string, string>) ?? {}), [consoleKey]: type };
     await window.emusync.config.save({ ...cfg, art_type_by_console: byConsole });
+    setArtType(type);
   }
 
   function toggleSelect(slug: string): void {
