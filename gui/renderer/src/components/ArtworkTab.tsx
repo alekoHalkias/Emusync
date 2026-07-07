@@ -53,9 +53,24 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
     }
   }
 
+  async function doRefreshAll(sgdbGameId: number | null): Promise<void> {
+    setRefreshing(true);
+    setError("");
+    try {
+      await window.emusync.artwork.refreshAll(slug, name, consoleKey, sgdbGameId);
+      await refreshCurrent();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function pickGame(id: number): Promise<void> {
     setSelectedId(id);
     try { await setGameSgdbId(slug, id); } catch { /* best-effort — local selection still works this session */ }
+    // Pull the id directly rather than through selectedId's state — a
+    // just-clicked setSelectedId hasn't re-rendered yet, so reading the
+    // state var here would still see the previous selection.
+    await doRefreshAll(id);
   }
 
   async function openPicker(type: ArtType): Promise<void> {
@@ -95,17 +110,6 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
     setPickerType(null);
   }
 
-  async function refreshAll(): Promise<void> {
-    setRefreshing(true);
-    setError("");
-    try {
-      await window.emusync.artwork.refreshAll(slug, name, consoleKey, selectedId);
-      await refreshCurrent();
-    } finally {
-      setRefreshing(false);
-    }
-  }
-
   return (
     <div>
       {/* Search row */}
@@ -128,13 +132,13 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
 
       {/* Results list — ~4 rows visible, scrolls for more */}
       {results.length > 0 && (
-        <div style={{ maxHeight: 168, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius)", marginBottom: 16 }}>
+        <div style={{ maxHeight: 128, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius)", marginBottom: 16 }}>
           {results.map((r) => (
             <div
               key={r.id}
               onClick={() => pickGame(r.id)}
               style={{
-                padding: "8px 12px", cursor: "pointer", fontSize: 13,
+                padding: "4px 10px", cursor: "pointer", fontSize: 12, lineHeight: 1.5,
                 background: selectedId === r.id ? "var(--surface2)" : "transparent",
                 borderBottom: "1px solid var(--border)",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -142,7 +146,7 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
             >
               <span>{r.name}{selectedId === r.id ? " ✓" : ""}</span>
               {r.release_date > 0 && (
-                <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
                   {new Date(r.release_date * 1000).getFullYear()}
                 </span>
               )}
@@ -158,7 +162,7 @@ export default function ArtworkTab({ slug, name, gameConsole }: Props): React.Re
         <label style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
           Current artwork
         </label>
-        <button className="btn btn-ghost" onClick={refreshAll} disabled={refreshing} style={{ fontSize: 12 }}>
+        <button className="btn btn-ghost" onClick={() => doRefreshAll(selectedId)} disabled={refreshing} style={{ fontSize: 12 }}>
           {refreshing ? <><span className="spinner" /> Refreshing…</> : "↻ Refresh all"}
         </button>
       </div>
