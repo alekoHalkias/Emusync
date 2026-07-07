@@ -454,7 +454,12 @@ input.error { border-color: var(--red); }
   color: var(--text-muted);
   flex-shrink: 0;
 }
-.game-grid-search {
+/* input[type="text"] (line ~67) sets `flex: 1`, which — via its higher
+   attribute-selector specificity — overrides this class's plain width and
+   makes the box grow to fill the row regardless of the width set below.
+   `.game-grid-header .game-grid-search` outranks it so the explicit
+   `flex: 0 0 <width>` below actually controls the size. */
+.game-grid-header .game-grid-search {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -462,13 +467,12 @@ input.error { border-color: var(--red); }
   padding: 7px 12px;
   font-size: 13px;
   outline: none;
-  width: 45px;
+  flex: 0 0 45px;
   height: 32px;
-  flex-shrink: 0;
   -webkit-app-region: no-drag;
-  transition: border-color 0.15s, width 0.2s;
+  transition: border-color 0.15s, flex-basis 0.2s;
 }
-.game-grid-search:focus { border-color: var(--accent); width: 55px; }
+.game-grid-header .game-grid-search:focus { border-color: var(--accent); flex-basis: 55px; }
 
 .game-grid-art-type {
   background: var(--bg);
