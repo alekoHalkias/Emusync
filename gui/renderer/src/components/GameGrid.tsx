@@ -68,6 +68,12 @@ export default function GameGrid({ consoleKey, consoleLabel, consoleAbbr, games,
   const [hasArt, setHasArt] = useState<Record<string, boolean>>({});
   const [filters, setFilters] = useState<GameFilters>(EMPTY_FILTERS);
 
+  // hasArt is keyed only by slug, not by artType — a stale entry from the
+  // previous type would otherwise keep a game wrongly filtered in/out of the
+  // artwork filter forever, since a game the filter excludes never mounts
+  // its GameCard to refresh the check for the new type (issue #345 follow-up).
+  useEffect(() => { setHasArt({}); }, [artType]);
+
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
       const byConsole = (cfg?.art_type_by_console as Record<string, string>) ?? {};
