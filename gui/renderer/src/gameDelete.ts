@@ -6,14 +6,19 @@
 // its saves/states, and every other device's config are untouched.
 // Tier 2 (opt-in, deleteLocalRom): also delete the ROM file from this
 // device's disk (a network ROM's localized copy, or a local-source ROM).
-// Tier 3 (opt-in, removeEverywhere): also delete the network-share master (if
-// network-sourced) and fully purge the game — every device, save/state
-// history, blobs — via the existing full-delete route.
+// Tier 3 (opt-in, removeEverywhere): fully purge the game — every device,
+// save/state history, blobs — via the existing full-delete route. Does NOT
+// touch the network-share master; that's Tier 3b.
+// Tier 3b (opt-in, deleteNetworkRom, independent of removeEverywhere): also
+// delete the network-share master ROM for a network-sourced game (#376 — a
+// user may want to fully unlink a game from EmuSync without touching the
+// actual file sitting on the NAS).
 import { getGameDevice, removeGame, removeGameDevice } from "./api";
 
 export type DeleteGameOptions = {
   deleteLocalRom: boolean;
   removeEverywhere: boolean;
+  deleteNetworkRom: boolean;
 };
 
 export async function deleteGame(slug: string, opts: DeleteGameOptions): Promise<void> {
@@ -29,10 +34,11 @@ export async function deleteGame(slug: string, opts: DeleteGameOptions): Promise
     }
   }
 
+  if (opts.deleteNetworkRom && gd && gd.rom_source === "network" && gd.rom_path) {
+    await window.emusync.rom.deleteFile(gd.rom_path).catch(() => {});
+  }
+
   if (opts.removeEverywhere) {
-    if (gd && gd.rom_source === "network" && gd.rom_path) {
-      await window.emusync.rom.deleteFile(gd.rom_path).catch(() => {});
-    }
     await removeGame(slug);
   } else {
     await removeGameDevice(slug);

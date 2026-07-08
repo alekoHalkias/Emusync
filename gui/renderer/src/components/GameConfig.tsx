@@ -38,6 +38,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   // happens; these two layer additional destructive steps on top of it.
   const [deleteLocalRom, setDeleteLocalRom] = useState(false);
   const [removeEverywhere, setRemoveEverywhere] = useState(false);
+  // Deleting the network master is independent of removeEverywhere (#376) and
+  // needs its own strong confirmation before it actually runs.
+  const [deleteNetworkRom, setDeleteNetworkRom] = useState(false);
+  const [confirmNetworkDelete, setConfirmNetworkDelete] = useState(false);
   const [name, setName] = useState(initialName ?? "");
   const [romPath, setRomPath] = useState("");
   const [savePath, setSavePath] = useState("");
@@ -91,14 +95,19 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
   async function handleDelete(): Promise<void> {
     if (!slug) return;
+    if (deleteNetworkRom && !confirmNetworkDelete) {
+      setConfirmNetworkDelete(true);
+      return;
+    }
     setDeleting(true);
     try {
-      await deleteGame(slug, { deleteLocalRom, removeEverywhere });
+      await deleteGame(slug, { deleteLocalRom, removeEverywhere, deleteNetworkRom });
       onRemoved?.();
     } catch (e: unknown) {
       setErrors({ _global: e instanceof Error ? e.message : "Failed to delete game." });
       setDeleting(false);
       setDeleteConfirm(false);
+      setConfirmNetworkDelete(false);
     }
   }
 
@@ -344,29 +353,61 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
           <div>
             {!isNew && (deleteConfirm ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, alignItems: "flex-start" }}>
-                <span>Remove this game from this device?</span>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
-                  <input type="checkbox" checked={deleteLocalRom} onChange={(e) => setDeleteLocalRom(e.target.checked)} disabled={deleting} />
-                  Also delete the ROM from local folders
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
-                  <input type="checkbox" checked={removeEverywhere} onChange={(e) => setRemoveEverywhere(e.target.checked)} disabled={deleting} />
-                  Also remove from all devices and delete the network ROM
-                </label>
-                <span style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
-                    {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
-                  </button>
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => { setDeleteConfirm(false); setDeleteLocalRom(false); setRemoveEverywhere(false); }}
-                    disabled={deleting}
-                  >
-                    Cancel
-                  </button>
-                </span>
-              </div>
+              confirmNetworkDelete ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, alignItems: "flex-start", maxWidth: 320 }}>
+                  <span style={{ color: "var(--color-danger, #e5484d)", fontWeight: 600 }}>
+                    ⚠ This will permanently delete "{romPath.split(/[\\/]/).pop()}" from the network drive. This cannot be undone.
+                  </span>
+                  <span style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                      {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete the network ROM"}
+                    </button>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => { setConfirmNetworkDelete(false); setDeleteNetworkRom(false); }}
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, alignItems: "flex-start" }}>
+                  <span>Remove this game from this device?</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
+                    <input type="checkbox" checked={deleteLocalRom} onChange={(e) => setDeleteLocalRom(e.target.checked)} disabled={deleting} />
+                    Also delete the ROM from local folders
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400 }}>
+                    <input type="checkbox" checked={removeEverywhere} onChange={(e) => setRemoveEverywhere(e.target.checked)} disabled={deleting} />
+                    Also remove from all devices
+                  </label>
+                  {removeEverywhere && romSource === "network" && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 400, marginLeft: 20 }}>
+                      <input type="checkbox" checked={deleteNetworkRom} onChange={(e) => setDeleteNetworkRom(e.target.checked)} disabled={deleting} />
+                      Also delete the ROM from the network drive
+                    </label>
+                  )}
+                  <span style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                      {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
+                    </button>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        setDeleteConfirm(false);
+                        setDeleteLocalRom(false);
+                        setRemoveEverywhere(false);
+                        setDeleteNetworkRom(false);
+                        setConfirmNetworkDelete(false);
+                      }}
+                      disabled={deleting}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                </div>
+              )
             ) : (
               <button className="btn btn-danger" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
             ))}
