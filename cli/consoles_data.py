@@ -73,7 +73,7 @@ _IMPORT_CONSOLES = [
      "standalones": [], "suggestions": ["RetroArch with Beetle PCE core"]},
     {"key": "psx",     "label": "PlayStation",                "abbr": "PSX",
      "system_keys": ["iso", "bin", "cue", "chd", "pbp"],
-     "standalones": [], "suggestions": ["RetroArch with PCSX-ReARMed or Beetle PSX core"]},
+     "standalones": [], "suggestions": ["RetroArch with PCSX-ReARMed or Beetle PSX HW core"]},
     # PS2 is standalone-only (no libretro core), so it has no `system_keys`
     # (which would otherwise surface PS1's disc cores for shared .iso/.chd). Its
     # scannable extensions are declared explicitly via `rom_extensions` (#293).
@@ -144,21 +144,26 @@ _IMPORT_SYSTEMS: dict[str, dict] = {
                       {"lib": "mednafen_pce_fast_libretro", "folder": "Beetle PCE Fast"}]},
     "iso": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
             "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_hw_libretro", "folder": "Beetle PSX HW"},
                       {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"},
                       {"lib": "flycast_libretro", "folder": "Flycast"}]},
     "bin": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
             "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_hw_libretro", "folder": "Beetle PSX HW"},
                       {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"}]},
     "cue": {"name": "Disc", "save_exts": ["mcr", "srm", "sav"],
             "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_hw_libretro", "folder": "Beetle PSX HW"},
                       {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"}]},
     "chd": {"name": "Disc (CHD)", "save_exts": ["mcr", "srm", "sav"],
             "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_hw_libretro", "folder": "Beetle PSX HW"},
                       {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"},
                       {"lib": "flycast_libretro", "folder": "Flycast"}]},
     "pbp": {"name": "PSP / PS1", "save_exts": ["srm", "sav", "mcr"],
             "cores": [{"lib": "ppsspp_libretro", "folder": "PPSSPP"},
-                      {"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"}]},
+                      {"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+                      {"lib": "mednafen_psx_hw_libretro", "folder": "Beetle PSX HW"}]},
 }
 
 _DEFAULT_SAVE_EXTS = ["srm", "sav", "save"]
