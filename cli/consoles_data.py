@@ -122,6 +122,7 @@ _IMPORT_SYSTEMS: dict[str, dict] = {
                       {"lib": "parallel_n64_libretro", "folder": "ParaLLEl N64"}]},
     "nds": {"name": "Nintendo DS", "save_exts": ["sav", "dsv", "srm"],
             "cores": [{"lib": "melonds_libretro", "folder": "melonDS"},
+                      {"lib": "melondsds_libretro", "folder": "melonDS DS"},
                       {"lib": "desmume_libretro", "folder": "DeSmuME"},
                       {"lib": "desmume2015_libretro", "folder": "DeSmuME 2015"}]},
     "md":  {"name": "Sega Genesis", "save_exts": ["srm", "sav"],

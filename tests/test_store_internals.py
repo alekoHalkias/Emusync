@@ -289,6 +289,19 @@ def test_real_seed_data_includes_ps2_pcsx2():
         assert pcsx2["dirs"]["native"]["memcard"].endswith("/memcards")
 
 
+def test_real_seed_data_includes_melonds_ds_core():
+    """The 'melonDS DS' RetroArch core (melondsds_libretro, distinct from the
+    legacy melonds_libretro) must be detectable for NDS (issue #378)."""
+    from cli.consoles_data import _prepare_console_seed_data
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs(_prepare_console_seed_data())
+        nds_cores = store.get_system_defs()["nds"]["cores"]
+        libs = {c["lib"] for c in nds_cores}
+        assert "melondsds_libretro" in libs
+        assert "melonds_libretro" in libs
+
+
 def test_console_rom_extensions_default_to_system_keys():
     """A console without explicit rom_extensions reports its systemKeys (#293)."""
     from cli.consoles_data import _prepare_console_seed_data
