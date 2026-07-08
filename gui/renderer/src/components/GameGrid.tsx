@@ -54,6 +54,10 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   // selected game — mirrors GameConfig.tsx's single-game delete confirm.
   const [bulkDeleteLocalRom, setBulkDeleteLocalRom] = useState(false);
   const [bulkRemoveEverywhere, setBulkRemoveEverywhere] = useState(false);
+  // Deleting the network master is independent of bulkRemoveEverywhere (#376)
+  // and needs its own strong confirmation before it actually runs.
+  const [bulkDeleteNetworkRom, setBulkDeleteNetworkRom] = useState(false);
+  const [confirmBulkNetworkDelete, setConfirmBulkNetworkDelete] = useState(false);
   const [artType, setArtType] = useState<ArtType>("grid");
   // Bumped per-slug when the settings modal closes, so that game's GameCard
   // remounts and re-fetches art (it may have just been edited in the
@@ -110,16 +114,26 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   }
 
   async function handleBulkDelete(): Promise<void> {
+    if (bulkDeleteNetworkRom && !confirmBulkNetworkDelete) {
+      setConfirmBulkNetworkDelete(true);
+      return;
+    }
     setDeleting(true);
     for (const slug of Array.from(selectedSlugs)) {
       try {
-        await deleteGame(slug, { deleteLocalRom: bulkDeleteLocalRom, removeEverywhere: bulkRemoveEverywhere });
+        await deleteGame(slug, {
+          deleteLocalRom: bulkDeleteLocalRom,
+          removeEverywhere: bulkRemoveEverywhere,
+          deleteNetworkRom: bulkDeleteNetworkRom,
+        });
       } catch { /* skip */ }
     }
     setSelectedSlugs(new Set());
     setConfirmDelete(false);
     setBulkDeleteLocalRom(false);
     setBulkRemoveEverywhere(false);
+    setBulkDeleteNetworkRom(false);
+    setConfirmBulkNetworkDelete(false);
     setDeleting(false);
     onChanged();
   }
@@ -286,7 +300,31 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         />
       )}
 
-      {confirmDelete && (
+      {confirmDelete && confirmBulkNetworkDelete && (
+        <div className="modal-overlay" onClick={() => !deleting && setConfirmBulkNetworkDelete(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: "var(--color-danger, #e5484d)" }}>⚠ Delete network ROM files?</h3>
+            <p>
+              This will permanently delete the network-drive ROM file for {selectedSlugs.size} selected
+              game{selectedSlugs.size !== 1 ? "s" : ""} (any that are network-sourced). <strong>This cannot be undone.</strong>
+            </p>
+            <div className="modal-actions">
+              <button
+                className="btn btn-ghost"
+                onClick={() => { setConfirmBulkNetworkDelete(false); setBulkDeleteNetworkRom(false); }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-danger" onClick={handleBulkDelete} disabled={deleting}>
+                {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete the network ROM"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && !confirmBulkNetworkDelete && (
         <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Remove {selectedSlugs.size} game{selectedSlugs.size !== 1 ? "s" : ""} from this device?</h3>
@@ -297,12 +335,23 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 8 }}>
               <input type="checkbox" checked={bulkRemoveEverywhere} onChange={(e) => setBulkRemoveEverywhere(e.target.checked)} disabled={deleting} />
-              Also remove from all devices and delete the network ROM
+              Also remove from all devices
             </label>
+            {bulkRemoveEverywhere && (
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 8, marginLeft: 20 }}>
+                <input type="checkbox" checked={bulkDeleteNetworkRom} onChange={(e) => setBulkDeleteNetworkRom(e.target.checked)} disabled={deleting} />
+                Also delete the ROM from the network drive
+              </label>
+            )}
             <div className="modal-actions">
               <button
                 className="btn btn-ghost"
-                onClick={() => { setConfirmDelete(false); setBulkDeleteLocalRom(false); setBulkRemoveEverywhere(false); }}
+                onClick={() => {
+                  setConfirmDelete(false);
+                  setBulkDeleteLocalRom(false);
+                  setBulkRemoveEverywhere(false);
+                  setBulkDeleteNetworkRom(false);
+                }}
                 disabled={deleting}
               >
                 Cancel
