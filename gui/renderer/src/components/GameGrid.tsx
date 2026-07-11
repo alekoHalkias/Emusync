@@ -73,9 +73,14 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   // check resolves, so the Steam filter passes everything while loading.
   const [steamSlugs, setSteamSlugs] = useState<Set<string> | null>(null);
   const [steamBusy, setSteamBusy] = useState(false);
-  const [steamMsg, setSteamMsg] = useState<{ text: string; isError: boolean } | null>(null);
+  // One shared dismissible result line under the header for every bulk action
+  // (Add to Steam #391, Download #396) — they can't run concurrently anyway.
+  const [bulkMsg, setBulkMsg] = useState<{ text: string; isError: boolean } | null>(null);
   // Steam-is-open confirm (issue #393): offer to close Steam, add, relaunch.
   const [showSteamRestart, setShowSteamRestart] = useState(false);
+  // Bulk ROM download (issue #396): localize every selected network game.
+  const [dlBusy, setDlBusy] = useState(false);
+  const [dlProgress, setDlProgress] = useState<{ done: number; total: number } | null>(null);
 
   // hasArt is keyed only by slug, not by artType — a stale entry from the
   // previous type would otherwise keep a game wrongly filtered in/out of the
@@ -150,6 +155,55 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     onChanged();
   }
 
+  // Bulk "Download" (issue #396): localize every selected network-sourced
+  // game via the existing rom:localize flow (free-space-checked, atomic,
+  // updates server config). Local-source and already-localized games are
+  // silently skipped; the first game of a console with no local folder
+  // configured prompts the folder picker once (rom:localize persists the
+  // choice onto the console, so the rest of the loop won't re-prompt).
+  async function handleBulkDownload(): Promise<void> {
+    setDlBusy(true);
+    setBulkMsg(null);
+    const selected = Array.from(selectedSlugs)
+      .map((slug) => games.find((g) => g.slug === slug))
+      .filter((g): g is GameRow => !!g);
+    const targets = selected.filter((g) => g.romSource === "network" && !g.hasLocalCopy);
+    const skipped = selected.length - targets.length;
+    let done = 0;
+    let error: string | null = null;
+    let pickedFolder: string | undefined;
+    setDlProgress({ done: 0, total: targets.length });
+    for (const g of targets) {
+      try {
+        let res = await window.emusync.rom.localize(g.slug, pickedFolder);
+        if (!res.ok && res.error?.includes("No local destination")) {
+          const folder = await window.emusync.dialog.openFolder();
+          if (!folder) { error = "Cancelled — no download folder chosen."; break; }
+          pickedFolder = folder;
+          res = await window.emusync.rom.localize(g.slug, pickedFolder);
+        }
+        if (!res.ok) { error = res.error ?? "Download failed."; break; }
+        done++;
+        setDlProgress({ done, total: targets.length });
+      } catch (e: unknown) {
+        error = e instanceof Error ? e.message : "Download failed.";
+        break;
+      }
+    }
+    if (error) {
+      setBulkMsg({ text: done > 0 ? `Downloaded ${done}, then failed: ${error}` : error, isError: true });
+    } else {
+      setBulkMsg({
+        text: `Downloaded ${done}${skipped > 0 ? `, skipped ${skipped} already local` : ""}.`,
+        isError: false,
+      });
+      setSelectedSlugs(new Set());
+    }
+    setDlProgress(null);
+    setDlBusy(false);
+    onChanged();
+  }
+
   // Bulk "Add to Steam" (issue #391): adds every selected game, silently
   // skipping ones that already have a shortcut. Any error aborts the loop and
   // is surfaced once for the whole batch. If Steam is running, offer to
@@ -164,7 +218,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
 
   async function doBulkAddToSteam(relaunching: boolean): Promise<void> {
     setSteamBusy(true);
-    setSteamMsg(null);
+    setBulkMsg(null);
     const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
     let added = 0;
     let skipped = 0;
@@ -187,10 +241,10 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     const slugs = await window.emusync.steam.addedSlugs().catch(() => null);
     if (slugs) setSteamSlugs(new Set(slugs));
     if (error) {
-      setSteamMsg({ text: added > 0 ? `Added ${added}, then failed: ${error}` : error, isError: true });
+      setBulkMsg({ text: added > 0 ? `Added ${added}, then failed: ${error}` : error, isError: true });
     } else {
       const seeThem = relaunching ? "Steam is restarting." : `Restart Steam to see ${added === 1 ? "it" : "them"}.`;
-      setSteamMsg({
+      setBulkMsg({
         text: `Added ${added} to Steam${skipped > 0 ? `, skipped ${skipped} already added` : ""}. ${seeThem}`,
         isError: false,
       });
@@ -203,14 +257,14 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     setSteamBusy(true);
     const down = await window.emusync.steam.shutdown().catch(() => ({ ok: false, error: "Couldn't close Steam." }));
     if (!down.ok) {
-      setSteamMsg({ text: down.error ?? "Couldn't close Steam.", isError: true });
+      setBulkMsg({ text: down.error ?? "Couldn't close Steam.", isError: true });
       setSteamBusy(false);
       setShowSteamRestart(false);
       return;
     }
     await doBulkAddToSteam(true);
     const up = await window.emusync.steam.launch().catch(() => ({ ok: false, error: "Couldn't relaunch Steam." }));
-    if (!up.ok) setSteamMsg({ text: `Added, but Steam didn't relaunch: ${up.error ?? "unknown error"}`, isError: false });
+    if (!up.ok) setBulkMsg({ text: `Added, but Steam didn't relaunch: ${up.error ?? "unknown error"}`, isError: false });
     setShowSteamRestart(false);
   }
 
@@ -300,6 +354,16 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         </button>
         <button
           className="btn btn-ghost game-grid-header-btn"
+          disabled={selectedSlugs.size === 0 || dlBusy}
+          onClick={handleBulkDownload}
+          title="Download the selected games' ROMs to this device (already-local games are skipped)"
+        >
+          {dlBusy
+            ? <><span className="spinner" /> Downloading {dlProgress ? `${Math.min(dlProgress.done + 1, dlProgress.total)}/${dlProgress.total}` : ""}…</>
+            : `⬇ Download${selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}`}
+        </button>
+        <button
+          className="btn btn-ghost game-grid-header-btn"
           disabled={selectedSlugs.size === 0 || steamBusy}
           onClick={handleBulkAddToSteam}
           title="Add the selected games to Steam (already-added games are skipped)"
@@ -315,13 +379,13 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         </button>
       </div>
 
-      {steamMsg && (
+      {bulkMsg && (
         <div
-          style={{ fontSize: 12, padding: "4px 16px", color: steamMsg.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)", cursor: "pointer" }}
-          onClick={() => setSteamMsg(null)}
+          style={{ fontSize: 12, padding: "4px 16px", color: bulkMsg.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)", cursor: "pointer" }}
+          onClick={() => setBulkMsg(null)}
           title="Dismiss"
         >
-          {steamMsg.text}
+          {bulkMsg.text}
         </div>
       )}
 
