@@ -66,19 +66,26 @@ function crc32(str: string): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+// Both IDs below hash the RAW, unquoted exe path — Steam computes its
+// internal ids from the bare path and only adds the surrounding quotes when
+// serializing the `exe` field into shortcuts.vdf. Hashing the already-quoted
+// string (the first cut of this feature did) silently produces a shortcut
+// whose grid images Steam never matches — confirmed on a real client: the
+// PNG lands in config/grid/ but Steam doesn't pick it up.
+
 /** Steam's legacy non-Steam-game appid: unsigned crc32(exe+name) with the top
  * bit forced on. shortcuts.vdf's `appid` field is a signed int32, so the
  * unsigned value is folded into signed range before writing. */
-function shortcutAppId(exe: string, name: string): number {
-  const unsigned = (crc32(exe + name) | 0x80000000) >>> 0;
+function shortcutAppId(rawExe: string, name: string): number {
+  const unsigned = (crc32(rawExe + name) | 0x80000000) >>> 0;
   return unsigned > 0x7fffffff ? unsigned - 0x100000000 : unsigned;
 }
 
 /** The 64-bit "grid asset" id Steam derives internally for artwork filenames —
  * distinct from the shortcuts.vdf appid field above. Returned as a decimal
  * string since it exceeds safe JS integer range as a Number. */
-function gridAssetId(exe: string, name: string): string {
-  const top = BigInt((crc32(exe + name) | 0x80000000) >>> 0);
+function gridAssetId(rawExe: string, name: string): string {
+  const top = BigInt((crc32(rawExe + name) | 0x80000000) >>> 0);
   return ((top << 32n) | 0x02000000n).toString();
 }
 
@@ -214,7 +221,7 @@ export function registerSteamIpc(): void {
         return { ok: false, error: `Failed to read shortcuts.vdf: ${e.message || e}` };
       }
 
-      const appid = shortcutAppId(exe, gameName);
+      const appid = shortcutAppId(launcherExe, gameName);
       const idx = parsed.shortcuts.findIndex((s) => s.exe === exe && s.LaunchOptions === launchOptions);
       const entry: SteamShortcut = {
         appid,
@@ -248,7 +255,7 @@ export function registerSteamIpc(): void {
       // <id>_hero = hero banner, <id>_logo = logo overlay.
       const gridDir = join(configDir, "grid");
       mkdirSync(gridDir, { recursive: true });
-      const assetId = gridAssetId(exe, gameName);
+      const assetId = gridAssetId(launcherExe, gameName);
       const artSrcDir = join(ART_DIR, consoleKey, slug);
       const artMap: [string, string][] = [["grid", `${assetId}p.png`], ["hero", `${assetId}_hero.png`], ["logo", `${assetId}_logo.png`]];
       for (const [type, destName] of artMap) {
