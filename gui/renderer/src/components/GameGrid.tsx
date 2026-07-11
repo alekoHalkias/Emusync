@@ -68,12 +68,21 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   // without artwork" filter doesn't hide everything while cards are loading.
   const [hasArt, setHasArt] = useState<Record<string, boolean>>({});
   const [filters, setFilters] = useState<GameFilters>(EMPTY_FILTERS);
+  // Slugs with an EmuSync Steam shortcut (issue #391) — null until the batch
+  // check resolves, so the Steam filter passes everything while loading.
+  const [steamSlugs, setSteamSlugs] = useState<Set<string> | null>(null);
+  const [steamBusy, setSteamBusy] = useState(false);
+  const [steamMsg, setSteamMsg] = useState<{ text: string; isError: boolean } | null>(null);
 
   // hasArt is keyed only by slug, not by artType — a stale entry from the
   // previous type would otherwise keep a game wrongly filtered in/out of the
   // artwork filter forever, since a game the filter excludes never mounts
   // its GameCard to refresh the check for the new type (issue #345 follow-up).
   useEffect(() => { setHasArt({}); }, [artType]);
+
+  useEffect(() => {
+    window.emusync.steam.addedSlugs().then((slugs) => setSteamSlugs(new Set(slugs))).catch(() => {});
+  }, []);
 
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
@@ -138,13 +147,58 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     onChanged();
   }
 
+  // Bulk "Add to Steam" (issue #391): adds every selected game, silently
+  // skipping ones that already have a shortcut. A Steam-is-running (or any
+  // other) error aborts the loop and is surfaced once for the whole batch.
+  async function handleBulkAddToSteam(): Promise<void> {
+    setSteamBusy(true);
+    setSteamMsg(null);
+    const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
+    let added = 0;
+    let skipped = 0;
+    let error: string | null = null;
+    for (const slug of Array.from(selectedSlugs)) {
+      const g = games.find((x) => x.slug === slug);
+      if (!g) continue;
+      if (steamSlugs?.has(slug)) { skipped++; continue; }
+      const def = consoles.find((c: { key: string; label: string; abbr: string }) => c.abbr === (g.console ?? ""));
+      try {
+        const res = await window.emusync.steam.addGame(slug, g.name, def?.label ?? g.console ?? "", def?.key ?? (g.console ?? "").toLowerCase());
+        if (!res.ok) { error = res.error ?? "Failed to add to Steam."; break; }
+        added++;
+      } catch (e: unknown) {
+        error = e instanceof Error ? e.message : "Failed to add to Steam.";
+        break;
+      }
+    }
+    // Refresh so the filter and future bulk runs see the new state.
+    const slugs = await window.emusync.steam.addedSlugs().catch(() => null);
+    if (slugs) setSteamSlugs(new Set(slugs));
+    if (error) {
+      setSteamMsg({ text: added > 0 ? `Added ${added}, then failed: ${error}` : error, isError: true });
+    } else {
+      setSteamMsg({
+        text: `Added ${added} to Steam${skipped > 0 ? `, skipped ${skipped} already added` : ""}. Restart Steam to see ${added === 1 ? "it" : "them"}.`,
+        isError: false,
+      });
+      setSelectedSlugs(new Set());
+    }
+    setSteamBusy(false);
+  }
+
   const accent = CONSOLE_ACCENT[consoleKey] ?? DEFAULT_ACCENT;
 
   const searched = search.trim()
     ? games.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : games;
   const filtered = searched.filter((g) =>
-    matchesFilters(filters, !!g.lastSave, g.romSource !== "network" || !!g.hasLocalCopy, hasArt[g.slug])
+    matchesFilters(
+      filters,
+      !!g.lastSave,
+      g.romSource !== "network" || !!g.hasLocalCopy,
+      hasArt[g.slug],
+      steamSlugs === null ? undefined : steamSlugs.has(g.slug),
+    )
   );
   const allFilteredSelected = filtered.length > 0 && filtered.every((g) => selectedSlugs.has(g.slug));
 
@@ -217,6 +271,14 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           {allFilteredSelected ? "☑ Deselect All" : "☐ Select All"}
         </button>
         <button
+          className="btn btn-ghost game-grid-header-btn"
+          disabled={selectedSlugs.size === 0 || steamBusy}
+          onClick={handleBulkAddToSteam}
+          title="Add the selected games to Steam (already-added games are skipped)"
+        >
+          {steamBusy ? <><span className="spinner" /> Adding…</> : `🎮 Add to Steam${selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}`}
+        </button>
+        <button
           className="btn btn-danger game-grid-header-btn"
           disabled={selectedSlugs.size === 0}
           onClick={() => setConfirmDelete(true)}
@@ -224,6 +286,16 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           🗑 Delete{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
         </button>
       </div>
+
+      {steamMsg && (
+        <div
+          style={{ fontSize: 12, padding: "4px 16px", color: steamMsg.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)", cursor: "pointer" }}
+          onClick={() => setSteamMsg(null)}
+          title="Dismiss"
+        >
+          {steamMsg.text}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="empty-state" style={{ padding: "40px 20px" }}>
