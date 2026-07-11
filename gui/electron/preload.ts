@@ -148,6 +148,9 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("steam:addGame", slug, gameName, consoleName, consoleKey),
     isAdded: (slug: string): Promise<boolean> => ipcRenderer.invoke("steam:isAdded", slug),
     addedSlugs: (): Promise<string[]> => ipcRenderer.invoke("steam:addedSlugs"),
+    isRunning: (): Promise<boolean> => ipcRenderer.invoke("steam:isRunning"),
+    shutdown: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke("steam:shutdown"),
+    launch: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke("steam:launch"),
   },
   game: {
     launch: (slug: string): Promise<{ ok: boolean }> =>

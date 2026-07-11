@@ -6,6 +6,7 @@ import GameCard from "./GameCard";
 import GameFilterButton, { EMPTY_FILTERS, matchesFilters, type GameFilters } from "./GameFilterButton";
 import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
+import SteamRestartModal from "./SteamRestartModal";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -73,6 +74,8 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   const [steamSlugs, setSteamSlugs] = useState<Set<string> | null>(null);
   const [steamBusy, setSteamBusy] = useState(false);
   const [steamMsg, setSteamMsg] = useState<{ text: string; isError: boolean } | null>(null);
+  // Steam-is-open confirm (issue #393): offer to close Steam, add, relaunch.
+  const [showSteamRestart, setShowSteamRestart] = useState(false);
 
   // hasArt is keyed only by slug, not by artType — a stale entry from the
   // previous type would otherwise keep a game wrongly filtered in/out of the
@@ -148,9 +151,18 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   }
 
   // Bulk "Add to Steam" (issue #391): adds every selected game, silently
-  // skipping ones that already have a shortcut. A Steam-is-running (or any
-  // other) error aborts the loop and is surfaced once for the whole batch.
+  // skipping ones that already have a shortcut. Any error aborts the loop and
+  // is surfaced once for the whole batch. If Steam is running, offer to
+  // restart it around the adds instead of refusing (#393).
   async function handleBulkAddToSteam(): Promise<void> {
+    if (await window.emusync.steam.isRunning().catch(() => false)) {
+      setShowSteamRestart(true);
+      return;
+    }
+    await doBulkAddToSteam(false);
+  }
+
+  async function doBulkAddToSteam(relaunching: boolean): Promise<void> {
     setSteamBusy(true);
     setSteamMsg(null);
     const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
@@ -177,13 +189,29 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     if (error) {
       setSteamMsg({ text: added > 0 ? `Added ${added}, then failed: ${error}` : error, isError: true });
     } else {
+      const seeThem = relaunching ? "Steam is restarting." : `Restart Steam to see ${added === 1 ? "it" : "them"}.`;
       setSteamMsg({
-        text: `Added ${added} to Steam${skipped > 0 ? `, skipped ${skipped} already added` : ""}. Restart Steam to see ${added === 1 ? "it" : "them"}.`,
+        text: `Added ${added} to Steam${skipped > 0 ? `, skipped ${skipped} already added` : ""}. ${seeThem}`,
         isError: false,
       });
       setSelectedSlugs(new Set());
     }
     setSteamBusy(false);
+  }
+
+  async function restartSteamAndBulkAdd(): Promise<void> {
+    setSteamBusy(true);
+    const down = await window.emusync.steam.shutdown().catch(() => ({ ok: false, error: "Couldn't close Steam." }));
+    if (!down.ok) {
+      setSteamMsg({ text: down.error ?? "Couldn't close Steam.", isError: true });
+      setSteamBusy(false);
+      setShowSteamRestart(false);
+      return;
+    }
+    await doBulkAddToSteam(true);
+    const up = await window.emusync.steam.launch().catch(() => ({ ok: false, error: "Couldn't relaunch Steam." }));
+    if (!up.ok) setSteamMsg({ text: `Added, but Steam didn't relaunch: ${up.error ?? "unknown error"}`, isError: false });
+    setShowSteamRestart(false);
   }
 
   const accent = CONSOLE_ACCENT[consoleKey] ?? DEFAULT_ACCENT;
@@ -359,6 +387,15 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           onClose={closeGameModal}
           onChanged={() => { closeGameModal(); onChanged(); }}
           onLaunch={onPlay}
+        />
+      )}
+
+      {showSteamRestart && (
+        <SteamRestartModal
+          count={selectedSlugs.size}
+          busy={steamBusy}
+          onYes={restartSteamAndBulkAdd}
+          onNo={() => setShowSteamRestart(false)}
         />
       )}
 

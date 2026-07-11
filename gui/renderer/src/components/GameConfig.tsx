@@ -5,6 +5,7 @@ import { sanitizeFilename, usesSharedSaveLayout } from "./console-import/helpers
 import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
 import { useGameSync } from "./game-config/useGameSync";
+import SteamRestartModal from "./SteamRestartModal";
 
 /**
  * Swap the basename of a portable ROM rel-path to a new base, keeping the
@@ -46,6 +47,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [steamBusy, setSteamBusy] = useState(false);
   const [steamAdded, setSteamAdded] = useState(false);
   const [steamMessage, setSteamMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  // Steam-is-open confirm (issue #393): offer to close Steam, add, relaunch.
+  const [showSteamRestart, setShowSteamRestart] = useState(false);
   const [name, setName] = useState(initialName ?? "");
   const [romPath, setRomPath] = useState("");
   const [savePath, setSavePath] = useState("");
@@ -118,6 +121,17 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
   async function handleAddToSteam(): Promise<void> {
     if (!slug) return;
+    // Steam running → offer to restart it around the add (#393) instead of
+    // failing with "close Steam first".
+    if (await window.emusync.steam.isRunning().catch(() => false)) {
+      setShowSteamRestart(true);
+      return;
+    }
+    await doAddToSteam(false);
+  }
+
+  async function doAddToSteam(relaunching: boolean): Promise<void> {
+    if (!slug) return;
     setSteamBusy(true);
     setSteamMessage(null);
     try {
@@ -127,16 +141,32 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
       const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
       const def = consoles.find((c: { key: string; label: string; abbr: string }) => c.abbr === gameConsole);
       const res = await window.emusync.steam.addGame(slug, name.trim(), def?.label ?? gameConsole, def?.key ?? gameConsole.toLowerCase());
+      const seeIt = relaunching ? "Steam is restarting." : "Restart Steam to see it.";
       if (!res.ok) setSteamMessage({ text: res.error ?? "Failed to add to Steam.", isError: true });
       else if (res.updated) setSteamMessage({ text: "Already in Steam — refreshed the shortcut and artwork.", isError: false });
       else if (res.warning) setSteamMessage({ text: `Added — ${res.warning}`, isError: false });
-      else setSteamMessage({ text: "Added to Steam. Restart Steam to see it.", isError: false });
+      else setSteamMessage({ text: `Added to Steam. ${seeIt}`, isError: false });
       if (res.ok) setSteamAdded(true);
     } catch (e: unknown) {
       setSteamMessage({ text: e instanceof Error ? e.message : "Failed to add to Steam.", isError: true });
     } finally {
       setSteamBusy(false);
     }
+  }
+
+  async function restartSteamAndAdd(): Promise<void> {
+    setSteamBusy(true);
+    const down = await window.emusync.steam.shutdown().catch(() => ({ ok: false, error: "Couldn't close Steam." }));
+    if (!down.ok) {
+      setSteamMessage({ text: down.error ?? "Couldn't close Steam.", isError: true });
+      setSteamBusy(false);
+      setShowSteamRestart(false);
+      return;
+    }
+    await doAddToSteam(true);
+    const up = await window.emusync.steam.launch().catch(() => ({ ok: false, error: "Couldn't relaunch Steam." }));
+    if (!up.ok) setSteamMessage({ text: `Added, but Steam didn't relaunch: ${up.error ?? "unknown error"}`, isError: false });
+    setShowSteamRestart(false);
   }
 
   function validate(): boolean {
@@ -466,6 +496,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </button>
         </div>
       </div>
+
+      {showSteamRestart && (
+        <SteamRestartModal
+          count={1}
+          busy={steamBusy}
+          onYes={restartSteamAndAdd}
+          onNo={() => setShowSteamRestart(false)}
+        />
+      )}
 
     </div>
   );
