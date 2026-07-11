@@ -119,7 +119,12 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     setSteamBusy(true);
     setSteamMessage(null);
     try {
-      const res = await window.emusync.steam.addGame(slug, name.trim(), gameConsole, gameConsole.toLowerCase());
+      // Collection is named with the console's full label ("Game Boy Advance"),
+      // not the stored abbr ("GBA") — fall back to the abbr if defs are
+      // unavailable (e.g. server unreachable).
+      const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
+      const def = consoles.find((c: { key: string; label: string; abbr: string }) => c.abbr === gameConsole);
+      const res = await window.emusync.steam.addGame(slug, name.trim(), def?.label ?? gameConsole, def?.key ?? gameConsole.toLowerCase());
       if (!res.ok) setSteamMessage({ text: res.error ?? "Failed to add to Steam.", isError: true });
       else if (res.updated) setSteamMessage({ text: "Already in Steam — refreshed the shortcut and artwork.", isError: false });
       else if (res.warning) setSteamMessage({ text: `Added — ${res.warning}`, isError: false });

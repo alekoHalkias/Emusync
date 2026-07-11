@@ -146,8 +146,94 @@ function writeShortcutsFile(path: string, obj: { shortcuts: SteamShortcut[] }): 
   });
 }
 
-/** Upserts this console's collection to include `assetId`, editing only the
- * "user-collections" string value inside localconfig.vdf's plaintext VDF and
+type CloudEntry = {
+  key: string;
+  timestamp: number;
+  value?: string;
+  version?: string;
+  is_deleted?: boolean;
+  conflictResolutionMethod?: string;
+  strMethodId?: string;
+};
+
+/** Upserts this console's collection in the modern client's collections store:
+ * `config/cloudstorage/cloud-storage-namespace-1.json`, an array of
+ * [key, entry] pairs where a live collection entry's `value` is a JSON string
+ * `{id, name, added: [unsigned appids], removed: []}` (format confirmed
+ * against a real 2026 client — issue #387; the localconfig.vdf
+ * "user-collections" key that #385 originally targeted is legacy and ignored
+ * by these clients). Deleted collections persist as `is_deleted` tombstones
+ * and must not be resurrected. Every write bumps both the entry version and
+ * namespace 1's version in cloud-storage-namespaces.json — Steam reconciles
+ * local vs cloud state by comparing these.
+ *
+ * Reuses an existing live collection with the same *name* (e.g. one made by
+ * Steam ROM Manager) rather than creating a parallel duplicate; otherwise
+ * creates `emusync-<base64(name)>`, mirroring SRM's `srm-<base64(name)>`
+ * convention. Returns false if the store isn't present/parseable — the
+ * caller then falls back to the legacy localconfig.vdf path. */
+function upsertCloudCollection(userdataDir: string, consoleName: string, appid: number): boolean {
+  const csDir = join(userdataDir, "config", "cloudstorage");
+  const nsPath = join(csDir, "cloud-storage-namespace-1.json");
+  const namespacesPath = join(csDir, "cloud-storage-namespaces.json");
+  if (!existsSync(nsPath) || !existsSync(namespacesPath)) return false;
+
+  let pairs: [string, CloudEntry][];
+  let namespaces: [number, string][];
+  try {
+    pairs = JSON.parse(readFileSync(nsPath, "utf8"));
+    namespaces = JSON.parse(readFileSync(namespacesPath, "utf8"));
+    if (!Array.isArray(pairs) || !Array.isArray(namespaces)) return false;
+  } catch {
+    return false; // format surprise — bail out rather than guess
+  }
+  const ns1 = namespaces.find((n) => n[0] === 1);
+  if (!ns1) return false;
+  const newVersion = String((parseInt(ns1[1], 10) || 0) + 1);
+  const now = Math.floor(Date.now() / 1000);
+
+  // Prefer a live collection already named after this console, whoever made it.
+  let target: CloudEntry | undefined;
+  for (const [key, entry] of pairs) {
+    if (!key.startsWith("user-collections.") || entry.is_deleted || !entry.value) continue;
+    try {
+      if (JSON.parse(entry.value).name === consoleName) { target = entry; break; }
+    } catch { /* skip unparseable entry */ }
+  }
+
+  if (target) {
+    const val = JSON.parse(target.value!);
+    val.added = val.added ?? [];
+    if (!val.added.includes(appid)) val.added.push(appid);
+    val.removed = (val.removed ?? []).filter((a: number) => a !== appid);
+    target.value = JSON.stringify(val);
+    target.timestamp = now;
+    target.version = newVersion;
+  } else {
+    const id = `emusync-${Buffer.from(consoleName, "utf8").toString("base64")}`;
+    const key = `user-collections.${id}`;
+    const entry: CloudEntry = {
+      key,
+      timestamp: now,
+      value: JSON.stringify({ id, name: consoleName, added: [appid], removed: [] }),
+      version: newVersion,
+      conflictResolutionMethod: "custom",
+      strMethodId: "union-collections",
+    };
+    // Replace our own tombstone if the collection was deleted before, else append.
+    const idx = pairs.findIndex(([k]) => k === key);
+    if (idx >= 0) pairs[idx] = [key, entry];
+    else pairs.push([key, entry]);
+  }
+
+  writeFileSync(nsPath, JSON.stringify(pairs), "utf8");
+  ns1[1] = newVersion;
+  writeFileSync(namespacesPath, JSON.stringify(namespaces), "utf8");
+  return true;
+}
+
+/** Legacy fallback for clients without a cloudstorage store: upserts the
+ * "user-collections" string value inside localconfig.vdf's plaintext VDF,
  * leaving everything else in the file byte-for-byte untouched. Returns false
  * (no-op) if that key isn't found — a documented fallback, not an error. */
 function upsertCollection(localconfigPath: string, consoleName: string, appid: number): boolean {
@@ -284,7 +370,10 @@ export function registerSteamIpc(): void {
       let warning: string | undefined;
       const localconfigPath = join(configDir, "localconfig.vdf");
       try {
-        const grouped = upsertCollection(localconfigPath, consoleName, appid);
+        // Modern clients store collections in cloudstorage; the localconfig.vdf
+        // key still exists on them but is ignored, so it's only the fallback.
+        const grouped = upsertCloudCollection(userdataDir, consoleName, appid)
+          || upsertCollection(localconfigPath, consoleName, appid);
         if (!grouped) {
           warning = "Shortcut and artwork added, but this Steam client's Collections storage wasn't recognized — add it to a collection manually.";
         }
