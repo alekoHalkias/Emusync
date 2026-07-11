@@ -34,9 +34,16 @@ def _launch_and_wait(command: tuple[str, ...], game_pid_file: Path) -> int:
     return code
 
 
-def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig) -> None:
+def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig,
+                        game_name: str = "", console: str = "") -> None:
     """Persist this device's game config so an offline launch knows the paths
-    (the authoritative config lives on the server)."""
+    (the authoritative config lives on the server).
+
+    Also updates a small sibling index (`_offline_index.json`, slug -> name/console)
+    so the GUI can build an offline game list when it can't reach the server at all
+    (issue #383) — kept separate from the per-slug cache file since that file is
+    deserialized straight into `GameDeviceConfig` and can't carry extra keys.
+    """
     try:
         path = Path(cfg.data_dir) / "game_cache" / f"{game_slug}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,6 +62,18 @@ def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig) -> None:
         # Non-fatal: a missing cache only means a later offline launch can't
         # resolve this game's paths (issue #241).
         logger.warning("failed to cache game config for '%s'", game_slug, exc_info=True)
+        return
+    if not game_name and not console:
+        return
+    try:
+        index_path = Path(cfg.data_dir) / "game_cache" / "_offline_index.json"
+        index = json.loads(index_path.read_text()) if index_path.exists() else {}
+        if not isinstance(index, dict):
+            index = {}
+        index[game_slug] = {"name": game_name, "console": console}
+        index_path.write_text(json.dumps(index))
+    except Exception:
+        logger.warning("failed to update offline game index for '%s'", game_slug, exc_info=True)
 
 
 def _load_cached_game_device(cfg, game_slug: str) -> Optional[GameDeviceConfig]:

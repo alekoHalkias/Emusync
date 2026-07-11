@@ -74,6 +74,11 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
               🔒
             </span>
           )}
+          {game.offline && (
+            <span className="game-card-badge game-card-badge-offline" title="Server unreachable — showing cached data; save will sync once reconnected">
+              ⚡ offline
+            </span>
+          )}
           {!game.isLocal && (
             <span className="game-card-badge game-card-badge-other" title="Not set up on this device">
               other device

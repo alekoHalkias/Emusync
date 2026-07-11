@@ -10,6 +10,7 @@ export type GameRow = Game & {
   statePath?: string;          // local state FOLDER (issue #285 recovery view)
   romSource?: string;          // 'local' | 'network' (issue #255)
   hasLocalCopy?: boolean;      // network ROM that's been localized for offline play
+  offline?: boolean;           // row built from local cache, server unreachable (issue #383)
 };
 
 /** State of an in-flight ROM push/pull to a single device, keyed by device id. */
