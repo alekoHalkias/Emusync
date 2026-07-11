@@ -129,13 +129,20 @@ function propCI(s: Record<string, unknown>, name: string): unknown {
   return key === undefined ? undefined : s[key];
 }
 
-/** True if the entry is EmuSync's shortcut for this slug: same launcher exe
- * (compared unquoted) and the same `run <slug>` LaunchOptions. Shared by
- * steam:addGame (upsert/dedup) and steam:isAdded so they can never disagree. */
+const stripQuotes = (v: unknown): string => (typeof v === "string" ? v.replace(/^"+|"+$/g, "") : "");
+
+/** If the entry is an EmuSync shortcut (our launcher exe, `run <slug>`
+ * LaunchOptions), return its slug; else null. The single matcher behind
+ * steam:addGame's upsert/dedup, steam:isAdded, and steam:addedSlugs so they
+ * can never disagree about what counts as ours. */
+function ourSlug(s: SteamShortcut, launcherExe: string): string | null {
+  if (stripQuotes(propCI(s, "exe")) !== launcherExe) return null;
+  const m = stripQuotes(propCI(s, "LaunchOptions")).match(/^run (.+)$/);
+  return m ? m[1] : null;
+}
+
 function isOurShortcut(s: SteamShortcut, launcherExe: string, launchOptions: string): boolean {
-  const stripQuotes = (v: unknown): string => (typeof v === "string" ? v.replace(/^"+|"+$/g, "") : "");
-  return stripQuotes(propCI(s, "exe")) === launcherExe &&
-    stripQuotes(propCI(s, "LaunchOptions")) === launchOptions;
+  return `run ${ourSlug(s, launcherExe)}` === launchOptions;
 }
 
 function parseShortcutsFile(path: string): Promise<{ shortcuts: SteamShortcut[] }> {
@@ -292,6 +299,25 @@ export function registerSteamIpc(): void {
       return parsed.shortcuts.some((s) => isOurShortcut(s, launcherExe, `run ${slug}`));
     } catch {
       return false;
+    }
+  });
+
+  // Batch form of steam:isAdded for the game grid (issue #391): one parse of
+  // shortcuts.vdf instead of one per game. Failures report [] so the grid
+  // behaves as if nothing were added.
+  ipcMain.handle("steam:addedSlugs", async (): Promise<string[]> => {
+    try {
+      const steamDir = findSteamDir();
+      if (!steamDir) return [];
+      const userdataDir = findActiveUserdataDir(steamDir);
+      if (!userdataDir) return [];
+      const parsed = await parseShortcutsFile(join(userdataDir, "config", "shortcuts.vdf"));
+      const launcherExe = join(dirname(SCRIPT), "emusync");
+      return parsed.shortcuts
+        .map((s) => ourSlug(s, launcherExe))
+        .filter((slug): slug is string => slug !== null);
+    } catch {
+      return [];
     }
   });
 
