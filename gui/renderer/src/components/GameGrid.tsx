@@ -178,17 +178,29 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     }
 
     // Batch byte total for the modal's overall bar; a game whose master can't
-    // be statted contributes 0 (its own localize will surface the real error).
+    // be statted contributes 0 up front and gets corrected from the copy's own
+    // progress events (which carry the authoritative file size) once it starts.
     const sizes = await window.emusync.rom.localizeSizes(targets.map((g) => g.slug)).catch(() => ({} as Record<string, number>));
-    const totalBytes = targets.reduce((sum, g) => sum + (sizes[g.slug] ?? 0), 0);
+    let totalBytes = targets.reduce((sum, g) => sum + (sizes[g.slug] ?? 0), 0);
 
     // Overall progress = bytes of completed games + the current game's copied
-    // bytes (from throttled main-process events). Speed is a light EMA over
+    // bytes. Progress events are async IPC, so a late event from the PREVIOUS
+    // game can arrive after the loop moved on — added to the new game's base
+    // it overshoots wildly and the bar leaps around; every event is therefore
+    // filtered to the slug currently downloading. Speed is a light EMA over
     // >=500ms windows so it reads steady instead of jittering per chunk.
     let completedBytes = 0;
     let currentBase = 0;
+    let currentSlug = "";
     const speed = { lastT: Date.now(), lastBytes: 0, bps: 0 };
-    const listener = window.emusync.rom.onLocalizeProgress(({ copied }) => {
+    const listener = window.emusync.rom.onLocalizeProgress(({ slug, copied, total }) => {
+      if (slug !== currentSlug) return; // stale event from a finished game
+      if ((sizes[slug] ?? 0) !== total) {
+        // The upfront stat missed/undersized this game — adopt the copy's real
+        // size so the bar's denominator stays honest.
+        totalBytes += total - (sizes[slug] ?? 0);
+        sizes[slug] = total;
+      }
       const doneBytes = currentBase + copied;
       const now = Date.now();
       const dt = now - speed.lastT;
@@ -198,7 +210,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         speed.lastT = now;
         speed.lastBytes = doneBytes;
       }
-      setDlModal((prev) => (prev ? { ...prev, doneBytes, speedBps: speed.bps } : prev));
+      setDlModal((prev) => (prev ? { ...prev, doneBytes, totalBytes, speedBps: speed.bps } : prev));
     });
 
     let done = 0;
@@ -209,6 +221,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
       for (let i = 0; i < targets.length; i++) {
         const g = targets[i];
         currentBase = completedBytes;
+        currentSlug = g.slug;
         speed.lastT = Date.now();
         speed.lastBytes = completedBytes;
         setDlModal({ index: i + 1, count: targets.length, gameName: g.name, doneBytes: completedBytes, totalBytes, speedBps: speed.bps });
@@ -220,6 +233,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
             pickedFolder = folder;
             res = await window.emusync.rom.localize(g.slug, pickedFolder);
           }
+          currentSlug = ""; // game finished — drop any still-queued events for it
           if (res.cancelled) { cancelled = true; break; }
           if (!res.ok) { error = res.error ?? "Download failed."; break; }
           completedBytes += sizes[g.slug] ?? 0;
