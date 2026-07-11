@@ -121,6 +121,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     try {
       const res = await window.emusync.steam.addGame(slug, name.trim(), gameConsole, gameConsole.toLowerCase());
       if (!res.ok) setSteamMessage({ text: res.error ?? "Failed to add to Steam.", isError: true });
+      else if (res.updated) setSteamMessage({ text: "Already in Steam — refreshed the shortcut and artwork.", isError: false });
       else if (res.warning) setSteamMessage({ text: `Added — ${res.warning}`, isError: false });
       else setSteamMessage({ text: "Added to Steam. Restart Steam to see it.", isError: false });
     } catch (e: unknown) {

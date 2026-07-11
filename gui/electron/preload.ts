@@ -144,7 +144,7 @@ contextBridge.exposeInMainWorld("emusync", {
     openKeyPage: (): Promise<void> => ipcRenderer.invoke("steamgriddb:openKeyPage"),
   },
   steam: {
-    addGame: (slug: string, gameName: string, consoleName: string, consoleKey: string): Promise<{ ok: boolean; warning?: string; error?: string }> =>
+    addGame: (slug: string, gameName: string, consoleName: string, consoleKey: string): Promise<{ ok: boolean; updated?: boolean; warning?: string; error?: string }> =>
       ipcRenderer.invoke("steam:addGame", slug, gameName, consoleName, consoleKey),
   },
   game: {

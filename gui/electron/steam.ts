@@ -119,6 +119,16 @@ function findActiveUserdataDir(steamDir: string): string | null {
   return best;
 }
 
+/** Case-insensitive property lookup. Steam rewrites shortcuts.vdf with its
+ * own key casing on restart (exe→Exe, AppName→appname, varies by client
+ * version), so matching our previously written entry by exact-cased property
+ * names silently fails after a Steam restart and duplicates the shortcut. */
+function propCI(s: Record<string, unknown>, name: string): unknown {
+  const lower = name.toLowerCase();
+  const key = Object.keys(s).find((k) => k.toLowerCase() === lower);
+  return key === undefined ? undefined : s[key];
+}
+
 function parseShortcutsFile(path: string): Promise<{ shortcuts: SteamShortcut[] }> {
   return new Promise((resolve, reject) => {
     if (!existsSync(path)) { resolve({ shortcuts: [] }); return; }
@@ -175,7 +185,7 @@ export function registerSteamIpc(): void {
   ipcMain.handle(
     "steam:addGame",
     async (_event, slug: string, gameName: string, consoleName: string, consoleKey: string):
-      Promise<{ ok: boolean; warning?: string; error?: string }> => {
+      Promise<{ ok: boolean; updated?: boolean; warning?: string; error?: string }> => {
       const steamDir = findSteamDir();
       if (!steamDir) return { ok: false, error: "Steam installation not found on this device." };
 
@@ -216,7 +226,16 @@ export function registerSteamIpc(): void {
       const signedAppid = appid > 0x7fffffff ? appid - 0x100000000 : appid;
       const artSrcDir = join(ART_DIR, consoleKey, slug);
       const cachedIcon = join(artSrcDir, "icon.png");
-      const idx = parsed.shortcuts.findIndex((s) => s.exe === exe && s.LaunchOptions === launchOptions);
+      // An entry is ours if it launches the same slug through our launcher —
+      // keys matched case-insensitively (see propCI) and the exe compared
+      // unquoted, since both vary once Steam has rewritten the file. Filtering
+      // (not findIndex) also collapses duplicates left by earlier runs.
+      const stripQuotes = (v: unknown): string => (typeof v === "string" ? v.replace(/^"+|"+$/g, "") : "");
+      const isOurs = (s: SteamShortcut): boolean =>
+        stripQuotes(propCI(s, "exe")) === launcherExe &&
+        stripQuotes(propCI(s, "LaunchOptions")) === launchOptions;
+      const others = parsed.shortcuts.filter((s) => !isOurs(s));
+      const alreadyAdded = others.length < parsed.shortcuts.length;
       const entry: SteamShortcut = {
         appid: signedAppid,
         AppName: gameName,
@@ -235,11 +254,10 @@ export function registerSteamIpc(): void {
         LastPlayTime: 0,
         tags: [],
       };
-      if (idx >= 0) parsed.shortcuts[idx] = entry;
-      else parsed.shortcuts.push(entry);
+      others.push(entry);
 
       try {
-        await writeShortcutsFile(shortcutsPath, parsed);
+        await writeShortcutsFile(shortcutsPath, { shortcuts: others });
       } catch (e: any) {
         return { ok: false, error: `Failed to write shortcuts.vdf: ${e.message || e}` };
       }
@@ -274,7 +292,7 @@ export function registerSteamIpc(): void {
         warning = "Shortcut and artwork added, but updating Steam Collections failed — add it to a collection manually.";
       }
 
-      return { ok: true, warning };
+      return { ok: true, updated: alreadyAdded, warning };
     }
   );
 }
