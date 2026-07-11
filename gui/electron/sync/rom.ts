@@ -1,10 +1,47 @@
 // ROM transfer/localize/delocalize/upload-master/network-play-setup IPC.
-import { ipcMain } from "electron";
-import { existsSync, mkdirSync, unlinkSync, rmdirSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream } from "fs";
+import { ipcMain, type WebContents } from "electron";
+import { existsSync, mkdirSync, unlinkSync, rmdirSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream, createWriteStream } from "fs";
 import { createHash } from "crypto";
 import { request as httpRequest } from "http";
 import { join, dirname, basename, resolve as resolvePath } from "path";
 import { loadServerCfg } from "../config-store";
+
+// Set by rom:cancelLocalize, checked by the in-flight streamed copy (#396's
+// download-progress modal). One flag suffices — localizes never run
+// concurrently (the renderer's bulk loop is sequential).
+let localizeCancelled = false;
+
+/** Streamed copy that emits throttled `rom:localize-progress` events
+ * ({slug, copied, total}) to the invoking window and honors
+ * rom:cancelLocalize between chunks. Resolves true on completion, false when
+ * cancelled (partial .part cleanup is the caller's finally block). */
+function copyWithProgress(src: string, dest: string, total: number, slug: string, sender: WebContents): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const rs = createReadStream(src);
+    const ws = createWriteStream(dest);
+    let copied = 0;
+    let lastSent = 0;
+    rs.on("data", (chunk) => {
+      if (localizeCancelled) {
+        rs.destroy();
+        ws.destroy();
+        resolve(false);
+        return;
+      }
+      copied += chunk.length;
+      // ~every 4MB, plus the final byte — enough for a smooth bar without
+      // flooding the IPC channel on fast local copies.
+      if (copied - lastSent >= 4 * 1024 * 1024 || copied === total) {
+        lastSent = copied;
+        try { sender.send("rom:localize-progress", { slug, copied, total }); } catch { /* window gone */ }
+      }
+    });
+    rs.on("error", reject);
+    ws.on("error", reject);
+    ws.on("finish", () => resolve(true));
+    rs.pipe(ws);
+  });
+}
 
 export function registerRomIpc(): void {
   // ── rom push ──────────────────────────────────────────────────────────────────
@@ -85,9 +122,33 @@ export function registerRomIpc(): void {
   // Copy a network-sourced ROM onto local disk for offline play, and remove it.
   // The NAS master is never modified or deleted.
 
+  // Cancels the in-flight localize (the download-progress modal's Cancel
+  // button, #396). The current game's partial .part file is removed by the
+  // localize handler's own finally block.
+  ipcMain.handle("rom:cancelLocalize", () => { localizeCancelled = true; });
+
+  // Network ROM sizes for the batch download's overall progress bar (#396):
+  // one call stats every slug's master on the share; unreachable/unknown
+  // games report 0 so the renderer can still sum a total.
+  ipcMain.handle("rom:localizeSizes", async (_event, slugs: string[]): Promise<Record<string, number>> => {
+    const { host, port, authHeaders } = loadServerCfg();
+    const sizes: Record<string, number> = {};
+    for (const slug of slugs) {
+      sizes[slug] = 0;
+      try {
+        const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+        if (!gdRes.ok) continue;
+        const gd = await gdRes.json() as any;
+        if (gd.rom_path && existsSync(gd.rom_path)) sizes[slug] = statSync(gd.rom_path).size;
+      } catch { /* leave 0 */ }
+    }
+    return sizes;
+  });
+
   ipcMain.handle(
     "rom:localize",
-    async (_event, slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; error?: string }> => {
+    async (event, slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; cancelled?: boolean; error?: string }> => {
+      localizeCancelled = false;
       try {
         const { host, port, authHeaders } = loadServerCfg();
         const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
@@ -125,10 +186,12 @@ export function registerRomIpc(): void {
           return { ok: false, error: `Not enough free space: need ${size} bytes, ${free} available` };
         }
 
-        // Atomic: copy to .part, hash, then rename into place.
+        // Atomic: copy to .part (streamed, with progress events + cancel
+        // support — #396), hash, then rename into place.
         const tmp = localPath + ".part";
         try {
-          copyFileSync(networkPath, tmp);
+          const completed = await copyWithProgress(networkPath, tmp, size, slug, event.sender);
+          if (!completed) return { ok: false, cancelled: true, error: "Download cancelled" };
           const hash = await sha256OfFile(tmp);
           renameSync(tmp, localPath);
           // Remember a manually-picked folder on the console so the next game of

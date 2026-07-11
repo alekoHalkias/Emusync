@@ -7,6 +7,7 @@ import GameFilterButton, { EMPTY_FILTERS, matchesFilters, type GameFilters } fro
 import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
 import SteamRestartModal from "./SteamRestartModal";
+import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -80,7 +81,8 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   const [showSteamRestart, setShowSteamRestart] = useState(false);
   // Bulk ROM download (issue #396): localize every selected network game.
   const [dlBusy, setDlBusy] = useState(false);
-  const [dlProgress, setDlProgress] = useState<{ done: number; total: number } | null>(null);
+  const [dlModal, setDlModal] = useState<DownloadModalState | null>(null);
+  const [dlCancelling, setDlCancelling] = useState(false);
 
   // hasArt is keyed only by slug, not by artType — a stale entry from the
   // previous type would otherwise keep a game wrongly filtered in/out of the
@@ -169,28 +171,70 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
       .filter((g): g is GameRow => !!g);
     const targets = selected.filter((g) => g.romSource === "network" && !g.hasLocalCopy);
     const skipped = selected.length - targets.length;
+    if (targets.length === 0) {
+      setBulkMsg({ text: `Nothing to download — ${skipped} already local.`, isError: false });
+      setDlBusy(false);
+      return;
+    }
+
+    // Batch byte total for the modal's overall bar; a game whose master can't
+    // be statted contributes 0 (its own localize will surface the real error).
+    const sizes = await window.emusync.rom.localizeSizes(targets.map((g) => g.slug)).catch(() => ({} as Record<string, number>));
+    const totalBytes = targets.reduce((sum, g) => sum + (sizes[g.slug] ?? 0), 0);
+
+    // Overall progress = bytes of completed games + the current game's copied
+    // bytes (from throttled main-process events). Speed is a light EMA over
+    // >=500ms windows so it reads steady instead of jittering per chunk.
+    let completedBytes = 0;
+    let currentBase = 0;
+    const speed = { lastT: Date.now(), lastBytes: 0, bps: 0 };
+    const listener = window.emusync.rom.onLocalizeProgress(({ copied }) => {
+      const doneBytes = currentBase + copied;
+      const now = Date.now();
+      const dt = now - speed.lastT;
+      if (dt >= 500) {
+        const inst = ((doneBytes - speed.lastBytes) / dt) * 1000;
+        speed.bps = speed.bps > 0 ? speed.bps * 0.7 + inst * 0.3 : inst;
+        speed.lastT = now;
+        speed.lastBytes = doneBytes;
+      }
+      setDlModal((prev) => (prev ? { ...prev, doneBytes, speedBps: speed.bps } : prev));
+    });
+
     let done = 0;
     let error: string | null = null;
+    let cancelled = false;
     let pickedFolder: string | undefined;
-    setDlProgress({ done: 0, total: targets.length });
-    for (const g of targets) {
-      try {
-        let res = await window.emusync.rom.localize(g.slug, pickedFolder);
-        if (!res.ok && res.error?.includes("No local destination")) {
-          const folder = await window.emusync.dialog.openFolder();
-          if (!folder) { error = "Cancelled — no download folder chosen."; break; }
-          pickedFolder = folder;
-          res = await window.emusync.rom.localize(g.slug, pickedFolder);
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        const g = targets[i];
+        currentBase = completedBytes;
+        speed.lastT = Date.now();
+        speed.lastBytes = completedBytes;
+        setDlModal({ index: i + 1, count: targets.length, gameName: g.name, doneBytes: completedBytes, totalBytes, speedBps: speed.bps });
+        try {
+          let res = await window.emusync.rom.localize(g.slug, pickedFolder);
+          if (!res.ok && !res.cancelled && res.error?.includes("No local destination")) {
+            const folder = await window.emusync.dialog.openFolder();
+            if (!folder) { error = "Cancelled — no download folder chosen."; break; }
+            pickedFolder = folder;
+            res = await window.emusync.rom.localize(g.slug, pickedFolder);
+          }
+          if (res.cancelled) { cancelled = true; break; }
+          if (!res.ok) { error = res.error ?? "Download failed."; break; }
+          completedBytes += sizes[g.slug] ?? 0;
+          done++;
+        } catch (e: unknown) {
+          error = e instanceof Error ? e.message : "Download failed.";
+          break;
         }
-        if (!res.ok) { error = res.error ?? "Download failed."; break; }
-        done++;
-        setDlProgress({ done, total: targets.length });
-      } catch (e: unknown) {
-        error = e instanceof Error ? e.message : "Download failed.";
-        break;
       }
+    } finally {
+      window.emusync.rom.offLocalizeProgress(listener);
     }
-    if (error) {
+    if (cancelled) {
+      setBulkMsg({ text: `Download cancelled — ${done} of ${targets.length} completed.`, isError: false });
+    } else if (error) {
       setBulkMsg({ text: done > 0 ? `Downloaded ${done}, then failed: ${error}` : error, isError: true });
     } else {
       setBulkMsg({
@@ -199,9 +243,15 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
       });
       setSelectedSlugs(new Set());
     }
-    setDlProgress(null);
+    setDlModal(null);
+    setDlCancelling(false);
     setDlBusy(false);
     onChanged();
+  }
+
+  async function cancelBulkDownload(): Promise<void> {
+    setDlCancelling(true);
+    await window.emusync.rom.cancelLocalize().catch(() => {});
   }
 
   // Bulk "Add to Steam" (issue #391): adds every selected game, silently
@@ -359,7 +409,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           title="Download the selected games' ROMs to this device (already-local games are skipped)"
         >
           {dlBusy
-            ? <><span className="spinner" /> Downloading {dlProgress ? `${Math.min(dlProgress.done + 1, dlProgress.total)}/${dlProgress.total}` : ""}…</>
+            ? <><span className="spinner" /> Downloading…</>
             : `⬇ Download${selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}`}
         </button>
         <button
@@ -451,6 +501,14 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           onClose={closeGameModal}
           onChanged={() => { closeGameModal(); onChanged(); }}
           onLaunch={onPlay}
+        />
+      )}
+
+      {dlModal && (
+        <DownloadProgressModal
+          state={dlModal}
+          cancelling={dlCancelling}
+          onCancel={cancelBulkDownload}
         />
       )}
 

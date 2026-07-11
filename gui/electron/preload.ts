@@ -90,8 +90,19 @@ contextBridge.exposeInMainWorld("emusync", {
   rom: {
     push: (slug: string, toDeviceId: string, consoleName: string): Promise<{ ok: boolean; targetOnline?: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:push", slug, toDeviceId, consoleName),
-    localize: (slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; error?: string }> =>
+    localize: (slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; cancelled?: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:localize", slug, destFolder),
+    localizeSizes: (slugs: string[]): Promise<Record<string, number>> =>
+      ipcRenderer.invoke("rom:localizeSizes", slugs),
+    cancelLocalize: (): Promise<void> => ipcRenderer.invoke("rom:cancelLocalize"),
+    onLocalizeProgress: (cb: (p: { slug: string; copied: number; total: number }) => void): ((event: unknown, p: { slug: string; copied: number; total: number }) => void) => {
+      const listener = (_event: unknown, p: { slug: string; copied: number; total: number }): void => cb(p);
+      ipcRenderer.on("rom:localize-progress", listener as never);
+      return listener;
+    },
+    offLocalizeProgress: (listener: (event: unknown, p: { slug: string; copied: number; total: number }) => void): void => {
+      ipcRenderer.removeListener("rom:localize-progress", listener as never);
+    },
     delocalize: (slug: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:delocalize", slug),
     uploadMaster: (localPath: string, networkPath: string): Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }> =>

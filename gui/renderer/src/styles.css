@@ -100,6 +100,21 @@ input.error { border-color: var(--red); }
 .modal p { color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
+/* Bulk-download progress bar (#396) */
+.download-progress-track {
+  width: 100%;
+  height: 10px;
+  background: var(--surface2, var(--border));
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.download-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
 .spinner {
   display: inline-block;
   width: 14px; height: 14px;
