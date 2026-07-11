@@ -98,6 +98,9 @@ export interface EmusyncBridge {
     setKey: (key: string) => Promise<{ ok: boolean; error?: string }>;
     openKeyPage: () => Promise<void>;
   };
+  steam: {
+    addGame: (slug: string, gameName: string, consoleName: string, consoleKey: string) => Promise<{ ok: boolean; warning?: string; error?: string }>;
+  };
   daemon: {
     start: () => Promise<void>;
     stop: () => Promise<void>;

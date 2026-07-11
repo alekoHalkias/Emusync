@@ -15,6 +15,7 @@ import { registerEmulatorIpc } from "./emulator/ipc";
 import { registerArtIpc } from "./art";
 import { registerArtworkIpc } from "./artwork";
 import { registerSteamGridDbIpc } from "./steamgriddb";
+import { registerSteamIpc } from "./steam";
 
 // Register all IPC handlers up front (renderer can only call them once a window
 // has loaded, which happens after app.whenReady below).
@@ -27,6 +28,7 @@ registerEmulatorIpc();
 registerArtIpc();
 registerArtworkIpc();
 registerSteamGridDbIpc();
+registerSteamIpc();
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 
