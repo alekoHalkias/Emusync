@@ -66,27 +66,17 @@ function crc32(str: string): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-// Both IDs below hash the RAW, unquoted exe path — Steam computes its
-// internal ids from the bare path and only adds the surrounding quotes when
-// serializing the `exe` field into shortcuts.vdf. Hashing the already-quoted
-// string (the first cut of this feature did) silently produces a shortcut
-// whose grid images Steam never matches — confirmed on a real client: the
-// PNG lands in config/grid/ but Steam doesn't pick it up.
-
-/** Steam's legacy non-Steam-game appid: unsigned crc32(exe+name) with the top
- * bit forced on. shortcuts.vdf's `appid` field is a signed int32, so the
- * unsigned value is folded into signed range before writing. */
+/** Steam's non-Steam-game appid: unsigned crc32(rawExe+name) with the top bit
+ * forced on. Two hard-won constraints, both confirmed on a real client:
+ * - Hash the RAW, unquoted exe path — quotes are only added when serializing
+ *   the `exe` field into shortcuts.vdf, they are not part of the hash input.
+ * - This UNSIGNED 32-bit value is what keys the modern library's artwork
+ *   filenames (<appid>p.png etc.) and collection entries. The 64-bit
+ *   (crc<<32)|0x02000000 variant floating around community docs is only the
+ *   legacy Big Picture banner id — name the files with it and Steam silently
+ *   ignores them. */
 function shortcutAppId(rawExe: string, name: string): number {
-  const unsigned = (crc32(rawExe + name) | 0x80000000) >>> 0;
-  return unsigned > 0x7fffffff ? unsigned - 0x100000000 : unsigned;
-}
-
-/** The 64-bit "grid asset" id Steam derives internally for artwork filenames —
- * distinct from the shortcuts.vdf appid field above. Returned as a decimal
- * string since it exceeds safe JS integer range as a Number. */
-function gridAssetId(rawExe: string, name: string): string {
-  const top = BigInt((crc32(rawExe + name) | 0x80000000) >>> 0);
-  return ((top << 32n) | 0x02000000n).toString();
+  return (crc32(rawExe + name) | 0x80000000) >>> 0;
 }
 
 function findSteamDir(): string | null {
@@ -150,7 +140,7 @@ function writeShortcutsFile(path: string, obj: { shortcuts: SteamShortcut[] }): 
  * "user-collections" string value inside localconfig.vdf's plaintext VDF and
  * leaving everything else in the file byte-for-byte untouched. Returns false
  * (no-op) if that key isn't found — a documented fallback, not an error. */
-function upsertCollection(localconfigPath: string, consoleName: string, assetId: string): boolean {
+function upsertCollection(localconfigPath: string, consoleName: string, appid: number): boolean {
   if (!existsSync(localconfigPath)) return false;
   const text = readFileSync(localconfigPath, "utf8");
   const re = /"user-collections"\s*"((?:[^"\\]|\\.)*)"/;
@@ -160,7 +150,7 @@ function upsertCollection(localconfigPath: string, consoleName: string, assetId:
   const unescape = (s: string) => s.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
   const escape = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
-  let collections: Record<string, { id: string; name: string; added: string[]; removed: string[] }>;
+  let collections: Record<string, { id: string; name: string; added: number[]; removed: number[] }>;
   try {
     collections = JSON.parse(unescape(match[1]));
   } catch {
@@ -170,9 +160,9 @@ function upsertCollection(localconfigPath: string, consoleName: string, assetId:
   const key = `emusync-${consoleName}`;
   const existing = collections[key];
   if (existing) {
-    if (!existing.added.includes(assetId)) existing.added.push(assetId);
+    if (!existing.added.includes(appid)) existing.added.push(appid);
   } else {
-    collections[key] = { id: key, name: consoleName, added: [assetId], removed: [] };
+    collections[key] = { id: key, name: consoleName, added: [appid], removed: [] };
   }
 
   const newValue = escape(JSON.stringify(collections));
@@ -222,13 +212,17 @@ export function registerSteamIpc(): void {
       }
 
       const appid = shortcutAppId(launcherExe, gameName);
+      // shortcuts.vdf stores the same 32 bits as a signed int32.
+      const signedAppid = appid > 0x7fffffff ? appid - 0x100000000 : appid;
+      const artSrcDir = join(ART_DIR, consoleKey, slug);
+      const cachedIcon = join(artSrcDir, "icon.png");
       const idx = parsed.shortcuts.findIndex((s) => s.exe === exe && s.LaunchOptions === launchOptions);
       const entry: SteamShortcut = {
-        appid,
+        appid: signedAppid,
         AppName: gameName,
         exe,
         StartDir: startDir,
-        icon: "",
+        icon: existsSync(cachedIcon) ? cachedIcon : "",
         ShortcutPath: "",
         LaunchOptions: launchOptions,
         IsHidden: false,
@@ -251,13 +245,17 @@ export function registerSteamIpc(): void {
       }
 
       // Artwork: copy whatever EmuSync already cached — never block on a
-      // missing type. Steam's grid folder naming: <id>p = portrait grid,
+      // missing type. Steam's grid folder naming, keyed by the UNSIGNED appid:
+      // <id>p = portrait grid, <id> (bare) = wide/header capsule,
       // <id>_hero = hero banner, <id>_logo = logo overlay.
       const gridDir = join(configDir, "grid");
       mkdirSync(gridDir, { recursive: true });
-      const assetId = gridAssetId(launcherExe, gameName);
-      const artSrcDir = join(ART_DIR, consoleKey, slug);
-      const artMap: [string, string][] = [["grid", `${assetId}p.png`], ["hero", `${assetId}_hero.png`], ["logo", `${assetId}_logo.png`]];
+      const artMap: [string, string][] = [
+        ["grid", `${appid}p.png`],
+        ["wide_grid", `${appid}.png`],
+        ["hero", `${appid}_hero.png`],
+        ["logo", `${appid}_logo.png`],
+      ];
       for (const [type, destName] of artMap) {
         const src = join(artSrcDir, `${type}.png`);
         if (existsSync(src)) {
@@ -268,7 +266,7 @@ export function registerSteamIpc(): void {
       let warning: string | undefined;
       const localconfigPath = join(configDir, "localconfig.vdf");
       try {
-        const grouped = upsertCollection(localconfigPath, consoleName, assetId);
+        const grouped = upsertCollection(localconfigPath, consoleName, appid);
         if (!grouped) {
           warning = "Shortcut and artwork added, but this Steam client's Collections storage wasn't recognized — add it to a collection manually.";
         }
