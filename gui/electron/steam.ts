@@ -18,6 +18,7 @@
 // verify byte-for-byte against; verify manually and adjust if this proves
 // wrong on a real client).
 import { ipcMain } from "electron";
+import { spawn } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync, copyFileSync } from "fs";
 import { join, dirname } from "path";
 import { homedir, platform } from "os";
@@ -283,7 +284,60 @@ function upsertCollection(localconfigPath: string, consoleName: string, appid: n
   return true;
 }
 
+/** Linux Steam's pid-file liveness check. Windows has no equally reliable
+ * equivalent, so this reports false there and the restart-dialog flow (#393)
+ * degrades to the write-time guard inside steam:addGame. */
+function steamIsRunning(): boolean {
+  if (platform() === "win32") return false;
+  const pidFile = join(homedir(), ".steam", "steam.pid");
+  if (!existsSync(pidFile)) return false;
+  try {
+    const pid = parseInt(readFileSync(pidFile, "utf8").trim(), 10);
+    if (!pid) return false;
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export function registerSteamIpc(): void {
+  ipcMain.handle("steam:isRunning", () => steamIsRunning());
+
+  // Graceful shutdown for the restart-to-add flow (#393): `steam -shutdown`
+  // (NOT a pid kill — Steam rewrites shortcuts.vdf/collections on its own
+  // exit, exactly the files about to be edited), then poll until the process
+  // is really gone plus a short grace period for file flushing.
+  ipcMain.handle("steam:shutdown", async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!steamIsRunning()) return { ok: true };
+    try {
+      spawn("steam", ["-shutdown"], { stdio: "ignore", detached: true }).unref();
+    } catch (e: any) {
+      return { ok: false, error: `Couldn't ask Steam to shut down: ${e.message || e}` };
+    }
+    for (let waited = 0; waited < 30_000; waited += 500) {
+      await sleep(500);
+      if (!steamIsRunning()) {
+        await sleep(2000); // grace for Steam's own file writes to land
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: "Steam didn't shut down within 30 seconds." };
+  });
+
+  // Detached relaunch after the writes; failure is a warning, not an error —
+  // the shortcuts were already added successfully.
+  ipcMain.handle("steam:launch", (): { ok: boolean; error?: string } => {
+    try {
+      spawn("steam", { stdio: "ignore", detached: true }).unref();
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.message || "Couldn't relaunch Steam." };
+    }
+  });
+
   // Read-only: whether this game already has an EmuSync shortcut in Steam.
   // Safe with Steam running; any failure (no Steam, unreadable shortcuts.vdf)
   // reports false so the Add button stays enabled and the add path surfaces
@@ -333,15 +387,9 @@ export function registerSteamIpc(): void {
 
       // Refuse while Steam owns the file — it overwrites shortcuts.vdf on its
       // own shutdown/startup, silently clobbering whatever we just wrote.
-      // Best-effort: Linux Steam writes a pid file at ~/.steam/steam.pid; no
-      // equally reliable equivalent is checked on Windows.
-      if (platform() !== "win32") {
-        const pidFile = join(homedir(), ".steam", "steam.pid");
-        if (existsSync(pidFile)) {
-          const pid = parseInt(readFileSync(pidFile, "utf8").trim(), 10);
-          const alive = pid && (() => { try { process.kill(pid, 0); return true; } catch { return false; } })();
-          if (alive) return { ok: false, error: "Steam appears to be running. Close Steam first, then try again." };
-        }
+      // Safety net behind the renderer's restart-dialog flow (#393).
+      if (steamIsRunning()) {
+        return { ok: false, error: "Steam appears to be running. Close Steam first, then try again." };
       }
 
       const launcherExe = join(dirname(SCRIPT), "emusync");
