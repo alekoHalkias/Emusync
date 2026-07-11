@@ -42,6 +42,9 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   // needs its own strong confirmation before it actually runs.
   const [deleteNetworkRom, setDeleteNetworkRom] = useState(false);
   const [confirmNetworkDelete, setConfirmNetworkDelete] = useState(false);
+  // "Add to Steam" (issue #385) — best-effort, so a warning is a normal outcome.
+  const [steamBusy, setSteamBusy] = useState(false);
+  const [steamMessage, setSteamMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [name, setName] = useState(initialName ?? "");
   const [romPath, setRomPath] = useState("");
   const [savePath, setSavePath] = useState("");
@@ -108,6 +111,23 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
       setDeleting(false);
       setDeleteConfirm(false);
       setConfirmNetworkDelete(false);
+    }
+  }
+
+  async function handleAddToSteam(): Promise<void> {
+    if (!slug) return;
+    setSteamBusy(true);
+    setSteamMessage(null);
+    try {
+      const res = await window.emusync.steam.addGame(slug, name.trim(), gameConsole, gameConsole.toLowerCase());
+      if (!res.ok) setSteamMessage({ text: res.error ?? "Failed to add to Steam.", isError: true });
+      else if (res.updated) setSteamMessage({ text: "Already in Steam — refreshed the shortcut and artwork.", isError: false });
+      else if (res.warning) setSteamMessage({ text: `Added — ${res.warning}`, isError: false });
+      else setSteamMessage({ text: "Added to Steam. Restart Steam to see it.", isError: false });
+    } catch (e: unknown) {
+      setSteamMessage({ text: e instanceof Error ? e.message : "Failed to add to Steam.", isError: true });
+    } finally {
+      setSteamBusy(false);
     }
   }
 
@@ -349,6 +369,22 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             placeholder="retroarch -L snes.so %ROM%"
           />
         </div>
+
+        {!isNew && (
+          <div className="input-group">
+            <label>Steam</label>
+            <div className="input-row" style={{ alignItems: "center", gap: 10 }}>
+              <button className="btn btn-ghost" onClick={handleAddToSteam} disabled={steamBusy}>
+                {steamBusy ? <><span className="spinner" /> Adding…</> : "🎮 Add to Steam"}
+              </button>
+              {steamMessage && (
+                <span style={{ fontSize: 12, color: steamMessage.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)" }}>
+                  {steamMessage.text}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
           <div>
