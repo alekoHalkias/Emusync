@@ -108,6 +108,7 @@ export interface EmusyncBridge {
     isRunning: () => Promise<boolean>;
     stopExternal: () => Promise<{ ok: boolean }>;
     hasPidFile: () => Promise<boolean>;
+    offlineList: () => Promise<{ slug: string; name: string; console: string; savePath?: string; statePath?: string }[]>;
     onExited: (cb: () => void) => void;
     offExited: (cb: () => void) => void;
   };

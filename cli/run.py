@@ -200,22 +200,26 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             sys.exit(1)
         launch_argv = tuple(shlex.split(launch_command))
 
-    # Cache the config so a future offline launch knows the paths + command.
-    _cache_game_device(cfg, game_slug, gd)
-
-    save_path = gd.save_path
-
     # Shared-memory-card consoles (PS2): the per-game "save" is actually one card
     # shared across the whole console, so route save reconciliation to the
     # console-scoped endpoints (keyed by console abbr) instead of this game's slug
     # (issue #295). Everything downstream uses save_client/save_key so the existing
     # newest-wins/.bak reconcile logic is reused unchanged.
+    game_name = ""
     console_abbr = ""
     try:
         _g = client.get_game(game_slug)
+        game_name = (_g or {}).get("name", "") or ""
         console_abbr = (_g or {}).get("console", "") or ""
     except Exception:
+        game_name = ""
         console_abbr = ""
+
+    # Cache the config so a future offline launch knows the paths + command, and
+    # so the GUI can show this game while the server is unreachable (issue #383).
+    _cache_game_device(cfg, game_slug, gd, game_name=game_name, console=console_abbr)
+
+    save_path = gd.save_path
     shared_memcard = console_abbr in _SHARED_MEMCARD_CONSOLES
     save_client = _MemcardClient(client, console_abbr) if shared_memcard else client
     save_key = console_abbr if shared_memcard else game_slug

@@ -67,8 +67,31 @@ export function useGameList(): UseGameList {
       if (loadIdRef.current !== thisId) return;
       if (silent) return; // background poll failed — keep showing current data
       if (!everLoadedRef.current) {
-        // Server not yet ready during startup. Stay in loading=true; the
-        // self-scheduling poll below retries in 1 s.
+        // Never reached the server (e.g. app opened while it's off/unreachable).
+        // Fall back to whatever this device cached from its last online launch of
+        // each game, so the user can still find and press Play (issue #383) — the
+        // CLI's offline-launch path already holds the save and reconciles it on
+        // the next online launch. Keep polling in the background so live data
+        // takes over the moment the server becomes reachable.
+        const offlineGames = await window.emusync.game.offlineList().catch(() => []);
+        if (loadIdRef.current !== thisId) return;
+        if (offlineGames.length > 0) {
+          setGames(offlineGames.map((g): GameRow => ({
+            slug: g.slug,
+            name: g.name,
+            console: g.console,
+            isLocal: true,
+            locked: false,
+            savePath: g.savePath,
+            statePath: g.statePath,
+            offline: true,
+          })));
+          everLoadedRef.current = true;
+          setLoading(false);
+          return;
+        }
+        // Nothing cached either. Stay in loading=true; the self-scheduling poll
+        // below retries in 1 s.
         setLoading(true);
         return;
       }

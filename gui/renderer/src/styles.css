@@ -647,6 +647,7 @@ input.error { border-color: var(--red); }
 .game-card-badge-locked { background: rgba(248,113,113,0.85); color: #fff; }
 .game-card-badge-other  { background: rgba(0,0,0,0.65); color: var(--text-muted); }
 .game-card-badge-net    { background: rgba(0,0,0,0.55); font-size: 12px; padding: 2px 4px; }
+.game-card-badge-offline { background: rgba(217,119,6,0.85); color: #fff; font-size: 11px; padding: 2px 5px; }
 
 .game-card-info {
   padding: 8px 10px 4px;

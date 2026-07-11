@@ -150,6 +150,8 @@ contextBridge.exposeInMainWorld("emusync", {
     isRunning: (): Promise<boolean> => ipcRenderer.invoke("game:isRunning"),
     stopExternal: (): Promise<{ ok: boolean }> => ipcRenderer.invoke("game:stop-external"),
     hasPidFile: (): Promise<boolean> => ipcRenderer.invoke("game:hasPidFile"),
+    offlineList: (): Promise<{ slug: string; name: string; console: string; savePath?: string; statePath?: string }[]> =>
+      ipcRenderer.invoke("game:offlineList"),
     onExited: (cb: () => void): void => { ipcRenderer.on("game:exited", cb); },
     offExited: (cb: () => void): void => { ipcRenderer.removeListener("game:exited", cb); },
   },

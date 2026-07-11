@@ -156,6 +156,38 @@ def test_game_device_cache_round_trip(tmp_path):
     assert loaded.launch_command == "ra x.gba"
 
 
+def test_game_device_cache_updates_offline_index(tmp_path):
+    """Caching a game with a name/console updates the sibling offline index
+    (issue #383) the GUI reads to build a fallback list when the server is
+    unreachable — without breaking `_load_cached_game_device`'s GameDeviceConfig
+    round-trip, since that file must not carry extra keys."""
+    cfg = SimpleNamespace(data_dir=str(tmp_path))
+    gd = GameDeviceConfig(rom_path="/roms/x.gba", save_path="/saves/x.srm")
+    _cache_game_device(cfg, "x", gd, game_name="X Game", console="GBA")
+
+    index_path = Path(tmp_path) / "game_cache" / "_offline_index.json"
+    assert index_path.exists()
+    index = json.loads(index_path.read_text())
+    assert index == {"x": {"name": "X Game", "console": "GBA"}}
+
+    # A later cache for a different slug is additive, not a wipe.
+    gd2 = GameDeviceConfig(rom_path="/roms/y.gba", save_path="/saves/y.srm")
+    _cache_game_device(cfg, "y", gd2, game_name="Y Game", console="GBA")
+    index = json.loads(index_path.read_text())
+    assert set(index.keys()) == {"x", "y"}
+
+    # The per-slug cache file is unaffected — still loads as a clean GameDeviceConfig.
+    loaded = _load_cached_game_device(cfg, "x")
+    assert loaded is not None
+    assert loaded.save_path == "/saves/x.srm"
+
+    # No name/console passed (e.g. `client.get_game` failed) — index untouched.
+    gd3 = GameDeviceConfig(rom_path="/roms/z.gba", save_path="/saves/z.srm")
+    _cache_game_device(cfg, "z", gd3)
+    index = json.loads(index_path.read_text())
+    assert "z" not in index
+
+
 # ── offline play log ────────────────────────────────────────────────────────────
 
 # ── conflict warning + log (#5) ─────────────────────────────────────────────────

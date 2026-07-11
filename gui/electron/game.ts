@@ -53,6 +53,38 @@ export function registerGameIpc(): void {
     return { ok: true };
   });
 
+  // Offline fallback game list (issue #383): when the server can't be reached at
+  // all, the renderer has nothing to show from GET /games/overview. Build a list
+  // from what cli/run.py cached on this device's last online launch of each game
+  // (~/.emusync/game_cache/) so the user can still find and press Play.
+  ipcMain.handle("game:offlineList", () => {
+    const cacheDir = join(homedir(), ".emusync", "game_cache");
+    const indexPath = join(cacheDir, "_offline_index.json");
+    if (!existsSync(indexPath)) return [];
+    let index: Record<string, { name?: string; console?: string }>;
+    try {
+      index = JSON.parse(readFileSync(indexPath, "utf-8"));
+    } catch {
+      return [];
+    }
+    const games: { slug: string; name: string; console: string; savePath?: string; statePath?: string }[] = [];
+    for (const [slug, meta] of Object.entries(index)) {
+      const gdPath = join(cacheDir, `${slug}.json`);
+      if (!existsSync(gdPath)) continue;
+      try {
+        const gd = JSON.parse(readFileSync(gdPath, "utf-8"));
+        games.push({
+          slug,
+          name: meta?.name || slug,
+          console: meta?.console || "",
+          savePath: gd.save_path || undefined,
+          statePath: gd.state_path || undefined,
+        });
+      } catch { /* skip unreadable cache entry */ }
+    }
+    return games;
+  });
+
   ipcMain.handle("game:hasPidFile", () => {
     const gamePidFile = join(homedir(), ".emusync", ".game_pid");
     if (!existsSync(gamePidFile)) return false;
