@@ -129,6 +129,15 @@ function propCI(s: Record<string, unknown>, name: string): unknown {
   return key === undefined ? undefined : s[key];
 }
 
+/** True if the entry is EmuSync's shortcut for this slug: same launcher exe
+ * (compared unquoted) and the same `run <slug>` LaunchOptions. Shared by
+ * steam:addGame (upsert/dedup) and steam:isAdded so they can never disagree. */
+function isOurShortcut(s: SteamShortcut, launcherExe: string, launchOptions: string): boolean {
+  const stripQuotes = (v: unknown): string => (typeof v === "string" ? v.replace(/^"+|"+$/g, "") : "");
+  return stripQuotes(propCI(s, "exe")) === launcherExe &&
+    stripQuotes(propCI(s, "LaunchOptions")) === launchOptions;
+}
+
 function parseShortcutsFile(path: string): Promise<{ shortcuts: SteamShortcut[] }> {
   return new Promise((resolve, reject) => {
     if (!existsSync(path)) { resolve({ shortcuts: [] }); return; }
@@ -268,6 +277,24 @@ function upsertCollection(localconfigPath: string, consoleName: string, appid: n
 }
 
 export function registerSteamIpc(): void {
+  // Read-only: whether this game already has an EmuSync shortcut in Steam.
+  // Safe with Steam running; any failure (no Steam, unreadable shortcuts.vdf)
+  // reports false so the Add button stays enabled and the add path surfaces
+  // its own errors (issue #389).
+  ipcMain.handle("steam:isAdded", async (_event, slug: string): Promise<boolean> => {
+    try {
+      const steamDir = findSteamDir();
+      if (!steamDir) return false;
+      const userdataDir = findActiveUserdataDir(steamDir);
+      if (!userdataDir) return false;
+      const parsed = await parseShortcutsFile(join(userdataDir, "config", "shortcuts.vdf"));
+      const launcherExe = join(dirname(SCRIPT), "emusync");
+      return parsed.shortcuts.some((s) => isOurShortcut(s, launcherExe, `run ${slug}`));
+    } catch {
+      return false;
+    }
+  });
+
   ipcMain.handle(
     "steam:addGame",
     async (_event, slug: string, gameName: string, consoleName: string, consoleKey: string):
@@ -312,15 +339,8 @@ export function registerSteamIpc(): void {
       const signedAppid = appid > 0x7fffffff ? appid - 0x100000000 : appid;
       const artSrcDir = join(ART_DIR, consoleKey, slug);
       const cachedIcon = join(artSrcDir, "icon.png");
-      // An entry is ours if it launches the same slug through our launcher —
-      // keys matched case-insensitively (see propCI) and the exe compared
-      // unquoted, since both vary once Steam has rewritten the file. Filtering
-      // (not findIndex) also collapses duplicates left by earlier runs.
-      const stripQuotes = (v: unknown): string => (typeof v === "string" ? v.replace(/^"+|"+$/g, "") : "");
-      const isOurs = (s: SteamShortcut): boolean =>
-        stripQuotes(propCI(s, "exe")) === launcherExe &&
-        stripQuotes(propCI(s, "LaunchOptions")) === launchOptions;
-      const others = parsed.shortcuts.filter((s) => !isOurs(s));
+      // Filtering (not findIndex) also collapses duplicates left by earlier runs.
+      const others = parsed.shortcuts.filter((s) => !isOurShortcut(s, launcherExe, launchOptions));
       const alreadyAdded = others.length < parsed.shortcuts.length;
       const entry: SteamShortcut = {
         appid: signedAppid,

@@ -44,6 +44,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [confirmNetworkDelete, setConfirmNetworkDelete] = useState(false);
   // "Add to Steam" (issue #385) — best-effort, so a warning is a normal outcome.
   const [steamBusy, setSteamBusy] = useState(false);
+  const [steamAdded, setSteamAdded] = useState(false);
   const [steamMessage, setSteamMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [name, setName] = useState(initialName ?? "");
   const [romPath, setRomPath] = useState("");
@@ -73,6 +74,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
   useEffect(() => {
     if (!slug) return;
+    window.emusync.steam.isAdded(slug).then(setSteamAdded).catch(() => {});
     getGame(slug).then(g => setGameConsole(g.console ?? "")).catch(() => {});
     getGameDevice(slug)
       .then((cfg) => {
@@ -129,6 +131,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
       else if (res.updated) setSteamMessage({ text: "Already in Steam — refreshed the shortcut and artwork.", isError: false });
       else if (res.warning) setSteamMessage({ text: `Added — ${res.warning}`, isError: false });
       else setSteamMessage({ text: "Added to Steam. Restart Steam to see it.", isError: false });
+      if (res.ok) setSteamAdded(true);
     } catch (e: unknown) {
       setSteamMessage({ text: e instanceof Error ? e.message : "Failed to add to Steam.", isError: true });
     } finally {
@@ -379,8 +382,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           <div className="input-group">
             <label>Steam</label>
             <div className="input-row" style={{ alignItems: "center", gap: 10 }}>
-              <button className="btn btn-ghost" onClick={handleAddToSteam} disabled={steamBusy}>
-                {steamBusy ? <><span className="spinner" /> Adding…</> : "🎮 Add to Steam"}
+              <button
+                className="btn btn-ghost"
+                onClick={handleAddToSteam}
+                disabled={steamBusy || steamAdded}
+                title={steamAdded ? "This game already has a Steam shortcut" : undefined}
+              >
+                {steamBusy ? <><span className="spinner" /> Adding…</> : steamAdded ? "✓ In Steam" : "🎮 Add to Steam"}
               </button>
               {steamMessage && (
                 <span style={{ fontSize: 12, color: steamMessage.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)" }}>
