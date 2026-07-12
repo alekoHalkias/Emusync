@@ -31,7 +31,6 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   const [startWarningConfirmed, setStartWarningConfirmed] = useState(false);
 
   // SteamGridDB art key (issue #322)
-  const [artKey, setArtKey] = useState("");
   const [artKeyInput, setArtKeyInput] = useState("");
   const [artKeyBusy, setArtKeyBusy] = useState(false);
   const [artKeySaved, setArtKeySaved] = useState(false);
@@ -73,7 +72,6 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       setPinInput((cfg.server_pin as string) || "");
     });
     window.emusync.steamgriddb.getKey().then((key) => {
-      setArtKey(key || "");
       setArtKeyInput(key || "");
     });
   }, [open]);
@@ -118,7 +116,6 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
     const result = await window.emusync.steamgriddb.setKey(artKeyInput.trim());
     setArtKeyBusy(false);
     if (result.ok) {
-      setArtKey(artKeyInput.trim());
       setArtKeySaved(true);
       setTimeout(() => setArtKeySaved(false), 2000);
     } else {
@@ -408,39 +405,31 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
               </div>
             )}
 
-            {/* SteamGridDB art key (issue #322) — set on the server device,
-                shared to every device that connects; joining devices see a
-                read-only view. */}
+            {/* SteamGridDB art key (issues #322/#398) — stored on the server,
+                shared to every device; editable from ANY device so a headless
+                server can still be configured. */}
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16, marginBottom: 20 }}>
               <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>
                 SteamGridDB art
               </div>
-              {isServer ? (
-                <>
-                  <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
-                    <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
-                      <label>API key <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
-                      <input
-                        type="text"
-                        value={artKeyInput}
-                        onChange={(e) => { setArtKeyInput(e.target.value); setArtKeyError(""); }}
-                        placeholder="Paste your SteamGridDB API key"
-                      />
-                    </div>
-                    <button className="btn btn-ghost" onClick={saveArtKey} disabled={artKeyBusy} style={{ flexShrink: 0 }}>
-                      {artKeySaved ? "Saved" : artKeyBusy ? <span className="spinner" /> : "Save"}
-                    </button>
-                  </div>
-                  {artKeyError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{artKeyError}</span>}
-                  <button className="btn btn-ghost" onClick={() => window.emusync.steamgriddb.openKeyPage()} style={{ fontSize: 12 }}>
-                    Get a key from SteamGridDB →
-                  </button>
-                </>
-              ) : (
-                <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {artKey ? "Configured on the server." : "Not configured on the server."}
-                </p>
-              )}
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
+                <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                  <label>API key <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional — shared with all devices via the server)</span></label>
+                  <input
+                    type="text"
+                    value={artKeyInput}
+                    onChange={(e) => { setArtKeyInput(e.target.value); setArtKeyError(""); }}
+                    placeholder="Paste your SteamGridDB API key"
+                  />
+                </div>
+                <button className="btn btn-ghost" onClick={saveArtKey} disabled={artKeyBusy} style={{ flexShrink: 0 }}>
+                  {artKeySaved ? "Saved" : artKeyBusy ? <span className="spinner" /> : "Save"}
+                </button>
+              </div>
+              {artKeyError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{artKeyError}</span>}
+              <button className="btn btn-ghost" onClick={() => window.emusync.steamgriddb.openKeyPage()} style={{ fontSize: 12 }}>
+                Get a key from SteamGridDB →
+              </button>
             </div>
 
             {/* Paired devices — folded in from the old standalone modal (#262) */}

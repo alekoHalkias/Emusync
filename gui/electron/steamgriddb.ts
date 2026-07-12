@@ -1,5 +1,5 @@
-// SteamGridDB shared-key handling (issue #322) — the key is entered once on
-// the server device and shared to every device via the EmuSync server, since
+// SteamGridDB shared-key handling (issue #322) — the key is entered once from
+// any device (#398) and shared to every device via the EmuSync server, since
 // SteamGridDB has no OAuth/programmatic flow for a third-party app to obtain
 // a per-user key (confirmed: every integration — Steam ROM Manager, RomM,
 // SteamTinkerLaunch — requires manually pasting a key obtained from
