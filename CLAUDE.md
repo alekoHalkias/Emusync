@@ -246,7 +246,7 @@ Name the branch after the issue: `feature/<issue-number>-short-description`
 git checkout main && git pull && git checkout -b feature/10-event-log
 ```
 
-**Claude agents:** skip this if already on a correctly-named branch. If on `main` or an unlinked branch, create the right one before making any edits. The automated skill pipeline (`/issue`, `/brainstorm`, `/search-and-split`) does this via the `using-git-worktrees` skill instead — an isolated `.worktrees/feature-<n>-...` checkout per issue, with its own `.venv`/`gui/node_modules` (run `bash install.sh` inside it) — so switching between in-flight issues never needs a `git stash`. The plain command above is the fallback when worktree creation isn't available, and the reference for ad-hoc work outside the pipeline.
+**Claude agents:** skip this if already on a correctly-named branch. If on `main` or an unlinked branch, create the right one before making any edits.
 
 ### Step 4 — reference the issue in the PR
 
