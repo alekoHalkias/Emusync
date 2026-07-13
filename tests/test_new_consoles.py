@@ -127,6 +127,35 @@ def test_gamecube_standalone_dolphin_def_follows_pcsx2_pattern():
     assert _BY_KEY["gamecube"]["standalones"] == [_DOLPHIN]
 
 
+def test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin(monkeypatch, tmp_path):
+    """No native dolphin-emu binary installed, but the flatpak is — detection
+    must fall back to the flatpak entry with its own save/state dirs (#415)."""
+    from cli.consoles_data import _DOLPHIN
+    from cli.detect import _detect_emulators_for_console
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("cli.detect.Path.home", staticmethod(lambda: home))
+    # Force every native_bins candidate to appear absent, regardless of what's
+    # actually installed on the machine running this test.
+    monkeypatch.setattr("cli.detect.os.path.exists", lambda p: False)
+
+    class _FakeResult:
+        stdout = "org.DolphinEmu.dolphin-emu\n"
+
+    monkeypatch.setattr("cli.detect.subprocess.run", lambda *a, **k: _FakeResult())
+
+    console_def = {"standalones": [_DOLPHIN], "system_keys": []}
+    options = _detect_emulators_for_console(console_def)
+
+    assert len(options) == 1
+    opt = options[0]
+    assert opt["id"] == "dolphin-flatpak"
+    assert opt["exec_path"] == "flatpak run org.DolphinEmu.dolphin-emu"
+    assert opt["save_dir"] == str(home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "data" / "dolphin-emu" / "GC")
+    assert opt["state_dir"] == str(home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "data" / "dolphin-emu" / "StateSaves")
+
+
 def test_gamecube_standalone_card_resolves_to_save_dir_directly(tmp_path):
     """Standalone Dolphin's save_dir IS the GC card folder already — no
     core_folder means no 'User/GC' subpath should be appended (#415)."""
