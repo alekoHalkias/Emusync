@@ -201,7 +201,6 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
   const expand = (p: string): string => !p ? p : p.startsWith("~/") ? join(home, p.slice(2)) : p === "~" ? home : p;
   for (const s of (consoleDef.standalones ?? []) as StandaloneDef[]) {
     const dirs = s.dirs ?? {};
-    let found = false;
     for (const bin of s.native_bins ?? []) {
       if (existsSync(expand(bin))) {
         options.push({
@@ -211,10 +210,13 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
           launchArgs: s.launch_args ?? [],
           romDirs: [],
         });
-        found = true; break;
+        break;
       }
     }
-    if (!found && s.flatpak_id && s.flatpak_exec && getFlatpakList().includes(s.flatpak_id)) {
+    // Listed independently of the native check, same as RetroArch's own
+    // native+flatpak detection above — both flavours show as separate
+    // options when both are installed (#415).
+    if (s.flatpak_id && s.flatpak_exec && getFlatpakList().includes(s.flatpak_id)) {
       options.push({
         id: `${s.id}-flatpak`, label: `${s.label} (Flatpak)`,
         execPath: s.flatpak_exec,

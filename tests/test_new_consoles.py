@@ -129,7 +129,7 @@ def test_gamecube_standalone_dolphin_def_follows_pcsx2_pattern():
 
 def test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin(monkeypatch, tmp_path):
     """No native dolphin-emu binary installed, but the flatpak is — detection
-    must fall back to the flatpak entry with its own save/state dirs (#415)."""
+    surfaces the flatpak entry with its own save/state dirs (#415)."""
     from cli.consoles_data import _DOLPHIN
     from cli.detect import _detect_emulators_for_console
 
@@ -154,6 +154,33 @@ def test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin(mon
     assert opt["exec_path"] == "flatpak run org.DolphinEmu.dolphin-emu"
     assert opt["save_dir"] == str(home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "data" / "dolphin-emu" / "GC")
     assert opt["state_dir"] == str(home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "data" / "dolphin-emu" / "StateSaves")
+
+
+def test_gamecube_standalone_dolphin_lists_native_and_flatpak_together(monkeypatch, tmp_path):
+    """Both a native binary and the flatpak are installed — detection must
+    list both as separate options, matching RetroArch's own native+flatpak
+    detection, instead of the native entry silently hiding the flatpak one
+    (regression: the standalone loop used to gate the flatpak check behind
+    `not found`, unlike every other detection path in this file) (#415)."""
+    from cli.consoles_data import _DOLPHIN
+    from cli.detect import _detect_emulators_for_console
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("cli.detect.Path.home", staticmethod(lambda: home))
+    native_bin = _DOLPHIN["native_bins"][0]
+    monkeypatch.setattr("cli.detect.os.path.exists", lambda p: p == native_bin)
+
+    class _FakeResult:
+        stdout = "org.DolphinEmu.dolphin-emu\n"
+
+    monkeypatch.setattr("cli.detect.subprocess.run", lambda *a, **k: _FakeResult())
+
+    console_def = {"standalones": [_DOLPHIN], "system_keys": []}
+    options = _detect_emulators_for_console(console_def)
+
+    ids = {opt["id"] for opt in options}
+    assert ids == {"dolphin-native", "dolphin-flatpak"}
 
 
 def test_gamecube_standalone_card_resolves_to_save_dir_directly(tmp_path):

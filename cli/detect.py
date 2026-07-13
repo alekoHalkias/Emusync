@@ -205,7 +205,6 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
     flatpak_list: str | None = None
     for s in console_def.get("standalones", []):
         dirs = s.get("dirs", {})
-        found = False
         for bin_path in s["native_bins"]:
             if os.path.exists(_expand_home(bin_path)):
                 native_dirs = dirs.get("native", {})
@@ -219,9 +218,10 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
                     "core_folder": None,
                     "rom_dirs": [],
                 })
-                found = True
                 break
-        if not found and s.get("flatpak_id"):
+        # Listed independently of the native check — both flavours show as
+        # separate options when both are installed (#415).
+        if s.get("flatpak_id"):
             if flatpak_list is None:
                 try:
                     r = subprocess.run(
