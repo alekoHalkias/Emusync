@@ -22,14 +22,14 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — i
 
 2. Drop the trailing `total` line, filter to files with **>= 500 lines**, keep the **top 5** by line count.
 
-3. For each candidate, read enough of the file (or lean on CLAUDE.md's key-files table, which already documents most large files' responsibilities) to write a one-line rationale — what distinct responsibilities it's mixing, e.g. "owns routing, IPC, and process lifecycle" or "one component handling fetch, layout, and modal state".
+3. For each candidate, read enough of the file (or lean on docs/ARCHITECTURE.md's Key Files detail, which already documents most large files' responsibilities) to write a one-line rationale — what distinct responsibilities it's mixing, e.g. "owns routing, IPC, and process lifecycle" or "one component handling fetch, layout, and modal state".
 
 4. If no file reaches 500 lines, report that and stop — nothing to split.
 
 5. Present the candidates (path, line count, rationale), largest first, and ask the user via `AskUserQuestion` (multi-select) which ones to turn into split issues. This is a genuine content decision — do not skip it or assume approval.
 
 6. For each approved file, **largest to smallest**:
-   a. Draft and create a GitHub issue proposing to split that file into smaller modules (what the file currently does, a sketch of a plausible split, acceptance criteria: behavior unchanged, `make test` passes, CLAUDE.md's key-files table updated) — per CLAUDE.md's "How Claude agents create issues".
+   a. Draft and create a GitHub issue proposing to split that file into smaller modules (what the file currently does, a sketch of a plausible split, acceptance criteria: behavior unchanged, `make test` passes, docs/ARCHITECTURE.md's Key Files detail updated) — per CLAUDE.md's "How Claude agents create issues".
    b. Check for conflicting branches (`git fetch --prune && git branch -r`) and warn if one already touches the same file, then proceed.
    c. `git checkout main && git pull && git checkout -b feature/<issue-number>-split-<short-name>`.
    d. Invoke the `plan` skill for that issue, then (once the plan is approved) `implement` — through to a pushed commit and an opened PR, per those skills' normal flow.

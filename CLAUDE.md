@@ -229,8 +229,6 @@ export PATH="$HOME/.local/bin:$PATH"   # add to ~/.bashrc to persist
 gh auth login
 ```
 
-**Always prefix gh commands with `export PATH="$HOME/.local/bin:$PATH"` in this project** until it's on the system PATH.
-
 ### Step 2 — check for conflicting branches
 
 ```bash

@@ -13,7 +13,7 @@ Follows CLAUDE.md's "Execution approval policy" — runs straight through with n
 
 2. Sanity-check the branch: `git branch --show-current` should match `feature/<issue-number>-...` from the plan. If it doesn't, stop and flag the mismatch.
 
-3. Implement the plan's steps in order. Follow this codebase's conventions (CLAUDE.md's architecture/key-files section, existing patterns in the files being touched) rather than introducing new patterns. Match the plan's file list — if implementation reveals the plan missed something material, adjust and note the deviation to the user, don't silently go off-script.
+3. Implement the plan's steps in order. Follow this codebase's conventions (CLAUDE.md's Key Files index, docs/ARCHITECTURE.md for a module's full detail, existing patterns in the files being touched) rather than introducing new patterns. Match the plan's file list — if implementation reveals the plan missed something material, adjust and note the deviation to the user, don't silently go off-script.
 
 4. Write tests per the plan's testing notes (new API route → integration test happy path + main error case; new Store method → direct or API-level test; bug fix → regression test), following the pattern in `tests/test_integration.py`. Never mock the database.
 

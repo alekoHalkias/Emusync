@@ -11,7 +11,6 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow". Issu
 
 1. **Survey the codebase.** Spawn an `Explore` agent (or `general-purpose` if synthesis/judgment is needed beyond location-finding) with "very thorough" breadth to read across `cli/`, `server/`, `gui/electron/`, `gui/renderer/src/`, and `tests/`. Ask it to report candidate biggest-impact features or fixes with file/line evidence — not vague suggestions. In parallel, pull current open issues so candidates don't duplicate existing work:
    ```bash
-   export PATH="$HOME/.local/bin:$PATH"
    curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues?state=open&per_page=50"
    ```
 

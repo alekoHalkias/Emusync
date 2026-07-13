@@ -17,7 +17,6 @@ Follows CLAUDE.md's "Execution approval policy" — read-only commands run autom
 
 2. Fetch the issue:
    ```bash
-   export PATH="$HOME/.local/bin:$PATH"
    gh issue view <issue-number> --repo alekoHalkias/Emusync --json number,title,body,comments
    ```
    Fallback via curl + `GITHUB_TOKEN` if `gh` is unavailable:
@@ -26,7 +25,7 @@ Follows CLAUDE.md's "Execution approval policy" — read-only commands run autom
    curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues/<issue-number>/comments"
    ```
 
-3. Read the issue title, body, and comments in full. Cross-reference CLAUDE.md's architecture/key-files tables and the actual code (not just the issue text) to figure out which files, IPC channels, DB tables, or components the work will actually touch.
+3. Read the issue title, body, and comments in full. Cross-reference CLAUDE.md's Key Files index, docs/ARCHITECTURE.md's full per-module detail (IPC surface, schema, server lifecycle, etc. — read the relevant section, not the whole file), and the actual code (not just the issue text) to figure out which files, IPC channels, DB tables, or components the work will actually touch.
 
 4. If the issue is ambiguous or leaves a design/config decision open (data shape, UX behavior, naming, which layer owns something, edge-case handling), ask the user targeted clarifying questions before finalizing the plan. Don't ask about things you can resolve by reading the code. Don't ask "should I proceed" once the plan itself is clear — only ask what's genuinely undecided.
 

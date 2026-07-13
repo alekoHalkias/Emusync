@@ -16,7 +16,6 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow" (Step
 
 2. Check for `gh` (CLAUDE.md's "How Claude agents create issues" has the setup steps if it's missing):
    ```bash
-   export PATH="$HOME/.local/bin:$PATH"
    which gh
    ```
    If missing and no `GITHUB_TOKEN` env var is set, tell the user to run `gh auth login` or set `GITHUB_TOKEN`, then stop.
