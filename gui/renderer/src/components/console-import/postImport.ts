@@ -5,7 +5,7 @@
 // parameters rather than closing over hook state, so it has no dependency on
 // useConsoleImport beyond the shared `window.emusync` bridge.
 import { getConsoleMemcardMeta, getDeviceGameDevices, getSaveMeta, getStateMeta, listDevices, type Device, type SaveMeta } from "../../api";
-import { usesSharedSaveLayout } from "./helpers";
+import { usesSharedSaveLayout, usesSharedStateLayout } from "./helpers";
 import type { ImportedEntry, PushResult } from "./types";
 import { parseUtc } from "../../time";
 
@@ -36,31 +36,32 @@ export async function prefetchArt(
 }
 
 export async function pullFromServerIfNewer(
-  entries: ImportedEntry[], sharedLayout: boolean, consoleAbbr: string,
+  entries: ImportedEntry[], sharedLayout: boolean, sharedStateLayout: boolean, consoleAbbr: string,
 ): Promise<void> {
   if (sharedLayout) {
     // One card shared by every game on the console — pull it once. Every
-    // entry's savePath resolves to the same physical card file (#295).
+    // entry's savePath resolves to the same physical card file (#295/#402).
     const cardPath = entries[0].savePath;
-    if (!cardPath) return;
-    try {
-      const [meta, localTime] = await Promise.all([
-        getConsoleMemcardMeta(consoleAbbr),
-        emusync.files.getSaveTime(cardPath).catch(() => null),
-      ]);
-      if (_serverIsNewer(localTime, meta)) {
-        await emusync.memcard.pull(consoleAbbr, cardPath);
-      }
-    } catch { /* best-effort */ }
-    // Shared save STATES aren't pulled here: they live in one folder keyed by
-    // game serial (sstates/), and there's no console-scoped state endpoint to
-    // pull the whole thing from — only emusync run's per-launch, serial-
-    // filtered sync touches them (#294).
-    return;
+    if (cardPath) {
+      try {
+        const [meta, localTime] = await Promise.all([
+          getConsoleMemcardMeta(consoleAbbr),
+          emusync.files.getSaveTime(cardPath).catch(() => null),
+        ]);
+        if (_serverIsNewer(localTime, meta)) {
+          await emusync.memcard.pull(consoleAbbr, cardPath);
+        }
+      } catch { /* best-effort */ }
+    }
   }
+  // Shared save STATES (PS2's serial-keyed sstates/) aren't pulled here:
+  // there's no console-scoped state endpoint — only emusync run's per-launch,
+  // serial-filtered sync touches them (#294). dc/gamecube/psp states are
+  // normal per-game folders, so they pull below like any other console (#402).
+  if (sharedLayout && sharedStateLayout) return;
   for (const entry of entries) {
     try {
-      if (entry.savePath) {
+      if (!sharedLayout && entry.savePath) {
         const [saveMeta, localTime] = await Promise.all([
           getSaveMeta(entry.slug),
           emusync.files.getSaveTime(entry.savePath).catch(() => null),
@@ -90,6 +91,7 @@ export async function autoPush(
   setPushResults: (fn: (prev: PushResult[]) => PushResult[]) => void,
 ): Promise<void> {
   const sharedLayout = usesSharedSaveLayout(consoleAbbr);
+  const sharedStateLayout = usesSharedStateLayout(consoleAbbr);
   const { pushSaves, pushStates } = opts;
   try {
     const cfg = await emusync.config.load();
@@ -118,9 +120,9 @@ export async function autoPush(
         if (romResult.targetOnline === false) offline = true;
 
         // Push save if user opted in and save file exists. Skipped for a
-        // shared-layout console (PS2): the card/states aren't per-game, so a
-        // per-game save/state push would store the wrong thing — they sync via
-        // `emusync run`'s console-card + serial-filtered paths (#294/#295).
+        // shared-save console (PS2/DC/GC/PSP): the card isn't per-game, so a
+        // per-game save push would store the wrong thing — it syncs via
+        // `emusync run`'s console-card path (#294/#295/#402).
         if (pushSaves && !sharedLayout) {
           const saveTime = await emusync.files.getSaveTime(entry.savePath);
           if (saveTime) {
@@ -128,8 +130,10 @@ export async function autoPush(
           }
         }
 
-        // Push state if user opted in and state folder has files
-        if (pushStates && !sharedLayout && entry.statePath) {
+        // Push state if user opted in and state folder has files. Only a
+        // shared-STATE console (PS2) skips this — dc/gamecube/psp states are
+        // normal per-game folders (#402).
+        if (pushStates && !sharedStateLayout && entry.statePath) {
           const latest = await emusync.files.getLatestInFolder(entry.statePath);
           if (latest) {
             try { await emusync.state.push(entry.slug, entry.statePath); } catch { /* non-fatal */ }

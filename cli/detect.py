@@ -63,6 +63,7 @@ def _detect_retroarch() -> list[dict]:
                 "states_dir": cfg.get("savestate_directory") or os.path.join(home, ".config/retroarch/states"),
                 "cores_dir": cores_dir,
                 "info_dirs": _info_dir_candidates(cfg, cores_dir),
+                "system_dir": cfg.get("system_directory") or os.path.join(home, ".config/retroarch/system"),
                 "rom_dirs": [rom_dir] if rom_dir else [],
             })
             break
@@ -93,6 +94,8 @@ def _detect_retroarch() -> list[dict]:
                     home, ".var/app/org.libretro.RetroArch/config/retroarch/states"),
                 "cores_dir": cores_dir,
                 "info_dirs": _info_dir_candidates(cfg, cores_dir),
+                "system_dir": cfg.get("system_directory") or os.path.join(
+                    home, ".var/app/org.libretro.RetroArch/config/retroarch/system"),
                 "rom_dirs": [rom_dir] if rom_dir else [],
             })
     except Exception:
@@ -192,6 +195,7 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
                 "state_dir": os.path.join(ra["states_dir"], core["folder"]),
                 "core_path": core["lib"],
                 "core_folder": core["folder"],
+                "system_dir": ra.get("system_dir"),
                 "rom_dirs": ra["rom_dirs"],
             })
 
@@ -301,12 +305,32 @@ def _dir_has_any_file(dir_path: str) -> bool:
 
 
 def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[dict, dict | None]:
-    """Resolve the shared save/state location for a shared-memcard console (PS2):
-    the memcard is one file/folder per console, not one per game. Mirrors the
-    `isSharedMemcard` branch in scan.ts (issue #295)."""
+    """Resolve the shared save/state location for a shared-save console: the
+    card is one file/folder per console, not one per game. Mirrors scan.ts's
+    resolveSharedCard (#295, #402). PS2 scans for a .ps2 card; DC/GC/PSP probe
+    known candidate paths, first existing wins, else the canonical default.
+    The returned state_match is only meaningful for a shared-STATE console
+    (PS2) — dc/gamecube/psp states are normal per-content RetroArch states."""
     save_dir = emu["save_dir"]
-    found = _find_first_by_ext(save_dir, ".ps2")
-    card_path = found or os.path.join(save_dir, _SHARED_MEMCARD_FALLBACK.get(console_abbr, "Mcd001.ps2"))
+    save_root = os.path.dirname(save_dir) if emu.get("core_folder") else save_dir
+    if console_abbr == "DC":
+        # ponytail: only VMU slot A1 is synced — B1/A2 are rare.
+        candidates = [os.path.join(save_root, "vmu_save_A1.bin"),
+                      os.path.join(save_dir, "vmu_save_A1.bin")]
+    elif console_abbr == "GC":
+        # ponytail: Wii NAND title saves are NOT synced — GC cards only.
+        candidates = [os.path.join(save_root, "User", "GC"),
+                      os.path.join(save_dir, "User", "GC")]
+        if emu.get("system_dir"):
+            candidates.append(os.path.join(emu["system_dir"], "dolphin-emu", "Userdata", "GC"))
+    elif console_abbr == "PSP":
+        # ponytail: all games sync as one console-wide SAVEDATA blob.
+        candidates = [os.path.join(save_root, "PPSSPP", "PSP", "SAVEDATA"),
+                      os.path.join(save_dir, "PSP", "SAVEDATA")]
+    else:  # PS2
+        found = _find_first_by_ext(save_dir, ".ps2")
+        candidates = [found or os.path.join(save_dir, _SHARED_MEMCARD_FALLBACK.get(console_abbr, "Mcd001.ps2"))]
+    card_path = next((c for c in candidates if os.path.exists(c)), candidates[0])
     save_match = {"path": card_path, "exists": os.path.exists(card_path)}
 
     state_match: dict | None = None

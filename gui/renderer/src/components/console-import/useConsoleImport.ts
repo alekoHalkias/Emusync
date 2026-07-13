@@ -11,6 +11,7 @@ import {
   groupByDir,
   sanitizeFilename,
   usesSharedSaveLayout,
+  usesSharedStateLayout,
   stepIndex,
 } from "./helpers";
 import { autoPush, prefetchArt, pullFromServerIfNewer } from "./postImport";
@@ -282,9 +283,11 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     const errs: string[] = [];
     const imported: ImportedEntry[] = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel, consoles);
-    // PS2-style consoles share one memory card + sstates folder across all games,
-    // so the per-game save/state must not be renamed/moved on import (#294/#295).
+    // Shared-save consoles (PS2/DC/GC/PSP) share one card across all games, so
+    // the per-game save must not be renamed/moved on import (#294/#295/#402).
+    // Only PS2 also shares its STATES — the rest keep per-game state handling.
     const sharedLayout = usesSharedSaveLayout(consoleSel);
+    const sharedStateLayout = usesSharedStateLayout(consoleSel);
     const scanRoots = [...new Set([...romDirs, ...extraPaths])].map(p => p.replace(/\/$/, ""));
     // Persist the chosen source + local destination for next time (issue #255).
     try {
@@ -304,7 +307,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
         const scanRoot   = (rom.romFolderPath ?? "").replace(/\/$/, "");
 
         const { romPath, savePath, statePath, launchCmd, romRelPath, netRoot, localCopyPath, romSha } =
-          await resolveImportPaths(rom, { romSource, localRomRoot, scanRoots, scanRoot, safeBase, sharedLayout });
+          await resolveImportPaths(rom, { romSource, localRomRoot, scanRoots, scanRoot, safeBase, sharedLayout, sharedStateLayout });
 
         const slug = rom.linkedSlug ?? (await addGame(displayName, consoleAbbr)).slug;
         await setGameDevice(slug, {
@@ -345,7 +348,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // EmuSync-wrapped launch (issue #316). Runs regardless of rom source: a
     // network import has no ROM to copy, but still benefits from an existing
     // save. Best-effort; a pull failure here shouldn't block the import.
-    if (imported.length > 0) pullFromServerIfNewer(imported, sharedLayout, consoleAbbr);
+    if (imported.length > 0) pullFromServerIfNewer(imported, sharedLayout, sharedStateLayout, consoleAbbr);
     // Pre-fetch art for every imported game now, reusing the same art:get
     // IPC/cache GameCard uses lazily, so the game grid isn't blank-then-
     // populated tile-by-tile the first time it's opened (issue #327).

@@ -5,12 +5,41 @@ import { rt } from "../runtime";
 import { findLatestFileInDir } from "../files";
 import { ROM_EXTENSIONS, DEFAULT_SAVE_EXTS, RomEntry, EmulatorScanResult, DetectedEmulatorOption } from "./types";
 
-// Consoles whose save is a single memory card shared across every game on the
-// console (PS2/PCSX2). The card lives at saveRoot/<cardFile> and is reconciled
-// per-console — not per-game — by `emusync run` (issue #295).
-// Fallback filename used when the memcards folder can't be scanned (issue #314).
-const SHARED_MEMCARD_CONSOLES = new Set(["ps2"]);
-const SHARED_MEMCARD_FALLBACK: Record<string, string> = { ps2: "Mcd001.ps2" };
+// Consoles whose save is a single card/folder shared across every game on the
+// console, reconciled per-console — not per-game — by `emusync run` (#295):
+// PS2 memory card, Dreamcast VMU, Dolphin GC cards, PPSSPP SAVEDATA (#402).
+// Keep in sync with run_ps2.py's _SHARED_MEMCARD_CONSOLES and
+// console-import/helpers.ts's _SHARED_SAVE_LAYOUT.
+const SHARED_MEMCARD_CONSOLES = new Set(["ps2", "dc", "gamecube", "psp"]);
+// Consoles whose save STATES are also shared (PS2's serial-named sstates/) —
+// dc/gamecube/psp cores write normal per-content RetroArch states.
+const SHARED_STATE_CONSOLES = new Set(["ps2"]);
+
+/** Resolve the shared card path for a shared-save console: the first existing
+ *  candidate, else the canonical default (registered before it exists). */
+function resolveSharedCard(consoleKey: string, saveDir: string, saveRoot: string, systemDir?: string): string {
+  if (consoleKey === "ps2") {
+    // Scan the memcards dir for the first .ps2 entry (file or folder); fall
+    // back to Mcd001.ps2 (issue #314).
+    return findFirstByExt(saveRoot, ".ps2") ?? join(saveRoot, "Mcd001.ps2");
+  }
+  let candidates: string[] = [];
+  if (consoleKey === "dc") {
+    // Flycast writes shared VMUs to the frontend save dir. ponytail: only VMU
+    // slot A1 is synced — B1/A2 (2nd controller / extra cards) are rare.
+    candidates = [join(saveRoot, "vmu_save_A1.bin"), join(saveDir, "vmu_save_A1.bin")];
+  } else if (consoleKey === "gamecube") {
+    // Dolphin core's GC memory-card folder. ponytail: Wii NAND title saves are
+    // NOT synced (large tree mixing system data) — follow-up if wanted.
+    candidates = [join(saveRoot, "User", "GC"), join(saveDir, "User", "GC")];
+    if (systemDir) candidates.push(join(systemDir, "dolphin-emu", "Userdata", "GC"));
+  } else if (consoleKey === "psp") {
+    // PPSSPP keeps all games' savedata under one folder — synced as one
+    // console-wide card. ponytail: per-game granularity needs serial parsing.
+    candidates = [join(saveRoot, "PPSSPP", "PSP", "SAVEDATA"), join(saveDir, "PSP", "SAVEDATA")];
+  }
+  return candidates.find(p => existsSync(p)) ?? candidates[0] ?? saveRoot;
+}
 
 /** Scan dir for the first entry (file or folder) ending in ext; returns its full path or null. */
 function findFirstByExt(dir: string, ext: string): string | null {
@@ -101,10 +130,8 @@ export function runEmulatorScan(params: {
         const isSharedMemcard = SHARED_MEMCARD_CONSOLES.has(consoleKey);
         let m: { path: string; exists: boolean };
         if (isSharedMemcard) {
-          // Shared-memory-card console (PS2): scan the memcards dir for the first
-          // .ps2 entry (file or folder); fall back to Mcd001.ps2 (issue #314).
-          const found = findFirstByExt(saveRoot, ".ps2");
-          const cardPath = found ?? join(saveRoot, SHARED_MEMCARD_FALLBACK[consoleKey] ?? "Mcd001.ps2");
+          // Shared-save console: every game's savePath is the same card (#295/#402).
+          const cardPath = resolveSharedCard(consoleKey, emulatorOption.saveDir, saveRoot, emulatorOption.systemDir);
           m = { path: cardPath, exists: existsSync(cardPath) };
         } else {
           m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
@@ -136,10 +163,11 @@ export function runEmulatorScan(params: {
         let sm: { path: string; exists: boolean } | undefined;
         if (emulatorOption.stateDir) {
           const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
-          if (isSharedMemcard) {
+          if (SHARED_STATE_CONSOLES.has(consoleKey)) {
             // Shared sstates folder (PS2): every game's states live flat in one
             // folder, named per serial — point at the folder itself; `emusync run`
-            // syncs only this game's serial files (issue #294).
+            // syncs only this game's serial files (issue #294). dc/gamecube/psp
+            // cores write normal per-content states, so they take the else branch.
             sm = { path: stateRoot, exists: !!findLatestFileInDir(stateRoot) };
           } else {
             const stateFolder = join(stateRoot, gameFolderName);

@@ -43,6 +43,7 @@ export function detectRetroArch(home: string): EmulatorInfo[] {
         statesDir: cfg.savestate_directory || join(home, ".config/retroarch/states"),
         coresDir,
         infoDirs: infoDirCandidates(cfg, coresDir),
+        systemDir: cfg.system_directory || join(home, ".config/retroarch/system"),
         romDirs:  [romDir].filter(Boolean) as string[],
       });
       break;
@@ -66,6 +67,7 @@ export function detectRetroArch(home: string): EmulatorInfo[] {
         statesDir: cfg.savestate_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/states"),
         coresDir,
         infoDirs: infoDirCandidates(cfg, coresDir),
+        systemDir: cfg.system_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/system"),
         romDirs:  [flatRomDir].filter(Boolean) as string[],
       });
     }
@@ -178,6 +180,7 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
         stateDir: join(ra.statesDir, core.folderName),
         corePath: core.lib,
         coreFolderName: core.folderName,
+        systemDir: ra.systemDir,
         romDirs,
       });
     }
