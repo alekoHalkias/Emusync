@@ -1,8 +1,8 @@
 """Server-wide settings (issue #322) — currently just the shared SteamGridDB
-API key. Entered once on the server device (see gui's Setup.tsx onboarding
-step and ServerStatusButton's settings panel) and fetched by every device's
-Electron process, since SteamGridDB has no OAuth/programmatic flow for a
-per-user key.
+API key. Entered once from any device (see gui's Setup.tsx onboarding step
+and ServerStatusButton's settings panel, editable everywhere so a headless
+server can still be configured — #398) and fetched by every device's Electron
+process, since SteamGridDB has no OAuth/programmatic flow for a per-user key.
 """
 from __future__ import annotations
 
