@@ -10,6 +10,28 @@ export type UseGameList = {
   reload: (silent?: boolean) => Promise<void>;
 };
 
+// Instant warm-start cache (issue #410) — a plain localStorage entry, not one of
+// the ~/.emusync/ files: this is a pure GUI paint-speed concern (skip the
+// loading spinner while the poll below silently reconciles), not cross-process
+// state the CLI needs to see. Bump the version suffix if GameRow's shape
+// changes incompatibly.
+const CACHE_KEY = "emusync.gameListCache.v1";
+
+function readCache(): GameRow[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null; // corrupt JSON, storage disabled, quota — always degrade to "no cache"
+  }
+}
+
+function writeCache(rows: GameRow[]): void {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(rows)); } catch { /* best-effort */ }
+}
+
 /**
  * Owns the game list data: the batched overview fetch, local save-time
  * enrichment, the initial load, and the 5s background poll.
@@ -19,11 +41,18 @@ export type UseGameList = {
  * reload but finished after it).
  */
 export function useGameList(): UseGameList {
-  const [games, setGames] = useState<GameRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Read once per mount (React only invokes a useState initializer function
+  // once, even under StrictMode's double-render) and share the result with
+  // the two other pieces of state that depend on whether a cache existed.
+  const [cached] = useState<GameRow[] | null>(readCache);
+  const [games, setGames] = useState<GameRow[]>(cached ?? []);
+  const [loading, setLoading] = useState(cached === null);
   const loadIdRef = useRef(0);
   // Flips to true after the first successful fetch; drives the poll cadence.
-  const everLoadedRef = useRef(false);
+  // Seeded true when a warm cache exists, so the initial fetch runs silently
+  // (no spinner flash over the cached view) and a failure just keeps showing
+  // the cached rows instead of falling through to the offline-list fallback.
+  const everLoadedRef = useRef(cached !== null);
 
   const reload = useCallback(async (silent = false) => {
     const thisId = ++loadIdRef.current;
@@ -62,6 +91,7 @@ export function useGameList(): UseGameList {
       if (loadIdRef.current !== thisId) return;
       everLoadedRef.current = true;
       setGames(enriched);
+      writeCache(enriched);
       if (!silent) setLoading(false);
     } catch {
       if (loadIdRef.current !== thisId) return;
@@ -101,8 +131,10 @@ export function useGameList(): UseGameList {
     }
   }, []);
 
-  // Initial load on mount.
-  useEffect(() => { reload(); }, [reload]);
+  // Initial load on mount. Silent when a warm cache already primed the view
+  // (everLoadedRef seeded true above), so this fetch never flashes a spinner
+  // over the cached rows; unchanged (non-silent) on a genuinely cold start.
+  useEffect(() => { reload(everLoadedRef.current); }, [reload]);
 
   // Self-scheduling poll: 1 s until first success, then 5 s.
   // Using setTimeout (not setInterval) so the delay adapts after each tick.
