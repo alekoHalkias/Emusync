@@ -30,7 +30,16 @@ export async function prefetchArt(
   const consoleKey = consoleAbbr.toLowerCase();
   setArtProgress({ done: 0, total: entries.length });
   for (let i = 0; i < entries.length; i++) {
-    try { await emusync.art.get(entries[i].slug, entries[i].name, consoleKey); } catch { /* best-effort */ }
+    // All 5 types, not just the console's configured one (#411) — reuses the
+    // Artwork tab's per-type SGDB dispatch (#325) instead of art:get's single
+    // type, so switching a console's art-type dropdown or opening a game's
+    // Artwork tab always has something cached. sgdbGameId is always null here:
+    // a freshly-imported game has no match yet, so refreshAll resolves and
+    // persists one (same auto-search behavior art:get already had, #339).
+    // Sequential across games and, internally, across types — never more than
+    // one SGDB request in flight — and each type's failure is isolated inside
+    // refreshAll, so a rate-limited/missing type doesn't stop the rest.
+    try { await emusync.artwork.refreshAll(entries[i].slug, entries[i].name, consoleKey, null); } catch { /* best-effort */ }
     setArtProgress({ done: i + 1, total: entries.length });
   }
 }

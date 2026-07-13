@@ -349,9 +349,10 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // network import has no ROM to copy, but still benefits from an existing
     // save. Best-effort; a pull failure here shouldn't block the import.
     if (imported.length > 0) pullFromServerIfNewer(imported, sharedLayout, sharedStateLayout, consoleAbbr);
-    // Pre-fetch art for every imported game now, reusing the same art:get
-    // IPC/cache GameCard uses lazily, so the game grid isn't blank-then-
-    // populated tile-by-tile the first time it's opened (issue #327).
+    // Pre-fetch all 5 artwork types for every imported game now, so the
+    // console's art-type dropdown and each game's Artwork tab always have
+    // something cached instead of triggering a fresh SGDB fetch on demand
+    // (issue #327, extended to all types by #411).
     if (imported.length > 0) prefetchArt(imported, consoleAbbr, setArtProgress);
   }
 
