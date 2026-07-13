@@ -26,10 +26,11 @@ export async function resolveImportPaths(
     scanRoots: string[];
     scanRoot: string;
     safeBase: string;
-    sharedLayout: boolean;
+    sharedLayout: boolean;       // save is a shared console card — never rename it
+    sharedStateLayout: boolean;  // states are shared too (PS2 only, #402)
   },
 ): Promise<ResolvedRomPaths> {
-  const { romSource, localRomRoot, scanRoots, scanRoot, safeBase, sharedLayout } = opts;
+  const { romSource, localRomRoot, scanRoots, scanRoot, safeBase, sharedLayout, sharedStateLayout } = opts;
 
   let romPath = rom.romPath;
   let savePath = rom.savePath;
@@ -58,13 +59,14 @@ export async function resolveImportPaths(
       if (!netRoot) throw new Error("no network folder configured to upload to");
       const renamed = await emusync.files.renameGameFiles({
         romPath: localPath, savePath: sharedLayout ? "" : savePath,
-        stateFolder: sharedLayout ? "" : statePath,
+        stateFolder: sharedStateLayout ? "" : statePath,
         newBase: safeBase, reorganize: false,
       });
       if (renamed.ok) {
         launchCmd = launchCmd.replaceAll(localPath, renamed.newRomPath);
         localPath = renamed.newRomPath;
-        if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
+        if (!sharedLayout) savePath = renamed.newSavePath;
+        if (!sharedStateLayout) statePath = renamed.newStateFolder;
       }
       const rel = relPathUnder(localPath, [localRomRoot]);
       const masterPath = `${netRoot}/${rel}`;
@@ -81,14 +83,15 @@ export async function resolveImportPaths(
       netRoot = networkRoots.find(r => romPath === r || romPath.startsWith(r + "/")) ?? scanRoot;
       const renamed = await emusync.files.renameGameFiles({
         romPath, savePath: sharedLayout ? "" : savePath,
-        stateFolder: sharedLayout ? "" : statePath,
+        stateFolder: sharedStateLayout ? "" : statePath,
         newBase: safeBase, reorganize: false,
         secondaryRomPath: rom.presence === "both" ? (rom.localRomPath ?? undefined) : undefined,
       });
       if (renamed.ok) {
         launchCmd = launchCmd.replaceAll(romPath, renamed.newRomPath);
         romPath   = renamed.newRomPath;
-        if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
+        if (!sharedLayout) savePath = renamed.newSavePath;
+        if (!sharedStateLayout) statePath = renamed.newStateFolder;
         if (rom.presence === "both") localCopyPath = renamed.newSecondaryRomPath ?? (rom.localRomPath ?? "");
       }
       romRelPath = relPathUnder(romPath, networkRoots);
@@ -100,13 +103,14 @@ export async function resolveImportPaths(
     const flat = !!scanRoot && romParent === scanRoot;
     const renamed = await emusync.files.renameGameFiles({
       romPath, savePath: sharedLayout ? "" : savePath,
-      stateFolder: sharedLayout ? "" : statePath,
+      stateFolder: sharedStateLayout ? "" : statePath,
       newBase: safeBase, reorganize: flat,
     });
     if (renamed.ok) {
       launchCmd  = launchCmd.replaceAll(romPath, renamed.newRomPath);
       romPath    = renamed.newRomPath;
-      if (!sharedLayout) { savePath = renamed.newSavePath; statePath = renamed.newStateFolder; }
+      if (!sharedLayout) savePath = renamed.newSavePath;
+      if (!sharedStateLayout) statePath = renamed.newStateFolder;
     }
   }
 

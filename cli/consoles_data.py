@@ -96,6 +96,27 @@ _IMPORT_CONSOLES = [
      "rom_extensions": ["iso", "chd", "bin"],
      "databases": ["Sony - PlayStation 2"],
      "standalones": [_PCSX2], "suggestions": ["PCSX2 standalone"]},
+    # dc / gamecube / psp (#402) follow the PS2 pattern: no `system_keys` (so
+    # PSX's disc cores never surface for shared .iso/.chd/.bin), explicit
+    # `rom_extensions`, cores matched purely via `databases` ↔ .info files
+    # (#400). All three are shared-save consoles (console-scoped card, see
+    # _SHARED_MEMCARD_CONSOLES / usesSharedSaveLayout); states are normal
+    # per-content RetroArch states.
+    {"key": "dc",      "label": "Sega Dreamcast",             "abbr": "DC",
+     "system_keys": [],
+     "rom_extensions": ["gdi", "cdi", "chd", "cue"],
+     "databases": ["Sega - Dreamcast"],
+     "standalones": [], "suggestions": ["RetroArch with Flycast core"]},
+    {"key": "gamecube", "label": "GameCube / Wii",            "abbr": "GC",
+     "system_keys": [],
+     "rom_extensions": ["iso", "gcm", "rvz", "wbfs"],
+     "databases": ["Nintendo - GameCube", "Nintendo - Wii"],
+     "standalones": [], "suggestions": ["RetroArch with Dolphin core"]},
+    {"key": "psp",     "label": "PlayStation Portable",       "abbr": "PSP",
+     "system_keys": [],
+     "rom_extensions": ["iso", "cso", "pbp"],
+     "databases": ["Sony - PlayStation Portable"],
+     "standalones": [], "suggestions": ["RetroArch with PPSSPP core"]},
 ]
 
 _IMPORT_SYSTEMS: dict[str, dict] = {
@@ -203,9 +224,10 @@ _IMPORT_SYSTEMS: dict[str, dict] = {
                       {"lib": "mednafen_psx_hw_libretro", "folder": "Beetle PSX HW"},
                       {"lib": "mednafen_psx_libretro", "folder": "Beetle PSX"},
                       {"lib": "swanstation_libretro", "folder": "SwanStation"}]},
+    # PPSSPP was removed from this list (#402): it's a PSP core with its own
+    # console now — PS1 eboot .pbp files play via the PS1 disc cores below.
     "pbp": {"name": "PSP / PS1", "save_exts": ["srm", "sav", "mcr"],
-            "cores": [{"lib": "ppsspp_libretro", "folder": "PPSSPP"},
-                      {"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
+            "cores": [{"lib": "pcsx_rearmed_libretro", "folder": "PCSX-ReARMed"},
                       {"lib": "mednafen_psx_hw_libretro", "folder": "Beetle PSX HW"}]},
 }
 
@@ -216,6 +238,9 @@ _ROM_EXTENSIONS = {
     "sfc", "smc", "gb", "gbc", "gba", "nes", "fds",
     "n64", "z64", "v64", "nds", "md", "smd", "gen",
     "sms", "gg", "pce", "iso", "cue", "bin", "chd", "pbp",
+    "gdi", "cdi",                 # Dreamcast (#402)
+    "gcm", "rvz", "wbfs",         # GameCube / Wii (#402)
+    "cso",                        # PSP (#402)
 }
 
 

@@ -11,9 +11,11 @@ from cli.run_reconcile import _mtime
 
 logger = logging.getLogger("emusync.run")
 
-# Consoles whose "save" is a single memory card shared across every game on the
-# console, so it's reconciled per-console rather than per-game. PS2/PCSX2 (#295).
-_SHARED_MEMCARD_CONSOLES = {"PS2"}
+# Consoles whose "save" is a single card/folder shared across every game on the
+# console, so it's reconciled per-console rather than per-game: PS2 memory card
+# (#295), Dreamcast VMU, Dolphin GC cards, PPSSPP SAVEDATA (#402). Keep in sync
+# with scan.ts's SHARED_MEMCARD_CONSOLES and helpers.ts's _SHARED_SAVE_LAYOUT.
+_SHARED_MEMCARD_CONSOLES = {"PS2", "DC", "GC", "PSP"}
 
 # Consoles that keep save states in one SHARED folder, named per game serial
 # (PCSX2 sstates/<SERIAL> (<CRC>).<slot>.p2s) — synced filtered by serial (#294).

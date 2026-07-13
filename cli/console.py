@@ -22,7 +22,7 @@ from cli.detect import (
     _scan_rom_dir,
 )
 from cli.root import cli
-from cli.run import _SHARED_MEMCARD_CONSOLES
+from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
 
 
 def _classify_network_roms(
@@ -172,10 +172,11 @@ def console_import() -> None:
     )
     console_def = _IMPORT_CONSOLES[choice - 1]
     console_key = console_def["key"]
-    # PS2-style consoles share one memory card + sstates folder across every game,
-    # so the per-game save/state is resolved to that shared location rather than
-    # matched by ROM filename (issue #295, #361).
+    # Shared-save consoles (PS2/DC/GC/PSP) share one card across every game, so
+    # the per-game save is resolved to that shared location rather than matched
+    # by ROM filename (issue #295, #361, #402). Only PS2 also shares its STATES.
     shared_layout = console_def["abbr"] in _SHARED_MEMCARD_CONSOLES
+    shared_state = console_def["abbr"] in _SHARED_STATE_CONSOLES
     click.echo(f"\nSelected: {console_def['label']}")
 
     # ── Step 2: detect emulators/cores ───────────────────────────────────────
@@ -290,7 +291,7 @@ def console_import() -> None:
         base = os.path.splitext(os.path.basename(rom_path))[0]
 
         if shared_layout:
-            save_match, state_match = shared_save_match, shared_state_match
+            save_match = shared_save_match
         else:
             system = _IMPORT_SYSTEMS.get(ext, {})
             save_exts = system.get("save_exts", default_save_exts)
@@ -303,6 +304,12 @@ def console_import() -> None:
                 if root_match["exists"]:
                     save_match = root_match
 
+        # States are per-game except for a shared-STATE console (PS2's serial-
+        # named sstates/) — dc/gamecube/psp cores write normal per-content
+        # states even though their saves are shared (#402).
+        if shared_state:
+            state_match = shared_state_match
+        else:
             state_match = None
             if emu.get("state_dir"):
                 state_match = _match_save_file(emu["state_dir"], base, _DEFAULT_STATE_EXTS)

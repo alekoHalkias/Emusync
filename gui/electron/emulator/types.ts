@@ -16,6 +16,9 @@ export const ROM_EXTENSIONS = new Set([
   "a26", "a52", "a78",                 // Atari
   "lnx",                               // Atari Lynx
   "iso", "cue", "bin", "chd", "pbp",   // Disc-based (PSX, Dreamcast, PSP…)
+  "gdi", "cdi",                        // Dreamcast (#402)
+  "gcm", "rvz", "wbfs",                // GameCube / Wii (#402)
+  "cso",                               // PSP (#402)
 ]);
 
 export const DEFAULT_SAVE_EXTS = ["srm", "sav", "save"];
@@ -28,6 +31,7 @@ export interface EmulatorInfo {
   statesDir: string;  // root states directory
   coresDir: string;   // where core .so files live
   infoDirs: string[]; // where core .info metadata files may live (#400)
+  systemDir?: string; // RetroArch system/BIOS dir — Dolphin's card path lives under it (#402)
   romDirs: string[];
 }
 
@@ -77,5 +81,6 @@ export interface DetectedEmulatorOption {
   corePath?: string;
   coreFolderName?: string;
   launchArgs?: string[];   // standalone-emulator flags, e.g. PCSX2 -batch -fullscreen (#293)
+  systemDir?: string;      // RetroArch system dir, for shared-card resolution (#402)
   romDirs: string[];
 }

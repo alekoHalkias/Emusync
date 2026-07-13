@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { addGame, getGame, getGameDevice, setGameDevice, updateGame, type GameDeviceConfig } from "../api";
 import { deleteGame } from "../gameDelete";
-import { sanitizeFilename, usesSharedSaveLayout } from "./console-import/helpers";
+import { sanitizeFilename, usesSharedSaveLayout, usesSharedStateLayout } from "./console-import/helpers";
 import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
 import { useGameSync } from "./game-config/useGameSync";
@@ -72,6 +72,9 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   // have no meaningful per-game manual push/pull (#294/#295).
   const [gameConsole, setGameConsole] = useState("");
   const sharedLayout = usesSharedSaveLayout(gameConsole);
+  // PS2 only: states are shared too, so their per-game controls hide as well;
+  // dc/gamecube/psp keep normal per-game state rename/push/pull (#402).
+  const sharedStateLayout = usesSharedStateLayout(gameConsole);
 
   const sync = useGameSync(slug, savePath, statePath, gameConsole, sharedLayout);
 
@@ -212,7 +215,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           const renamed = await window.emusync.files.renameGameFiles({
             romPath: finalRom,
             savePath: sharedLayout ? "" : finalSave,
-            stateFolder: sharedLayout ? "" : finalState,
+            stateFolder: sharedStateLayout ? "" : finalState,
             newBase,
             reorganize: false,
             // A network ROM's localized copy is renamed alongside the master.
@@ -227,10 +230,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             }
           }
           finalRom = renamed.newRomPath;
-          if (!sharedLayout) {
-            finalSave = renamed.newSavePath;
-            finalState = renamed.newStateFolder;
-          }
+          if (!sharedLayout) finalSave = renamed.newSavePath;
+          if (!sharedStateLayout) finalState = renamed.newStateFolder;
           if (renamed.newSecondaryRomPath) finalLocalRom = renamed.newSecondaryRomPath;
           // Rename keeps the master in the same share folder, so only the
           // rel-path's basename changes; rom_sha256 is unchanged (same bytes).
@@ -385,7 +386,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
-          {!isNew && statePath && !sharedLayout && (
+          {!isNew && statePath && !sharedStateLayout && (
             <SyncLine
               localTime={sync.latestStateFile?.time ?? null}
               serverTime={sync.serverStateMeta?.pushed_at ?? null}

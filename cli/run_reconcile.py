@@ -57,7 +57,9 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
     local_mtime: Optional[datetime] = None
     if p.exists():
         local_hash = hashlib.sha256(memcard_bytes(p)).hexdigest()
-        mtime_src = max((f.stat().st_mtime for f in p.iterdir() if f.is_file()), default=p.stat().st_mtime) if p.is_dir() else p.stat().st_mtime
+        # rglob, not iterdir: folder cards nest content (PCSX2 GAME1/GAME1,
+        # PPSSPP SAVEDATA/<GAME>/, Dolphin GC/) whose changes must count (#402).
+        mtime_src = max((f.stat().st_mtime for f in p.rglob("*") if f.is_file()), default=p.stat().st_mtime) if p.is_dir() else p.stat().st_mtime
         local_mtime = datetime.fromtimestamp(mtime_src, tz=timezone.utc)
 
     # A true divergence = both sides have a save and they differ.
