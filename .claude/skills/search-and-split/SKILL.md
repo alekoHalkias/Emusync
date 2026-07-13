@@ -5,7 +5,7 @@ description: Scan the codebase for the largest source files (>=500 lines, top 5)
 
 # /search-and-split — find oversized files and split the approved ones
 
-Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — issue creation, branching, commits, pushes, and PRs are pre-approved and run without asking. The only deliberate pause points are (a) which files to split (a content decision, not permission) and (b) waiting for each PR to merge before starting the next file (mirrors `/issue`'s existing merge-gate).
+Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — issue creation, branching, commits, pushes, and PRs are pre-approved and run without asking. The one deliberate pause point is which files to split (a content decision, not permission) — the per-file merge gate is *verified via `gh`*, not taken on the user's word (step 6e).
 
 ## Steps
 
@@ -33,6 +33,10 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — i
    b. Check for conflicting branches (`git fetch --prune && git branch -r`) and warn if one already touches the same file, then proceed.
    c. `git checkout main && git pull && git checkout -b feature/<issue-number>-split-<short-name>`.
    d. Invoke the `plan` skill for that issue, then (once the plan is approved) `implement` — through to a pushed commit and an opened PR, per those skills' normal flow.
-   e. Report the PR URL, then **stop and wait for the user to merge it** before starting the next approved file. Do not begin the next file's issue/branch until told the PR is merged (or the user says to proceed anyway).
+   e. Report the PR URL, then **stop** before starting the next approved file — merging takes real time. When the user gives any go-ahead to continue, verify the merge yourself rather than trusting their word:
+      ```bash
+      gh pr view <PR-number> --json state,mergedAt,url
+      ```
+      If `state` isn't `MERGED`, report it's still open (with the URL) and don't advance. If merged, proceed to the next file automatically.
 
 7. Once every approved file has been processed (or the user stops early), report a summary: which files got PRs, which are still pending merge.
