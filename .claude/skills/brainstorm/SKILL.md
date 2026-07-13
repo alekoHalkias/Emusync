@@ -5,13 +5,12 @@ description: Read the whole codebase, surface the top 5 biggest features/fixes w
 
 # /brainstorm — find the biggest wins, then work the backlog
 
-Follows CLAUDE.md's "Execution approval policy" and "Development workflow". Issue/branch/commit/push/PR creation are pre-approved per that policy — the two deliberate human checkpoints in this skill are (a) approving which of the 5 candidates become issues, and (b) approving each PR before the next issue starts.
+Follows CLAUDE.md's "Execution approval policy" and "Development workflow". Issue/branch/commit/push/PR creation are pre-approved per that policy — the one deliberate human checkpoint in this skill is approving which of the 5 candidates become issues. The PR-merge gate between backlog items is *verified*, not taken on the user's word — see step 5e.
 
 ## Steps
 
 1. **Survey the codebase.** Spawn an `Explore` agent (or `general-purpose` if synthesis/judgment is needed beyond location-finding) with "very thorough" breadth to read across `cli/`, `server/`, `gui/electron/`, `gui/renderer/src/`, and `tests/`. Ask it to report candidate biggest-impact features or fixes with file/line evidence — not vague suggestions. In parallel, pull current open issues so candidates don't duplicate existing work:
    ```bash
-   export PATH="$HOME/.local/bin:$PATH"
    curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues?state=open&per_page=50"
    ```
 
@@ -26,7 +25,11 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow". Issu
    b. `git checkout main && git pull && git checkout -b feature/<issue-number>-short-description`.
    c. Invoke the `plan` skill for this issue. It will read the issue, ask any genuinely-open clarifying questions, and present a plan — resolve those inline so the loop doesn't stall on a silent wait.
    d. Once the plan is approved (by you resolving its clarifying questions and confirming, or immediately if it had none needing input), invoke the `implement` skill to build it, test it, commit, push, and open the PR.
-   e. **Stop after the PR is opened and wait for the user to say the PR is approved/merged.** Do not check out the next branch or touch the next issue until that confirmation arrives — this is the second required pause, once per issue.
-   f. On confirmation, move to the next issue in the backlog. Report a one-line status each time you advance ("issue #N done, PR #M — starting issue #N+1").
+   e. **Stop after the PR is opened.** Don't advance to the next issue on the spot — merging takes real time (review, CI, a manual click). When the user gives any go-ahead to continue (e.g. "next", "continue", or just re-invoking), verify the merge yourself rather than trusting their word:
+      ```bash
+      gh pr view <PR-number> --json state,mergedAt,url
+      ```
+      If `state` isn't `MERGED`, report that it's still open (with the URL) and don't advance. If it's merged, proceed to the next issue automatically — no further confirmation needed.
+   f. On a verified merge, move to the next issue in the backlog. Report a one-line status each time you advance ("issue #N done, PR #M merged — starting issue #N+1").
 
 6. When the backlog is empty, report a final summary: all 5 issues, their PR links, and merge status as of the last confirmation.

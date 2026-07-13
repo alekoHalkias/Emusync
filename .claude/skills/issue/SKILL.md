@@ -9,14 +9,19 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow" (Step
 
 ## Steps
 
-1. Output exactly this line first, nothing else:
-   > pr merged, make a new issue.
+1. Verify the previous work is actually done before declaring it done — don't take "merged" on faith:
+   ```bash
+   git branch --show-current
+   gh pr view --json number,state,mergedAt,url 2>/dev/null
+   ```
+   - If the current branch has an OPEN PR: stop and tell the user "PR #N is still open — merge it, then run /issue again" (include the URL). Do not proceed to ask about a new issue.
+   - If there's no PR for this branch (e.g. already on `main`, or the branch was never pushed) or the PR is MERGED: proceed. Output exactly this line:
+     > pr merged, make a new issue.
 
    Then ask the user what the new issue should be about (if `args` already contains a description, use that instead of asking).
 
 2. Check for `gh` (CLAUDE.md's "How Claude agents create issues" has the setup steps if it's missing):
    ```bash
-   export PATH="$HOME/.local/bin:$PATH"
    which gh
    ```
    If missing and no `GITHUB_TOKEN` env var is set, tell the user to run `gh auth login` or set `GITHUB_TOKEN`, then stop.

@@ -5,7 +5,7 @@ description: Scan the codebase for the largest source files (>=500 lines, top 5)
 
 # /search-and-split — find oversized files and split the approved ones
 
-Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — issue creation, branching, commits, pushes, and PRs are pre-approved and run without asking. The only deliberate pause points are (a) which files to split (a content decision, not permission) and (b) waiting for each PR to merge before starting the next file (mirrors `/issue`'s existing merge-gate).
+Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — issue creation, branching, commits, pushes, and PRs are pre-approved and run without asking. The one deliberate pause point is which files to split (a content decision, not permission) — the per-file merge gate is *verified via `gh`*, not taken on the user's word (step 6e).
 
 ## Steps
 
@@ -22,17 +22,21 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — i
 
 2. Drop the trailing `total` line, filter to files with **>= 500 lines**, keep the **top 5** by line count.
 
-3. For each candidate, read enough of the file (or lean on CLAUDE.md's key-files table, which already documents most large files' responsibilities) to write a one-line rationale — what distinct responsibilities it's mixing, e.g. "owns routing, IPC, and process lifecycle" or "one component handling fetch, layout, and modal state".
+3. For each candidate, read enough of the file (or lean on docs/ARCHITECTURE.md's Key Files detail, which already documents most large files' responsibilities) to write a one-line rationale — what distinct responsibilities it's mixing, e.g. "owns routing, IPC, and process lifecycle" or "one component handling fetch, layout, and modal state".
 
 4. If no file reaches 500 lines, report that and stop — nothing to split.
 
 5. Present the candidates (path, line count, rationale), largest first, and ask the user via `AskUserQuestion` (multi-select) which ones to turn into split issues. This is a genuine content decision — do not skip it or assume approval.
 
 6. For each approved file, **largest to smallest**:
-   a. Draft and create a GitHub issue proposing to split that file into smaller modules (what the file currently does, a sketch of a plausible split, acceptance criteria: behavior unchanged, `make test` passes, CLAUDE.md's key-files table updated) — per CLAUDE.md's "How Claude agents create issues".
+   a. Draft and create a GitHub issue proposing to split that file into smaller modules (what the file currently does, a sketch of a plausible split, acceptance criteria: behavior unchanged, `make test` passes, docs/ARCHITECTURE.md's Key Files detail updated) — per CLAUDE.md's "How Claude agents create issues".
    b. Check for conflicting branches (`git fetch --prune && git branch -r`) and warn if one already touches the same file, then proceed.
    c. `git checkout main && git pull && git checkout -b feature/<issue-number>-split-<short-name>`.
    d. Invoke the `plan` skill for that issue, then (once the plan is approved) `implement` — through to a pushed commit and an opened PR, per those skills' normal flow.
-   e. Report the PR URL, then **stop and wait for the user to merge it** before starting the next approved file. Do not begin the next file's issue/branch until told the PR is merged (or the user says to proceed anyway).
+   e. Report the PR URL, then **stop** before starting the next approved file — merging takes real time. When the user gives any go-ahead to continue, verify the merge yourself rather than trusting their word:
+      ```bash
+      gh pr view <PR-number> --json state,mergedAt,url
+      ```
+      If `state` isn't `MERGED`, report it's still open (with the URL) and don't advance. If merged, proceed to the next file automatically.
 
 7. Once every approved file has been processed (or the user stops early), report a summary: which files got PRs, which are still pending merge.

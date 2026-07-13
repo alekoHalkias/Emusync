@@ -178,11 +178,12 @@ To re-cut a failed release: delete the tag remotely and locally, fix the issue, 
 
 ## Execution approval policy
 
-Applies to every Claude agent and skill working in this repo (`/issue`, `/plan`, `/implement`, and any added later):
+Applies to every Claude agent and skill working in this repo (`/issue`, `/plan`, `/implement`, and any added later). The governing rule: **no permission pause for anything scoped to this repo or its GitHub — reading, editing code, running `gh`/`git`/build/test commands. Only pause when a step would modify something on the machine *outside* this repo.**
 
-- Read-only commands (curl GET, `gh issue/pr list|view`, `git status|log|branch|fetch|diff`, `make test`, lint/build checks) always run automatically — never pause to ask first.
-- GitHub issue creation, PR creation, and git commits/pushes are pre-approved — create/commit/push/open-PR without asking "should I proceed?".
-- Only pause for the user's explicit go-ahead when a step would directly modify something on the machine *outside* this repo (e.g. deleting unrelated files, changing system config, killing unrelated processes). Editing tracked files, opening a PR, or filing an issue does not require a pause.
+- Reading anything (files, `curl`/`gh` GETs, `git status|log|branch|fetch|diff|show|blame`, running tests/lint/build) always runs automatically — never pause to ask first. `.claude/settings.json` allowlists these at the tool level so the harness itself doesn't prompt.
+- Editing/writing tracked files, GitHub issue creation, PR creation, and git commits/pushes are pre-approved — create/commit/push/open-PR without asking "should I proceed?".
+- Only pause for the user's explicit go-ahead when a step would directly modify something on the machine *outside* this repo (e.g. deleting unrelated files, changing system config, killing unrelated processes) — or for the handful of git operations that discard history irreversibly (`push --force`, `reset --hard`, `checkout --`/`restore` over uncommitted work, `branch -D`, `--no-verify`, `--amend` on a published commit): those stay gated regardless of task context, per the Git Safety Protocol.
+- A skill pause point that depends on external state (e.g. "has the PR merged?") must *verify* via `gh`/`git` rather than take the user's word for it — see `/issue` step 1 and the backlog-advance steps in `/brainstorm`/`/search-and-split`.
 - Clarifying questions about ambiguous requirements are not permission requests — always fine to ask those.
 
 ---
@@ -228,8 +229,6 @@ curl -sL https://github.com/cli/cli/releases/download/v2.71.0/gh_2.71.0_linux_am
 export PATH="$HOME/.local/bin:$PATH"   # add to ~/.bashrc to persist
 gh auth login
 ```
-
-**Always prefix gh commands with `export PATH="$HOME/.local/bin:$PATH"` in this project** until it's on the system PATH.
 
 ### Step 2 — check for conflicting branches
 
