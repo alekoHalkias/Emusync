@@ -225,6 +225,27 @@ def test_seed_console_defs_picks_up_additions():
         assert {c["lib"] for c in store.get_system_defs()["gba"]["cores"]} == {"mgba", "vbam"}
 
 
+def test_seed_updates_databases_on_existing_rows():
+    """`databases` is server-owned seed data (#400): a console row seeded
+    before v16 (or before a mapping fix) must pick up the current value on
+    re-seed — INSERT OR IGNORE alone would leave it permanently stale."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        base = [{
+            "key": "gba", "label": "Game Boy Advance", "abbr": "GBA",
+            "suggestions": [], "system_keys": ["gba"],
+            "systems": {"gba": {"name": "GBA", "save_exts": ["srm"], "cores": []}},
+            "folder_names": [], "standalones": [],
+        }]
+        store.seed_console_defs(base)  # no databases — like a pre-v16 row
+        assert {c["key"]: c for c in store.get_console_defs()}["gba"]["databases"] == []
+
+        base[0]["databases"] = ["Nintendo - Game Boy Advance"]
+        store.seed_console_defs(base)
+        gba = {c["key"]: c for c in store.get_console_defs()}["gba"]
+        assert gba["databases"] == ["Nintendo - Game Boy Advance"]
+
+
 def test_seed_and_serve_standalones():
     """Standalones round-trip through seed → get_console_defs/get_standalones
     with split native_bins and a parsed `dirs` blob (issue #292)."""

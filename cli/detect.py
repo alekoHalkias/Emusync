@@ -32,6 +32,13 @@ def _parse_retroarch_cfg(cfg_path: str) -> dict[str, str]:
     return out
 
 
+def _info_dir_candidates(cfg: dict[str, str], cores_dir: str) -> list[str]:
+    """Candidate dirs for core .info metadata files, best source first (#400).
+    Mirrors detect.ts's infoDirCandidates()."""
+    candidates = [cfg.get("libretro_info_path", ""), cores_dir, "/usr/share/libretro/info"]
+    return list(dict.fromkeys(c for c in candidates if c))
+
+
 def _detect_retroarch() -> list[dict]:
     """Return list of detected RetroArch installs (native + flatpak)."""
     home = str(Path.home())
@@ -47,13 +54,15 @@ def _detect_retroarch() -> list[dict]:
             rom_dir = cfg.get("rgui_browser_directory", "")
             if rom_dir == "default":
                 rom_dir = ""
+            cores_dir = cfg.get("libretro_directory") or os.path.join(home, ".config/retroarch/cores")
             infos.append({
                 "type": "native",
                 "label": "RetroArch",
                 "exec_path": bin_path,
                 "save_dir": cfg.get("savefile_directory") or os.path.join(home, ".config/retroarch/saves"),
                 "states_dir": cfg.get("savestate_directory") or os.path.join(home, ".config/retroarch/states"),
-                "cores_dir": cfg.get("libretro_directory") or os.path.join(home, ".config/retroarch/cores"),
+                "cores_dir": cores_dir,
+                "info_dirs": _info_dir_candidates(cfg, cores_dir),
                 "rom_dirs": [rom_dir] if rom_dir else [],
             })
             break
@@ -72,6 +81,8 @@ def _detect_retroarch() -> list[dict]:
             rom_dir = cfg.get("rgui_browser_directory", "")
             if rom_dir == "default":
                 rom_dir = ""
+            cores_dir = cfg.get("libretro_directory") or os.path.join(
+                home, ".var/app/org.libretro.RetroArch/data/retroarch/cores")
             infos.append({
                 "type": "flatpak",
                 "label": "RetroArch (Flatpak)",
@@ -80,8 +91,8 @@ def _detect_retroarch() -> list[dict]:
                     home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
                 "states_dir": cfg.get("savestate_directory") or os.path.join(
                     home, ".var/app/org.libretro.RetroArch/config/retroarch/states"),
-                "cores_dir": cfg.get("libretro_directory") or os.path.join(
-                    home, ".var/app/org.libretro.RetroArch/data/retroarch/cores"),
+                "cores_dir": cores_dir,
+                "info_dirs": _info_dir_candidates(cfg, cores_dir),
                 "rom_dirs": [rom_dir] if rom_dir else [],
             })
     except Exception:
@@ -90,13 +101,46 @@ def _detect_retroarch() -> list[dict]:
     return infos
 
 
-def _find_installed_core(cores_dir: str, system: dict) -> dict | None:
-    """Return first core whose .so exists in cores_dir, or None."""
+def _find_installed_cores(cores_dir: str, system: dict) -> list[dict]:
+    """Every core whose .so exists in cores_dir, in list order — all of them,
+    not just the first, so alternate cores show as options (#400)."""
+    found: list[dict] = []
     for core in system["cores"]:
         so_path = os.path.join(cores_dir, f"{core['lib']}.so")
         if os.path.exists(so_path):
-            return {"lib": so_path, "folder": core["folder"]}
-    return None
+            found.append({"lib": so_path, "folder": core["folder"]})
+    return found
+
+
+def _discover_cores_by_info(cores_dir: str, info_dirs: list[str], databases: list[str]) -> list[dict]:
+    """Discover installed cores for a console from RetroArch's own .info
+    metadata (#400): each core ships a `<lib>.info` whose `database` field names
+    the systems it runs (pipe-separated libretro database names) and whose
+    `corename` is the exact name RetroArch uses for `saves/<CoreName>/`.
+    Matching that against the console def's `databases` recognizes ANY core for
+    a supported console — including ones not in the hardcoded seed lists.
+    Mirrors detect.ts's discoverCoresByInfo()."""
+    if not databases or not os.path.isdir(cores_dir):
+        return []
+    wanted = set(databases)
+    found: list[dict] = []
+    try:
+        so_files = sorted(f for f in os.listdir(cores_dir) if f.endswith(".so"))
+    except OSError:
+        return []
+    for so in so_files:
+        base = so[:-3]  # strip ".so"
+        info_path = next(
+            (p for d in info_dirs if os.path.exists(p := os.path.join(d, f"{base}.info"))), None)
+        if not info_path:
+            continue
+        info = _parse_retroarch_cfg(info_path)  # same key = "value" format
+        corename = info.get("corename", "")
+        db_names = {db.strip() for db in info.get("database", "").split("|")}
+        if not corename or not (db_names & wanted):
+            continue
+        found.append({"lib": os.path.join(cores_dir, so), "folder": corename})
+    return found
 
 
 def _expand_home(path: str) -> str:
@@ -117,25 +161,35 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
     home = str(Path.home())
     options: list[dict] = []
 
-    # RetroArch
-    seen_cores: set[str] = set()
+    # RetroArch. Every installed core for this console: the seeded core lists
+    # first (preferred order), then any extra cores discovered via .info
+    # metadata — so an unlisted-but-valid core still shows up with the right
+    # save folder (#400). Mirrors detectEmulatorsForConsole in detect.ts.
     for ra in _detect_retroarch():
+        cores: list[dict] = []
+        seen_cores: set[str] = set()
+
+        def _add(core: dict) -> None:
+            if core["lib"] not in seen_cores:
+                seen_cores.add(core["lib"])
+                cores.append(core)
+
         for sys_key in console_def["system_keys"]:
             system = _IMPORT_SYSTEMS.get(sys_key)
-            if not system:
-                continue
-            core = _find_installed_core(ra["cores_dir"], system)
-            if not core or core["lib"] in seen_cores:
-                continue
-            seen_cores.add(core["lib"])
-            save_dir = os.path.join(ra["save_dir"], core["folder"])
-            state_dir = os.path.join(ra["states_dir"], core["folder"])
+            if system:
+                for core in _find_installed_cores(ra["cores_dir"], system):
+                    _add(core)
+        for core in _discover_cores_by_info(
+                ra["cores_dir"], ra["info_dirs"], console_def.get("databases", [])):
+            _add(core)
+
+        for core in cores:
             options.append({
                 "id": f"{ra['type']}-{core['folder'].lower().replace(' ', '-')}",
                 "label": f"{ra['label']} · {core['folder']}",
                 "exec_path": ra["exec_path"],
-                "save_dir": save_dir,
-                "state_dir": state_dir,
+                "save_dir": os.path.join(ra["save_dir"], core["folder"]),
+                "state_dir": os.path.join(ra["states_dir"], core["folder"]),
                 "core_path": core["lib"],
                 "core_folder": core["folder"],
                 "rom_dirs": ra["rom_dirs"],

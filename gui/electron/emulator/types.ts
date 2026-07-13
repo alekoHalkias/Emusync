@@ -27,6 +27,7 @@ export interface EmulatorInfo {
   saveDir: string;    // root saves directory
   statesDir: string;  // root states directory
   coresDir: string;   // where core .so files live
+  infoDirs: string[]; // where core .info metadata files may live (#400)
   romDirs: string[];
 }
 
