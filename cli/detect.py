@@ -205,7 +205,6 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
     flatpak_list: str | None = None
     for s in console_def.get("standalones", []):
         dirs = s.get("dirs", {})
-        found = False
         for bin_path in s["native_bins"]:
             if os.path.exists(_expand_home(bin_path)):
                 native_dirs = dirs.get("native", {})
@@ -219,9 +218,10 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
                     "core_folder": None,
                     "rom_dirs": [],
                 })
-                found = True
                 break
-        if not found and s.get("flatpak_id"):
+        # Listed independently of the native check — both flavours show as
+        # separate options when both are installed (#415).
+        if s.get("flatpak_id"):
             if flatpak_list is None:
                 try:
                     r = subprocess.run(
@@ -319,10 +319,15 @@ def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[di
                       os.path.join(save_dir, "vmu_save_A1.bin")]
     elif console_abbr == "GC":
         # ponytail: Wii NAND title saves are NOT synced — GC cards only.
-        candidates = [os.path.join(save_root, "User", "GC"),
-                      os.path.join(save_dir, "User", "GC")]
-        if emu.get("system_dir"):
-            candidates.append(os.path.join(emu["system_dir"], "dolphin-emu", "Userdata", "GC"))
+        if emu.get("core_folder"):
+            candidates = [os.path.join(save_root, "User", "GC"),
+                          os.path.join(save_dir, "User", "GC")]
+            if emu.get("system_dir"):
+                candidates.append(os.path.join(emu["system_dir"], "dolphin-emu", "Userdata", "GC"))
+        else:
+            # Standalone Dolphin: save_dir IS the GC card folder already
+            # (~/.local/share/dolphin-emu/GC), no "User/GC" subpath to append.
+            candidates = [save_dir]
     elif console_abbr == "PSP":
         # ponytail: all games sync as one console-wide SAVEDATA blob.
         candidates = [os.path.join(save_root, "PPSSPP", "PSP", "SAVEDATA"),

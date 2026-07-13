@@ -117,6 +117,90 @@ def test_gamecube_card_prefers_existing_candidate(tmp_path):
     assert save_match == {"path": str(gc_dir), "exists": True}
 
 
+def test_gamecube_standalone_dolphin_def_follows_pcsx2_pattern():
+    """Standalone Dolphin (#415) mirrors _PCSX2's shape: native_bins/flatpak
+    fields present, registered as the gamecube console's standalone."""
+    from cli.consoles_data import _DOLPHIN
+    assert _DOLPHIN["native_bins"]
+    assert _DOLPHIN["flatpak_id"] == "org.DolphinEmu.dolphin-emu"
+    assert _DOLPHIN["dirs"]["native"]["save"] == "~/.local/share/dolphin-emu/GC"
+    assert _BY_KEY["gamecube"]["standalones"] == [_DOLPHIN]
+
+
+def test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin(monkeypatch, tmp_path):
+    """No native dolphin-emu binary installed, but the flatpak is — detection
+    surfaces the flatpak entry with its own save/state dirs (#415)."""
+    from cli.consoles_data import _DOLPHIN
+    from cli.detect import _detect_emulators_for_console
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("cli.detect.Path.home", staticmethod(lambda: home))
+    # Force every native_bins candidate to appear absent, regardless of what's
+    # actually installed on the machine running this test.
+    monkeypatch.setattr("cli.detect.os.path.exists", lambda p: False)
+
+    class _FakeResult:
+        stdout = "org.DolphinEmu.dolphin-emu\n"
+
+    monkeypatch.setattr("cli.detect.subprocess.run", lambda *a, **k: _FakeResult())
+
+    console_def = {"standalones": [_DOLPHIN], "system_keys": []}
+    options = _detect_emulators_for_console(console_def)
+
+    assert len(options) == 1
+    opt = options[0]
+    assert opt["id"] == "dolphin-flatpak"
+    assert opt["exec_path"] == "flatpak run org.DolphinEmu.dolphin-emu"
+    assert opt["save_dir"] == str(home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "data" / "dolphin-emu" / "GC")
+    assert opt["state_dir"] == str(home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "data" / "dolphin-emu" / "StateSaves")
+
+
+def test_gamecube_standalone_dolphin_lists_native_and_flatpak_together(monkeypatch, tmp_path):
+    """Both a native binary and the flatpak are installed — detection must
+    list both as separate options, matching RetroArch's own native+flatpak
+    detection, instead of the native entry silently hiding the flatpak one
+    (regression: the standalone loop used to gate the flatpak check behind
+    `not found`, unlike every other detection path in this file) (#415)."""
+    from cli.consoles_data import _DOLPHIN
+    from cli.detect import _detect_emulators_for_console
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("cli.detect.Path.home", staticmethod(lambda: home))
+    native_bin = _DOLPHIN["native_bins"][0]
+    monkeypatch.setattr("cli.detect.os.path.exists", lambda p: p == native_bin)
+
+    class _FakeResult:
+        stdout = "org.DolphinEmu.dolphin-emu\n"
+
+    monkeypatch.setattr("cli.detect.subprocess.run", lambda *a, **k: _FakeResult())
+
+    console_def = {"standalones": [_DOLPHIN], "system_keys": []}
+    options = _detect_emulators_for_console(console_def)
+
+    ids = {opt["id"] for opt in options}
+    assert ids == {"dolphin-native", "dolphin-flatpak"}
+
+
+def test_gamecube_standalone_card_resolves_to_save_dir_directly(tmp_path):
+    """Standalone Dolphin's save_dir IS the GC card folder already — no
+    core_folder means no 'User/GC' subpath should be appended (#415)."""
+    gc_dir = tmp_path / "dolphin-emu" / "GC"
+    gc_dir.mkdir(parents=True)
+    (gc_dir / "MemoryCardA.USA.raw").write_bytes(b"card")
+    emu = {"save_dir": str(gc_dir), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "GC")
+    assert save_match == {"path": str(gc_dir), "exists": True}
+
+
+def test_gamecube_standalone_card_defaults_to_save_dir_when_missing(tmp_path):
+    gc_dir = tmp_path / "dolphin-emu" / "GC"
+    emu = {"save_dir": str(gc_dir), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "GC")
+    assert save_match == {"path": str(gc_dir), "exists": False}
+
+
 def test_psp_card_resolves_to_savedata_folder(tmp_path):
     save_root = tmp_path / "saves"
     savedata = save_root / "PPSSPP" / "PSP" / "SAVEDATA"

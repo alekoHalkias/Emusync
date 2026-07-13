@@ -41,6 +41,30 @@ _PCSX2 = {
     },
 }
 
+# Dolphin (GameCube/Wii) standalone. `-b` runs headless/batch and requires the
+# ROM path, passed positionally like the other standalones (issue #415). Save
+# dir is the GC memory-card folder directly (no "User/GC" subpath — that's a
+# RetroArch-core-only layout); Wii NAND title saves stay out of scope, same as
+# the RetroArch core.
+_DOLPHIN = {
+    "id": "dolphin", "label": "Dolphin",
+    "native_bins": ["/usr/bin/dolphin-emu", "/usr/bin/dolphin-emu-qt2",
+                    "~/.local/bin/dolphin-emu", "~/Applications/Dolphin.AppImage"],
+    "flatpak_id": "org.DolphinEmu.dolphin-emu",
+    "flatpak_exec": "flatpak run org.DolphinEmu.dolphin-emu",
+    "launch_args": ["-b"],
+    "dirs": {
+        "native": {
+            "save":  "~/.local/share/dolphin-emu/GC",
+            "state": "~/.local/share/dolphin-emu/StateSaves",
+        },
+        "flatpak": {
+            "save":  "~/.var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu/GC",
+            "state": "~/.var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu/StateSaves",
+        },
+    },
+}
+
 # `databases` = the libretro database names for the console, matched against an
 # installed core's .info `database` field so ANY core for the console (present
 # or future) is recognized without being hardcoded in a core list (#400).
@@ -111,7 +135,8 @@ _IMPORT_CONSOLES = [
      "system_keys": [],
      "rom_extensions": ["iso", "gcm", "rvz", "wbfs"],
      "databases": ["Nintendo - GameCube", "Nintendo - Wii"],
-     "standalones": [], "suggestions": ["RetroArch with Dolphin core"]},
+     "standalones": [_DOLPHIN],
+     "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"]},
     {"key": "psp",     "label": "PlayStation Portable",       "abbr": "PSP",
      "system_keys": [],
      "rom_extensions": ["iso", "cso", "pbp"],
