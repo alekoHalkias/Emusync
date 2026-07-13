@@ -31,8 +31,14 @@ function resolveSharedCard(consoleKey: string, saveDir: string, saveRoot: string
   } else if (consoleKey === "gamecube") {
     // Dolphin core's GC memory-card folder. ponytail: Wii NAND title saves are
     // NOT synced (large tree mixing system data) — follow-up if wanted.
-    candidates = [join(saveRoot, "User", "GC"), join(saveDir, "User", "GC")];
-    if (systemDir) candidates.push(join(systemDir, "dolphin-emu", "Userdata", "GC"));
+    if (saveDir !== saveRoot) {
+      candidates = [join(saveRoot, "User", "GC"), join(saveDir, "User", "GC")];
+      if (systemDir) candidates.push(join(systemDir, "dolphin-emu", "Userdata", "GC"));
+    } else {
+      // Standalone Dolphin: saveDir IS the GC card folder already
+      // (~/.local/share/dolphin-emu/GC), no "User/GC" subpath to append.
+      candidates = [saveDir];
+    }
   } else if (consoleKey === "psp") {
     // PPSSPP keeps all games' savedata under one folder — synced as one
     // console-wide card. ponytail: per-game granularity needs serial parsing.

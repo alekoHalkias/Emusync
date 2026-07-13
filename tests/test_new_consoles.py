@@ -117,6 +117,34 @@ def test_gamecube_card_prefers_existing_candidate(tmp_path):
     assert save_match == {"path": str(gc_dir), "exists": True}
 
 
+def test_gamecube_standalone_dolphin_def_follows_pcsx2_pattern():
+    """Standalone Dolphin (#415) mirrors _PCSX2's shape: native_bins/flatpak
+    fields present, registered as the gamecube console's standalone."""
+    from cli.consoles_data import _DOLPHIN
+    assert _DOLPHIN["native_bins"]
+    assert _DOLPHIN["flatpak_id"] == "org.DolphinEmu.dolphin-emu"
+    assert _DOLPHIN["dirs"]["native"]["save"] == "~/.local/share/dolphin-emu/GC"
+    assert _BY_KEY["gamecube"]["standalones"] == [_DOLPHIN]
+
+
+def test_gamecube_standalone_card_resolves_to_save_dir_directly(tmp_path):
+    """Standalone Dolphin's save_dir IS the GC card folder already — no
+    core_folder means no 'User/GC' subpath should be appended (#415)."""
+    gc_dir = tmp_path / "dolphin-emu" / "GC"
+    gc_dir.mkdir(parents=True)
+    (gc_dir / "MemoryCardA.USA.raw").write_bytes(b"card")
+    emu = {"save_dir": str(gc_dir), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "GC")
+    assert save_match == {"path": str(gc_dir), "exists": True}
+
+
+def test_gamecube_standalone_card_defaults_to_save_dir_when_missing(tmp_path):
+    gc_dir = tmp_path / "dolphin-emu" / "GC"
+    emu = {"save_dir": str(gc_dir), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "GC")
+    assert save_match == {"path": str(gc_dir), "exists": False}
+
+
 def test_psp_card_resolves_to_savedata_folder(tmp_path):
     save_root = tmp_path / "saves"
     savedata = save_root / "PPSSPP" / "PSP" / "SAVEDATA"

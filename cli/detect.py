@@ -319,10 +319,15 @@ def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[di
                       os.path.join(save_dir, "vmu_save_A1.bin")]
     elif console_abbr == "GC":
         # ponytail: Wii NAND title saves are NOT synced — GC cards only.
-        candidates = [os.path.join(save_root, "User", "GC"),
-                      os.path.join(save_dir, "User", "GC")]
-        if emu.get("system_dir"):
-            candidates.append(os.path.join(emu["system_dir"], "dolphin-emu", "Userdata", "GC"))
+        if emu.get("core_folder"):
+            candidates = [os.path.join(save_root, "User", "GC"),
+                          os.path.join(save_dir, "User", "GC")]
+            if emu.get("system_dir"):
+                candidates.append(os.path.join(emu["system_dir"], "dolphin-emu", "Userdata", "GC"))
+        else:
+            # Standalone Dolphin: save_dir IS the GC card folder already
+            # (~/.local/share/dolphin-emu/GC), no "User/GC" subpath to append.
+            candidates = [save_dir]
     elif console_abbr == "PSP":
         # ponytail: all games sync as one console-wide SAVEDATA blob.
         candidates = [os.path.join(save_root, "PPSSPP", "PSP", "SAVEDATA"),
