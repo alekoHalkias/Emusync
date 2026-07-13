@@ -22,11 +22,20 @@ class ConsoleDefMixin:
         """
         for console in consoles_data:
             key = console["key"]
+            databases = ";".join(console.get("databases", []))
             self._conn.execute(
-                "INSERT OR IGNORE INTO console_defs (key, label, abbr, suggestions, rom_extensions) VALUES (?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO console_defs (key, label, abbr, suggestions, rom_extensions, databases) VALUES (?, ?, ?, ?, ?, ?)",
                 (key, console["label"], console.get("abbr", key.upper()),
                  ";".join(console.get("suggestions", [])),
-                 ";".join(console.get("rom_extensions", [])))
+                 ";".join(console.get("rom_extensions", [])),
+                 databases)
+            )
+            # `databases` is server-owned seed data (not user-edited), so overwrite
+            # it every startup — INSERT OR IGNORE alone would leave rows seeded
+            # before v16 (or before a mapping fix) permanently stale (#400).
+            self._conn.execute(
+                "UPDATE console_defs SET databases = ? WHERE key = ?",
+                (databases, key)
             )
             for sys_key in console["system_keys"]:
                 sys_info = console["systems"].get(sys_key)
@@ -65,7 +74,7 @@ class ConsoleDefMixin:
 
     def get_console_defs(self) -> list[dict]:
         """Return all console definitions with systemKeys and standalones."""
-        rows = self._conn.execute("SELECT key, label, abbr, suggestions, rom_extensions FROM console_defs ORDER BY key").fetchall()
+        rows = self._conn.execute("SELECT key, label, abbr, suggestions, rom_extensions, databases FROM console_defs ORDER BY key").fetchall()
         result = []
         for row in rows:
             console_key = row["key"]
@@ -95,6 +104,9 @@ class ConsoleDefMixin:
                 # so a standalone-only console (PS2) scans the right files even with
                 # no libretro core; falls back to systemKeys when unset (issue #293).
                 "romExtensions": row["rom_extensions"].split(";") if row["rom_extensions"] else system_keys,
+                # Libretro database names, matched against installed cores'
+                # .info `database` field by the import wizard's detection (#400).
+                "databases": row["databases"].split(";") if row["databases"] else [],
                 "standalones": standalones,
             })
         return result

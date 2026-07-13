@@ -166,7 +166,7 @@ export function runEmulatorScan(params: {
   return {
     emulators: [{ type: "native" as const, label: emulatorOption.label,
       execPath: emulatorOption.execPath, saveDir: emulatorOption.saveDir,
-      statesDir: emulatorOption.stateDir ?? "", coresDir: "", romDirs: emulatorOption.romDirs }],
+      statesDir: emulatorOption.stateDir ?? "", coresDir: "", infoDirs: [], romDirs: emulatorOption.romDirs }],
     romDirs,
     roms,
   };

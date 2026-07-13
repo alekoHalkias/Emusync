@@ -67,6 +67,17 @@ async def test_console_defs_falls_back_to_system_keys_when_no_rom_extensions(see
 
 
 @pytest.mark.asyncio
+async def test_console_defs_include_databases(seeded_client):
+    """Console defs carry the libretro database names the GUI's info-file core
+    discovery matches against (#400)."""
+    r = await seeded_client.get("/console-defs", headers=AUTH)
+    assert r.status_code == 200
+    defs = {c["key"]: c for c in r.json()}
+    assert defs["snes"]["databases"] == ["Nintendo - Super Nintendo Entertainment System"]
+    assert "Sega - Game Gear" in defs["sms"]["databases"]
+
+
+@pytest.mark.asyncio
 async def test_system_defs_requires_auth(client):
     r = await client.get("/system-defs")
     assert r.status_code == 401

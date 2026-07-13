@@ -17,6 +17,11 @@ export function parseRetroArchCfg(cfgPath: string, home: string): Record<string,
   return out;
 }
 
+/** Candidate dirs for core .info metadata files, best source first (#400). */
+function infoDirCandidates(cfg: Record<string, string>, coresDir: string): string[] {
+  return [...new Set([cfg.libretro_info_path, coresDir, "/usr/share/libretro/info"].filter(Boolean))] as string[];
+}
+
 export function detectRetroArch(home: string): EmulatorInfo[] {
   const infos: EmulatorInfo[] = [];
 
@@ -29,13 +34,15 @@ export function detectRetroArch(home: string): EmulatorInfo[] {
       // Filter out RetroArch's "default" placeholder (means "not configured")
       const romDir = cfg.rgui_browser_directory && cfg.rgui_browser_directory !== "default"
         ? cfg.rgui_browser_directory : "";
+      const coresDir = cfg.libretro_directory || join(home, ".config/retroarch/cores");
       infos.push({
         type:     "native",
         label:    "RetroArch",
         execPath:  bin,
         saveDir:   cfg.savefile_directory || join(home, ".config/retroarch/saves"),
         statesDir: cfg.savestate_directory || join(home, ".config/retroarch/states"),
-        coresDir:  cfg.libretro_directory  || join(home, ".config/retroarch/cores"),
+        coresDir,
+        infoDirs: infoDirCandidates(cfg, coresDir),
         romDirs:  [romDir].filter(Boolean) as string[],
       });
       break;
@@ -50,13 +57,15 @@ export function detectRetroArch(home: string): EmulatorInfo[] {
       const cfg = parseRetroArchCfg(flatCfg, home);
       const flatRomDir = cfg.rgui_browser_directory && cfg.rgui_browser_directory !== "default"
         ? cfg.rgui_browser_directory : "";
+      const coresDir = cfg.libretro_directory || join(home, ".var/app/org.libretro.RetroArch/data/retroarch/cores");
       infos.push({
         type:     "flatpak",
         label:    "RetroArch (Flatpak)",
         execPath: "flatpak run org.libretro.RetroArch",
         saveDir:  cfg.savefile_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/saves"),
         statesDir: cfg.savestate_directory || join(home, ".var/app/org.libretro.RetroArch/config/retroarch/states"),
-        coresDir: cfg.libretro_directory  || join(home, ".var/app/org.libretro.RetroArch/data/retroarch/cores"),
+        coresDir,
+        infoDirs: infoDirCandidates(cfg, coresDir),
         romDirs:  [flatRomDir].filter(Boolean) as string[],
       });
     }
@@ -65,16 +74,43 @@ export function detectRetroArch(home: string): EmulatorInfo[] {
   return infos;
 }
 
-/** Find the first installed core for a system in the given coresDir. */
-function findInstalledCore(coresDir: string, system: any): { lib: string; folderName: string } | null {
-  const cores = system.cores || [];
-  for (const core of cores) {
+/** Every installed core for a system in the given coresDir, in list order —
+ *  all of them, not just the first, so alternate cores show as options (#400). */
+function findInstalledCores(coresDir: string, system: any): Array<{ lib: string; folderName: string }> {
+  const found: Array<{ lib: string; folderName: string }> = [];
+  for (const core of system.cores || []) {
     const libName = core.libName || core.lib;
     const folderName = core.folderName || core.folder;
     const soPath = join(coresDir, `${libName}.so`);
-    if (existsSync(soPath)) return { lib: soPath, folderName };
+    if (existsSync(soPath)) found.push({ lib: soPath, folderName });
   }
-  return null;
+  return found;
+}
+
+/** Discover installed cores for a console from RetroArch's own .info metadata
+ *  (#400): each core ships a `<lib>.info` whose `database` field names the
+ *  systems it runs (pipe-separated libretro database names) and whose
+ *  `corename` is the exact name RetroArch uses for `saves/<CoreName>/`.
+ *  Matching that against the console def's `databases` recognizes ANY core for
+ *  a supported console — including ones not in the hardcoded seed lists. */
+function discoverCoresByInfo(
+  coresDir: string, infoDirs: string[], databases: string[], home: string,
+): Array<{ lib: string; folderName: string }> {
+  if (!databases.length || !existsSync(coresDir)) return [];
+  const wanted = new Set(databases);
+  const found: Array<{ lib: string; folderName: string }> = [];
+  let soFiles: string[];
+  try { soFiles = readdirSync(coresDir).filter((f) => f.endsWith(".so")).sort(); }
+  catch { return []; }
+  for (const so of soFiles) {
+    const base = so.slice(0, -3); // strip ".so"
+    const infoPath = infoDirs.map((d) => join(d, `${base}.info`)).find((p) => existsSync(p));
+    if (!infoPath) continue;
+    const info = parseRetroArchCfg(infoPath, home); // same key = "value" format
+    if (!info.corename || !(info.database || "").split("|").some((db) => wanted.has(db.trim()))) continue;
+    found.push({ lib: join(coresDir, so), folderName: info.corename });
+  }
+  return found;
 }
 
 function findConsoleRomDirs(baseDir: string, consoleKey: string): string[] {
@@ -107,31 +143,39 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
 
   // ── RetroArch (native + flatpak) ──────────────────────────────────────────
   for (const ra of detectRetroArch(home)) {
+    // Every installed core for this console: the seeded core lists first
+    // (preferred order), then any extra cores discovered via .info metadata —
+    // so an unlisted-but-valid core (e.g. a brand-new SNES core) still shows
+    // up with the right save folder (#400).
+    const cores: Array<{ lib: string; folderName: string }> = [];
     const seenCores = new Set<string>();
+    const addCore = (core: { lib: string; folderName: string }) => {
+      if (seenCores.has(core.lib)) return;
+      seenCores.add(core.lib);
+      cores.push(core);
+    };
     for (const sysKey of consoleDef.systemKeys) {
       const sys = rt.cachedSystemDefs?.[sysKey];
-      if (!sys) continue;
-      const core = findInstalledCore(ra.coresDir, sys);
-      if (!core || seenCores.has(core.lib)) continue;
-      seenCores.add(core.lib);
-      const saveDir = join(ra.saveDir, core.folderName);
-      const stateDir = join(ra.statesDir, core.folderName);
+      if (sys) findInstalledCores(ra.coresDir, sys).forEach(addCore);
+    }
+    discoverCoresByInfo(ra.coresDir, ra.infoDirs, consoleDef.databases ?? [], home).forEach(addCore);
 
-      // Try to find console-specific ROM subfolders first
-      let romDirs = ra.romDirs;
-      if (ra.romDirs.length > 0) {
-        const consoleDirs = findConsoleRomDirs(ra.romDirs[0], consoleKey);
-        if (consoleDirs.length > 0) {
-          romDirs = consoleDirs;
-        }
+    // Try to find console-specific ROM subfolders first
+    let romDirs = ra.romDirs;
+    if (ra.romDirs.length > 0) {
+      const consoleDirs = findConsoleRomDirs(ra.romDirs[0], consoleKey);
+      if (consoleDirs.length > 0) {
+        romDirs = consoleDirs;
       }
+    }
 
+    for (const core of cores) {
       options.push({
         id: `${ra.type}-${core.folderName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
         label: `${ra.label} · ${core.folderName}`,
         execPath: ra.execPath,
-        saveDir,
-        stateDir,
+        saveDir: join(ra.saveDir, core.folderName),
+        stateDir: join(ra.statesDir, core.folderName),
         corePath: core.lib,
         coreFolderName: core.folderName,
         romDirs,

@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 15
+_SCHEMA_VERSION = 16
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -111,7 +111,8 @@ CREATE TABLE IF NOT EXISTS console_defs (
     label            TEXT NOT NULL,
     abbr             TEXT NOT NULL,
     suggestions      TEXT NOT NULL DEFAULT '',
-    rom_extensions   TEXT NOT NULL DEFAULT ''
+    rom_extensions   TEXT NOT NULL DEFAULT '',
+    databases        TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS system_defs (
     extension        TEXT PRIMARY KEY,
@@ -361,4 +362,10 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # every device sees the same pinned artwork source instead of each
         # re-searching independently (issue #325).
         _try(conn, "ALTER TABLE games ADD COLUMN sgdb_game_id INTEGER")
+    if from_version < 16:
+        # Libretro database names per console (';'-joined, e.g. "Sony -
+        # PlayStation"), matched against each installed core's .info `database`
+        # field so ANY core for a supported console is recognized without being
+        # hardcoded in a core list (issue #400).
+        _try(conn, "ALTER TABLE console_defs ADD COLUMN databases TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
