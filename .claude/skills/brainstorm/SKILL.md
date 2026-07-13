@@ -22,7 +22,7 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow". Issu
 
 5. **Work the backlog one issue at a time.** For each issue number in order:
    a. Check for conflicting branches (`git fetch --prune && git branch -r`); warn if another branch already touches the same area, but proceed.
-   b. `git checkout main && git pull && git checkout -b feature/<issue-number>-short-description`.
+   b. Set up the branch in an isolated worktree, same as `/issue` step 5: invoke `superpowers:using-git-worktrees` for `feature/<issue-number>-short-description`, then `bash install.sh` inside the new worktree before treating it as ready. Falls back to plain `git checkout main && git pull && git checkout -b ...` if worktree creation isn't available.
    c. Invoke the `plan` skill for this issue. It will read the issue, ask any genuinely-open clarifying questions, and present a plan — resolve those inline so the loop doesn't stall on a silent wait.
    d. Once the plan is approved (by you resolving its clarifying questions and confirming, or immediately if it had none needing input), invoke the `implement` skill to build it, test it, commit, push, and open the PR.
    e. **Stop after the PR is opened.** Don't advance to the next issue on the spot — merging takes real time (review, CI, a manual click). When the user gives any go-ahead to continue (e.g. "next", "continue", or just re-invoking), verify the merge yourself rather than trusting their word:

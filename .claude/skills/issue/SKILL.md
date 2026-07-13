@@ -36,15 +36,14 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow" (Step
 
 4. Draft a title and body for the new issue from the user's description (title: short, imperative; body: what/why + acceptance criteria) and create it automatically, per CLAUDE.md's "How Claude agents create issues" (`gh issue create`, curl fallback with `GITHUB_TOKEN`). Note the returned issue number.
 
-5. Create and check out the linked branch (CLAUDE.md Step 2/3):
+5. Check for overlap, then set up an isolated workspace for the linked branch:
    ```bash
    git fetch --prune && git branch -r
    ```
    If another open branch already touches the same area, warn the user about the overlap in your report, but still proceed — this is informational, not an approval gate.
-   ```bash
-   git checkout main && git pull && git checkout -b feature/<issue-number>-short-description
-   ```
 
-6. Report back: the issue used or created (number/URL) and the branch now checked out.
+   Invoke the `superpowers:using-git-worktrees` skill to create `feature/<issue-number>-short-description` in its own isolated worktree rather than switching branches in the current checkout — this is what makes it safe to have several issues in flight without stashing/switching. That skill prefers a native tool (e.g. `EnterWorktree`) when available, falling back to `git worktree add .worktrees/<branch>` otherwise. After the worktree exists, run `bash install.sh` inside it (its own `.venv`/`gui/node_modules` are not shared with the main checkout — they don't exist yet) before treating the workspace as ready. If worktree creation fails (sandbox denial, no `git worktree` support) or the user has declined isolation before, fall back to the plain in-place flow: `git checkout main && git pull && git checkout -b feature/<issue-number>-short-description`.
+
+6. Report back: the issue used or created (number/URL), the branch, and the workspace path (worktree directory, or "in place" if the fallback was used).
 
 7. Invoke the `plan` skill (via the Skill tool) for this issue/branch — do not ask permission first, this is the expected next step in the workflow.

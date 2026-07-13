@@ -31,7 +31,7 @@ Follows CLAUDE.md's "Execution approval policy" and "Development workflow" — i
 6. For each approved file, **largest to smallest**:
    a. Draft and create a GitHub issue proposing to split that file into smaller modules (what the file currently does, a sketch of a plausible split, acceptance criteria: behavior unchanged, `make test` passes, docs/ARCHITECTURE.md's Key Files detail updated) — per CLAUDE.md's "How Claude agents create issues".
    b. Check for conflicting branches (`git fetch --prune && git branch -r`) and warn if one already touches the same file, then proceed.
-   c. `git checkout main && git pull && git checkout -b feature/<issue-number>-split-<short-name>`.
+   c. Set up the branch in an isolated worktree, same as `/issue` step 5: invoke `superpowers:using-git-worktrees` for `feature/<issue-number>-split-<short-name>`, then `bash install.sh` inside the new worktree before treating it as ready. Falls back to plain `git checkout main && git pull && git checkout -b ...` if worktree creation isn't available.
    d. Invoke the `plan` skill for that issue, then (once the plan is approved) `implement` — through to a pushed commit and an opened PR, per those skills' normal flow.
    e. Report the PR URL, then **stop** before starting the next approved file — merging takes real time. When the user gives any go-ahead to continue, verify the merge yourself rather than trusting their word:
       ```bash

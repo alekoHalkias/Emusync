@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Execute the plan drafted by /plan for the current branch's issue, write tests, verify, commit, push, and open the PR. Use when the user runs /implement, normally right after confirming a /plan.
+description: Execute the plan drafted by /plan for the current branch's issue, write tests, run a code-review pass, verify GUI changes actually work end-to-end, commit, push, and open the PR. Use when the user runs /implement, normally right after confirming a /plan.
 ---
 
 # /implement — build the plan and ship the PR
@@ -23,16 +23,22 @@ Follows CLAUDE.md's "Execution approval policy" — runs straight through with n
    ```
    Also run relevant lint/build checks if the plan touched GUI code (`gui/`). Fix failures and re-run — do not report success without a passing run.
 
-6. Commit:
+6. **Review the diff before it becomes a PR.** Skip this step for docs-only or config-only changes (nothing to review). Otherwise invoke the `code-review` skill at `low` effort — fast, high-confidence findings only, so routine implementations aren't slowed down chasing speculative issues. If it returns findings:
+   - Apply straightforward fixes directly (typo-class bugs, an obviously-missing edge case, a simplification the review calls out).
+   - For anything requiring a judgment call (a design tradeoff, an ambiguous edge case, a finding you disagree with), note it in the final report instead of guessing — don't silently drop it either.
+
+7. **Verify GUI changes actually work, not just typecheck.** If the plan touched `gui/` (renderer or electron), invoke the `verify` skill to drive the affected feature end-to-end in the running app before claiming done — per CLAUDE.md's rule that UI changes need to be exercised in a browser, not just type-checked. Skip for CLI/server-only changes with no runtime UI surface.
+
+8. Commit:
    - Stage only the files relevant to this change (no `git add -A`).
    - Write a commit message explaining why, not just what, per repo convention.
    - Do not use `--no-verify` or `--amend`.
 
-7. Push and open the PR:
+9. Push and open the PR:
    ```bash
    git push -u origin <branch>
    gh pr create --repo alekoHalkias/Emusync --title "..." --body "..."
    ```
    PR body must include `Closes #<issue-number>` so the issue auto-closes on merge, plus a short summary and a test-plan checklist. Do this automatically after the commit — don't ask whether to push or open the PR.
 
-8. Report back the PR URL and a one-line summary of what changed.
+10. Report back the PR URL, a one-line summary of what changed, and any judgment-call findings from step 6 that weren't auto-fixed.
