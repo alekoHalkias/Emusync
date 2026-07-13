@@ -323,6 +323,9 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **`server_host` is empty string on server devices** — they store `server_host = ""` since they connect to themselves. Fall back to `"localhost"` when empty; never use `!cfg.server_host` as a "not configured" guard — check `!cfg.server_port` instead.
 
+**A fresh `npm install` in `gui/` needs `electron`/`esbuild`'s postinstall scripts to actually run** — npm's `install-scripts` safety gate blocks them by default on a first install, leaving `node_modules/electron/dist/` with no binary at all (`require('electron')` throws `Error: Electron uninstall`). `gui/package.json`'s `allowScripts` block pre-approves both so a normal `bash install.sh` doesn't hit this; if it recurs (e.g. after a lockfile change), `npm install-scripts approve electron esbuild && npm rebuild electron esbuild` in `gui/`.
+
+
 ---
 
 ## Keeping this file updated
