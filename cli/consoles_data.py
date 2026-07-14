@@ -65,6 +65,27 @@ _DOLPHIN = {
     },
 }
 
+# Azahar (3DS) standalone — no usable libretro core. Citra (the original
+# standalone) was taken down by Nintendo; Azahar is the maintained successor
+# (merger of the Lime3DS and PabloMK7 Citra forks) and keeps Citra's exact
+# user-data layout, just renamed `azahar-emu`. Save data lives nested under
+# sdmc/Nintendo 3DS/<ID0>/<ID1>/title/ — the ID0/ID1 hash folders are usually
+# all-zeros for a single local profile but not guaranteed, so `dirs.*.save`
+# points at the SD-card root (one level up) and the ID0/ID1/title path is
+# resolved by probing for an existing folder first (see detect.py), falling
+# back to the well-documented all-zeros default (issue #418).
+_AZAHAR = {
+    "id": "azahar", "label": "Azahar",
+    "native_bins": ["/usr/bin/azahar", "~/.local/bin/azahar",
+                    "~/Applications/azahar.AppImage"],
+    "flatpak_id": "org.azahar_emu.Azahar",
+    "flatpak_exec": "flatpak run org.azahar_emu.Azahar",
+    "dirs": {
+        "native":  {"save": "~/.local/share/azahar-emu/sdmc/Nintendo 3DS"},
+        "flatpak": {"save": "~/.var/app/org.azahar_emu.Azahar/data/azahar-emu/sdmc/Nintendo 3DS"},
+    },
+}
+
 # `databases` = the libretro database names for the console, matched against an
 # installed core's .info `database` field so ANY core for the console (present
 # or future) is recognized without being hardcoded in a core list (#400).
@@ -142,6 +163,14 @@ _IMPORT_CONSOLES = [
      "rom_extensions": ["iso", "cso", "pbp"],
      "databases": ["Sony - PlayStation Portable"],
      "standalones": [], "suggestions": ["RetroArch with PPSSPP core"]},
+    # 3DS is standalone-only (no viable libretro core) and shares the
+    # PS2/dc/gamecube/psp shared-save-layout pattern — Azahar's SD-card save
+    # tree nests per-title, same shape as PSP's SAVEDATA folder (#418).
+    {"key": "3ds",     "label": "Nintendo 3DS",               "abbr": "3DS",
+     "system_keys": [],
+     "rom_extensions": ["3ds", "cci", "cxi"],
+     "databases": ["Nintendo - Nintendo 3DS"],
+     "standalones": [_AZAHAR], "suggestions": ["Azahar standalone"]},
 ]
 
 _IMPORT_SYSTEMS: dict[str, dict] = {
@@ -266,6 +295,7 @@ _ROM_EXTENSIONS = {
     "gdi", "cdi",                 # Dreamcast (#402)
     "gcm", "rvz", "wbfs",         # GameCube / Wii (#402)
     "cso",                        # PSP (#402)
+    "3ds", "cci", "cxi",          # Nintendo 3DS (#418)
 }
 
 

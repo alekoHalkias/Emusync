@@ -53,7 +53,7 @@ def test_new_console_defs_follow_ps2_pattern():
 def test_shared_membership_matches_console_abbrs():
     """run.py keys the shared sets by the game's stored console abbr — a
     mismatch with the def's abbr silently disables card sync."""
-    shared_abbrs = {_BY_KEY[k]["abbr"] for k in ("ps2", "dc", "gamecube", "psp")}
+    shared_abbrs = {_BY_KEY[k]["abbr"] for k in ("ps2", "dc", "gamecube", "psp", "3ds")}
     assert shared_abbrs == _SHARED_MEMCARD_CONSOLES
     # Only PS2 shares its states; dc/gamecube/psp states are per-game.
     assert _SHARED_STATE_CONSOLES == {"PS2"}
@@ -222,6 +222,74 @@ def test_ps2_card_resolution_unchanged(tmp_path):
 
 
 # ── folder cards round-trip through the existing memcard machinery ────────────
+
+# ── 3DS / Azahar standalone (#418) ─────────────────────────────────────────────
+
+def test_3ds_console_def_follows_ps2_pattern():
+    cdef = _BY_KEY["3ds"]
+    assert cdef["system_keys"] == []
+    assert set(cdef["rom_extensions"]) == {"3ds", "cci", "cxi"}
+    assert cdef["databases"] == ["Nintendo - Nintendo 3DS"]
+    for ext in cdef["rom_extensions"]:
+        assert ext in _ROM_EXTENSIONS
+
+
+def test_3ds_shared_membership():
+    from cli.run_ps2 import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
+    assert "3DS" in _SHARED_MEMCARD_CONSOLES
+    assert "3DS" not in _SHARED_STATE_CONSOLES
+
+
+def test_3ds_standalone_azahar_def_follows_pcsx2_pattern():
+    from cli.consoles_data import _AZAHAR
+    assert _AZAHAR["native_bins"]
+    assert _AZAHAR["flatpak_id"] == "org.azahar_emu.Azahar"
+    assert _AZAHAR["dirs"]["native"]["save"] == "~/.local/share/azahar-emu/sdmc/Nintendo 3DS"
+    assert _BY_KEY["3ds"]["standalones"] == [_AZAHAR]
+
+
+def test_3ds_card_prefers_existing_id_folder_over_default(tmp_path):
+    """A real Azahar install may not use all-zeros ID0/ID1 — the resolver must
+    find whichever folder actually exists rather than assuming the default."""
+    sd_root = tmp_path / "Nintendo 3DS"
+    real_title_dir = sd_root / "abc123" / "def456" / "title"
+    real_title_dir.mkdir(parents=True)
+    emu = {"save_dir": str(sd_root), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "3DS")
+    assert save_match == {"path": str(real_title_dir), "exists": True}
+
+
+def test_3ds_card_falls_back_to_all_zeros_default_when_no_id_folder_exists(tmp_path):
+    sd_root = tmp_path / "Nintendo 3DS"
+    emu = {"save_dir": str(sd_root), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "3DS")
+    default = sd_root / ("0" * 32) / ("0" * 32) / "title"
+    assert save_match == {"path": str(default), "exists": False}
+
+
+def test_3ds_standalone_azahar_lists_native_and_flatpak_together(monkeypatch, tmp_path):
+    """Both a native binary and the flatpak installed — detection must list
+    both as separate options, matching the Dolphin native+flatpak fix (#415)."""
+    from cli.consoles_data import _AZAHAR
+    from cli.detect import _detect_emulators_for_console
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("cli.detect.Path.home", staticmethod(lambda: home))
+    native_bin = _AZAHAR["native_bins"][0]
+    monkeypatch.setattr("cli.detect.os.path.exists", lambda p: p == native_bin)
+
+    class _FakeResult:
+        stdout = "org.azahar_emu.Azahar\n"
+
+    monkeypatch.setattr("cli.detect.subprocess.run", lambda *a, **k: _FakeResult())
+
+    console_def = {"standalones": [_AZAHAR], "system_keys": []}
+    options = _detect_emulators_for_console(console_def)
+
+    ids = {opt["id"] for opt in options}
+    assert ids == {"azahar-native", "azahar-flatpak"}
+
 
 def test_psp_savedata_folder_card_round_trips(tmp_path):
     """A PPSSPP SAVEDATA tree (nested per-game folders) packs and restores
