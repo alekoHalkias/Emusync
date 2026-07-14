@@ -265,11 +265,16 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
       seen.add(n);
     }
 
-    // Against existing server games
+    // Against existing server games — skip ROMs that already carry a
+    // linkedSlug (dedupeAndLink matched them to a game that exists on
+    // another device but isn't set up on this one yet): those import by
+    // linking to the existing game, not by creating a new one, so sharing
+    // its name isn't a duplicate.
     const serverNames = new Set(existingGames.map(g => g.name.toLowerCase()));
-    for (const n of lowerNames) {
-      if (serverNames.has(n)) conflicts.add(n);
-    }
+    toImport.forEach((r, i) => {
+      if (r.linkedSlug) return;
+      if (serverNames.has(lowerNames[i])) conflicts.add(lowerNames[i]);
+    });
 
     // Return original-case names, deduplicated
     return [...new Set(displayNames.filter(n => conflicts.has(n.toLowerCase())))];
