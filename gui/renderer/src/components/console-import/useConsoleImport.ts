@@ -352,8 +352,11 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // Pre-fetch all 5 artwork types for every imported game now, so the
     // console's art-type dropdown and each game's Artwork tab always have
     // something cached instead of triggering a fresh SGDB fetch on demand
-    // (issue #327, extended to all types by #411).
-    if (imported.length > 0) prefetchArt(imported, consoleAbbr, setArtProgress);
+    // (issue #327, extended to all types by #411). Uses the canonical
+    // console key (consoleSel), not the stored abbreviation — they diverge
+    // for GameCube ("gc" vs "gamecube"), which would silently cache art
+    // under a folder the grid never reads from (issue #419).
+    if (imported.length > 0) prefetchArt(imported, consoleSel, setArtProgress);
   }
 
   async function doImport(): Promise<void> {

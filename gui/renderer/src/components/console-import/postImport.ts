@@ -24,10 +24,9 @@ export function _serverIsNewer(localTime: string | null, serverMeta: SaveMeta): 
 }
 
 export async function prefetchArt(
-  entries: ImportedEntry[], consoleAbbr: string,
+  entries: ImportedEntry[], consoleKey: string,
   setArtProgress: (v: { done: number; total: number }) => void,
 ): Promise<void> {
-  const consoleKey = consoleAbbr.toLowerCase();
   setArtProgress({ done: 0, total: entries.length });
   for (let i = 0; i < entries.length; i++) {
     // All 5 types, not just the console's configured one (#411) — reuses the
