@@ -1,5 +1,10 @@
 // Shared types and constants for the emulator detection / scanning subsystem.
 
+// Keep in sync with cli/consoles_data.py's _ROM_EXTENSIONS — this set gates
+// scanRomDir() before the per-console rom_extensions filter even runs, so a
+// new extension missing here silently drops matching files from every GUI
+// scan even though the CLI wizard (which reads _ROM_EXTENSIONS directly)
+// finds them fine.
 export const ROM_EXTENSIONS = new Set([
   "sfc", "smc",                        // SNES
   "gb", "gbc",                         // Game Boy / Color
@@ -19,6 +24,7 @@ export const ROM_EXTENSIONS = new Set([
   "gdi", "cdi",                        // Dreamcast (#402)
   "gcm", "rvz", "wbfs",                // GameCube / Wii (#402)
   "cso",                               // PSP (#402)
+  "3ds", "cci", "cxi",                 // Nintendo 3DS (#418)
 ]);
 
 export const DEFAULT_SAVE_EXTS = ["srm", "sav", "save"];

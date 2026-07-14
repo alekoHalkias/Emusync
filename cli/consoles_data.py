@@ -288,6 +288,11 @@ _IMPORT_SYSTEMS: dict[str, dict] = {
 _DEFAULT_SAVE_EXTS = ["srm", "sav", "save"]
 _DEFAULT_STATE_EXTS = ["state", "state.auto"]
 
+# Keep in sync with gui/electron/emulator/types.ts's ROM_EXTENSIONS — that
+# mirror gates scanRomDir() before the per-console rom_extensions filter even
+# runs, so a new extension missing there silently drops matching files from
+# every GUI scan even though the CLI wizard (which reads this set directly)
+# finds them fine (#418 regression: .3ds/.cci/.cxi added here but not there).
 _ROM_EXTENSIONS = {
     "sfc", "smc", "gb", "gbc", "gba", "nes", "fds",
     "n64", "z64", "v64", "nds", "md", "smd", "gen",
