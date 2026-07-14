@@ -7,12 +7,13 @@ export const STEP_LABELS = ["Console", "Emulator", "ROMs"];
 
 // Consoles whose SAVE lives in ONE shared location across every game on the
 // console — PS2's memory card (#294/#295), Dreamcast's VMU, Dolphin's GC cards,
-// PPSSPP's SAVEDATA folder (#402). For these the per-game on-disk save must
-// never be renamed, moved, or pushed per-game; the shared card is synced by
-// `emusync run` + the console-scoped memcard endpoint. Accepts a console key
-// ("ps2", "gamecube") or stored abbreviation ("PS2", "GC"). Keep in sync with
-// run_ps2.py's _SHARED_MEMCARD_CONSOLES and scan.ts's SHARED_MEMCARD_CONSOLES.
-const _SHARED_SAVE_LAYOUT = new Set(["ps2", "dc", "gamecube", "gc", "psp"]);
+// PPSSPP's SAVEDATA folder (#402), Azahar's 3DS SD-card title tree (#418). For
+// these the per-game on-disk save must never be renamed, moved, or pushed
+// per-game; the shared card is synced by `emusync run` + the console-scoped
+// memcard endpoint. Accepts a console key ("ps2", "gamecube") or stored
+// abbreviation ("PS2", "GC"). Keep in sync with run_ps2.py's
+// _SHARED_MEMCARD_CONSOLES and scan.ts's SHARED_MEMCARD_CONSOLES.
+const _SHARED_SAVE_LAYOUT = new Set(["ps2", "dc", "gamecube", "gc", "psp", "3ds"]);
 export function usesSharedSaveLayout(consoleKeyOrAbbr: string): boolean {
   return _SHARED_SAVE_LAYOUT.has((consoleKeyOrAbbr || "").toLowerCase());
 }

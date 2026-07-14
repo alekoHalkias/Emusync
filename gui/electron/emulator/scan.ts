@@ -7,10 +7,10 @@ import { ROM_EXTENSIONS, DEFAULT_SAVE_EXTS, RomEntry, EmulatorScanResult, Detect
 
 // Consoles whose save is a single card/folder shared across every game on the
 // console, reconciled per-console — not per-game — by `emusync run` (#295):
-// PS2 memory card, Dreamcast VMU, Dolphin GC cards, PPSSPP SAVEDATA (#402).
-// Keep in sync with run_ps2.py's _SHARED_MEMCARD_CONSOLES and
-// console-import/helpers.ts's _SHARED_SAVE_LAYOUT.
-const SHARED_MEMCARD_CONSOLES = new Set(["ps2", "dc", "gamecube", "psp"]);
+// PS2 memory card, Dreamcast VMU, Dolphin GC cards, PPSSPP SAVEDATA (#402),
+// Azahar's 3DS SD-card title tree (#418). Keep in sync with run_ps2.py's
+// _SHARED_MEMCARD_CONSOLES and console-import/helpers.ts's _SHARED_SAVE_LAYOUT.
+const SHARED_MEMCARD_CONSOLES = new Set(["ps2", "dc", "gamecube", "psp", "3ds"]);
 // Consoles whose save STATES are also shared (PS2's serial-named sstates/) —
 // dc/gamecube/psp cores write normal per-content RetroArch states.
 const SHARED_STATE_CONSOLES = new Set(["ps2"]);
@@ -43,6 +43,13 @@ function resolveSharedCard(consoleKey: string, saveDir: string, saveRoot: string
     // PPSSPP keeps all games' savedata under one folder — synced as one
     // console-wide card. ponytail: per-game granularity needs serial parsing.
     candidates = [join(saveRoot, "PPSSPP", "PSP", "SAVEDATA"), join(saveDir, "PSP", "SAVEDATA")];
+  } else if (consoleKey === "3ds") {
+    // saveDir is Azahar's SD-card root (.../sdmc/Nintendo 3DS); the ID0/ID1
+    // hash folders below it are usually all-zeros for a single local profile
+    // but not guaranteed, so probe for an existing <ID0>/<ID1>/title folder
+    // first, falling back to the well-documented all-zeros default (#418).
+    const found = findFirstIdFolderTitlePath(saveDir);
+    candidates = [found ?? join(saveDir, "0".repeat(32), "0".repeat(32), "title")];
   }
   return candidates.find(p => existsSync(p)) ?? candidates[0] ?? saveRoot;
 }
@@ -55,6 +62,25 @@ function findFirstByExt(dir: string, ext: string): string | null {
       if (e.name.toLowerCase().endsWith(ext)) return join(dir, e.name);
     }
   } catch { /* unreadable dir */ }
+  return null;
+}
+
+/** First existing `<ID0>/<ID1>/title` folder under an Azahar SD-card root, sorted for determinism. */
+function findFirstIdFolderTitlePath(sdRoot: string): string | null {
+  let id0s: string[] = [];
+  try {
+    id0s = readdirSync(sdRoot, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name).sort();
+  } catch { return null; }
+  for (const id0 of id0s) {
+    let id1s: string[] = [];
+    try {
+      id1s = readdirSync(join(sdRoot, id0), { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name).sort();
+    } catch { continue; }
+    for (const id1 of id1s) {
+      const titlePath = join(sdRoot, id0, id1, "title");
+      if (existsSync(titlePath)) return titlePath;
+    }
+  }
   return null;
 }
 

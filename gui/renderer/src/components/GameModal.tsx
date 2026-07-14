@@ -10,6 +10,7 @@ export type GameModalTarget = {
   slug: string;
   name: string;
   gameConsole: string;
+  consoleKey: string;
   gameIsLocal: boolean;
   savePath?: string;
   statePath?: string;
@@ -25,7 +26,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   onLaunch: (slug: string, name: string) => void;
 }): React.ReactElement {
   const [tab, setTab] = useState<Tab>("settings");
-  const { slug, name, gameConsole, gameIsLocal, savePath, statePath, canPlay } = target;
+  const { slug, name, gameConsole, consoleKey, gameIsLocal, savePath, statePath, canPlay } = target;
 
   const tabs: { key: Tab; label: string; disabled?: boolean }[] = [
     { key: "settings", label: "Settings" },
@@ -74,7 +75,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
             />
           )}
           {tab === "artwork" && (
-            <ArtworkTab slug={slug} name={name} gameConsole={gameConsole} />
+            <ArtworkTab slug={slug} name={name} consoleKey={consoleKey} />
           )}
           {tab === "devices" && (
             <GameDeviceModal embedded slug={slug} name={name} gameConsole={gameConsole} gameIsLocal={gameIsLocal} onClose={onClose} />

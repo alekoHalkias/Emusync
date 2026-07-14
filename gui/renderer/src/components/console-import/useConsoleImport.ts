@@ -265,11 +265,16 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
       seen.add(n);
     }
 
-    // Against existing server games
+    // Against existing server games — skip ROMs that already carry a
+    // linkedSlug (dedupeAndLink matched them to a game that exists on
+    // another device but isn't set up on this one yet): those import by
+    // linking to the existing game, not by creating a new one, so sharing
+    // its name isn't a duplicate.
     const serverNames = new Set(existingGames.map(g => g.name.toLowerCase()));
-    for (const n of lowerNames) {
-      if (serverNames.has(n)) conflicts.add(n);
-    }
+    toImport.forEach((r, i) => {
+      if (r.linkedSlug) return;
+      if (serverNames.has(lowerNames[i])) conflicts.add(lowerNames[i]);
+    });
 
     // Return original-case names, deduplicated
     return [...new Set(displayNames.filter(n => conflicts.has(n.toLowerCase())))];
@@ -352,8 +357,11 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // Pre-fetch all 5 artwork types for every imported game now, so the
     // console's art-type dropdown and each game's Artwork tab always have
     // something cached instead of triggering a fresh SGDB fetch on demand
-    // (issue #327, extended to all types by #411).
-    if (imported.length > 0) prefetchArt(imported, consoleAbbr, setArtProgress);
+    // (issue #327, extended to all types by #411). Uses the canonical
+    // console key (consoleSel), not the stored abbreviation — they diverge
+    // for GameCube ("gc" vs "gamecube"), which would silently cache art
+    // under a folder the grid never reads from (issue #419).
+    if (imported.length > 0) prefetchArt(imported, consoleSel, setArtProgress);
   }
 
   async function doImport(): Promise<void> {

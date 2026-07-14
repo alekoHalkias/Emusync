@@ -17,15 +17,10 @@ type SgdbCandidate = { id: number; thumb: string; url: string };
 type Props = {
   slug: string;
   name: string;
-  gameConsole: string;
+  consoleKey: string;
 };
 
-export default function ArtworkTab({ slug, name, gameConsole }: Props): React.ReactElement {
-  // Every seeded console's abbr lowercases to its key (verified across
-  // cli/consoles_data.py) — reuse that instead of threading a separate
-  // consoleKey prop through GameModal/GameGrid just for this tab.
-  const consoleKey = gameConsole.toLowerCase();
-
+export default function ArtworkTab({ slug, name, consoleKey }: Props): React.ReactElement {
   const [searchTerm, setSearchTerm] = useState(name);
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<SgdbGameResult[]>([]);

@@ -22,7 +22,8 @@ export function registerArtworkIpc(): void {
     const key = await getSteamGridDbKey();
     if (!key) return [];
     try {
-      const games = await makeSteamGridDbClient(key).searchGame(name);
+      const client = await makeSteamGridDbClient(key);
+      const games = await client.searchGame(name);
       return games.map((g) => ({ id: g.id, name: g.name, release_date: g.release_date, verified: g.verified }));
     } catch {
       return [];
@@ -35,7 +36,8 @@ export function registerArtworkIpc(): void {
       const key = await getSteamGridDbKey();
       if (!key) return null;
       try {
-        const game = await makeSteamGridDbClient(key).getGameById(sgdbGameId);
+        const client = await makeSteamGridDbClient(key);
+        const game = await client.getGameById(sgdbGameId);
         return { id: game.id, name: game.name };
       } catch {
         return null;
@@ -49,7 +51,7 @@ export function registerArtworkIpc(): void {
       const key = await getSteamGridDbKey();
       if (!key) return null;
       try {
-        const client = makeSteamGridDbClient(key);
+        const client = await makeSteamGridDbClient(key);
         // Persists the found (or already-set) sgdb_game_id, same as the
         // automatic art:get path — but callable on demand for a game whose
         // art was cached before that persistence existed, so opening the
@@ -71,7 +73,7 @@ export function registerArtworkIpc(): void {
       const key = await getSteamGridDbKey();
       if (!key) return [];
       try {
-        const client = makeSteamGridDbClient(key);
+        const client = await makeSteamGridDbClient(key);
         const images = await getSgdbImagesForType(client, sgdbGameId, type);
         return images.map((img) => ({ id: img.id, thumb: String(img.thumb), url: String(img.url) }));
       } catch {
@@ -132,7 +134,7 @@ export function registerArtworkIpc(): void {
         return result;
       }
       try {
-        const client = makeSteamGridDbClient(key);
+        const client = await makeSteamGridDbClient(key);
         // Persists the top search result as the game's sgdb_game_id if
         // nothing's been chosen yet (manually or automatically), so it stays
         // the same match on future refreshes instead of re-searching (#339).

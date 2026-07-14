@@ -5,6 +5,7 @@ the GUI Add Console flow.
 """
 from __future__ import annotations
 
+import glob
 import os
 import re
 import subprocess
@@ -332,6 +333,16 @@ def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[di
         # ponytail: all games sync as one console-wide SAVEDATA blob.
         candidates = [os.path.join(save_root, "PPSSPP", "PSP", "SAVEDATA"),
                       os.path.join(save_dir, "PSP", "SAVEDATA")]
+    elif console_abbr == "3DS":
+        # save_dir is the SD-card root (.../sdmc/Nintendo 3DS); the ID0/ID1
+        # hash folders below it are usually all-zeros for a single local
+        # profile but not guaranteed, so probe for an existing one first.
+        found = sorted(
+            p for p in glob.glob(os.path.join(save_dir, "*", "*", "title"))
+            if os.path.isdir(p)
+        )
+        default = os.path.join(save_dir, "0" * 32, "0" * 32, "title")
+        candidates = [found[0]] if found else [default]
     else:  # PS2
         found = _find_first_by_ext(save_dir, ".ps2")
         candidates = [found or os.path.join(save_dir, _SHARED_MEMCARD_FALLBACK.get(console_abbr, "Mcd001.ps2"))]

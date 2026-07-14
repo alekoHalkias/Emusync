@@ -7,17 +7,21 @@ import { join } from "path";
 import { homedir } from "os";
 import https from "https";
 import { parse as parseTOML } from "smol-toml";
-import SGDBImport from "steamgriddb";
+import type SGDBImport from "steamgriddb";
 import { getSteamGridDbKey } from "./steamgriddb";
 import { CONFIG_PATH } from "./runtime";
 import { loadServerCfg } from "./config-store";
 
 // steamgriddb is a pure-ESM package ("type": "module"); the Electron main
-// bundle is CJS and externalizes it as a plain require(), which resolves to
-// the module namespace ({ default: SGDB }) rather than the class itself —
-// unwrap .default defensively so `new SGDB(...)` gets the actual class either
-// way the bundler happens to expose it.
-const SGDB: typeof SGDBImport = (SGDBImport as any).default ?? SGDBImport;
+// bundle is CJS, and CJS require() of an ESM module throws ERR_REQUIRE_ESM
+// on Electron's bundled Node (20.x) — only a dynamic import() can load it.
+let SGDBCtor: typeof SGDBImport | undefined;
+async function loadSGDB(): Promise<typeof SGDBImport> {
+  if (!SGDBCtor) {
+    SGDBCtor = (await import("steamgriddb")).default;
+  }
+  return SGDBCtor;
+}
 
 export const ART_DIR = join(homedir(), ".emusync", "art");
 const CONSOLE_DIR    = join(homedir(), ".emusync", "art", "consoles");
@@ -116,7 +120,8 @@ export function download(url: string, dest: string): Promise<void> {
 
 // Shared with gui/electron/artwork.ts (issue #325) so the ESM/CJS interop
 // workaround above lives in exactly one place.
-export function makeSteamGridDbClient(key: string): SGDBImport {
+export async function makeSteamGridDbClient(key: string): Promise<SGDBImport> {
+  const SGDB = await loadSGDB();
   return new SGDB({ key });
 }
 
@@ -185,7 +190,7 @@ async function fetchFromSteamGridDb(slug: string, gameName: string, dest: string
   const key = await getSteamGridDbKey();
   if (!key) return false;
   try {
-    const client = makeSteamGridDbClient(key);
+    const client = await makeSteamGridDbClient(key);
     const sgdbId = await resolveSgdbGameId(client, slug, gameName);
     if (!sgdbId) return false;
     const images = await getSgdbImagesForType(client, sgdbId, artType);

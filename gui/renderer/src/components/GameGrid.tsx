@@ -356,6 +356,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
       slug: g.slug,
       name: g.name,
       gameConsole: g.console ?? "",
+      consoleKey,
       gameIsLocal: g.isLocal,
       savePath: g.savePath,
       statePath: g.statePath,
