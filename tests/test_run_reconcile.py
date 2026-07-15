@@ -277,6 +277,25 @@ def test_reconcile_no_conflict_logged_when_not_diverged(tmp_path):
     assert not (tmp_path / "save_conflicts.json").exists()
 
 
+def test_reconcile_detects_dirty_nested_gci_folder_card(tmp_path):
+    """Dolphin's GCI-folder card nests changes two levels down
+    (region/slot/game/*.gci) — the mtime-dirty rglob must reach that depth,
+    not just PCSX2's one-level nesting, to decide push vs. pull correctly (#426)."""
+    card = tmp_path / "GC"
+    game_dir = card / "USA" / "Card A" / "GALE01"
+    game_dir.mkdir(parents=True)
+    _write_save(game_dir / "01-GALE-ZeldaWW.gci", b"LOCAL-NEW-GCI", NOW)
+    server_meta = {"hash": "server-old", "pushed_at": EARLIER.isoformat(), "device_id": "dev-server"}
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local")
+    client = _FakeClient(server_meta)
+
+    _reconcile_save(client, cfg, "gc-zelda", str(card))
+
+    assert client.pushed and not client.pulled
+    conflicts = json.loads((tmp_path / "save_conflicts.json").read_text())
+    assert conflicts[0]["winner"] == "local"
+
+
 def test_offline_play_log_appends_and_records_save(tmp_path):
     cfg = SimpleNamespace(data_dir=str(tmp_path))
     save = tmp_path / "save.srm"

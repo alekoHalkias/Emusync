@@ -201,6 +201,20 @@ def test_gamecube_standalone_card_defaults_to_save_dir_when_missing(tmp_path):
     assert save_match == {"path": str(gc_dir), "exists": False}
 
 
+def test_gamecube_standalone_card_resolves_to_save_dir_with_gci_folder_format(tmp_path):
+    """Dolphin's 'GCI Folder' format (its current default) nests a per-game
+    .gci file two levels down (region/slot/game); the resolver still just
+    hands back the whole save_dir since packing the nested tree is
+    memcard_bytes's job, not the resolver's (#426)."""
+    gc_dir = tmp_path / "dolphin-emu" / "GC"
+    gci_game_dir = gc_dir / "USA" / "Card A" / "GALE01"
+    gci_game_dir.mkdir(parents=True)
+    (gci_game_dir / "01-GALE-ZeldaWW.gci").write_bytes(b"gci-save")
+    emu = {"save_dir": str(gc_dir), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "GC")
+    assert save_match == {"path": str(gc_dir), "exists": True}
+
+
 def test_psp_card_resolves_to_savedata_folder(tmp_path):
     save_root = tmp_path / "saves"
     savedata = save_root / "PPSSPP" / "PSP" / "SAVEDATA"

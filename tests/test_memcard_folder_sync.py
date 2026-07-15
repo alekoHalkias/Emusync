@@ -70,6 +70,55 @@ def test_write_memcard_backs_up_whole_folder_and_extracts(tmp_path):
     assert not (dest / "GAME1" / "GAME1.bak").exists()
 
 
+def _make_gci_folder_card(root: Path) -> None:
+    """Dolphin's 'GCI Folder' format (its default): a folder per region/slot
+    containing one subfolder per game, each with its own .gci file(s) — one
+    level deeper than PCSX2's layout (#426)."""
+    root.mkdir(parents=True, exist_ok=True)
+    game_dir = root / "USA" / "Card A" / "GALE01"
+    game_dir.mkdir(parents=True)
+    (game_dir / "01-GALE-ZeldaWW.gci").write_bytes(b"gci-save-1")
+    (game_dir / "01-GALE-ZeldaWW.gci.bnr").write_bytes(b"banner")
+
+
+def test_memcard_bytes_includes_nested_gci_folder_saves(tmp_path):
+    """Dolphin's GCI-folder format nests two levels deep (region/slot/game),
+    not one like PCSX2 — confirm rglob still finds it (#426)."""
+    card = tmp_path / "GC"
+    _make_gci_folder_card(card)
+
+    data = memcard_bytes(card)
+
+    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(data)).getmembers()}
+    assert names == {
+        "USA/Card A/GALE01/01-GALE-ZeldaWW.gci",
+        "USA/Card A/GALE01/01-GALE-ZeldaWW.gci.bnr",
+    }
+
+
+def test_write_memcard_gci_folder_round_trips_and_backs_up_whole_tree(tmp_path):
+    """Pull side must extract the nested GCI-folder tree intact and back up
+    the whole existing card, not per-file (#426)."""
+    src = tmp_path / "src"
+    _make_gci_folder_card(src)
+    data = memcard_bytes(src)
+
+    dest = tmp_path / "dest" / "GC"
+    old_game_dir = dest / "USA" / "Card A" / "GALE01"
+    old_game_dir.mkdir(parents=True)
+    (old_game_dir / "01-GALE-ZeldaWW.gci").write_bytes(b"old-gci-save")
+
+    _write_memcard(dest, data)
+
+    new_game_dir = dest / "USA" / "Card A" / "GALE01"
+    assert (new_game_dir / "01-GALE-ZeldaWW.gci").read_bytes() == b"gci-save-1"
+    assert (new_game_dir / "01-GALE-ZeldaWW.gci.bnr").read_bytes() == b"banner"
+
+    bak = dest.parent / (dest.name + ".bak")
+    assert bak.is_dir()
+    assert (bak / "USA" / "Card A" / "GALE01" / "01-GALE-ZeldaWW.gci").read_bytes() == b"old-gci-save"
+
+
 def test_write_memcard_legacy_raw_file_fallback(tmp_path):
     """A file-based memcard (non-tar bytes) still writes as a plain file."""
     dest = tmp_path / "Mcd001.ps2"
