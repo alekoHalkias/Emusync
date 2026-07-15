@@ -37,8 +37,8 @@ def test_new_console_defs_follow_ps2_pattern():
     explicit rom_extensions, databases for .info matching."""
     expectations = {
         "dc": ({"gdi", "cdi", "chd", "cue"}, ["Sega - Dreamcast"]),
-        "gamecube": ({"iso", "gcm", "rvz", "wbfs"},
-                     ["Nintendo - GameCube", "Nintendo - Wii"]),
+        "gamecube": ({"iso", "gcm", "rvz"}, ["Nintendo - GameCube"]),
+        "wii": ({"iso", "rvz", "wbfs"}, ["Nintendo - Wii"]),
         "psp": ({"iso", "cso", "pbp"}, ["Sony - PlayStation Portable"]),
     }
     for key, (exts, databases) in expectations.items():
@@ -57,6 +57,14 @@ def test_shared_membership_matches_console_abbrs():
     assert shared_abbrs == _SHARED_MEMCARD_CONSOLES
     # Only PS2 shares its states; dc/gamecube/psp states are per-game.
     assert _SHARED_STATE_CONSOLES == {"PS2"}
+
+
+def test_wii_is_not_a_shared_save_console():
+    """Wii (#430, split from the former combined GameCube/Wii console) has no
+    safe NAND sync boundary yet (#431) — must stay excluded from both shared
+    sets, unlike its sibling GameCube console."""
+    assert _BY_KEY["wii"]["abbr"] not in _SHARED_MEMCARD_CONSOLES
+    assert _BY_KEY["wii"]["abbr"] not in _SHARED_STATE_CONSOLES
 
 
 # ── core ↔ console matching via .info databases (#400) ────────────────────────
@@ -78,7 +86,8 @@ def test_new_cores_match_their_console_and_not_psx(tmp_path):
         return {c["folder"] for c in found}
 
     assert folders_for("dc") == {"Flycast"}
-    assert folders_for("gamecube") == {"dolphin-emu"}  # both GC and Wii databases hit
+    assert folders_for("gamecube") == {"dolphin-emu"}
+    assert folders_for("wii") == {"dolphin-emu"}  # same Dolphin core, separate console (#430)
     assert folders_for("psp") == {"PPSSPP"}
     assert folders_for("psx") == set()  # none of them are PS1 cores
 
@@ -125,6 +134,13 @@ def test_gamecube_standalone_dolphin_def_follows_pcsx2_pattern():
     assert _DOLPHIN["flatpak_id"] == "org.DolphinEmu.dolphin-emu"
     assert _DOLPHIN["dirs"]["native"]["save"] == "~/.local/share/dolphin-emu/GC"
     assert _BY_KEY["gamecube"]["standalones"] == [_DOLPHIN]
+
+
+def test_wii_standalone_shares_dolphin_with_gamecube():
+    """Wii (#430) is a separate console entry but reuses the same _DOLPHIN
+    standalone def as GameCube — one emulator, two console keys."""
+    from cli.consoles_data import _DOLPHIN
+    assert _BY_KEY["wii"]["standalones"] == [_DOLPHIN]
 
 
 def test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin(monkeypatch, tmp_path):

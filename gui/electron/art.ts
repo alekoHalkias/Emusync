@@ -43,9 +43,8 @@ const LIBRETRO_SYSTEM: Record<string, string> = {
   ps2:     "Sony_-_PlayStation_2",
   psp:     "Sony_-_PlayStation_Portable",
   dc:      "Sega_-_Dreamcast",
-  // Combined console (#402) — boxart fallback uses the GameCube repo; Wii
-  // games rely on SteamGridDB (the primary source) for art.
   gamecube: "Nintendo_-_GameCube",
+  wii:     "Nintendo_-_Wii",
   saturn:  "Sega_-_Saturn",
   gg:      "Sega_-_Game_Gear",
   msx:     "Microsoft_-_MSX",
@@ -220,6 +219,7 @@ const CONSOLE_LOGO: Record<string, string> = {
   psp:       "Sony - PlayStation Portable",
   dc:        "Sega - Dreamcast",
   gamecube:  "Nintendo - GameCube",
+  wii:       "Nintendo - Wii",
   saturn:    "Sega - Saturn",
   gg:        "Sega - Game Gear",
   msx:       "Microsoft - MSX",
