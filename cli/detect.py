@@ -5,6 +5,7 @@ the GUI Add Console flow.
 """
 from __future__ import annotations
 
+import configparser
 import glob
 import os
 import re
@@ -354,3 +355,30 @@ def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[di
         state_dir = emu["state_dir"]
         state_match = {"path": state_dir, "exists": _dir_has_any_file(state_dir)}
     return save_match, state_match
+
+
+# Dolphin's own config, not this app's — read directly to learn which memory-card
+# storage format (flat file vs. GCI folder) THIS device is configured for, since
+# the two aren't distinguishable from the card folder's contents alone (a stale
+# leftover folder from a prior format switch, or an empty fresh card, would fool
+# a disk-shape guess) (#428).
+_DOLPHIN_INI = {
+    "native":  "~/.config/dolphin-emu/Dolphin.ini",
+    "flatpak": "~/.var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu/Dolphin.ini",
+}
+
+
+def _dolphin_card_format(save_dir: str, slot: str = "SlotA") -> str:
+    """This device's configured Dolphin memory-card format for *slot*:
+    "MemoryCard" (flat file), "GCIFolder", "None" (unconfigured), or
+    "unknown" if Dolphin.ini can't be found/read."""
+    variant = "flatpak" if "org.DolphinEmu.dolphin-emu" in save_dir else "native"
+    ini_path = os.path.expanduser(_DOLPHIN_INI[variant])
+    if not os.path.exists(ini_path):
+        return "unknown"
+    cfg = configparser.ConfigParser()
+    try:
+        cfg.read(ini_path)
+        return cfg.get("Core", slot, fallback="unknown")
+    except (configparser.Error, OSError):
+        return "unknown"

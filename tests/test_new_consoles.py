@@ -11,7 +11,7 @@ import io
 import tarfile
 
 from cli.consoles_data import _IMPORT_CONSOLES, _ROM_EXTENSIONS
-from cli.detect import _discover_cores_by_info, _resolve_shared_memcard_save_state
+from cli.detect import _dolphin_card_format, _discover_cores_by_info, _resolve_shared_memcard_save_state
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
 from server.sync_client import _write_memcard, memcard_bytes
 
@@ -213,6 +213,48 @@ def test_gamecube_standalone_card_resolves_to_save_dir_with_gci_folder_format(tm
     emu = {"save_dir": str(gc_dir), "state_dir": None}
     save_match, _ = _resolve_shared_memcard_save_state(emu, "GC")
     assert save_match == {"path": str(gc_dir), "exists": True}
+
+
+# ── Dolphin memory-card format detection (#428) ────────────────────────────────
+
+def test_dolphin_card_format_reads_native_ini(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    ini_dir = home / ".config" / "dolphin-emu"
+    ini_dir.mkdir(parents=True)
+    (ini_dir / "Dolphin.ini").write_text("[Core]\nSlotA = GCIFolder\n")
+    monkeypatch.setattr("cli.detect.os.path.expanduser", lambda p: p.replace("~", str(home)))
+
+    save_dir = str(home / ".local" / "share" / "dolphin-emu" / "GC")
+    assert _dolphin_card_format(save_dir) == "GCIFolder"
+
+
+def test_dolphin_card_format_reads_flatpak_ini(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    ini_dir = home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "config" / "dolphin-emu"
+    ini_dir.mkdir(parents=True)
+    (ini_dir / "Dolphin.ini").write_text("[Core]\nSlotA = MemoryCard\n")
+    monkeypatch.setattr("cli.detect.os.path.expanduser", lambda p: p.replace("~", str(home)))
+
+    save_dir = str(home / ".var" / "app" / "org.DolphinEmu.dolphin-emu" / "data" / "dolphin-emu" / "GC")
+    assert _dolphin_card_format(save_dir) == "MemoryCard"
+
+
+def test_dolphin_card_format_unknown_when_ini_missing(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setattr("cli.detect.os.path.expanduser", lambda p: p.replace("~", str(home)))
+    save_dir = str(home / ".local" / "share" / "dolphin-emu" / "GC")
+    assert _dolphin_card_format(save_dir) == "unknown"
+
+
+def test_dolphin_card_format_unknown_when_slot_unset(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    ini_dir = home / ".config" / "dolphin-emu"
+    ini_dir.mkdir(parents=True)
+    (ini_dir / "Dolphin.ini").write_text("[Core]\n")  # no SlotA at all
+    monkeypatch.setattr("cli.detect.os.path.expanduser", lambda p: p.replace("~", str(home)))
+
+    save_dir = str(home / ".local" / "share" / "dolphin-emu" / "GC")
+    assert _dolphin_card_format(save_dir) == "unknown"
 
 
 def test_psp_card_resolves_to_savedata_folder(tmp_path):

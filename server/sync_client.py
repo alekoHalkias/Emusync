@@ -418,12 +418,12 @@ class SyncClient:
         _write_memcard(Path(card_path), r.content)
         return True, r.headers.get("X-Save-Hash")
 
-    def push_console_memcard(self, console_key: str, card_path: str) -> str:
+    def push_console_memcard(self, console_key: str, card_path: str, card_format: str = "") -> str:
         data = memcard_bytes(Path(card_path))
         r = self._client.post(
             self._url(f"/consoles/{console_key}/memcard"),
             content=data,
-            headers={"Content-Type": "application/octet-stream"},
+            headers={"Content-Type": "application/octet-stream", "X-Card-Format": card_format},
             timeout=30,
         )
         r.raise_for_status()

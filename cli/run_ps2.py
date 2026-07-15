@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import click
+
+from cli.detect import _dolphin_card_format
+from cli.run_conflicts import _notify
 from cli.run_reconcile import _mtime
 
 logger = logging.getLogger("emusync.run")
@@ -39,23 +44,59 @@ def _ps2_state_serial_prefix(state_folder: str, since: float) -> Optional[str]:
     return f"{serial} ("
 
 
+def _warn_card_format_mismatch(cfg, local_format: str, remote_format: str) -> None:
+    """Surface a GC memory-card format mismatch: stderr + notification + a
+    current-state file (overwritten, not appended — this describes an ongoing
+    misconfiguration, not a one-off event like save_conflicts.json) (#428)."""
+    msg = (
+        f"GameCube memory card sync skipped: this device's Dolphin is configured for "
+        f"'{local_format}' but the last-synced card is '{remote_format}'. Saves won't "
+        f"sync until every device's Dolphin uses the same Config -> GameCube -> Slot A/B "
+        f"setting (or you convert the card via Dolphin's own 'Convert File' feature)."
+    )
+    click.echo(f"⚠ {msg}", err=True)
+    _notify("EmuSync — GC memory card format mismatch", msg)
+    try:
+        path = Path(cfg.data_dir) / "card_format_mismatch.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "console_key": "GC",
+            "local_format": local_format,
+            "remote_format": remote_format,
+            "detected_at": datetime.now(timezone.utc).isoformat(),
+        }, indent=2))
+    except Exception:
+        logger.warning("failed to write card_format_mismatch.json", exc_info=True)
+
+
 class _MemcardClient:
     """Adapts the per-game save API (used by `_reconcile_save` and the post-game
     push) onto the console-scoped shared memory-card endpoints, so the shared card
     reconciles with the exact same newest-wins / `.bak` logic. The `slug` args are
     the console key (e.g. ``"PS2"``) and are forwarded as the console_key (#295)."""
 
-    def __init__(self, client, console_key: str) -> None:
+    def __init__(self, client, console_key: str, cfg=None) -> None:
         self._client = client
         self._key = console_key
+        self._cfg = cfg
+        self._last_meta: Optional[dict] = None
 
     def get_save_meta(self, _slug: str):
-        return self._client.get_console_memcard_meta(self._key)
+        self._last_meta = self._client.get_console_memcard_meta(self._key)
+        return self._last_meta
 
     def push_save(self, _slug: str, path: str) -> str:
-        return self._client.push_console_memcard(self._key, path)
+        card_format = _dolphin_card_format(path) if self._key == "GC" else ""
+        return self._client.push_console_memcard(self._key, path, card_format=card_format)
 
     def pull_save(self, _slug: str, path: str):
+        if self._key == "GC":
+            remote_format = (self._last_meta or {}).get("card_format") or ""
+            local_format = _dolphin_card_format(path)
+            if (remote_format not in ("", "unknown") and local_format not in ("", "unknown")
+                    and remote_format != local_format):
+                _warn_card_format_mismatch(self._cfg, local_format, remote_format)
+                return False, None
         return self._client.pull_console_memcard(self._key, path)
 
     def report_conflict(self, *args, **kwargs) -> None:

@@ -322,11 +322,18 @@ class SaveStateMixin:
     # doesn't fit the per-game save model. It's stored once per console_key, single
     # generation (overwrite), bytes on disk under blobs/console_saves/<key>.
 
-    def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int) -> dict:
-        """Store a console's shared memory card, overwriting the previous copy."""
+    def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int,
+                                card_format: str = "") -> dict:
+        """Store a console's shared memory card, overwriting the previous copy.
+
+        `card_format` is the pushing device's configured memory-card storage
+        format (e.g. Dolphin's "MemoryCard"/"GCIFolder" — issue #428), recorded
+        so a pulling device can detect a mismatch before merging incompatible
+        card layouts together. Empty for consoles without multiple formats.
+        """
         now = datetime.now(timezone.utc).isoformat()
         row = self._conn.execute(
-            "SELECT device_id, hash, pushed_at, size FROM console_saves WHERE console_key = ?",
+            "SELECT device_id, hash, pushed_at, size, card_format FROM console_saves WHERE console_key = ?",
             (console_key,),
         ).fetchone()
         if row and row["hash"] == h:
@@ -336,13 +343,14 @@ class SaveStateMixin:
         dest.parent.mkdir(parents=True, exist_ok=True)
         os.replace(src, dest)
         self._conn.execute(
-            "INSERT INTO console_saves (console_key, device_id, hash, pushed_at, size) "
-            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(console_key) DO UPDATE SET "
-            "device_id=excluded.device_id, hash=excluded.hash, pushed_at=excluded.pushed_at, size=excluded.size",
-            (console_key, device_id, h, now, size),
+            "INSERT INTO console_saves (console_key, device_id, hash, pushed_at, size, card_format) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(console_key) DO UPDATE SET "
+            "device_id=excluded.device_id, hash=excluded.hash, pushed_at=excluded.pushed_at, "
+            "size=excluded.size, card_format=excluded.card_format",
+            (console_key, device_id, h, now, size, card_format),
         )
         self._conn.commit()
-        return {"device_id": device_id, "hash": h, "pushed_at": now, "size": size}
+        return {"device_id": device_id, "hash": h, "pushed_at": now, "size": size, "card_format": card_format}
 
     def pull_console_save_path(self, console_key: str) -> tuple[Optional[Path], Optional[dict]]:
         """The console's shared-card on-disk path + meta, or (None, None)."""
@@ -356,7 +364,7 @@ class SaveStateMixin:
 
     def get_console_save_meta(self, console_key: str) -> Optional[dict]:
         row = self._conn.execute(
-            "SELECT device_id, hash, pushed_at, size FROM console_saves WHERE console_key = ?",
+            "SELECT device_id, hash, pushed_at, size, card_format FROM console_saves WHERE console_key = ?",
             (console_key,),
         ).fetchone()
         return dict(row) if row else None

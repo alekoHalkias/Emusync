@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 16
+_SCHEMA_VERSION = 17
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -157,7 +157,8 @@ CREATE TABLE IF NOT EXISTS console_saves (
     device_id        TEXT NOT NULL,
     hash             TEXT NOT NULL,
     pushed_at        TEXT NOT NULL,
-    size             INTEGER NOT NULL
+    size             INTEGER NOT NULL,
+    card_format      TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS server_settings (
     key   TEXT PRIMARY KEY,
@@ -368,4 +369,12 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # field so ANY core for a supported console is recognized without being
         # hardcoded in a core list (issue #400).
         _try(conn, "ALTER TABLE console_defs ADD COLUMN databases TEXT NOT NULL DEFAULT ''")
+    if from_version < 17:
+        # Dolphin's GC memory card can be either a flat file or a nested
+        # GCI-folder tree, user-configured independently per device; a mismatch
+        # doesn't crash but silently stops saves from actually propagating
+        # between devices (issue #428). Tag each push with the pushing device's
+        # configured format so a pulling device can detect a mismatch before
+        # merging incompatible card layouts together.
+        _try(conn, "ALTER TABLE console_saves ADD COLUMN card_format TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
