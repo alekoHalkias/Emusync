@@ -246,6 +246,36 @@ def test_seed_updates_databases_on_existing_rows():
         assert gba["databases"] == ["Nintendo - Game Boy Advance"]
 
 
+def test_seed_updates_label_and_rom_extensions_on_existing_rows():
+    """The whole console_defs row is server-owned (#430 regression): a console
+    split (label/rom_extensions changing on an already-seeded key, e.g. the
+    combined "GameCube / Wii" becoming just "GameCube") must actually take
+    effect on restart, not just `databases` — a user reported the old label
+    and rom_extensions persisting after upgrading past the split."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        base = [{
+            "key": "gamecube", "label": "GameCube / Wii", "abbr": "GC",
+            "suggestions": [], "system_keys": [],
+            "rom_extensions": ["iso", "gcm", "rvz", "wbfs"],
+            "databases": ["Nintendo - GameCube", "Nintendo - Wii"],
+            "folder_names": [], "standalones": [],
+        }]
+        store.seed_console_defs(base)
+        gc = {c["key"]: c for c in store.get_console_defs()}["gamecube"]
+        assert gc["label"] == "GameCube / Wii"
+        assert set(gc["romExtensions"]) == {"iso", "gcm", "rvz", "wbfs"}
+
+        base[0]["label"] = "GameCube"
+        base[0]["rom_extensions"] = ["iso", "gcm", "rvz"]
+        base[0]["databases"] = ["Nintendo - GameCube"]
+        store.seed_console_defs(base)
+        gc = {c["key"]: c for c in store.get_console_defs()}["gamecube"]
+        assert gc["label"] == "GameCube"
+        assert set(gc["romExtensions"]) == {"iso", "gcm", "rvz"}
+        assert gc["databases"] == ["Nintendo - GameCube"]
+
+
 def test_seed_and_serve_standalones():
     """Standalones round-trip through seed → get_console_defs/get_standalones
     with split native_bins and a parsed `dirs` blob (issue #292)."""

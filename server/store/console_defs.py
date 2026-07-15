@@ -14,28 +14,33 @@ class ConsoleDefMixin:
     def seed_console_defs(self, consoles_data: list[dict]) -> None:
         """Populate console definition tables from structured data.
 
-        Idempotent *and* additive: every insert is INSERT OR IGNORE, so adding a
-        new core/system/standalone to an already-seeded console in
-        cli/consoles_data.py gets picked up on the next startup without wiping the
-        DB. (The old early-out `continue` skipped existing consoles entirely, so
-        additions were silently ignored.)
+        Idempotent and additive. The top-level `console_defs` row is fully
+        server-owned, so it's an upsert (overwritten every startup, including
+        on a key that already existed — #430). Everything nested under a
+        console (systems/cores/standalones/folder names) stays INSERT OR
+        IGNORE: adding a new one to an already-seeded console in
+        cli/consoles_data.py gets picked up on the next startup without wiping
+        the DB. (The old early-out `continue` skipped existing consoles
+        entirely, so additions were silently ignored.)
         """
         for console in consoles_data:
             key = console["key"]
+            label = console["label"]
+            abbr = console.get("abbr", key.upper())
+            suggestions = ";".join(console.get("suggestions", []))
+            rom_extensions = ";".join(console.get("rom_extensions", []))
             databases = ";".join(console.get("databases", []))
+            # The whole row is server-owned seed data (never user-edited), so
+            # every column is overwritten on every startup — INSERT OR IGNORE
+            # alone would leave a row seeded under an older cli/consoles_data.py
+            # (e.g. a stale label/rom_extensions from before a console split)
+            # permanently stuck at its first-ever values (#400, #430).
             self._conn.execute(
-                "INSERT OR IGNORE INTO console_defs (key, label, abbr, suggestions, rom_extensions, databases) VALUES (?, ?, ?, ?, ?, ?)",
-                (key, console["label"], console.get("abbr", key.upper()),
-                 ";".join(console.get("suggestions", [])),
-                 ";".join(console.get("rom_extensions", [])),
-                 databases)
-            )
-            # `databases` is server-owned seed data (not user-edited), so overwrite
-            # it every startup — INSERT OR IGNORE alone would leave rows seeded
-            # before v16 (or before a mapping fix) permanently stale (#400).
-            self._conn.execute(
-                "UPDATE console_defs SET databases = ? WHERE key = ?",
-                (databases, key)
+                "INSERT INTO console_defs (key, label, abbr, suggestions, rom_extensions, databases) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET "
+                "label=excluded.label, abbr=excluded.abbr, suggestions=excluded.suggestions, "
+                "rom_extensions=excluded.rom_extensions, databases=excluded.databases",
+                (key, label, abbr, suggestions, rom_extensions, databases)
             )
             for sys_key in console["system_keys"]:
                 sys_info = console["systems"].get(sys_key)

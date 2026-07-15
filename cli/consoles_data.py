@@ -152,10 +152,22 @@ _IMPORT_CONSOLES = [
      "rom_extensions": ["gdi", "cdi", "chd", "cue"],
      "databases": ["Sega - Dreamcast"],
      "standalones": [], "suggestions": ["RetroArch with Flycast core"]},
-    {"key": "gamecube", "label": "GameCube / Wii",            "abbr": "GC",
+    {"key": "gamecube", "label": "GameCube",                  "abbr": "GC",
      "system_keys": [],
-     "rom_extensions": ["iso", "gcm", "rvz", "wbfs"],
-     "databases": ["Nintendo - GameCube", "Nintendo - Wii"],
+     "rom_extensions": ["iso", "gcm", "rvz"],
+     "databases": ["Nintendo - GameCube"],
+     "standalones": [_DOLPHIN],
+     "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"]},
+    # Wii is its own console (#430, split from the former combined "GameCube /
+    # Wii" entry) but shares Dolphin as its emulator. Deliberately NOT in
+    # _SHARED_MEMCARD_CONSOLES: Wii save data lives inside Dolphin's emulated
+    # NAND, a monolithic filesystem mixing per-title saves with unrelated
+    # system state (Shop Channel, System Menu, IOS) — no safe sync boundary
+    # exists yet (follow-up: #431). Wii saves are NOT synced.
+    {"key": "wii",      "label": "Wii",                       "abbr": "Wii",
+     "system_keys": [],
+     "rom_extensions": ["iso", "rvz", "wbfs"],
+     "databases": ["Nintendo - Wii"],
      "standalones": [_DOLPHIN],
      "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"]},
     {"key": "psp",     "label": "PlayStation Portable",       "abbr": "PSP",
