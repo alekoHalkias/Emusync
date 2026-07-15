@@ -221,7 +221,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
     save_path = gd.save_path
     shared_memcard = console_abbr in _SHARED_MEMCARD_CONSOLES
-    save_client = _MemcardClient(client, console_abbr) if shared_memcard else client
+    save_client = _MemcardClient(client, console_abbr, cfg) if shared_memcard else client
     save_key = console_abbr if shared_memcard else game_slug
     # Whether save states live in a shared, serial-named folder (PS2 sstates/) and
     # so must be synced filtered by serial rather than as a whole folder (#294).

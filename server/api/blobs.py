@@ -245,6 +245,7 @@ def pull_console_memcard(console_key: str, device_id: str = Depends(_auth)) -> R
             "X-Save-Hash": meta["hash"],
             "X-Pushed-At": meta["pushed_at"],
             "X-Device-Id": meta["device_id"],
+            "X-Card-Format": meta.get("card_format", ""),
         },
     )
 
@@ -252,9 +253,10 @@ def pull_console_memcard(console_key: str, device_id: str = Depends(_auth)) -> R
 @router.post("/consoles/{console_key}/memcard")
 async def push_console_memcard(console_key: str, request: Request, device_id: str = Depends(_auth)) -> dict:
     tmp, h, size = await _stage_upload(request)
+    card_format = request.headers.get("X-Card-Format", "")
 
     def _store_it() -> dict:
-        return _get_store().push_console_save_file(console_key, device_id, tmp, h, size)
+        return _get_store().push_console_save_file(console_key, device_id, tmp, h, size, card_format)
 
     meta = await asyncio.to_thread(_store_it)
     _print_activity(f"memcard pushed: {console_key} from {_device_label(device_id)}")
@@ -268,6 +270,7 @@ def get_console_memcard_meta(console_key: str, device_id: str = Depends(_auth)) 
         return Response(status_code=204)
     return Response(
         content=json.dumps({"hash": meta["hash"], "pushed_at": meta["pushed_at"],
-                            "device_id": meta["device_id"], "size": meta["size"]}),
+                            "device_id": meta["device_id"], "size": meta["size"],
+                            "card_format": meta.get("card_format", "")}),
         media_type="application/json",
     )
