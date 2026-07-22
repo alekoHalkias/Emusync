@@ -2,14 +2,18 @@ import React, { useCallback, useEffect, useState } from "react";
 import { configure, configureDevice, health, listEvents, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
 import DevicesPanel from "./DevicesPanel";
+import { useDevices } from "../DeviceContext";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
 
 export default function ServerStatusButton({ isServer, onRepaired }: { isServer: boolean; onRepaired: () => void }): React.ReactElement {
+  const { devices } = useDevices();
   const [serverState, setServerState] = useState<ServerState>("checking");
   const [open, setOpen] = useState(false);
   const [startState, setStartState] = useState<StartState>("idle");
+  const [showDevices, setShowDevices] = useState(false);
+  const [showArtKey, setShowArtKey] = useState(false);
 
   // PIN management
   const [pinInput, setPinInput] = useState("");
@@ -250,7 +254,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
               onClick={() => setShowActivity(true)}
               style={{
                 display: "flex", alignItems: "center", gap: 10,
-                width: "100%", padding: "12px 14px", marginBottom: 20,
+                width: "100%", padding: "12px 14px", marginBottom: 14,
                 background: "var(--bg)", borderRadius: "var(--radius)",
                 border: "1px solid var(--border)", cursor: "pointer", textAlign: "left",
               }}
@@ -264,7 +268,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
             </button>
 
             {/* Device name editor */}
-            <div style={{ marginBottom: 20 }}>
+            <div style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
                   <label>Device name</label>
@@ -283,8 +287,8 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
 
             {/* Server machine controls */}
             {isServer && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>This machine is the server</div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>This machine is the server</div>
 
                 {/* Start/stop */}
                 {startState === "idle" && serverState === "offline" && (
@@ -321,8 +325,8 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                 )}
 
                 {/* PIN management */}
-                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                     PIN <span style={{ opacity: 0.6 }}>(optional — if no PIN, any device can connect)</span>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -360,8 +364,8 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
 
             {/* Connect to server section — only show if this machine is NOT the server */}
             {!isServer && (
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
                   Connect to server
                 </div>
 
@@ -410,35 +414,60 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
               </div>
             )}
 
-            {/* SteamGridDB art key (issues #322/#398) — stored on the server,
-                shared to every device; editable from ANY device so a headless
-                server can still be configured. */}
-            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16, marginBottom: 20 }}>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 12 }}>
-                SteamGridDB art
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
-                <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label>API key <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional — shared with all devices via the server)</span></label>
-                  <input
-                    type="text"
-                    value={artKeyInput}
-                    onChange={(e) => { setArtKeyInput(e.target.value); setArtKeyError(""); }}
-                    placeholder="Paste your SteamGridDB API key"
-                  />
-                </div>
-                <button className="btn btn-ghost" onClick={saveArtKey} disabled={artKeyBusy} style={{ flexShrink: 0 }}>
-                  {artKeySaved ? "Saved" : artKeyBusy ? <span className="spinner" /> : "Save"}
-                </button>
-              </div>
-              {artKeyError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{artKeyError}</span>}
-              <button className="btn btn-ghost" onClick={() => window.emusync.steamgriddb.openKeyPage()} style={{ fontSize: 12 }}>
-                Get a key from SteamGridDB →
+            {/* Secondary settings — folded out into their own popups to keep this modal short */}
+            <div style={{ display: "flex", gap: 8, marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowDevices(true)}>
+                Paired devices ({devices.length}) →
+              </button>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowArtKey(true)}>
+                SteamGridDB art →
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Paired devices — folded in from the old standalone modal (#262) */}
+      {/* Paired devices popup — folded in from the old standalone modal (#262) */}
+      {showDevices && (
+        <div className="modal-overlay" onClick={() => setShowDevices(false)}>
+          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3>Paired devices</h3>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowDevices(false)}>✕</button>
+            </div>
             <DevicesPanel />
+          </div>
+        </div>
+      )}
+
+      {/* SteamGridDB art key popup (issues #322/#398) — stored on the server,
+          shared to every device; editable from ANY device so a headless
+          server can still be configured. */}
+      {showArtKey && (
+        <div className="modal-overlay" onClick={() => setShowArtKey(false)}>
+          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3>SteamGridDB art</h3>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowArtKey(false)}>✕</button>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
+              <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                <label>API key <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional — shared with all devices via the server)</span></label>
+                <input
+                  type="text"
+                  value={artKeyInput}
+                  onChange={(e) => { setArtKeyInput(e.target.value); setArtKeyError(""); }}
+                  placeholder="Paste your SteamGridDB API key"
+                />
+              </div>
+              <button className="btn btn-ghost" onClick={saveArtKey} disabled={artKeyBusy} style={{ flexShrink: 0 }}>
+                {artKeySaved ? "Saved" : artKeyBusy ? <span className="spinner" /> : "Save"}
+              </button>
+            </div>
+            {artKeyError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{artKeyError}</span>}
+            <button className="btn btn-ghost" onClick={() => window.emusync.steamgriddb.openKeyPage()} style={{ fontSize: 12 }}>
+              Get a key from SteamGridDB →
+            </button>
           </div>
         </div>
       )}

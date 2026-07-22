@@ -48,8 +48,7 @@ export default function DevicesPanel(): React.ReactElement {
   }
 
   return (
-    <div style={{ marginTop: 20, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-      <h4 style={{ margin: "0 0 12px" }}>Paired devices ({devices.length})</h4>
+    <div>
 
       {eventsLoading ? (
         <div style={{ textAlign: "center", padding: "20px 0" }}>
