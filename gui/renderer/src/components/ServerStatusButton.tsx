@@ -68,6 +68,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       if (!cfg) return;
       setPairHost((cfg.server_host as string) || "localhost");
       setPairPort(String((cfg.server_port as number) || 8765));
+      setPairPin((cfg.server_pin as string) || "");
       setDeviceName((cfg.device_name as string) || "");
       setPinInput((cfg.server_pin as string) || "");
     });
@@ -198,8 +199,12 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
         is_server: false,
       });
 
+      // Sync-daemon binds to the server host at its own startup, so it
+      // needs a restart to pick up the new address (#433).
+      await window.emusync.daemon.stop();
+      await window.emusync.daemon.start();
+
       setPairSuccess(true);
-      setPairPin("");
       poll();
       onRepaired();
     } catch (e: unknown) {
