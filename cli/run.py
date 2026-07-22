@@ -68,6 +68,7 @@ from cli.run_reconcile import (  # noqa: F401 — re-exported for existing calle
     _SAVE_EXTS,
     _STATE_RE,
 )
+from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
 
 
 def _resolve_launch_command(gd) -> Optional[str]:
@@ -314,8 +315,14 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # name = ROM filename vs database label) — and adopt that path. Skipped for
         # a shared-memcard console: the card lives at a fixed path, and this
         # RetroArch content-name heuristic doesn't apply to PCSX2 (issue #295).
+        # Wii instead adopts whichever NAND title folder was actually written,
+        # since the save location isn't knowable until a game has been played
+        # at least once (#431).
         if shared_memcard:
             actual_save_path = None
+            actual_state_path = None
+        elif console_abbr == "Wii":
+            actual_save_path = _resolve_written_wii_save(launch_start)
             actual_state_path = None
         else:
             actual_save_path = _resolve_written_save(save_path, launch_start)
