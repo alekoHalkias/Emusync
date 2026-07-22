@@ -29,8 +29,9 @@ function resolveSharedCard(consoleKey: string, saveDir: string, saveRoot: string
     // slot A1 is synced — B1/A2 (2nd controller / extra cards) are rare.
     candidates = [join(saveRoot, "vmu_save_A1.bin"), join(saveDir, "vmu_save_A1.bin")];
   } else if (consoleKey === "gamecube") {
-    // Dolphin core's GC memory-card folder. ponytail: Wii NAND title saves are
-    // NOT synced (large tree mixing system data) — follow-up if wanted.
+    // Dolphin core's GC memory-card folder. Wii isn't a shared-memcard
+    // console — it has no entry here; its NAND title saves sync per-game via
+    // a separate mechanism, resolved at play-time by cli/run_wii.py (#431).
     if (saveDir !== saveRoot) {
       candidates = [join(saveRoot, "User", "GC"), join(saveDir, "User", "GC")];
       if (systemDir) candidates.push(join(systemDir, "dolphin-emu", "Userdata", "GC"));
