@@ -25,6 +25,7 @@ export const ROM_EXTENSIONS = new Set([
   "gcm", "rvz", "wbfs",                // GameCube / Wii (#402)
   "cso",                               // PSP (#402)
   "3ds", "cci", "cxi",                 // Nintendo 3DS (#418)
+  "nsp", "xci", "nca",                 // Nintendo Switch (#419)
 ]);
 
 export const DEFAULT_SAVE_EXTS = ["srm", "sav", "save"];

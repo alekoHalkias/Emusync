@@ -86,6 +86,26 @@ _AZAHAR = {
     },
 }
 
+# Eden (Switch) standalone — no libretro core exists for Switch. Eden is the
+# maintained successor to Yuzu/suyu/Citron (all taken down or discontinued
+# after Nintendo's litigation, #419) and keeps Yuzu's exact NAND save layout.
+# Distributed as a Linux AppImage only — no Flathub package exists yet, so
+# there's no flatpak_id/flatpak_exec/flatpak dirs entry (both are optional,
+# see detect.py's `s.get("flatpak_id")`). Save data lives nested under
+# nand/user/save/0000000000000000/<profile-id>/<title-id-hex>/ — the
+# profile-id folder isn't knowable ahead of time (normally exactly one), and
+# the title-ID folder isn't known until a game has been played at least once,
+# so both are resolved/learned the same way Wii's NAND title folder is
+# (cli/run_switch.py, mirrors cli/run_wii.py, #431).
+_EDEN = {
+    "id": "eden", "label": "Eden",
+    "native_bins": ["/usr/bin/eden", "~/.local/bin/eden",
+                    "~/Applications/eden.AppImage", "~/.local/bin/eden.AppImage"],
+    "dirs": {
+        "native": {"save": "~/.local/share/eden/nand/user/save/0000000000000000"},
+    },
+}
+
 # `databases` = the libretro database names for the console, matched against an
 # installed core's .info `database` field so ANY core for the console (present
 # or future) is recognized without being hardcoded in a core list (#400).
@@ -188,6 +208,15 @@ _IMPORT_CONSOLES = [
      "rom_extensions": ["3ds", "cci", "cxi"],
      "databases": ["Nintendo - Nintendo 3DS"],
      "standalones": [_AZAHAR], "suggestions": ["Azahar standalone"]},
+    # Switch is standalone-only (no libretro core) and, like Wii, saves
+    # per-game via a learned NAND folder rather than a shared card — NOT a
+    # _SHARED_MEMCARD_CONSOLES member despite the issue title's suggestion
+    # (#419). See cli/run_switch.py / the _EDEN comment above.
+    {"key": "switch",  "label": "Nintendo Switch",            "abbr": "Switch",
+     "system_keys": [],
+     "rom_extensions": ["nsp", "xci", "nca"],
+     "databases": ["Nintendo - Switch"],
+     "standalones": [_EDEN], "suggestions": ["Eden standalone"]},
 ]
 
 _IMPORT_SYSTEMS: dict[str, dict] = {
@@ -318,6 +347,7 @@ _ROM_EXTENSIONS = {
     "gcm", "rvz", "wbfs",         # GameCube / Wii (#402)
     "cso",                        # PSP (#402)
     "3ds", "cci", "cxi",          # Nintendo 3DS (#418)
+    "nsp", "xci", "nca",          # Nintendo Switch (#419)
 }
 
 

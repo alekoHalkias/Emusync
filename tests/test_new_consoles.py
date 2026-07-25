@@ -67,6 +67,34 @@ def test_wii_is_not_a_shared_save_console():
     assert _BY_KEY["wii"]["abbr"] not in _SHARED_STATE_CONSOLES
 
 
+def test_switch_console_def_follows_ps2_pattern():
+    cdef = _BY_KEY["switch"]
+    assert cdef["system_keys"] == []
+    assert set(cdef["rom_extensions"]) == {"nsp", "xci", "nca"}
+    assert cdef["databases"] == ["Nintendo - Switch"]
+    for ext in cdef["rom_extensions"]:
+        assert ext in _ROM_EXTENSIONS
+
+
+def test_switch_is_not_a_shared_save_console():
+    """Switch saves per-game via a learned NAND folder (#419), same reasoning
+    as Wii (#431) — must stay excluded from both shared sets despite the
+    issue title's suggestion of shared-save-layout treatment."""
+    assert _BY_KEY["switch"]["abbr"] not in _SHARED_MEMCARD_CONSOLES
+    assert _BY_KEY["switch"]["abbr"] not in _SHARED_STATE_CONSOLES
+
+
+def test_switch_standalone_eden_def_has_no_flatpak():
+    """Eden is AppImage-only (no Flathub package yet, #419) — unlike every
+    other standalone def, it must omit flatpak_id/flatpak_exec entirely
+    rather than pointing at a nonexistent app ID."""
+    from cli.consoles_data import _EDEN
+    assert _EDEN["native_bins"]
+    assert "flatpak_id" not in _EDEN
+    assert "flatpak_exec" not in _EDEN
+    assert _BY_KEY["switch"]["standalones"] == [_EDEN]
+
+
 # ── core ↔ console matching via .info databases (#400) ────────────────────────
 
 def test_new_cores_match_their_console_and_not_psx(tmp_path):
