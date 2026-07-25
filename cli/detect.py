@@ -320,7 +320,9 @@ def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[di
         candidates = [os.path.join(save_root, "vmu_save_A1.bin"),
                       os.path.join(save_dir, "vmu_save_A1.bin")]
     elif console_abbr == "GC":
-        # ponytail: Wii NAND title saves are NOT synced — GC cards only.
+        # This shared-memcard resolver handles GC cards only — Wii isn't a
+        # shared-memcard console; its NAND title saves sync per-game via a
+        # separate mechanism (cli/run_wii.py, #431).
         if emu.get("core_folder"):
             candidates = [os.path.join(save_root, "User", "GC"),
                           os.path.join(save_dir, "User", "GC")]

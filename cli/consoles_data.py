@@ -44,8 +44,8 @@ _PCSX2 = {
 # Dolphin (GameCube/Wii) standalone. `-b` runs headless/batch and requires the
 # ROM path, passed positionally like the other standalones (issue #415). Save
 # dir is the GC memory-card folder directly (no "User/GC" subpath — that's a
-# RetroArch-core-only layout); Wii NAND title saves stay out of scope, same as
-# the RetroArch core.
+# RetroArch-core-only layout). Wii doesn't use this dict's "save" key at all —
+# its NAND title-save root is resolved separately by cli/run_wii.py (#431).
 _DOLPHIN = {
     "id": "dolphin", "label": "Dolphin",
     "native_bins": ["/usr/bin/dolphin-emu", "/usr/bin/dolphin-emu-qt2",
@@ -160,10 +160,15 @@ _IMPORT_CONSOLES = [
      "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"]},
     # Wii is its own console (#430, split from the former combined "GameCube /
     # Wii" entry) but shares Dolphin as its emulator. Deliberately NOT in
-    # _SHARED_MEMCARD_CONSOLES: Wii save data lives inside Dolphin's emulated
-    # NAND, a monolithic filesystem mixing per-title saves with unrelated
-    # system state (Shop Channel, System Menu, IOS) — no safe sync boundary
-    # exists yet (follow-up: #431). Wii saves are NOT synced.
+    # _SHARED_MEMCARD_CONSOLES: unlike GC's whole-card sync, Wii saves sync
+    # per-game, keyed by the game's own NAND title-ID folder
+    # (Wii/title/00010000/<hex-id>/data/) — never the sibling content/ folder
+    # (install-time tickets) or 00000001/* (system titles: Shop Channel,
+    # System Menu, IOS). The title-ID folder isn't known until a game has been
+    # played at least once, so it's learned the same way as RetroArch's
+    # content-name mismatch (#210): cli/run_wii.py's _resolve_written_wii_save
+    # scans for whichever title folder was actually written that session and
+    # adopts it (#431).
     {"key": "wii",      "label": "Wii",                       "abbr": "Wii",
      "system_keys": [],
      "rom_extensions": ["iso", "rvz", "wbfs"],

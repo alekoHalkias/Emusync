@@ -371,20 +371,20 @@ class SyncClient:
                         pass
 
     def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
-        """Write server save to disk. Returns (pulled, server_hash). pulled=False if no save exists."""
+        """Write server save to disk. Returns (pulled, server_hash). pulled=False if no save exists.
+
+        Folder-based saves (Dolphin GC/Wii, PPSSPP, PCSX2 memcards) arrive as a
+        plain tar archive; file-based saves arrive as raw bytes. _write_memcard
+        detects which and handles both (#431)."""
         r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
-        save = Path(save_path)
-        if save.exists():
-            shutil.copy2(save, save.with_suffix(save.suffix + ".bak"))
-        save.parent.mkdir(parents=True, exist_ok=True)
-        save.write_bytes(r.content)
+        _write_memcard(Path(save_path), r.content)
         return True, r.headers.get("X-Save-Hash")
 
     def push_save(self, slug: str, save_path: str) -> str:
-        data = Path(save_path).read_bytes()
+        data = memcard_bytes(Path(save_path))
         r = self._client.post(
             self._url(f"/games/{slug}/save"),
             content=data,
