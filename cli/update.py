@@ -48,6 +48,29 @@ def _require_game(client, slug: str) -> dict:
     return game
 
 
+def _resolve_update_files(client, cfg, slug: str) -> dict[str, str]:
+    """Every update/DLC file available for *slug* on this device, basename ->
+    absolute path — merges the managed folder (explicitly `add`ed files) with
+    files auto-detected next to the base ROM at import time (#441). A managed
+    copy wins on a basename collision, since it was an explicit user action."""
+    files: dict[str, str] = {}
+    try:
+        gd = client.get_game_device(slug)
+        for path in (gd.update_paths if gd else []):
+            if os.path.isfile(path):
+                files[os.path.basename(path)] = path
+    except Exception:
+        pass
+
+    dest_dir = switch_updates_dir(cfg.data_dir, slug)
+    if os.path.isdir(dest_dir):
+        for name in os.listdir(dest_dir):
+            path = os.path.join(dest_dir, name)
+            if os.path.isfile(path):
+                files[name] = path
+    return files
+
+
 @update.command("add")
 @click.argument("slug")
 @click.argument("file", type=click.Path(exists=True, dir_okay=False))
@@ -70,21 +93,18 @@ def add_update(slug: str, file: str) -> None:
 @update.command("list")
 @click.argument("slug")
 def list_updates(slug: str) -> None:
-    """List update/DLC files managed for SLUG on this device."""
+    """List update/DLC files available for SLUG on this device — both
+    managed-folder additions and files auto-detected next to the ROM."""
     cfg = cfg_module.load()
     client = _require_client(cfg)
     _require_game(client, slug)
 
-    dest_dir = switch_updates_dir(cfg.data_dir, slug)
-    if not os.path.isdir(dest_dir):
-        click.echo("No update files managed for this game yet.")
-        return
-    files = sorted(os.listdir(dest_dir))
+    files = _resolve_update_files(client, cfg, slug)
     if not files:
-        click.echo("No update files managed for this game yet.")
+        click.echo("No update/DLC files found for this game yet.")
         return
-    for name in files:
-        size_mb = os.path.getsize(os.path.join(dest_dir, name)) / (1024 * 1024)
+    for name in sorted(files):
+        size_mb = os.path.getsize(files[name]) / (1024 * 1024)
         click.echo(f"  {name}  ({size_mb:.1f} MB)")
 
 
@@ -92,15 +112,15 @@ def list_updates(slug: str) -> None:
 @click.argument("slug")
 @click.argument("filename")
 def push_update(slug: str, filename: str) -> None:
-    """Push a managed update/DLC file for SLUG to another device."""
+    """Push an update/DLC file for SLUG (managed or auto-detected) to another device."""
     cfg = cfg_module.load()
     client = _require_client(cfg)
     _require_game(client, slug)
 
-    dest_dir = switch_updates_dir(cfg.data_dir, slug)
-    local_path = os.path.join(dest_dir, filename)
-    if not os.path.isfile(local_path):
-        click.echo(f"'{filename}' is not in this device's managed folder for '{slug}'.", err=True)
+    files = _resolve_update_files(client, cfg, slug)
+    local_path = files.get(filename)
+    if not local_path:
+        click.echo(f"'{filename}' isn't available for '{slug}' on this device.", err=True)
         click.echo(f"Run 'emusync update list {slug}' to see what's available.", err=True)
         sys.exit(1)
 

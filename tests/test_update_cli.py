@@ -8,7 +8,7 @@ from click.testing import CliRunner
 
 import server.config as cfg_module
 from cli.update import add_update, list_updates, push_update
-from server.sync_client import SyncClient
+from server.sync_client import GameDeviceConfig, SyncClient
 
 
 def _device_client(live_server, device_id: str, device_name: str) -> SyncClient:
@@ -60,7 +60,7 @@ def test_list_reports_none_when_empty(monkeypatch, tmp_path, live_server):
 
     result = CliRunner().invoke(list_updates, ["some-game"])
     assert result.exit_code == 0, result.output
-    assert "No update files managed" in result.output
+    assert "No update/DLC files found" in result.output
 
 
 def test_push_update_queues_a_kind_tagged_transfer(monkeypatch, tmp_path, live_server):
@@ -88,6 +88,36 @@ def test_push_update_queues_a_kind_tagged_transfer(monkeypatch, tmp_path, live_s
     assert pending[0]["slug"] == "pokemon-brilliant-diamond"
 
 
+def test_list_and_push_merge_auto_detected_update_paths(monkeypatch, tmp_path, live_server):
+    """A file never added via `emusync update add` — only recorded as
+    update_paths on the game (as the import wizard now does, #441) — still
+    shows up in `list` and is pushable, without first copying it into the
+    managed folder."""
+    client = _device_client(live_server, "dev-d", "PC")
+    client.add_game("Pokemon Brilliant Diamond", console="Switch")
+    _write_cfg(monkeypatch, tmp_path, live_server, "dev-d", "PC")
+
+    auto_detected = tmp_path / "roms" / "pbd_update.nsp"
+    auto_detected.parent.mkdir(parents=True)
+    auto_detected.write_bytes(b"AUTO-DETECTED")
+    client.set_game_device("pokemon-brilliant-diamond", GameDeviceConfig(
+        rom_path=str(tmp_path / "roms" / "pbd.nsp"),
+        update_paths=[str(auto_detected)],
+    ))
+
+    target = _device_client(live_server, "dev-e", "Steam Deck")
+    target.list_devices()
+
+    runner = CliRunner()
+    result = runner.invoke(list_updates, ["pokemon-brilliant-diamond"])
+    assert result.exit_code == 0, result.output
+    assert "pbd_update.nsp" in result.output
+
+    result = runner.invoke(push_update, ["pokemon-brilliant-diamond", "pbd_update.nsp"], input="1\n")
+    assert result.exit_code == 0, result.output
+    assert "Pushed to Steam Deck" in result.output
+
+
 def test_push_update_missing_local_file_errors(monkeypatch, tmp_path, live_server):
     client = _device_client(live_server, "dev-c", "PC")
     client.add_game("Some Game", console="Switch")
@@ -95,4 +125,4 @@ def test_push_update_missing_local_file_errors(monkeypatch, tmp_path, live_serve
 
     result = CliRunner().invoke(push_update, ["some-game", "missing.nsp"])
     assert result.exit_code != 0
-    assert "is not in this device's managed folder" in result.output
+    assert "isn't available for" in result.output

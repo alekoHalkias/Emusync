@@ -39,6 +39,8 @@ export type RomEntry = {
   // will upload its ROM to the share and convert it to network-source in place
   // (carries `linkedSlug`, so no duplicate game is created).
   existingLocal?: boolean;
+  // Switch update/DLC files auto-detected next to romPath at scan time (#441).
+  updatePaths?: string[];
 };
 
 export type Phase =

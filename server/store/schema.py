@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 18
+_SCHEMA_VERSION = 19
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS game_devices (
     rom_rel_path    TEXT NOT NULL DEFAULT '',
     local_rom_path  TEXT NOT NULL DEFAULT '',
     rom_sha256      TEXT NOT NULL DEFAULT '',
+    update_paths    TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (game_slug, device_id)
 );
 CREATE TABLE IF NOT EXISTS saves (
@@ -384,4 +385,9 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # managed per-game folder instead of the game's rom_path. Existing rows
         # default to 'rom', preserving current behavior unchanged.
         _try(conn, "ALTER TABLE rom_transfers ADD COLUMN kind TEXT NOT NULL DEFAULT 'rom'")
+    if from_version < 19:
+        # Update/DLC files auto-detected next to a Switch game's base ROM at
+        # import time (';'-joined absolute paths, mirroring console_defs's
+        # list-field convention) — issue #441.
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN update_paths TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

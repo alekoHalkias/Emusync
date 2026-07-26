@@ -325,6 +325,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
           rom_rel_path: romRelPath,
           local_rom_path: localCopyPath,
           ...(romSha ? { rom_sha256: romSha } : {}),
+          ...(rom.updatePaths?.length ? { update_paths: rom.updatePaths } : {}),
           // Network root + chosen local-copy destination land on the console row
           // so `Copy for offline play` / `emusync rom localize` know where to put it.
           ...(romSource === "network" ? {

@@ -125,6 +125,40 @@ async def test_set_and_get_device_config(client):
 
 
 @pytest.mark.asyncio
+async def test_update_paths_round_trip(client):
+    """Switch update/DLC files auto-detected next to the base ROM at import
+    time (#441) persist as a list through the API, stored as a ';'-joined
+    string at rest (mirrors console_defs's list-field convention)."""
+    await client.post("/games", json={"name": "Pokemon Brilliant Diamond", "console": "Switch"}, headers=AUTH)
+
+    cfg = {
+        "rom_path": "/roms/switch/pbd/pbd.nsp",
+        "save_path": "",
+        "launch_command": "eden /roms/switch/pbd/pbd.nsp",
+        "update_paths": ["/roms/switch/pbd/pbd_update.nsp", "/roms/switch/pbd/pbd_dlc.nsp"],
+    }
+    r = await client.put("/games/pokemon-brilliant-diamond/device", json=cfg, headers=AUTH)
+    assert r.status_code == 200
+
+    r = await client.get("/games/pokemon-brilliant-diamond/device", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["update_paths"] == cfg["update_paths"]
+
+
+@pytest.mark.asyncio
+async def test_update_paths_defaults_to_empty_list(client):
+    """Every existing caller that doesn't send update_paths (every non-Switch
+    console) still round-trips cleanly to an empty list."""
+    await client.post("/games", json={"name": "Metroid Fusion", "console": "GBA"}, headers=AUTH)
+    await client.put("/games/metroid-fusion/device", json={
+        "rom_path": "/roms/fusion.gba", "save_path": "/roms/fusion.srm", "launch_command": "retroarch fusion.gba",
+    }, headers=AUTH)
+
+    r = await client.get("/games/metroid-fusion/device", headers=AUTH)
+    assert r.json()["update_paths"] == []
+
+
+@pytest.mark.asyncio
 async def test_set_device_config_nonexistent_game(client):
     """PUT /games/:slug/device on a slug that doesn't exist should 404 or fail gracefully."""
     r = await client.put("/games/ghost-game/device", json={

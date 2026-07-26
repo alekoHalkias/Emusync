@@ -120,6 +120,31 @@ def test_switch_base_game_vs_update_filter():
     assert _is_switch_base_game_file("weird_name.nsp") is True
 
 
+def test_find_switch_update_files_matches_by_title_id_prefix(tmp_path):
+    """Update/DLC files for the same title are auto-detected next to the base
+    ROM at import time (#441) — matched by the shared 13-hex title-ID prefix
+    so an unrelated game's files in the same flat ROM folder aren't picked up."""
+    from cli.detect import _find_switch_update_files
+
+    base = tmp_path / "Pokemon Brilliant Diamond [0100000011D90000][v0].nsp"
+    update = tmp_path / "Pokemon Brilliant Diamond [0100000011D90800][v393216].nsp"
+    dlc = tmp_path / "Pokemon Brilliant Diamond DLC [0100000011D90001][v0].nsp"
+    unrelated = tmp_path / "Some Other Game [0100ABCDEF012000][v0].nsp"
+    for f in (base, update, dlc, unrelated):
+        f.write_bytes(b"")
+
+    found = _find_switch_update_files(str(base))
+
+    assert set(found) == {str(update), str(dlc)}
+
+
+def test_find_switch_update_files_no_title_id_returns_empty(tmp_path):
+    from cli.detect import _find_switch_update_files
+    base = tmp_path / "weird_name.nsp"
+    base.write_bytes(b"")
+    assert _find_switch_update_files(str(base)) == []
+
+
 # ── core ↔ console matching via .info databases (#400) ────────────────────────
 
 def test_new_cores_match_their_console_and_not_psx(tmp_path):

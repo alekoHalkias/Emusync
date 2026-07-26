@@ -53,6 +53,7 @@ export interface RomEntry {
   launchCommand: string;
   consoleName?: string;   // e.g. "Game Boy Advance"
   coreName?: string;      // e.g. "mGBA" — the core that will be used
+  updatePaths?: string[]; // Switch update/DLC files auto-detected next to romPath (#441)
 }
 
 export interface EmulatorScanResult {

@@ -4,7 +4,7 @@ import io
 import os
 import shutil
 import tarfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -88,6 +88,8 @@ class GameDeviceConfig:
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
+    # Update/DLC files auto-detected next to the base ROM at import time (#441).
+    update_paths: list = field(default_factory=list)
     # Console-level network/local folder config; transient — populates the console row.
     device_network_folder: str = ""
     device_local_folder: str = ""
@@ -234,6 +236,7 @@ class SyncClient:
             rom_rel_path=d.get("rom_rel_path", ""),
             local_rom_path=d.get("local_rom_path", ""),
             rom_sha256=d.get("rom_sha256", ""),
+            update_paths=d.get("update_paths", []),
         )
 
     def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:
@@ -243,6 +246,7 @@ class SyncClient:
                   "state_path": cfg.state_path, "rom_folder_path": cfg.rom_folder_path,
                   "rom_source": cfg.rom_source, "rom_rel_path": cfg.rom_rel_path,
                   "local_rom_path": cfg.local_rom_path, "rom_sha256": cfg.rom_sha256,
+                  "update_paths": cfg.update_paths,
                   "device_network_folder": cfg.device_network_folder,
                   "device_local_folder": cfg.device_local_folder},
             timeout=10,

@@ -1,5 +1,5 @@
 // ROM directory scanning and save/state path resolution for the import wizard.
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import { join, basename, extname, dirname } from "path";
 import { rt } from "../runtime";
 import { findLatestFileInDir } from "../files";
@@ -130,6 +130,37 @@ function switchDisplayName(baseName: string): string {
   return baseName.replace(BRACKET_TAG_RE, "").trim();
 }
 
+/** Update/DLC files for the same title as `baseRomPath`, found next to it
+ *  (issue #441) — auto-detected at import time instead of managed
+ *  separately. Matches by the shared 13-hex title-ID prefix so an unrelated
+ *  game's files in the same flat ROM folder are never picked up. Only the
+ *  base ROM's own folder is scanned — not recursive. Mirrors
+ *  cli/detect.py's _find_switch_update_files. */
+function findSwitchUpdateFiles(baseRomPath: string): string[] {
+  const name = basename(baseRomPath);
+  const match = SWITCH_TITLE_ID_RE.exec(name);
+  if (!match) return [];
+  const titlePrefix = match[1].slice(0, 13).toLowerCase();
+  const folder = dirname(baseRomPath);
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(folder);
+  } catch { return []; }
+  const found: string[] = [];
+  for (const entry of entries.sort()) {
+    const path = join(folder, entry);
+    if (path === baseRomPath) continue;
+    const ext = extname(entry).slice(1).toLowerCase();
+    if (ext !== "nsp" && ext !== "xci") continue;
+    if (!statSync(path, { throwIfNoEntry: false })?.isFile()) continue;
+    const entryMatch = SWITCH_TITLE_ID_RE.exec(entry);
+    if (entryMatch && entryMatch[1].toLowerCase().startsWith(titlePrefix)) {
+      found.push(path);
+    }
+  }
+  return found;
+}
+
 /** Search saveDir for a file matching baseName + any of the given extensions. */
 function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { path: string; exists: boolean } {
   for (const ext of exts) {
@@ -251,6 +282,7 @@ export function runEmulatorScan(params: {
           launchCommand,
           consoleName: system?.name ?? consoleDef.label,
           coreName: emulatorOption.coreFolderName,
+          updatePaths: consoleKey === "switch" ? findSwitchUpdateFiles(romPath) : undefined,
         };
       });
   });
