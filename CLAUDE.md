@@ -297,6 +297,8 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **WSL2 + Electron** — requires `--no-sandbox` (baked into `npm run dev`) and `DISPLAY=:0`. dbus errors in the output are harmless.
 
+**Electron dev mode defaults to X11/XWayland on Linux** even in a real Wayland session (`XDG_SESSION_TYPE=wayland`) unless Ozone's Wayland backend is requested. `npm run dev` passes `--ozone-platform-hint=auto` (#439) so it picks Wayland when a compositor is present while still falling back to X11 under WSL2, where there's no compositor and the `--no-sandbox`/`DISPLAY=:0` gotcha above still applies.
+
 **Stale DB schema** — `sqlite3.OperationalError: no such column` → delete `~/.emusync/emusync.db` and restart the server.
 
 **TypeScript on `window.emusync`** — globally typed via `EmusyncBridge` in `gui/renderer/src/emusync.d.ts`, the source of truth mirroring `preload.ts`. New IPC channel → add its signature there too, or renderer call sites won't be type-checked.
