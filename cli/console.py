@@ -17,9 +17,11 @@ from cli.consoles_data import (
 )
 from cli.detect import (
     _detect_emulators_for_console,
+    _is_switch_base_game_file,
     _match_save_file,
     _resolve_shared_memcard_save_state,
     _scan_rom_dir,
+    _switch_display_name,
 )
 from cli.root import cli
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
@@ -272,6 +274,11 @@ def console_import() -> None:
         all_files.extend(_scan_rom_dir(folder))
     matching = [p for p in all_files
                 if os.path.splitext(p)[1].lstrip(".").lower() in rom_ext_set]
+    # Switch base/update/DLC all ship as .nsp — filter down to base games via
+    # the title-ID convention rather than importing updates as separate
+    # "games" (#419).
+    if console_def["key"] == "switch":
+        matching = [p for p in matching if _is_switch_base_game_file(p)]
 
     if not matching:
         click.echo("No ROMs found.")
@@ -324,8 +331,15 @@ def console_import() -> None:
         else:
             launch_cmd = f'{emu["exec_path"]} "{rom_path}"'
 
+        # Switch dumps carry bracketed title-ID/version tags in the filename
+        # (e.g. "Pokemon Brilliant Diamond [0100000011D90000][v0].nsp") — every
+        # other console just uses the filename as-is, but that's unreadable
+        # here, so the stored game name strips the tags. rom_path/`base` (used
+        # below for save-file matching) are untouched — only display name (#419).
+        display_name = _switch_display_name(base) if console_def["key"] == "switch" else base
+
         entries.append({
-            "name": base,
+            "name": display_name,
             "rom_path": rom_path,
             "save_path": save_match["path"],
             "save_exists": save_match["exists"],

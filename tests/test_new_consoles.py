@@ -67,6 +67,59 @@ def test_wii_is_not_a_shared_save_console():
     assert _BY_KEY["wii"]["abbr"] not in _SHARED_STATE_CONSOLES
 
 
+def test_switch_console_def_follows_ps2_pattern():
+    cdef = _BY_KEY["switch"]
+    assert cdef["system_keys"] == []
+    assert set(cdef["rom_extensions"]) == {"nsp", "xci"}
+    assert cdef["databases"] == ["Nintendo - Switch"]
+    for ext in cdef["rom_extensions"]:
+        assert ext in _ROM_EXTENSIONS
+
+
+def test_switch_is_not_a_shared_save_console():
+    """Switch saves per-game via a learned NAND folder (#419), same reasoning
+    as Wii (#431) — must stay excluded from both shared sets despite the
+    issue title's suggestion of shared-save-layout treatment."""
+    assert _BY_KEY["switch"]["abbr"] not in _SHARED_MEMCARD_CONSOLES
+    assert _BY_KEY["switch"]["abbr"] not in _SHARED_STATE_CONSOLES
+
+
+def test_switch_standalone_eden_def_has_no_flatpak():
+    """Eden is AppImage-only (no Flathub package yet, #419) — unlike every
+    other standalone def, it must omit flatpak_id/flatpak_exec entirely
+    rather than pointing at a nonexistent app ID."""
+    from cli.consoles_data import _EDEN
+    assert _EDEN["native_bins"]
+    assert "flatpak_id" not in _EDEN
+    assert "flatpak_exec" not in _EDEN
+    assert _BY_KEY["switch"]["standalones"] == [_EDEN]
+
+
+def test_switch_display_name_strips_bracket_tags():
+    """Switch dump filenames carry bracketed title-ID/version tags every
+    other console's plain-filename naming doesn't — stripped for the stored
+    game name only, never touching the actual ROM file (#419)."""
+    from cli.detect import _switch_display_name
+    assert _switch_display_name(
+        "Pokemon Brilliant Diamond [0100000011D90000][v0]") == "Pokemon Brilliant Diamond"
+    assert _switch_display_name("No Tags Here") == "No Tags Here"
+
+
+def test_switch_base_game_vs_update_filter():
+    """Base/update/DLC all ship as .nsp, distinguishable only by Nintendo's
+    title-ID convention (base ends in '000') — real-world example filenames
+    from #419's bug report (Pokemon Brilliant Diamond base + its update)."""
+    from cli.detect import _is_switch_base_game_file
+    assert _is_switch_base_game_file(
+        "Pokemon Brilliant Diamond [0100000011D90000][v0].nsp") is True
+    assert _is_switch_base_game_file(
+        "Pokemon Brilliant Diamond [0100000011D90800][v393216].nsp") is False
+    # .xci cart dumps are never split into update packages — always kept.
+    assert _is_switch_base_game_file("Some Game [0100000011D90800].xci") is True
+    # No recognizable title ID — kept rather than guessed away.
+    assert _is_switch_base_game_file("weird_name.nsp") is True
+
+
 # ── core ↔ console matching via .info databases (#400) ────────────────────────
 
 def test_new_cores_match_their_console_and_not_psx(tmp_path):

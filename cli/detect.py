@@ -269,6 +269,40 @@ def _scan_rom_dir(directory: str, depth: int = 0) -> list[str]:
     return roms
 
 
+# Nintendo Switch title IDs: a base title's low 3 hex digits are always
+# "000"; its update package reuses the same ID with the low digits set to
+# "800"; DLC uses other nonzero low digits. Base/update/DLC all ship as .nsp
+# (#419), so this is the only reliable way to filter a ROM scan down to base
+# games — mirrors scan.ts's SWITCH_TITLE_ID_RE.
+_SWITCH_TITLE_ID_RE = re.compile(r"\[([0-9A-Fa-f]{16})\]")
+
+
+def _is_switch_base_game_file(path: str) -> bool:
+    """True unless *path* is clearly a Switch update/DLC package, not a base
+    game. Only .nsp is ambiguous — .xci cart dumps are always a whole base
+    game. A filename without a recognizable bracketed title ID is kept as-is
+    rather than guessed away."""
+    name = os.path.basename(path)
+    if not name.lower().endswith(".nsp"):
+        return True
+    match = _SWITCH_TITLE_ID_RE.search(name)
+    if not match:
+        return True
+    return match.group(1).lower().endswith("000")
+
+
+# Switch dump filenames carry bracketed title-ID/version tags (see above) that
+# every other console's "filename minus extension" naming doesn't have —
+# stripped here for display only, never touching the actual file on disk
+# (rom_path is untouched; this only feeds the game's stored "name"/slug, #419).
+_BRACKET_TAG_RE = re.compile(r"\s*\[[^\[\]]*\]")
+
+
+def _switch_display_name(base_name: str) -> str:
+    """*base_name* (filename minus extension) with bracketed tags removed."""
+    return _BRACKET_TAG_RE.sub("", base_name).strip()
+
+
 def _match_save_file(save_dir: str, base_name: str, exts: list[str]) -> dict:
     """Find save file in save_dir matching base_name + any extension."""
     for ext in exts:
