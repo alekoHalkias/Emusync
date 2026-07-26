@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 17
+_SCHEMA_VERSION = 18
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -94,7 +94,8 @@ CREATE TABLE IF NOT EXISTS rom_transfers (
     status           TEXT NOT NULL DEFAULT 'pending',
     queued_at        TEXT NOT NULL,
     completed_at     TEXT,
-    sha256           TEXT
+    sha256           TEXT,
+    kind             TEXT NOT NULL DEFAULT 'rom'
 );
 CREATE TABLE IF NOT EXISTS rom_pull_requests (
     id               TEXT PRIMARY KEY,
@@ -377,4 +378,10 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # configured format so a pulling device can detect a mismatch before
         # merging incompatible card layouts together.
         _try(conn, "ALTER TABLE console_saves ADD COLUMN card_format TEXT NOT NULL DEFAULT ''")
+    if from_version < 18:
+        # Distinguishes a plain ROM push from a Switch update/DLC package push
+        # (issue #441) — the receiving side routes an 'update' transfer into a
+        # managed per-game folder instead of the game's rom_path. Existing rows
+        # default to 'rom', preserving current behavior unchanged.
+        _try(conn, "ALTER TABLE rom_transfers ADD COLUMN kind TEXT NOT NULL DEFAULT 'rom'")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

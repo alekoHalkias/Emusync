@@ -292,6 +292,48 @@ def push_rom() -> None:
             click.echo(f"  Warning: {target['name']} is offline — {game_name} will be delivered when it comes online.")
 
 
+def switch_updates_dir(data_dir: str, slug: str) -> str:
+    """Managed folder for a game's Switch update/DLC files (#441) — not the
+    game's ROM location, since these still need a manual one-time
+    'Install Files to NAND' in Eden per device (no headless install exists)."""
+    return os.path.join(data_dir, "switch_updates", slug)
+
+
+def _receive_update_transfer(
+    client: "SyncClient",
+    data_dir: str,
+    transfer_id: str,
+    slug: str,
+    sender_destination_path: str,
+    game_name: str,
+    log=click.echo,
+    sha256: str | None = None,
+) -> bool:
+    """Download one pending 'update'-kind transfer into the managed updates
+    folder. Unlike _receive_transfer, never touches game_device registration
+    — an update/DLC file is not the game's ROM. Only the filename is taken
+    from the sender (`sender_destination_path`'s basename); the receiving
+    device always chooses its own managed folder rather than trusting a
+    sender-supplied absolute path for this kind."""
+    dest_dir = switch_updates_dir(data_dir, slug)
+    os.makedirs(dest_dir, exist_ok=True)
+    filename = os.path.basename(sender_destination_path) or f"update-{transfer_id}"
+    destination_path = os.path.join(dest_dir, filename)
+    try:
+        log(f"  Receiving update for {game_name}...")
+        client.download_transfer(transfer_id, destination_path, expected_hash=sha256)
+        client.complete_transfer(transfer_id)
+        log(f"  Saved to {destination_path}")
+        return True
+    except Exception as e:
+        log(f"  Failed to receive update for {game_name}: {e}")
+        try:
+            client.complete_transfer(transfer_id, status="failed")
+        except Exception:
+            pass
+        return False
+
+
 def _receive_transfer(
     client: "SyncClient",
     transfer_id: str,
@@ -434,6 +476,13 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
             for t in pending:
                 if _stopping():
                     return
+                if t.get("kind") == "update":
+                    data_dir = getattr(watch_cfg, "data_dir", None) if watch_cfg else None
+                    if data_dir:
+                        _receive_update_transfer(client, data_dir, t["id"], t["slug"],
+                                                 t["destination_path"], t.get("game_name", t["slug"]), log,
+                                                 sha256=t.get("sha256"))
+                    continue
                 _receive_transfer(client, t["id"], t["destination_path"],
                                   t["slug"], t.get("console", ""), t.get("game_name", t["slug"]), log,
                                   sha256=t.get("sha256"))
@@ -461,6 +510,20 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
                 if _stopping():
                     return
                 if event.get("type") == "rom_transfer_queued":
+                    if event.get("kind") == "update":
+                        data_dir = getattr(watch_cfg, "data_dir", None) if watch_cfg else None
+                        if data_dir:
+                            _receive_update_transfer(
+                                client,
+                                data_dir,
+                                event["transfer_id"],
+                                event.get("slug", ""),
+                                event["destination_path"],
+                                event.get("game_name", event.get("slug", event["transfer_id"])),
+                                log,
+                                sha256=event.get("sha256"),
+                            )
+                        continue
                     _receive_transfer(
                         client,
                         event["transfer_id"],

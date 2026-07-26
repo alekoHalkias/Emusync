@@ -33,7 +33,7 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | Path | Owns |
 |------|------|
 | `emusync.py` | Thin entry-point shim — bootstraps `sys.path`, calls `cli()`. Must stay at this exact path (referenced by `install.sh`/`Makefile`/Electron `spawn`/`pkill`) |
-| `cli/` | Click CLI, one module per command group: `server`/`device`/`game`/`console`/`sync`/`transfer`/`watch`/`run`/`rom`. `consoles_data.py`/`detect.py` drive emulator/core detection for the import wizard (mirrors `gui/electron/emulator/detect.ts`) |
+| `cli/` | Click CLI, one module per command group: `server`/`device`/`game`/`console`/`sync`/`transfer`/`watch`/`run`/`rom`/`update`. `consoles_data.py`/`detect.py` drive emulator/core detection for the import wizard (mirrors `gui/electron/emulator/detect.ts`) |
 | `server/api/` | FastAPI app, one `APIRouter` per domain (`devices`/`games`/`transfers`/`blobs`/`locks`/`defs`/`conflicts`/`settings`). PIN + device-header auth |
 | `server/store/` | SQLite (stdlib `sqlite3`, WAL), one CRUD mixin per table-group; schema versioned via `PRAGMA user_version` in `schema.py` |
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |

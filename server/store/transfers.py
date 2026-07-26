@@ -21,25 +21,26 @@ class TransferMixin:
         destination_path: str,
         staged_file: str,
         sha256: Optional[str] = None,
+        kind: str = "rom",
     ) -> RomTransfer:
         now = datetime.now(timezone.utc).isoformat()
         self._conn.execute(
             """INSERT INTO rom_transfers
-               (id, slug, from_device_id, to_device_id, destination_path, staged_file, status, queued_at, sha256)
-               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)""",
-            (id, slug, from_device_id, to_device_id, destination_path, staged_file, now, sha256),
+               (id, slug, from_device_id, to_device_id, destination_path, staged_file, status, queued_at, sha256, kind)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)""",
+            (id, slug, from_device_id, to_device_id, destination_path, staged_file, now, sha256, kind),
         )
         self._conn.commit()
         return RomTransfer(
             id=id, slug=slug, from_device_id=from_device_id, to_device_id=to_device_id,
             destination_path=destination_path, staged_file=staged_file,
-            status="pending", queued_at=now, sha256=sha256,
+            status="pending", queued_at=now, sha256=sha256, kind=kind,
         )
 
     def get_rom_transfer(self, transfer_id: str) -> Optional[RomTransfer]:
         row = self._conn.execute(
             """SELECT id, slug, from_device_id, to_device_id, destination_path,
-                      staged_file, status, queued_at, completed_at, sha256
+                      staged_file, status, queued_at, completed_at, sha256, kind
                FROM rom_transfers WHERE id = ?""",
             (transfer_id,),
         ).fetchone()
@@ -48,7 +49,7 @@ class TransferMixin:
     def list_pending_transfers_for_device(self, device_id: str) -> list[RomTransfer]:
         rows = self._conn.execute(
             """SELECT id, slug, from_device_id, to_device_id, destination_path,
-                      staged_file, status, queued_at, completed_at, sha256
+                      staged_file, status, queued_at, completed_at, sha256, kind
                FROM rom_transfers WHERE to_device_id = ? AND status = 'pending'
                ORDER BY queued_at""",
             (device_id,),

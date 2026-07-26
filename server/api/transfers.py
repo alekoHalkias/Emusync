@@ -37,6 +37,7 @@ async def create_rom_transfer(
     x_to_device_id: str = Header(None),
     x_destination_path: str = Header(None),
     x_filename: str = Header("rom"),
+    x_transfer_kind: str = Header("rom"),
     device_id: str = Depends(_auth),
 ) -> dict:
     store = _get_store()
@@ -75,6 +76,7 @@ async def create_rom_transfer(
         destination_path=x_destination_path or "",
         staged_file=str(staged_path),
         sha256=sha256,
+        kind=x_transfer_kind or "rom",
     )
 
     target_name = next((d.name for d in devices if d.id == x_to_device_id), x_to_device_id)
@@ -91,6 +93,7 @@ async def create_rom_transfer(
             "console": game.console,
             "destination_path": x_destination_path or "",
             "sha256": sha256,
+            "kind": x_transfer_kind or "rom",
         })
 
     store.log_event("rom_transfer_queued", slug, device_id)
@@ -119,6 +122,7 @@ def list_pending_transfers(device_id: str = Depends(_auth)) -> list[dict]:
             "console": game.console if game else "",
             "game_name": game.name if game else t.slug,
             "sha256": t.sha256,
+            "kind": t.kind,
         })
     return result
 

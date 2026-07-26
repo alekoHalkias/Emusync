@@ -262,9 +262,10 @@ class SyncClient:
         return r.json()
 
     def create_rom_transfer(
-        self, slug: str, to_device_id: str, destination_path: str, rom_path: str
+        self, slug: str, to_device_id: str, destination_path: str, rom_path: str, kind: str = "rom"
     ) -> dict:
-        """Upload a ROM to the server and queue it for delivery to target device."""
+        """Upload a ROM (or, with kind='update', a Switch update/DLC file, #441)
+        to the server and queue it for delivery to target device."""
         path = Path(rom_path)
         file_size = path.stat().st_size
         mb_total = file_size / (1024 * 1024)
@@ -289,6 +290,7 @@ class SyncClient:
                 "X-To-Device-ID": to_device_id,
                 "X-Destination-Path": destination_path,
                 "X-Filename": path.name,
+                "X-Transfer-Kind": kind,
             },
             timeout=httpx.Timeout(None),
         )

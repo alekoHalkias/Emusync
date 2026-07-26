@@ -80,6 +80,7 @@ class RomTransfer:
     queued_at: str
     completed_at: Optional[str] = None
     sha256: Optional[str] = None  # hash of the staged ROM, for download integrity checks
+    kind: str = "rom"  # 'rom' or 'update' — an 'update' lands in a managed folder, not rom_path (#441)
 
 
 @dataclass
