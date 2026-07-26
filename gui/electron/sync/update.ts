@@ -8,7 +8,8 @@
 import { ipcMain } from "electron";
 import { existsSync, mkdirSync, readdirSync, statSync, copyFileSync, createReadStream, basename } from "fs";
 import { request as httpRequest } from "http";
-import { join, homedir } from "path";
+import { join } from "path";
+import { homedir } from "os";
 import { loadServerCfg } from "../config-store";
 
 /** Managed folder for a game's Switch update/DLC files — mirrors
