@@ -101,6 +101,24 @@ function scanRomDir(dir: string, depth = 0): string[] {
   } catch { return []; }
 }
 
+// Nintendo Switch title IDs: a base title's low 3 hex digits are always
+// "000"; its update package reuses the same ID with the low digits set to
+// "800"; DLC uses other nonzero low digits. Base/update/DLC all ship as .nsp
+// (#419), so this is the only reliable way to filter a scan down to base
+// games — mirrors cli/detect.py's _SWITCH_TITLE_ID_RE.
+const SWITCH_TITLE_ID_RE = /\[([0-9A-Fa-f]{16})\]/;
+
+/** True unless `name` is clearly a Switch update/DLC package, not a base game.
+ *  Only .nsp is ambiguous — .xci cart dumps are always a whole base game. A
+ *  filename without a recognizable bracketed title ID is kept as-is rather
+ *  than guessed away. */
+function isSwitchBaseGameFile(name: string): boolean {
+  if (extname(name).slice(1).toLowerCase() !== "nsp") return true;
+  const match = SWITCH_TITLE_ID_RE.exec(name);
+  if (!match) return true;
+  return match[1].toLowerCase().endsWith("000");
+}
+
 /** Search saveDir for a file matching baseName + any of the given extensions. */
 function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { path: string; exists: boolean } {
   for (const ext of exts) {
@@ -138,7 +156,10 @@ export function runEmulatorScan(params: {
   const roms: RomEntry[] = romDirs.flatMap(dir => {
     const allInDir = scanRomDir(dir);
     console.error(`[scan] dir='${dir}' → scanRomDir found ${allInDir.length} files total`);
-    const filtered = allInDir.filter(p => romExtSet.has(extname(p).slice(1).toLowerCase()));
+    const filtered = allInDir.filter(p =>
+      romExtSet.has(extname(p).slice(1).toLowerCase()) &&
+      (consoleKey !== "switch" || isSwitchBaseGameFile(basename(p)))
+    );
     console.error(`[scan] dir='${dir}' → after ext filter (${[...romExtSet].join(",")}) kept ${filtered.length}`);
     return filtered
       .map(romPath => {

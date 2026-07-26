@@ -211,10 +211,16 @@ _IMPORT_CONSOLES = [
     # Switch is standalone-only (no libretro core) and, like Wii, saves
     # per-game via a learned NAND folder rather than a shared card — NOT a
     # _SHARED_MEMCARD_CONSOLES member despite the issue title's suggestion
-    # (#419). See cli/run_switch.py / the _EDEN comment above.
+    # (#419). See cli/run_switch.py / the _EDEN comment above. Base game,
+    # update, and DLC all ship as .nsp, so extension alone can't tell them
+    # apart — the scan step filters .nsp files by Nintendo's title-ID
+    # convention instead (base title IDs end in "000"; an update reuses the
+    # same ID with the low 3 hex digits set to "800", DLC uses other nonzero
+    # low digits) via `_is_switch_base_game_file` in cli/console.py /
+    # gui/electron/emulator/scan.ts's mirrored filter.
     {"key": "switch",  "label": "Nintendo Switch",            "abbr": "Switch",
      "system_keys": [],
-     "rom_extensions": ["nsp", "xci", "nca"],
+     "rom_extensions": ["nsp", "xci"],
      "databases": ["Nintendo - Switch"],
      "standalones": [_EDEN], "suggestions": ["Eden standalone"]},
 ]
@@ -347,7 +353,9 @@ _ROM_EXTENSIONS = {
     "gcm", "rvz", "wbfs",         # GameCube / Wii (#402)
     "cso",                        # PSP (#402)
     "3ds", "cci", "cxi",          # Nintendo 3DS (#418)
-    "nsp", "xci", "nca",          # Nintendo Switch (#419)
+    "nsp", "xci",                 # Nintendo Switch (#419) — .nca excluded: it's a
+                                  # raw internal content container, never a
+                                  # standalone ROM file users have loose
 }
 
 
