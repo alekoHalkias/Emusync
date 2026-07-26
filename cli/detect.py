@@ -291,6 +291,18 @@ def _is_switch_base_game_file(path: str) -> bool:
     return match.group(1).lower().endswith("000")
 
 
+# Switch dump filenames carry bracketed title-ID/version tags (see above) that
+# every other console's "filename minus extension" naming doesn't have —
+# stripped here for display only, never touching the actual file on disk
+# (rom_path is untouched; this only feeds the game's stored "name"/slug, #419).
+_BRACKET_TAG_RE = re.compile(r"\s*\[[^\[\]]*\]")
+
+
+def _switch_display_name(base_name: str) -> str:
+    """*base_name* (filename minus extension) with bracketed tags removed."""
+    return _BRACKET_TAG_RE.sub("", base_name).strip()
+
+
 def _match_save_file(save_dir: str, base_name: str, exts: list[str]) -> dict:
     """Find save file in save_dir matching base_name + any extension."""
     for ext in exts:

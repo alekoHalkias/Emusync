@@ -21,6 +21,7 @@ from cli.detect import (
     _match_save_file,
     _resolve_shared_memcard_save_state,
     _scan_rom_dir,
+    _switch_display_name,
 )
 from cli.root import cli
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
@@ -330,8 +331,15 @@ def console_import() -> None:
         else:
             launch_cmd = f'{emu["exec_path"]} "{rom_path}"'
 
+        # Switch dumps carry bracketed title-ID/version tags in the filename
+        # (e.g. "Pokemon Brilliant Diamond [0100000011D90000][v0].nsp") — every
+        # other console just uses the filename as-is, but that's unreadable
+        # here, so the stored game name strips the tags. rom_path/`base` (used
+        # below for save-file matching) are untouched — only display name (#419).
+        display_name = _switch_display_name(base) if console_def["key"] == "switch" else base
+
         entries.append({
-            "name": base,
+            "name": display_name,
             "rom_path": rom_path,
             "save_path": save_match["path"],
             "save_exists": save_match["exists"],

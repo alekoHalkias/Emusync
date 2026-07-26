@@ -119,6 +119,17 @@ function isSwitchBaseGameFile(name: string): boolean {
   return match[1].toLowerCase().endsWith("000");
 }
 
+// Switch dumps carry bracketed title-ID/version tags in the filename (e.g.
+// "Pokemon Brilliant Diamond [0100000011D90000][v0]") that every other
+// console's "filename minus extension" naming doesn't have — stripped here
+// for display only, never touching the actual file on disk (romPath/`base`
+// are untouched — only the stored game name, #419).
+const BRACKET_TAG_RE = /\s*\[[^[\]]*\]/g;
+
+function switchDisplayName(baseName: string): string {
+  return baseName.replace(BRACKET_TAG_RE, "").trim();
+}
+
 /** Search saveDir for a file matching baseName + any of the given extensions. */
 function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { path: string; exists: boolean } {
   for (const ext of exts) {
@@ -234,7 +245,7 @@ export function runEmulatorScan(params: {
           ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
           : `${emulatorOption.execPath}${standaloneArgs ? ` ${standaloneArgs}` : ""} "${romPath}"`;
         return {
-          name: base, romPath,
+          name: consoleKey === "switch" ? switchDisplayName(base) : base, romPath,
           savePath: m.path, saveExists: m.exists,
           statePath: sm?.path, stateExists: sm?.exists,
           launchCommand,

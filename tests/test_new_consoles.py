@@ -95,6 +95,16 @@ def test_switch_standalone_eden_def_has_no_flatpak():
     assert _BY_KEY["switch"]["standalones"] == [_EDEN]
 
 
+def test_switch_display_name_strips_bracket_tags():
+    """Switch dump filenames carry bracketed title-ID/version tags every
+    other console's plain-filename naming doesn't — stripped for the stored
+    game name only, never touching the actual ROM file (#419)."""
+    from cli.detect import _switch_display_name
+    assert _switch_display_name(
+        "Pokemon Brilliant Diamond [0100000011D90000][v0]") == "Pokemon Brilliant Diamond"
+    assert _switch_display_name("No Tags Here") == "No Tags Here"
+
+
 def test_switch_base_game_vs_update_filter():
     """Base/update/DLC all ship as .nsp, distinguishable only by Nintendo's
     title-ID convention (base ends in '000') — real-world example filenames
