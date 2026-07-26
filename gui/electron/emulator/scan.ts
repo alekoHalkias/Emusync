@@ -101,6 +101,35 @@ function scanRomDir(dir: string, depth = 0): string[] {
   } catch { return []; }
 }
 
+// Nintendo Switch title IDs: a base title's low 3 hex digits are always
+// "000"; its update package reuses the same ID with the low digits set to
+// "800"; DLC uses other nonzero low digits. Base/update/DLC all ship as .nsp
+// (#419), so this is the only reliable way to filter a scan down to base
+// games — mirrors cli/detect.py's _SWITCH_TITLE_ID_RE.
+const SWITCH_TITLE_ID_RE = /\[([0-9A-Fa-f]{16})\]/;
+
+/** True unless `name` is clearly a Switch update/DLC package, not a base game.
+ *  Only .nsp is ambiguous — .xci cart dumps are always a whole base game. A
+ *  filename without a recognizable bracketed title ID is kept as-is rather
+ *  than guessed away. */
+function isSwitchBaseGameFile(name: string): boolean {
+  if (extname(name).slice(1).toLowerCase() !== "nsp") return true;
+  const match = SWITCH_TITLE_ID_RE.exec(name);
+  if (!match) return true;
+  return match[1].toLowerCase().endsWith("000");
+}
+
+// Switch dumps carry bracketed title-ID/version tags in the filename (e.g.
+// "Pokemon Brilliant Diamond [0100000011D90000][v0]") that every other
+// console's "filename minus extension" naming doesn't have — stripped here
+// for display only, never touching the actual file on disk (romPath/`base`
+// are untouched — only the stored game name, #419).
+const BRACKET_TAG_RE = /\s*\[[^[\]]*\]/g;
+
+function switchDisplayName(baseName: string): string {
+  return baseName.replace(BRACKET_TAG_RE, "").trim();
+}
+
 /** Search saveDir for a file matching baseName + any of the given extensions. */
 function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { path: string; exists: boolean } {
   for (const ext of exts) {
@@ -138,7 +167,10 @@ export function runEmulatorScan(params: {
   const roms: RomEntry[] = romDirs.flatMap(dir => {
     const allInDir = scanRomDir(dir);
     console.error(`[scan] dir='${dir}' → scanRomDir found ${allInDir.length} files total`);
-    const filtered = allInDir.filter(p => romExtSet.has(extname(p).slice(1).toLowerCase()));
+    const filtered = allInDir.filter(p =>
+      romExtSet.has(extname(p).slice(1).toLowerCase()) &&
+      (consoleKey !== "switch" || isSwitchBaseGameFile(basename(p)))
+    );
     console.error(`[scan] dir='${dir}' → after ext filter (${[...romExtSet].join(",")}) kept ${filtered.length}`);
     return filtered
       .map(romPath => {
@@ -213,7 +245,7 @@ export function runEmulatorScan(params: {
           ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
           : `${emulatorOption.execPath}${standaloneArgs ? ` ${standaloneArgs}` : ""} "${romPath}"`;
         return {
-          name: base, romPath,
+          name: consoleKey === "switch" ? switchDisplayName(base) : base, romPath,
           savePath: m.path, saveExists: m.exists,
           statePath: sm?.path, stateExists: sm?.exists,
           launchCommand,
