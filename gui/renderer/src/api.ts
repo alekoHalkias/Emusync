@@ -11,8 +11,6 @@ export type GameDeviceConfig = {
   rom_rel_path?: string;
   local_rom_path?: string;
   rom_sha256?: string;
-  // Switch update/DLC files auto-detected next to the base ROM at import time (#441).
-  update_paths?: string[];
   // Transient hints (not stored on the game) used to populate the console row's
   // per-console network/local folders during a network import.
   device_network_folder?: string;

@@ -76,11 +76,6 @@ export interface EmusyncBridge {
     onLocalizeProgress: (cb: (p: { slug: string; copied: number; total: number }) => void) => (event: unknown, p: { slug: string; copied: number; total: number }) => void;
     offLocalizeProgress: (listener: (event: unknown, p: { slug: string; copied: number; total: number }) => void) => void;
   };
-  update: {
-    add: (slug: string, filePath: string) => Promise<{ ok: boolean; error?: string }>;
-    list: (slug: string) => Promise<{ name: string; sizeBytes: number }[]>;
-    push: (slug: string, filename: string, toDeviceId: string) => Promise<{ ok: boolean; targetOnline?: boolean; error?: string }>;
-  };
   recovery: {
     listLocalBackups: (savePath: string, stateFolder: string) => Promise<{
       saves: LocalBak[];

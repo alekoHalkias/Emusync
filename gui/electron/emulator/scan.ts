@@ -130,35 +130,27 @@ function switchDisplayName(baseName: string): string {
   return baseName.replace(BRACKET_TAG_RE, "").trim();
 }
 
-/** Update/DLC files for the same title as `baseRomPath`, found next to it
- *  (issue #441) — auto-detected at import time instead of managed
- *  separately. Matches by the shared 13-hex title-ID prefix so an unrelated
- *  game's files in the same flat ROM folder are never picked up. Only the
- *  base ROM's own folder is scanned — not recursive. Mirrors
- *  cli/detect.py's _find_switch_update_files. */
-function findSwitchUpdateFiles(baseRomPath: string): string[] {
-  const name = basename(baseRomPath);
-  const match = SWITCH_TITLE_ID_RE.exec(name);
-  if (!match) return [];
-  const titlePrefix = match[1].slice(0, 13).toLowerCase();
+/** Other .nsp/.xci files sitting next to `baseRomPath` — an FYI count shown
+ *  at import time. Switch games live one-per-folder, so the whole folder
+ *  (base ROM + any update/DLC alongside it) syncs as one unit via
+ *  `emusync push`/`pull` — no per-file detection/tracking needed here
+ *  (#441). Mirrors cli/console.py's _count_switch_sibling_files. */
+function countSwitchSiblingFiles(baseRomPath: string): number {
   const folder = dirname(baseRomPath);
   let entries: string[] = [];
   try {
     entries = readdirSync(folder);
-  } catch { return []; }
-  const found: string[] = [];
-  for (const entry of entries.sort()) {
+  } catch { return 0; }
+  let count = 0;
+  for (const entry of entries) {
     const path = join(folder, entry);
     if (path === baseRomPath) continue;
     const ext = extname(entry).slice(1).toLowerCase();
     if (ext !== "nsp" && ext !== "xci") continue;
     if (!statSync(path, { throwIfNoEntry: false })?.isFile()) continue;
-    const entryMatch = SWITCH_TITLE_ID_RE.exec(entry);
-    if (entryMatch && entryMatch[1].toLowerCase().startsWith(titlePrefix)) {
-      found.push(path);
-    }
+    count++;
   }
-  return found;
+  return count;
 }
 
 /** Search saveDir for a file matching baseName + any of the given extensions. */
@@ -282,7 +274,7 @@ export function runEmulatorScan(params: {
           launchCommand,
           consoleName: system?.name ?? consoleDef.label,
           coreName: emulatorOption.coreFolderName,
-          updatePaths: consoleKey === "switch" ? findSwitchUpdateFiles(romPath) : undefined,
+          switchSiblingCount: consoleKey === "switch" ? countSwitchSiblingFiles(romPath) : undefined,
         };
       });
   });

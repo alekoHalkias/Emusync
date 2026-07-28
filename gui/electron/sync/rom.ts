@@ -2,6 +2,7 @@
 import { ipcMain, type WebContents } from "electron";
 import { existsSync, mkdirSync, unlinkSync, rmdirSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream, createWriteStream } from "fs";
 import { createHash } from "crypto";
+import { spawnSync } from "child_process";
 import { request as httpRequest } from "http";
 import { join, dirname, basename, resolve as resolvePath } from "path";
 import { loadServerCfg } from "../config-store";
@@ -71,9 +72,28 @@ export function registerRomIpc(): void {
 
         const romFilename = basename(gd.rom_path);
         const destinationPath = join(match.device_game_folder, romFilename);
-        const fileSize = statSync(gd.rom_path).size;
 
-        // 3. Stream ROM file to server via http.request (fetch can't stream a local file reliably)
+        // Switch games live one-per-folder — pack the ROM's whole containing
+        // folder (base ROM + any update/DLC files sitting alongside it) as a
+        // tar archive instead of sending just the ROM file, reusing the same
+        // tar-packing approach already used for PS2 folder memcards (#441).
+        // destinationPath stays the ROM's own eventual path — the receiving
+        // side (the Python daemon) extracts into its directory instead of
+        // writing one file.
+        const isSwitchFolder = consoleName === "Switch";
+        let folderTar: Buffer | null = null;
+        if (isSwitchFolder) {
+          const tarResult = spawnSync("tar", ["-cf", "-", "-C", dirname(gd.rom_path), "."], {
+            maxBuffer: 1024 * 1024 * 1024,
+          });
+          if (tarResult.error || tarResult.status !== 0) {
+            return { ok: false, error: `Failed to pack game folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
+          }
+          folderTar = tarResult.stdout as Buffer;
+        }
+        const fileSize = folderTar ? folderTar.length : statSync(gd.rom_path).size;
+
+        // 3. Stream ROM (or folder tar) to server via http.request (fetch can't stream a local file reliably)
         const result = await new Promise<any>((resolve, reject) => {
           const req = httpRequest(
             {
@@ -88,6 +108,7 @@ export function registerRomIpc(): void {
                 "X-To-Device-ID": toDeviceId,
                 "X-Destination-Path": destinationPath,
                 "X-Filename": romFilename,
+                "X-Transfer-Kind": isSwitchFolder ? "rom-folder" : "rom",
               },
             },
             (res) => {
@@ -108,7 +129,11 @@ export function registerRomIpc(): void {
             }
           );
           req.on("error", reject);
-          createReadStream(gd.rom_path).pipe(req);
+          if (folderTar) {
+            req.end(folderTar);
+          } else {
+            createReadStream(gd.rom_path).pipe(req);
+          }
         });
 
         return { ok: true, targetOnline: result.target_online };

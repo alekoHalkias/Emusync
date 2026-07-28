@@ -73,24 +73,25 @@ class TransferMixin:
         from_device_id: str,
         to_device_id: str,
         destination_path: str,
+        kind: str = "rom",
     ) -> RomPullRequest:
         now = datetime.now(timezone.utc).isoformat()
         self._conn.execute(
             """INSERT INTO rom_pull_requests
-               (id, slug, from_device_id, to_device_id, destination_path, status, requested_at)
-               VALUES (?, ?, ?, ?, ?, 'pending', ?)""",
-            (id, slug, from_device_id, to_device_id, destination_path, now),
+               (id, slug, from_device_id, to_device_id, destination_path, status, requested_at, kind)
+               VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)""",
+            (id, slug, from_device_id, to_device_id, destination_path, now, kind),
         )
         self._conn.commit()
         return RomPullRequest(
             id=id, slug=slug, from_device_id=from_device_id, to_device_id=to_device_id,
-            destination_path=destination_path, status="pending", requested_at=now,
+            destination_path=destination_path, status="pending", requested_at=now, kind=kind,
         )
 
     def get_pull_request(self, pull_request_id: str) -> Optional[RomPullRequest]:
         row = self._conn.execute(
             """SELECT id, slug, from_device_id, to_device_id, destination_path,
-                      status, requested_at, fulfilled_at
+                      status, requested_at, fulfilled_at, kind
                FROM rom_pull_requests WHERE id = ?""",
             (pull_request_id,),
         ).fetchone()
@@ -100,7 +101,7 @@ class TransferMixin:
         """Return pending pull requests where this device is the source (from_device_id)."""
         rows = self._conn.execute(
             """SELECT id, slug, from_device_id, to_device_id, destination_path,
-                      status, requested_at, fulfilled_at
+                      status, requested_at, fulfilled_at, kind
                FROM rom_pull_requests WHERE from_device_id = ? AND status = 'pending'
                ORDER BY requested_at""",
             (device_id,),

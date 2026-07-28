@@ -303,37 +303,6 @@ def _switch_display_name(base_name: str) -> str:
     return _BRACKET_TAG_RE.sub("", base_name).strip()
 
 
-def _find_switch_update_files(base_rom_path: str) -> list[str]:
-    """Update/DLC files for the same title as *base_rom_path*, found next to
-    it (issue #441) — auto-detected at import time instead of managed
-    separately. Matches by the shared 13-hex title-ID prefix (base/update/DLC
-    only ever differ in the low 3 hex digits, see _SWITCH_TITLE_ID_RE above)
-    so an unrelated game's files sitting in the same flat ROM folder are never
-    picked up. Only the base ROM's own folder is scanned — not recursive."""
-    name = os.path.basename(base_rom_path)
-    match = _SWITCH_TITLE_ID_RE.search(name)
-    if not match:
-        return []
-    title_prefix = match.group(1)[:13].lower()
-    folder = os.path.dirname(base_rom_path)
-    found: list[str] = []
-    try:
-        entries = sorted(os.listdir(folder))
-    except OSError:
-        return []
-    for entry in entries:
-        path = os.path.join(folder, entry)
-        if path == base_rom_path or not os.path.isfile(path):
-            continue
-        ext = os.path.splitext(entry)[1].lstrip(".").lower()
-        if ext not in ("nsp", "xci"):
-            continue
-        entry_match = _SWITCH_TITLE_ID_RE.search(entry)
-        if entry_match and entry_match.group(1).lower().startswith(title_prefix):
-            found.append(path)
-    return found
-
-
 def _match_save_file(save_dir: str, base_name: str, exts: list[str]) -> dict:
     """Find save file in save_dir matching base_name + any extension."""
     for ext in exts:

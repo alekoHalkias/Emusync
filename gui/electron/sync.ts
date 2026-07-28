@@ -6,7 +6,6 @@ import { registerMemcardIpc } from "./sync/memcard";
 import { registerStateIpc } from "./sync/state";
 import { registerRomIpc } from "./sync/rom";
 import { registerRecoveryIpc } from "./sync/recovery";
-import { registerUpdateIpc } from "./sync/update";
 
 export function registerSyncIpc(): void {
   registerSaveIpc();
@@ -14,5 +13,4 @@ export function registerSyncIpc(): void {
   registerStateIpc();
   registerRomIpc();
   registerRecoveryIpc();
-  registerUpdateIpc();
 }

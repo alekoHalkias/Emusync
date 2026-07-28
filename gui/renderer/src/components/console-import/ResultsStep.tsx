@@ -252,9 +252,9 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                       {rom.statePath && rom.stateExists && (
                         <span className="ci-ok" style={{ flexShrink: 0 }}>✓ State</span>
                       )}
-                      {!!rom.updatePaths?.length && (
-                        <span className="ci-ok" style={{ flexShrink: 0 }} title={rom.updatePaths.join(", ")}>
-                          {rom.updatePaths.length} update/DLC
+                      {!!rom.switchSiblingCount && (
+                        <span className="ci-ok" style={{ flexShrink: 0 }} title="Synced as part of this game's folder">
+                          {rom.switchSiblingCount} other file(s) in folder
                         </span>
                       )}
                       {rom.linkedSlug && !rom.existingLocal && (

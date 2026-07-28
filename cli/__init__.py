@@ -14,6 +14,5 @@ from cli import run  # noqa: E402,F401
 from cli import server  # noqa: E402,F401
 from cli import sync  # noqa: E402,F401
 from cli import transfer  # noqa: E402,F401
-from cli import update  # noqa: E402,F401
 
 __all__ = ["cli"]

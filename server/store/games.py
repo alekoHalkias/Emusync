@@ -63,18 +63,18 @@ class GameDeviceMixin:
         self._conn.execute(
             """INSERT OR REPLACE INTO game_devices
                (game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path,
-                rom_source, rom_rel_path, local_rom_path, rom_sha256, update_paths)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                rom_source, rom_rel_path, local_rom_path, rom_sha256)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command,
              gd.state_path, gd.rom_folder_path, gd.rom_source, gd.rom_rel_path,
-             gd.local_rom_path, gd.rom_sha256, gd.update_paths),
+             gd.local_rom_path, gd.rom_sha256),
         )
         self._conn.commit()
 
     def get_game_device(self, game_slug: str, device_id: str) -> Optional[GameDevice]:
         row = self._conn.execute(
             """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path,
-                      rom_folder_path, rom_source, rom_rel_path, local_rom_path, rom_sha256, update_paths
+                      rom_folder_path, rom_source, rom_rel_path, local_rom_path, rom_sha256
                FROM game_devices WHERE game_slug = ? AND device_id = ?""",
             (game_slug, device_id),
         ).fetchone()

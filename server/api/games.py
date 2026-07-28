@@ -34,8 +34,6 @@ class GameDeviceRequest(BaseModel):
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
-    # Update/DLC files auto-detected next to the base ROM at import time (#441).
-    update_paths: list[str] = []
     # Transient: populate the console row's per-console network/local folders.
     device_network_folder: str = ""
     device_local_folder: str = ""
@@ -105,8 +103,7 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command,
             "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path,
             "rom_source": gd.rom_source, "rom_rel_path": gd.rom_rel_path,
-            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256,
-            "update_paths": [p for p in gd.update_paths.split(";") if p]}
+            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256}
 
 
 @router.delete("/games/{slug}/device")
@@ -162,7 +159,6 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
             rom_rel_path=req.rom_rel_path,
             local_rom_path=req.local_rom_path,
             rom_sha256=req.rom_sha256,
-            update_paths=";".join(req.update_paths),
         )
     )
 

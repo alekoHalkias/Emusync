@@ -52,7 +52,6 @@ CREATE TABLE IF NOT EXISTS game_devices (
     rom_rel_path    TEXT NOT NULL DEFAULT '',
     local_rom_path  TEXT NOT NULL DEFAULT '',
     rom_sha256      TEXT NOT NULL DEFAULT '',
-    update_paths    TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (game_slug, device_id)
 );
 CREATE TABLE IF NOT EXISTS saves (
@@ -106,7 +105,8 @@ CREATE TABLE IF NOT EXISTS rom_pull_requests (
     destination_path TEXT NOT NULL DEFAULT '',
     status           TEXT NOT NULL DEFAULT 'pending',
     requested_at     TEXT NOT NULL,
-    fulfilled_at     TEXT
+    fulfilled_at     TEXT,
+    kind             TEXT NOT NULL DEFAULT 'rom'
 );
 CREATE TABLE IF NOT EXISTS console_defs (
     key              TEXT PRIMARY KEY,
@@ -380,14 +380,16 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # merging incompatible card layouts together.
         _try(conn, "ALTER TABLE console_saves ADD COLUMN card_format TEXT NOT NULL DEFAULT ''")
     if from_version < 18:
-        # Distinguishes a plain ROM push from a Switch update/DLC package push
-        # (issue #441) — the receiving side routes an 'update' transfer into a
-        # managed per-game folder instead of the game's rom_path. Existing rows
-        # default to 'rom', preserving current behavior unchanged.
+        # Distinguishes a plain single-file ROM push from a Switch
+        # whole-folder push ('rom-folder', issue #441) — the receiving side
+        # tars the whole game folder (base ROM + any update/DLC files sitting
+        # alongside it) into a new per-game folder instead of writing one
+        # file. Existing rows default to 'rom', preserving current behavior.
         _try(conn, "ALTER TABLE rom_transfers ADD COLUMN kind TEXT NOT NULL DEFAULT 'rom'")
     if from_version < 19:
-        # Update/DLC files auto-detected next to a Switch game's base ROM at
-        # import time (';'-joined absolute paths, mirroring console_defs's
-        # list-field convention) — issue #441.
-        _try(conn, "ALTER TABLE game_devices ADD COLUMN update_paths TEXT NOT NULL DEFAULT ''")
+        # Mirrors rom_transfers.kind (migration 18) on the pull-request side —
+        # a Switch pull request tags kind='rom-folder' so the fulfilling
+        # device tars up the whole game folder instead of uploading just the
+        # ROM file (issue #441).
+        _try(conn, "ALTER TABLE rom_pull_requests ADD COLUMN kind TEXT NOT NULL DEFAULT 'rom'")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

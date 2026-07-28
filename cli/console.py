@@ -17,7 +17,6 @@ from cli.consoles_data import (
 )
 from cli.detect import (
     _detect_emulators_for_console,
-    _find_switch_update_files,
     _is_switch_base_game_file,
     _match_save_file,
     _resolve_shared_memcard_save_state,
@@ -26,6 +25,26 @@ from cli.detect import (
 )
 from cli.root import cli
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
+
+
+def _count_switch_sibling_files(rom_path: str) -> int:
+    """Other .nsp/.xci files sitting next to *rom_path* — an FYI count shown
+    at import time. Switch games live one-per-folder, so the whole folder
+    (base ROM + any update/DLC alongside it) syncs as one unit via `emusync
+    push`/`pull` — no per-file detection/tracking needed here (#441)."""
+    folder = os.path.dirname(rom_path)
+    try:
+        entries = os.listdir(folder)
+    except OSError:
+        return 0
+    count = 0
+    for entry in entries:
+        path = os.path.join(folder, entry)
+        if path == rom_path or not os.path.isfile(path):
+            continue
+        if os.path.splitext(entry)[1].lstrip(".").lower() in ("nsp", "xci"):
+            count += 1
+    return count
 
 
 def _classify_network_roms(
@@ -339,10 +358,6 @@ def console_import() -> None:
         # below for save-file matching) are untouched — only display name (#419).
         display_name = _switch_display_name(base) if console_def["key"] == "switch" else base
 
-        # Update/DLC files for this same title, auto-detected next to the base
-        # ROM rather than managed separately (#441).
-        update_paths = _find_switch_update_files(rom_path) if console_def["key"] == "switch" else []
-
         entries.append({
             "name": display_name,
             "rom_path": rom_path,
@@ -351,7 +366,6 @@ def console_import() -> None:
             "state_path": state_match["path"] if state_match and state_match["exists"] else "",
             "launch_command": launch_cmd,
             "rom_folder_path": rom_folder,
-            "update_paths": update_paths,
         })
 
     # For network imports, classify each ROM as network/local/both and merge dupes.
@@ -393,8 +407,15 @@ def console_import() -> None:
         save_tag = "  [save found]" if e["save_exists"] else ""
         state_tag = "  [state found]" if e.get("state_path") else ""
         src_tag = _PRESENCE_TAG.get(e.get("presence", ""), "") if rom_source == "network" else ""
-        n_updates = len(e.get("update_paths") or [])
-        update_tag = f"  [{n_updates} update/DLC file(s) found]" if n_updates else ""
+        # Switch games sync their whole containing folder (base ROM + any
+        # update/DLC files sitting alongside it) as one unit via `emusync
+        # push`/`pull`, so this is just an FYI count — no per-file tracking
+        # needed at import time (#441).
+        update_tag = ""
+        if console_def["key"] == "switch":
+            n_siblings = _count_switch_sibling_files(e["rom_path"])
+            if n_siblings:
+                update_tag = f"  [{n_siblings} other file(s) in folder]"
         click.echo(f"  {i:>3}. {e['name']}{save_tag}{state_tag}{update_tag}{src_tag}")
 
     click.echo(
@@ -439,7 +460,6 @@ def console_import() -> None:
                     state_path=entry["state_path"],
                     rom_folder_path=entry["rom_folder_path"],
                 )
-            gd_cfg.update_paths = entry.get("update_paths") or []
             client.set_game_device(slug, gd_cfg)
             click.echo("ok")
         except Exception as exc:

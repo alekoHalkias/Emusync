@@ -53,7 +53,7 @@ export interface RomEntry {
   launchCommand: string;
   consoleName?: string;   // e.g. "Game Boy Advance"
   coreName?: string;      // e.g. "mGBA" — the core that will be used
-  updatePaths?: string[]; // Switch update/DLC files auto-detected next to romPath (#441)
+  switchSiblingCount?: number; // other .nsp/.xci files next to romPath, FYI only (#441)
 }
 
 export interface EmulatorScanResult {
