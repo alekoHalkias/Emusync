@@ -180,7 +180,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Game name is required.";
-    if (!savePath.trim()) e.savePath = "Save file path is required.";
+    // Switch's real save path is unknowable until learned after first play
+    // (cli/run_switch.py, #441) — never require it up front like every other
+    // console's save path.
+    if (!savePath.trim() && gameConsole !== "Switch") e.savePath = "Save file path is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }

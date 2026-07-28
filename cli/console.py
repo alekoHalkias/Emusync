@@ -27,6 +27,16 @@ from cli.root import cli
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
 
 
+def _switch_save_match() -> dict:
+    """Eden's real save folder is a NAND path keyed by profile-ID + title-ID
+    (nand/user/save/0000000000000000/<profile>/<title>/) — nothing like the
+    ROM's own name or location, so a filename-based guess at import time is
+    actively wrong, not just imprecise (unlike every other console, where a
+    guessed path is at worst unconfirmed). Always blank; learned after first
+    play instead (cli/run_switch.py, #419/#441)."""
+    return {"path": "", "exists": False}
+
+
 def _count_switch_sibling_files(rom_path: str) -> int:
     """Other .nsp/.xci files sitting next to *rom_path* — an FYI count shown
     at import time. Switch games live one-per-folder, so the whole folder
@@ -319,6 +329,8 @@ def console_import() -> None:
 
         if shared_layout:
             save_match = shared_save_match
+        elif console_def["key"] == "switch":
+            save_match = _switch_save_match()
         else:
             system = _IMPORT_SYSTEMS.get(ext, {})
             save_exts = system.get("save_exts", default_save_exts)

@@ -221,6 +221,12 @@ export function runEmulatorScan(params: {
           // Shared-save console: every game's savePath is the same card (#295/#402).
           const cardPath = resolveSharedCard(consoleKey, emulatorOption.saveDir, saveRoot, emulatorOption.systemDir);
           m = { path: cardPath, exists: existsSync(cardPath) };
+        } else if (consoleKey === "switch") {
+          // Eden's real save folder is a NAND path keyed by profile-ID +
+          // title-ID, nothing like the ROM's own name or location — a
+          // filename-based guess here is actively wrong, not just imprecise.
+          // Left blank and learned after first play (cli/run_switch.py, #441).
+          m = { path: "", exists: false };
         } else {
           m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
           if (!m.exists) {
