@@ -76,6 +76,11 @@ export interface EmusyncBridge {
     onLocalizeProgress: (cb: (p: { slug: string; copied: number; total: number }) => void) => (event: unknown, p: { slug: string; copied: number; total: number }) => void;
     offLocalizeProgress: (listener: (event: unknown, p: { slug: string; copied: number; total: number }) => void) => void;
   };
+  gameFolder: {
+    list: (slug: string) => Promise<{ folder: string; files: { name: string; sizeBytes: number }[] } | null>;
+    reveal: (slug: string) => Promise<{ ok: boolean; error?: string }>;
+    addFile: (slug: string, filePath: string) => Promise<{ ok: boolean; error?: string }>;
+  };
   recovery: {
     listLocalBackups: (savePath: string, stateFolder: string) => Promise<{
       saves: LocalBak[];

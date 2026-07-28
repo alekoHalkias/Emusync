@@ -39,10 +39,10 @@ tests/              ← Integration tests (real SQLite, no mocks)
 | `server/config.py` | TOML config dataclass; load/save `~/.emusync/emusync.toml` |
 | `server/mdns.py` | mDNS advertise + LAN discovery via `zeroconf` |
 | `server/sync_client.py` | HTTP client wrapping all server endpoints, used by `emusync run`/`push`/`pull` |
-| `gui/electron/` | Electron main process, per-domain modules (`server.ts`, `game.ts`, `sync/*.ts`, `emulator/*.ts`, `steam.ts`, `art.ts`, `steamgriddb.ts`, `artwork.ts`). Shared mutable state lives on the `rt` object in `runtime.ts` |
+| `gui/electron/` | Electron main process, per-domain modules (`server.ts`, `game.ts`, `sync/*.ts`, `emulator/*.ts`, `steam.ts`, `art.ts`, `steamgriddb.ts`, `artwork.ts`, `gamefolder.ts`). Shared mutable state lives on the `rt` object in `runtime.ts` |
 | `gui/electron/preload.ts` | `contextBridge` — everything in `window.emusync.*` is defined here |
 | `gui/renderer/src/api.ts` | Fetch wrapper for the Python REST API |
-| `gui/renderer/src/components/` | React components — `App.tsx` (router), `ConsoleGrid`/`GameGrid`/`GameCard` (browse), `GameModal`/`GameConfig`/`ArtworkTab`/`SaveHistory` (per-game), `ConsoleImport` + `console-import/` (Add Console wizard), `ServerStatusButton`/`DevicesButton`/`ConflictsButton` (server controls) |
+| `gui/renderer/src/components/` | React components — `App.tsx` (router), `ConsoleGrid`/`GameGrid`/`GameCard` (browse), `GameModal`/`GameConfig`/`ArtworkTab`/`SaveHistory`/`GameFolderTab` (per-game), `ConsoleImport` + `console-import/` (Add Console wizard), `ServerStatusButton`/`DevicesButton`/`ConflictsButton` (server controls) |
 
 ---
 

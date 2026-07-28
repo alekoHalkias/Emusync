@@ -18,6 +18,10 @@ type Props = {
   onClose: () => void;
   onRestored: () => void;
   embedded?: boolean;            // rendered inside the tabbed game modal (#260)
+  /** Skip all state history/integrity — Eden has no save-state feature at
+   *  all, unlike every other emulator here, so there's never anything to
+   *  show (#441). */
+  hideStates?: boolean;
 };
 
 /** One row in the merged recovery timeline: a server generation or a local .bak. */
@@ -61,7 +65,7 @@ function reasonsText(reasons: IntegrityReason[]): string {
  * (when the game is local) writes it to disk; restoring a `.bak` recovers a copy
  * that may never have reached the server. Nothing is auto-acted on.
  */
-export default function SaveHistory({ slug, name, savePath, statePath, onClose, onRestored, embedded }: Props): React.ReactElement {
+export default function SaveHistory({ slug, name, savePath, statePath, onClose, onRestored, embedded, hideStates }: Props): React.ReactElement {
   const { devices } = useDevices();
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [integrity, setIntegrity] = useState<GameIntegrity | null>(null);
@@ -80,10 +84,10 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
       const listBaks = window.emusync.recovery?.listLocalBackups;
       const [saveHist, stateHist, integ, baks] = await Promise.all([
         listSaveHistory(slug).catch(() => [] as SaveVersion[]),
-        listStateHistory(slug).catch(() => [] as SaveVersion[]),
+        hideStates ? Promise.resolve([] as SaveVersion[]) : listStateHistory(slug).catch(() => [] as SaveVersion[]),
         getGameIntegrity(slug).catch(() => null),
         listBaks
-          ? listBaks(savePath ?? "", statePath ?? "").catch(() => ({ saves: [], states: [] }))
+          ? listBaks(savePath ?? "", hideStates ? "" : statePath ?? "").catch(() => ({ saves: [], states: [] }))
           : Promise.resolve({ saves: [], states: [] }),
       ]);
       setIntegrity(integ);
@@ -101,7 +105,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
         });
       };
       addServer("save", saveHist, integ?.save);
-      addServer("state", stateHist, integ?.state);
+      if (!hideStates) addServer("state", stateHist, integ?.state);
 
       const addBaks = (kind: Kind, list: { path: string; size: number; mtime: string }[]): void => {
         for (const b of list) {
@@ -242,7 +246,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
     );
   }
 
-  const anyDamaged = integrity && (integrity.save.status === "damaged" || integrity.state.status === "damaged");
+  const anyDamaged = integrity && (integrity.save.status === "damaged" || (!hideStates && integrity.state.status === "damaged"));
 
   const body = (
     <>
@@ -258,7 +262,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
       ) : error && entries.length === 0 ? (
         <p style={{ color: "var(--red)" }}>{error}</p>
       ) : entries.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>No save or state history yet for this game.</p>
+        <p style={{ color: "var(--text-muted)" }}>{hideStates ? "No save history yet for this game." : "No save or state history yet for this game."}</p>
       ) : (
         <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0" }}>
           {entries.map(renderRow)}
