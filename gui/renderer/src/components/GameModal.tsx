@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import ArtworkTab from "./ArtworkTab";
 import GameConfig from "./GameConfig";
 import GameDeviceModal from "./game-list/GameDeviceModal";
-import GameFolderTab from "./GameFolderTab";
 import SaveHistory from "./SaveHistory";
 
 export type GameModalTarget = {
@@ -18,7 +17,7 @@ export type GameModalTarget = {
   canPlay: boolean;
 };
 
-type Tab = "folder" | "settings" | "artwork" | "devices" | "history" | "run";
+type Tab = "settings" | "artwork" | "devices" | "history" | "run";
 
 export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   target: GameModalTarget;
@@ -28,10 +27,9 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
 }): React.ReactElement {
   const { slug, name, gameConsole, consoleKey, gameIsLocal, savePath, statePath, canPlay } = target;
   const isSwitch = consoleKey === "switch";
-  const [tab, setTab] = useState<Tab>(isSwitch ? "folder" : "settings");
+  const [tab, setTab] = useState<Tab>("settings");
 
   const tabs: { key: Tab; label: string; disabled?: boolean }[] = [
-    ...(isSwitch ? [{ key: "folder" as Tab, label: "Folder" }] : []),
     { key: "settings", label: "Settings" },
     { key: "artwork", label: "Artwork" },
     { key: "devices", label: "Devices" },
@@ -67,9 +65,6 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
         </div>
 
         <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
-          {tab === "folder" && (
-            <GameFolderTab slug={slug} />
-          )}
           {tab === "settings" && (
             <GameConfig
               embedded

@@ -1,10 +1,10 @@
 // Game-folder management IPC — Switch games live one-per-folder and sync as
 // a whole folder via emusync push/pull (#441), so this is the local-file
-// counterpart: list what's in the folder, reveal it in the OS file manager,
-// and add a file (e.g. a DLC .nsp) into it directly from the GUI.
+// counterpart: reveal the folder in the OS file manager, and add a file
+// (e.g. a DLC .nsp) into it directly from the GUI.
 import { ipcMain, shell } from "electron";
-import { existsSync, readdirSync, statSync, copyFileSync, mkdirSync } from "fs";
-import { join, dirname, basename } from "path";
+import { existsSync, copyFileSync, mkdirSync } from "fs";
+import { dirname, join, basename } from "path";
 import { loadServerCfg } from "./config-store";
 
 async function romFolderFor(slug: string): Promise<string | null> {
@@ -16,19 +16,6 @@ async function romFolderFor(slug: string): Promise<string | null> {
 }
 
 export function registerGameFolderIpc(): void {
-  ipcMain.handle(
-    "gamefolder:list",
-    async (_event, slug: string): Promise<{ folder: string; files: { name: string; sizeBytes: number }[] } | null> => {
-      const folder = await romFolderFor(slug);
-      if (!folder || !existsSync(folder)) return null;
-      const files = readdirSync(folder)
-        .filter(name => statSync(join(folder, name)).isFile())
-        .map(name => ({ name, sizeBytes: statSync(join(folder, name)).size }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      return { folder, files };
-    }
-  );
-
   ipcMain.handle(
     "gamefolder:reveal",
     async (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {

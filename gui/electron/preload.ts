@@ -113,8 +113,6 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("rom:deleteFile", absolutePath),
   },
   gameFolder: {
-    list: (slug: string): Promise<{ folder: string; files: { name: string; sizeBytes: number }[] } | null> =>
-      ipcRenderer.invoke("gamefolder:list", slug),
     reveal: (slug: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("gamefolder:reveal", slug),
     addFile: (slug: string, filePath: string): Promise<{ ok: boolean; error?: string }> =>
