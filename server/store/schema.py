@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 19
+_SCHEMA_VERSION = 20
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -386,10 +386,16 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # alongside it) into a new per-game folder instead of writing one
         # file. Existing rows default to 'rom', preserving current behavior.
         _try(conn, "ALTER TABLE rom_transfers ADD COLUMN kind TEXT NOT NULL DEFAULT 'rom'")
-    if from_version < 19:
+    if from_version < 20:
         # Mirrors rom_transfers.kind (migration 18) on the pull-request side —
         # a Switch pull request tags kind='rom-folder' so the fulfilling
         # device tars up the whole game folder instead of uploading just the
-        # ROM file (issue #441).
+        # ROM file (issue #441). Deliberately NOT migration 19: an earlier,
+        # since-reverted iteration of this branch used 19 for a different
+        # column (game_devices.update_paths) — a dev DB that already ran that
+        # one has its user_version stuck at 19, which would make `from_version
+        # < 19` false forever and permanently skip this ALTER. Bumping to a
+        # fresh number is the only safe fix once any DB has advanced past a
+        # version number, even a pre-release one.
         _try(conn, "ALTER TABLE rom_pull_requests ADD COLUMN kind TEXT NOT NULL DEFAULT 'rom'")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

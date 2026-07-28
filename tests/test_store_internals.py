@@ -203,6 +203,47 @@ def test_v7_to_v8_migration_moves_blobs_to_disk():
         assert meta.size == len(b"legacy-save-bytes")
 
 
+def test_stuck_at_19_still_gets_rom_pull_requests_kind_column():
+    """Regression: an earlier, since-reverted iteration of #441 used migration
+    19 for a different column (game_devices.update_paths). A dev DB that
+    already ran that one has PRAGMA user_version stuck at 19 — `from_version <
+    19` is false forever for it, so that slot could never be reused for
+    rom_pull_requests.kind without permanently skipping the ALTER on such a
+    DB. Simulates exactly that: a DB already at user_version=19 with no `kind`
+    column on rom_pull_requests, and asserts opening it via Store() (which
+    runs migrations up through the current _SCHEMA_VERSION) adds it anyway."""
+    import sqlite3
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "emusync.db"
+        conn = sqlite3.connect(db_path)
+        conn.executescript(
+            """
+            CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+            CREATE TABLE games (slug TEXT PRIMARY KEY, name TEXT NOT NULL, console TEXT DEFAULT '');
+            CREATE TABLE rom_pull_requests (
+                id TEXT PRIMARY KEY,
+                slug TEXT NOT NULL REFERENCES games(slug) ON DELETE CASCADE,
+                from_device_id TEXT NOT NULL REFERENCES devices(id),
+                to_device_id TEXT NOT NULL REFERENCES devices(id),
+                destination_path TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                requested_at TEXT NOT NULL,
+                fulfilled_at TEXT
+            );
+            """
+        )
+        conn.execute("PRAGMA user_version = 19")
+        conn.commit()
+        conn.close()
+
+        store = Store(tmpdir)
+
+        assert store._conn.execute("PRAGMA user_version").fetchone()[0] >= 20
+        cols = {c[1] for c in store._conn.execute("PRAGMA table_info(rom_pull_requests)").fetchall()}
+        assert "kind" in cols
+
+
 # ── console-def seeding is additive (#202) ─────────────────────────────────────
 
 def test_seed_console_defs_picks_up_additions():
