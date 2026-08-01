@@ -296,6 +296,35 @@ def test_reconcile_detects_dirty_nested_gci_folder_card(tmp_path):
     assert conflicts[0]["winner"] == "local"
 
 
+def test_reconcile_blank_save_path_never_touches_cwd(tmp_path, monkeypatch):
+    """Regression (#441): Switch's save path is intentionally blank before the
+    game's first launch (cli/console.py's _switch_save_match). Path("") resolves
+    to the cwd, which must never be hashed/pushed as if it were a save file —
+    reconcile must no-op (no push, no pull) and just report the server's hash."""
+    server_meta = {"hash": "server-hash", "pushed_at": NOW.isoformat(), "device_id": "dev-server"}
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local")
+    client = _FakeClient(server_meta)
+    # If the empty path were resolved to the cwd, a stray file here would get
+    # hashed/tarred as the "local save" — assert it never runs that far.
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "not_a_save.txt").write_text("decoy")
+
+    result = _reconcile_save(client, cfg, "switch-game", "")
+
+    assert result == "server-hash"
+    assert not client.pushed and not client.pulled
+
+
+def test_reconcile_blank_save_path_no_server_save_either(tmp_path):
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local")
+    client = _FakeClient(None)
+
+    result = _reconcile_save(client, cfg, "switch-game", "")
+
+    assert result is None
+    assert not client.pushed and not client.pulled
+
+
 def test_offline_play_log_appends_and_records_save(tmp_path):
     cfg = SimpleNamespace(data_dir=str(tmp_path))
     save = tmp_path / "save.srm"

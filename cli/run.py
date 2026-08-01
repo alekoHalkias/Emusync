@@ -156,9 +156,13 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
     gd = client.get_game_device(game_slug)
 
-    # A game is "imported" on this device when it has a save path configured (so
-    # EmuSync knows what to sync). Both launch modes require this.
-    if not gd or not gd.save_path:
+    # A game is "imported" on this device when it has a ROM path configured.
+    # Not save_path: Switch's real save path is a NAND folder that can't be
+    # guessed at import time and is only learned after this game's first
+    # launch (cli/run_switch.py, #441) — save_path is intentionally blank
+    # until then, so gating launch on it would make that first launch
+    # impossible.
+    if not gd or not gd.rom_path:
         if command:
             # Fallback path: an external launcher tried to run a game EmuSync
             # doesn't know about — refuse, since we can't sync its save.
@@ -169,8 +173,8 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             )
         else:
             click.echo(
-                f"No save path configured for '{game_slug}'. "
-                f"Run 'emusync game edit {game_slug} --save <path>' first.",
+                f"'{game_slug}' isn't imported into EmuSync on this device. "
+                f"Import it first (Add Console / 'emusync console import').",
                 err=True,
             )
         sys.exit(1)

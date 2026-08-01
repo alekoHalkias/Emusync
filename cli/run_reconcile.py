@@ -47,6 +47,18 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
     push-if-changed comparison. When both copies diverged (a true conflict) the
     auto-resolution is surfaced loudly via _warn_save_conflict.
     """
+    if not save_path:
+        # No local save path is known yet (e.g. Switch before its first launch —
+        # the real NAND save folder is only learned after this session,
+        # cli/run_switch.py/#441). Nothing to reconcile against: Path("") would
+        # otherwise resolve to the cwd, which must never be treated as a save
+        # file. The caller's post-launch adoption step picks up and pushes the
+        # freshly written save instead.
+        try:
+            meta = client.get_save_meta(game_slug)
+        except Exception:
+            meta = None
+        return meta.get("hash") if meta else None
     p = Path(save_path)
     try:
         meta = client.get_save_meta(game_slug)
