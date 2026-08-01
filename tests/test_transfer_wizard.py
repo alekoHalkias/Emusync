@@ -108,6 +108,9 @@ def test_push_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
 
     assert (dest_folder / "pbd.nsp").read_bytes() == b"BASEROMDATA"
     assert (dest_folder / "pbd_update.nsp").read_bytes() == b"UPDATEDATA"
+    # Exactly these two files — regression guard for the temp tar being
+    # placed inside the folder it's archiving and including itself (#441).
+    assert {f.name for f in dest_folder.iterdir()} == {"pbd.nsp", "pbd_update.nsp"}
 
     registered = target.get_game_device("pokemon-brilliant-diamond")
     assert registered.rom_path == str(dest_folder / "pbd.nsp")
@@ -196,6 +199,9 @@ def test_pull_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
 
     assert (dest_folder / "pbd.nsp").read_bytes() == b"BASEROMDATA"
     assert (dest_folder / "pbd_update.nsp").read_bytes() == b"UPDATEDATA"
+    # Exactly these two files — regression guard for the temp tar being
+    # placed inside the folder it's archiving and including itself (#441).
+    assert {f.name for f in dest_folder.iterdir()} == {"pbd.nsp", "pbd_update.nsp"}
 
 
 def test_push_rom_no_games_configured_exits_quietly(monkeypatch, tmp_path, live_server):

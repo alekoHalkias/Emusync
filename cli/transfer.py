@@ -292,8 +292,17 @@ def push_rom() -> None:
         upload_path = rom_path
         tmp_tar_path: str | None = None
         if is_switch_folder:
-            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False)
-            tmp.write(memcard_bytes(Path(os.path.dirname(rom_path))))
+            # dir=parent-of-the-game-folder: keeps the temp file on the same
+            # filesystem as the ROM library — the system temp dir (the
+            # tempfile default) can be a much smaller partition than game
+            # storage (e.g. Steam Deck's root vs. its games drive/SD card),
+            # and a multi-GB game folder can exhaust it even with plenty of
+            # room where it actually needs to end up. Must NOT be placed
+            # inside the game folder itself — memcard_bytes would archive the
+            # still-being-written tar into itself.
+            game_folder = os.path.dirname(rom_path)
+            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(game_folder))
+            tmp.write(memcard_bytes(Path(game_folder)))
             tmp.close()
             tmp_tar_path = upload_path = tmp.name
 
@@ -342,7 +351,12 @@ def _receive_transfer(
         if kind == "rom-folder":
             folder = os.path.dirname(destination_path)
             os.makedirs(folder, exist_ok=True)
-            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False)
+            # dir=parent-of-folder: same filesystem as the actual game
+            # library (not the system temp dir, which can be a much smaller
+            # partition — e.g. Steam Deck's root vs. its games drive), and
+            # outside `folder` itself so it's never swept into _write_memcard's
+            # own backup-then-extract of that folder.
+            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(folder))
             tmp.close()
             try:
                 client.download_transfer(transfer_id, tmp.name, expected_hash=sha256)
@@ -448,8 +462,14 @@ def _handle_pull_request(
         log(f"  Fulfilling pull request for '{game_name}'...")
         upload_path = rom_path
         if kind == "rom-folder":
-            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False)
-            tmp.write(memcard_bytes(Path(os.path.dirname(rom_path))))
+            # See push_rom's identical comment: dir=parent-of-the-game-folder
+            # keeps this on the same filesystem as game storage (not a
+            # possibly much smaller system temp partition), and outside the
+            # game folder itself so memcard_bytes doesn't archive the tar
+            # into itself while it's still being written.
+            game_folder = os.path.dirname(rom_path)
+            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(game_folder))
+            tmp.write(memcard_bytes(Path(game_folder)))
             tmp.close()
             tmp_tar_path = upload_path = tmp.name
         client.create_rom_transfer(slug, to_device_id, destination_path, upload_path, kind=kind)
