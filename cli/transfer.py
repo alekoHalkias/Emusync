@@ -168,14 +168,25 @@ def pull_rom() -> None:
             click.echo(f"  {label} not yet set up on this device.")
             dest_folder = click.prompt("  Which local folder should the ROM go in?")
 
-        destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
+        # Switch games live one-per-folder — the local suggested/chosen
+        # folder is the shared console ROM root (matching every other
+        # console), not a per-game folder, so an extra path segment (the
+        # source's own game-folder name) is needed here or the whole folder's
+        # contents would land loose in that shared root instead of their own
+        # subfolder (#441).
+        is_switch_folder = console == "Switch"
+        if is_switch_folder:
+            game_folder_name = os.path.basename(os.path.dirname(game["rom_path"]))
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), game_folder_name, rom_filename)
+        else:
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
 
         # Send pull request to server
         click.echo(f"  Requesting '{rom_filename}' from {source['name']}...")
         try:
             result = client.create_pull_request(
                 slug, source["id"], destination_path,
-                kind="rom-folder" if console == "Switch" else "rom",
+                kind="rom-folder" if is_switch_folder else "rom",
             )
         except Exception as e:
             click.echo(f"  Failed: {e}", err=True)
@@ -280,15 +291,25 @@ def push_rom() -> None:
             click.echo(f"  {label} not yet set up on {target['name']}.")
             dest_folder = click.prompt("  Which folder should the ROM go in?")
 
-        destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
-
-        # Switch games live one-per-folder — sync the whole folder (base ROM +
-        # any update/DLC files sitting alongside it) as one tar archive rather
-        # than just the ROM file, reusing the same folder-tar machinery
-        # already used for Wii/PS2 folder saves (#441). destination_path stays
-        # the ROM's own eventual path, exactly as for a single-file push — the
-        # receiving side just extracts into its directory instead of copying.
+        # Switch games live one-per-folder — the target's suggested/chosen
+        # folder is its shared console ROM root (matching every other
+        # console), not a per-game folder, so an extra path segment (the
+        # source's own game-folder name) is needed here or the whole folder's
+        # contents would land loose in that shared root instead of their own
+        # subfolder (#441).
         is_switch_folder = console == "Switch"
+        if is_switch_folder:
+            game_folder_name = os.path.basename(os.path.dirname(rom_path))
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), game_folder_name, rom_filename)
+        else:
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
+
+        # Sync the whole folder (base ROM + any update/DLC files sitting
+        # alongside it) as one tar archive rather than just the ROM file,
+        # reusing the same folder-tar machinery already used for Wii/PS2
+        # folder saves (#441). destination_path (above) already points at the
+        # ROM's own eventual path inside its own subfolder — the receiving
+        # side just extracts into that directory instead of copying one file.
         upload_path = rom_path
         tmp_tar_path: str | None = None
         if is_switch_folder:
@@ -350,7 +371,13 @@ def _receive_transfer(
         log(f"  Receiving {game_name}...")
         if kind == "rom-folder":
             folder = os.path.dirname(destination_path)
-            os.makedirs(folder, exist_ok=True)
+            # Only the PARENT (the shared console root) needs to exist ahead
+            # of time, for the tempfile below — _write_memcard creates
+            # `folder` itself. Pre-creating `folder` here would make it look
+            # like an existing (empty) folder on a first-ever sync, so
+            # _write_memcard's own backup-before-extract step would back up
+            # nothing into a useless <folder>.bak every single time.
+            os.makedirs(os.path.dirname(folder), exist_ok=True)
             # dir=parent-of-folder: same filesystem as the actual game
             # library (not the system temp dir, which can be a much smaller
             # partition — e.g. Steam Deck's root vs. its games drive), and

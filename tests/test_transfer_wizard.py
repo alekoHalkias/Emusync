@@ -86,9 +86,15 @@ def test_push_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
 
     _write_cfg(monkeypatch, tmp_path, live_server, "dev-source", "SourcePC")
 
-    dest_folder = tmp_path / "deck_roms" / "Pokemon Brilliant Diamond"
+    # The user only types/confirms the SHARED console ROM root here — same as
+    # every other console — never a per-game folder. The per-game subfolder
+    # must come from the code itself, not from what's typed at this prompt
+    # (#441 regression: destination_path used to be console_root/rom_filename
+    # directly, landing every Switch game's files loose in the shared root).
+    console_root = tmp_path / "deck_roms"
+    dest_folder = console_root / "Pokemon Brilliant Diamond"
     runner = CliRunner()
-    result = runner.invoke(push_rom, input=f"1\n1\n{dest_folder}\n")
+    result = runner.invoke(push_rom, input=f"1\n1\n{console_root}\n")
 
     assert result.exit_code == 0, result.output
     assert "pushed to SteamDeck" in result.output
@@ -97,6 +103,7 @@ def test_push_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
     pending = target.list_pending_transfers()
     assert len(pending) == 1
     assert pending[0]["kind"] == "rom-folder"
+    assert pending[0]["destination_path"] == str(dest_folder / "pbd.nsp")
 
     # Simulate the target's sync-daemon receiving the queued transfer.
     ok = _receive_transfer(
@@ -111,6 +118,8 @@ def test_push_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
     # Exactly these two files — regression guard for the temp tar being
     # placed inside the folder it's archiving and including itself (#441).
     assert {f.name for f in dest_folder.iterdir()} == {"pbd.nsp", "pbd_update.nsp"}
+    # Nothing else was dumped loose into the shared console root (#441).
+    assert {p.name for p in console_root.iterdir()} == {"Pokemon Brilliant Diamond"}
 
     registered = target.get_game_device("pokemon-brilliant-diamond")
     assert registered.rom_path == str(dest_folder / "pbd.nsp")
@@ -167,9 +176,12 @@ def test_pull_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
 
     _write_cfg(monkeypatch, tmp_path, live_server, "dev-target", "SteamDeck")
 
-    dest_folder = tmp_path / "deck_roms" / "Pokemon Brilliant Diamond"
+    # Same as the push test: only the shared console ROM root is typed here,
+    # never a per-game folder — the code must append that itself (#441).
+    console_root = tmp_path / "deck_roms"
+    dest_folder = console_root / "Pokemon Brilliant Diamond"
     runner = CliRunner()
-    result = runner.invoke(pull_rom, input=f"1\n1\n{dest_folder}\n")
+    result = runner.invoke(pull_rom, input=f"1\n1\n{console_root}\n")
 
     assert result.exit_code == 0, result.output
     assert "pulled from SourcePC" in result.output
@@ -177,6 +189,7 @@ def test_pull_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
     pending = source.list_pending_pull_requests()
     assert len(pending) == 1
     assert pending[0]["kind"] == "rom-folder"
+    assert pending[0]["destination_path"] == str(dest_folder / "pbd.nsp")
 
     # Simulate the source's sync-daemon fulfilling the pull request.
     ok = _handle_pull_request(
@@ -202,6 +215,8 @@ def test_pull_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
     # Exactly these two files — regression guard for the temp tar being
     # placed inside the folder it's archiving and including itself (#441).
     assert {f.name for f in dest_folder.iterdir()} == {"pbd.nsp", "pbd_update.nsp"}
+    # Nothing else was dumped loose into the shared console root (#441).
+    assert {p.name for p in console_root.iterdir()} == {"Pokemon Brilliant Diamond"}
 
 
 def test_push_rom_no_games_configured_exits_quietly(monkeypatch, tmp_path, live_server):
