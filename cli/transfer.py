@@ -322,6 +322,10 @@ def push_rom() -> None:
             # inside the game folder itself — memcard_bytes would archive the
             # still-being-written tar into itself.
             game_folder = os.path.dirname(rom_path)
+            # Walking + tar-packing a multi-GB folder in memory takes real
+            # time with no progress of its own — say so, or it looks hung
+            # between the destination prompt and the upload progress bar.
+            click.echo(f"  Packing {os.path.basename(game_folder)}...")
             tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(game_folder))
             tmp.write(memcard_bytes(Path(game_folder)))
             tmp.close()
@@ -387,6 +391,7 @@ def _receive_transfer(
             tmp.close()
             try:
                 client.download_transfer(transfer_id, tmp.name, expected_hash=sha256)
+                log(f"  Extracting into {folder}...")
                 _write_memcard(Path(folder), Path(tmp.name).read_bytes())
             finally:
                 os.unlink(tmp.name)
@@ -495,6 +500,7 @@ def _handle_pull_request(
             # game folder itself so memcard_bytes doesn't archive the tar
             # into itself while it's still being written.
             game_folder = os.path.dirname(rom_path)
+            log(f"  Packing {os.path.basename(game_folder)}...")
             tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(game_folder))
             tmp.write(memcard_bytes(Path(game_folder)))
             tmp.close()
