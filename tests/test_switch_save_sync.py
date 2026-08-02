@@ -9,7 +9,11 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from cli.run_switch import _resolve_written_switch_save
+from cli.run_switch import (
+    _resolve_written_switch_save,
+    _seed_switch_save,
+    _switch_title_id_from_rom,
+)
 
 
 def _make_title(nand_root: Path, profile_id: str, title_id: str) -> Path:
@@ -66,6 +70,75 @@ def test_no_profile_folder_returns_none(tmp_path, monkeypatch):
     result = _resolve_written_switch_save(time.time())
 
     assert result is None
+
+
+# ── pre-seeding an existing server save before first launch (#443) ────────────
+
+def test_switch_title_id_from_rom_extracts_bracketed_id():
+    rom = "/roms/switch/Pokemon Legends Arceus [0100000011D90000][v0].nsp"
+    assert _switch_title_id_from_rom(rom) == "0100000011D90000"
+
+
+def test_switch_title_id_from_rom_none_when_untagged():
+    assert _switch_title_id_from_rom("/roms/switch/some_game.nsp") is None
+
+
+class _FakeSeedClient:
+    def __init__(self, fail_for: set[str] = frozenset()):
+        self.calls: list[tuple[str, str]] = []
+        self._fail_for = fail_for
+
+    def pull_save(self, slug, path):
+        self.calls.append((slug, path))
+        if path in self._fail_for:
+            raise RuntimeError("boom")
+        return True, "server-hash"
+
+
+def test_seed_switch_save_writes_into_every_existing_profile(monkeypatch, tmp_path):
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    profile_a = nand_root / "profile-a"
+    profile_b = nand_root / "profile-b"
+    profile_a.mkdir(parents=True)
+    profile_b.mkdir(parents=True)
+
+    rom = "/roms/switch/Pokemon Legends Arceus [0100000011D90000][v0].nsp"
+    client = _FakeSeedClient()
+
+    seeded = _seed_switch_save(client, "pokemon-legends-arceus", rom)
+
+    assert sorted(seeded) == sorted([
+        str(profile_a / "0100000011D90000"),
+        str(profile_b / "0100000011D90000"),
+    ])
+    assert {p for _, p in client.calls} == set(seeded)
+
+
+def test_seed_switch_save_returns_empty_when_title_id_unavailable(tmp_path):
+    client = _FakeSeedClient()
+
+    seeded = _seed_switch_save(client, "some-game", "/roms/switch/untagged.nsp")
+
+    assert seeded == []
+    assert client.calls == []
+
+
+def test_seed_switch_save_tolerates_a_failed_profile(monkeypatch, tmp_path):
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    profile_a = nand_root / "profile-a"
+    profile_b = nand_root / "profile-b"
+    profile_a.mkdir(parents=True)
+    profile_b.mkdir(parents=True)
+
+    rom = "/roms/switch/game [0100000011D90000].nsp"
+    failing_dest = str(profile_a / "0100000011D90000")
+    client = _FakeSeedClient(fail_for={failing_dest})
+
+    seeded = _seed_switch_save(client, "some-game", rom)
+
+    assert seeded == [str(profile_b / "0100000011D90000")]
 
 
 def test_finds_title_under_emudeck_style_second_root(monkeypatch, tmp_path):

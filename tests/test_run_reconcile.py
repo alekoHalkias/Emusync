@@ -476,6 +476,85 @@ def test_run_switch_never_pushes_cwd_when_save_path_still_blank(monkeypatch, tmp
     assert pushed_paths == []  # blank save_path must never be pushed (Path("") == cwd)
 
 
+def test_run_seeds_existing_save_before_first_switch_launch(monkeypatch, tmp_path):
+    """Feature (#443): a device's first-ever session for a learned-save-path
+    game plays blind, since the destination folder isn't known until after
+    the session. If the server already has real progress, it must be
+    pre-seeded into every existing Eden profile folder BEFORE the emulator
+    launches, so whichever profile the player picks already has it loaded."""
+    import cli.run as run_mod
+
+    nand_root = tmp_path / "nand"
+    profile_dir = nand_root / "profile-a"
+    profile_dir.mkdir(parents=True)
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local", device_name="deck")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+
+    rom_path = str(tmp_path / "Pokemon Legends Arceus [0100000011D90000][v0].nsp")
+    Path(rom_path).write_bytes(b"ROM")
+    gd = GameDeviceConfig(
+        rom_path=rom_path, save_path="",
+        launch_command="eden", state_path="", rom_folder_path=str(tmp_path),
+    )
+
+    events = []
+    seeded_dest = str(profile_dir / "0100000011D90000")
+
+    class _C:
+        def health(self):
+            return True
+
+        def get_game_device(self, slug):
+            return gd
+
+        def get_game(self, slug):
+            return {"name": "Test Game", "console": "Switch"}
+
+        def get_lock(self, slug):
+            return {"locked": False}
+
+        def acquire_lock(self, slug):
+            pass
+
+        def release_lock(self, slug):
+            pass
+
+        def get_save_meta(self, slug):
+            return {"hash": "server-hash", "pushed_at": None}
+
+        def pull_save(self, slug, path):
+            events.append(("pull_save", path))
+            Path(path).mkdir(parents=True, exist_ok=True)
+            return True, "server-hash"
+
+        def push_save(self, slug, path):
+            events.append(("push_save", path))
+
+        def set_game_device(self, slug, updated_gd):
+            pass
+
+    def _fake_launch(argv, pid_file):
+        events.append(("launch", None))
+        return 0
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+    monkeypatch.setattr(run_mod, "_launch_and_wait", _fake_launch)
+    # The player picked the seeded profile and kept playing it — the write
+    # detector finds the same folder we just seeded.
+    monkeypatch.setattr(run_mod, "_resolve_written_switch_save", lambda since: seeded_dest)
+
+    with pytest.raises(SystemExit) as exc:
+        run_mod.run_game.callback(game_slug="test-game", command=())
+    assert exc.value.code == 0
+
+    assert ("pull_save", seeded_dest) in events
+    # Seeding must happen BEFORE launch — that's the whole point (#443): the
+    # player's first session should already have the synced save loaded.
+    assert events.index(("pull_save", seeded_dest)) < events.index(("launch", None))
+
+
 # ── RetroArch content-name detection: filename vs database-label folder (#210) ────
 
 SINCE = 1_000_000.0  # arbitrary epoch baseline for "launch start"

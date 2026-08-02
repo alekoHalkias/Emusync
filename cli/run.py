@@ -69,7 +69,10 @@ from cli.run_reconcile import (  # noqa: F401 — re-exported for existing calle
     _STATE_RE,
 )
 from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
-from cli.run_switch import _resolve_written_switch_save  # noqa: F401 — re-exported for existing callers/tests
+from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
+    _resolve_written_switch_save,
+    _seed_switch_save,
+)
 
 
 def _resolve_launch_command(gd) -> Optional[str]:
@@ -284,6 +287,17 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # as .bak). server_hash = what's authoritative on the server afterwards.
         # For a shared-memcard console this reconciles the console card (#295).
         server_hash = _reconcile_save(save_client, cfg, save_key, save_path)
+
+        # First-ever session on this device for a learned-save-path game
+        # (save_path still blank) plays blind — the NAND title folder isn't
+        # known until after the session. If the server already has real
+        # progress, pre-seed it into every existing Eden profile folder now,
+        # so whichever profile the player picks already has it loaded instead
+        # of starting fresh and clobbering synced progress (#443).
+        if console_abbr == "Switch" and not save_path and server_hash:
+            seeded = _seed_switch_save(save_client, save_key, gd.rom_path)
+            if seeded:
+                click.echo(f"Seeded existing save into {len(seeded)} profile folder(s) before launch.")
 
         # Pull state if configured. For a shared sstates folder (PS2) use the
         # merge pull so other games' states in the folder aren't disturbed (#294).
