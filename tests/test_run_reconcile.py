@@ -555,6 +555,79 @@ def test_run_seeds_existing_save_before_first_switch_launch(monkeypatch, tmp_pat
     assert events.index(("pull_save", seeded_dest)) < events.index(("launch", None))
 
 
+def test_run_matches_existing_local_save_by_stored_title_id(monkeypatch, tmp_path):
+    """Feature (#443): a device that has already played this Switch game once
+    finds its own save deterministically by title ID on every subsequent
+    launch — save_path adopted and persisted BEFORE reconcile, rather than
+    only reconciling against a blank path (the meta-only no-op branch)."""
+    import cli.run as run_mod
+
+    nand_root = tmp_path / "nand"
+    title_dir = nand_root / "profile-a" / "0100000011D90000"
+    title_dir.mkdir(parents=True)
+    (title_dir / "save_data.bin").write_bytes(b"progress")
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local", device_name="deck")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+
+    rom_path = str(tmp_path / "game.nsp")  # no bracketed tag — must fall back to the stored ID
+    Path(rom_path).write_bytes(b"ROM")
+    gd = GameDeviceConfig(
+        rom_path=rom_path, save_path="",
+        launch_command="eden", state_path="", rom_folder_path=str(tmp_path),
+    )
+
+    events = []
+    persisted_paths = []
+
+    class _C:
+        def health(self):
+            return True
+
+        def get_game_device(self, slug):
+            return gd
+
+        def get_game(self, slug):
+            return {"name": "Test Game", "console": "Switch", "switch_title_id": "0100000011D90000"}
+
+        def get_lock(self, slug):
+            return {"locked": False}
+
+        def acquire_lock(self, slug):
+            pass
+
+        def release_lock(self, slug):
+            pass
+
+        def get_save_meta(self, slug):
+            return {"hash": "server-hash", "pushed_at": None}
+
+        def pull_save(self, slug, path):
+            events.append(("pull_save", path))
+            return True, "server-hash"
+
+        def push_save(self, slug, path):
+            events.append(("push_save", path))
+            return "local-hash"
+
+        def set_game_device(self, slug, updated_gd):
+            persisted_paths.append(updated_gd.save_path)
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+    monkeypatch.setattr(run_mod, "_launch_and_wait", lambda argv, pid_file: 0)
+    monkeypatch.setattr(run_mod, "_resolve_written_switch_save", lambda since: None)
+
+    with pytest.raises(SystemExit) as exc:
+        run_mod.run_game.callback(game_slug="test-game", command=())
+    assert exc.value.code == 0
+
+    assert persisted_paths == [str(title_dir)]  # matched + persisted before reconcile ran
+    # Reconciled against the real local save (not the blank-path no-op branch):
+    # local content differs from "server-hash", so it pushed.
+    assert ("push_save", str(title_dir)) in events
+
+
 # ── RetroArch content-name detection: filename vs database-label folder (#210) ────
 
 SINCE = 1_000_000.0  # arbitrary epoch baseline for "launch start"

@@ -21,6 +21,10 @@ class GameRequest(BaseModel):
     # devices. Omitted/None on a plain rename leaves the existing value alone —
     # see update_game below.
     sgdb_game_id: Optional[int] = None
+    # The Switch NAND save folder's title ID (issue #443), derived from the
+    # ROM's bracketed filename tag at import time. Empty leaves the existing
+    # value alone on update, same as sgdb_game_id.
+    switch_title_id: str = ""
 
 
 class GameDeviceRequest(BaseModel):
@@ -39,19 +43,23 @@ class GameDeviceRequest(BaseModel):
     device_local_folder: str = ""
 
 
+def _game_dict(g) -> dict:
+    return {
+        "slug": g.slug, "name": g.name, "console": g.console,
+        "sgdb_game_id": g.sgdb_game_id, "switch_title_id": g.switch_title_id,
+    }
+
+
 @router.get("/games")
 def list_games(device_id: str = Depends(_auth)) -> list[dict]:
-    return [
-        {"slug": g.slug, "name": g.name, "console": g.console, "sgdb_game_id": g.sgdb_game_id}
-        for g in _get_store().list_games()
-    ]
+    return [_game_dict(g) for g in _get_store().list_games()]
 
 
 @router.post("/games")
 def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
     slug = re.sub(r"[^a-z0-9]+", "-", req.name.lower()).strip("-")
-    game = _get_store().add_game(slug, req.name, req.console)
-    return {"slug": game.slug, "name": game.name, "console": game.console, "sgdb_game_id": game.sgdb_game_id}
+    game = _get_store().add_game(slug, req.name, req.console, req.switch_title_id)
+    return _game_dict(game)
 
 
 @router.get("/games/overview")
@@ -68,7 +76,7 @@ def get_game(slug: str, device_id: str = Depends(_auth)) -> dict:
     game = _get_store().get_game(slug)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    return {"slug": game.slug, "name": game.name, "console": game.console, "sgdb_game_id": game.sgdb_game_id}
+    return _game_dict(game)
 
 
 @router.put("/games/{slug}")
@@ -81,8 +89,10 @@ def update_game(slug: str, req: GameRequest, device_id: str = Depends(_auth)) ->
         store.update_game_console(slug, req.console)
     if req.sgdb_game_id:
         store.update_game_sgdb_id(slug, req.sgdb_game_id)
+    if req.switch_title_id:
+        store.update_game_switch_title_id(slug, req.switch_title_id)
     game = store.get_game(slug)
-    return {"slug": slug, "name": game.name, "console": game.console, "sgdb_game_id": game.sgdb_game_id}
+    return _game_dict(game)
 
 
 @router.delete("/games/{slug}")

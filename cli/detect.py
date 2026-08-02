@@ -300,6 +300,22 @@ def _scan_rom_dir(directory: str, depth: int = 0) -> list[str]:
 _SWITCH_TITLE_ID_RE = re.compile(r"\[([0-9A-Fa-f]{16})\]")
 
 
+def _switch_title_id_from_rom(rom_path: str) -> str:
+    """The 16-hex title ID bracketed in *rom_path*'s filename, or "".
+
+    Same scene convention _SWITCH_TITLE_ID_RE already filters base/update/DLC
+    files with, above — reused because it's also the title-ID folder name
+    under each Eden profile, letting a save be matched/pre-seeded to its exact
+    destination without ever having played the game on this device (#443).
+    Stored on the game at import time (server-side, shared across devices) so
+    it doesn't depend on every device's local filename still carrying the tag.
+    A filename without the tag returns "" — the caller falls back to the
+    older blind-first-play/learn behavior.
+    """
+    match = _SWITCH_TITLE_ID_RE.search(os.path.basename(rom_path))
+    return match.group(1) if match else ""
+
+
 def _is_switch_base_game_file(path: str) -> bool:
     """True unless *path* is clearly a Switch update/DLC package, not a base
     game. Only .nsp is ambiguous — .xci cart dumps are always a whole base

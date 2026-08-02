@@ -102,6 +102,37 @@ async def test_update_game_without_sgdb_id_leaves_existing_value(client):
     assert r.json()["sgdb_game_id"] == 12345
 
 
+@pytest.mark.asyncio
+async def test_add_game_with_switch_title_id(client):
+    """The Switch NAND save folder's title ID (#443), set at import and shared
+    across devices via this same server-side row."""
+    r = await client.post(
+        "/games", json={"name": "Pokemon Legends Arceus", "console": "Switch", "switch_title_id": "0100000011D90000"},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert r.json()["switch_title_id"] == "0100000011D90000"
+
+    r = await client.get("/games/pokemon-legends-arceus", headers=AUTH)
+    assert r.json()["switch_title_id"] == "0100000011D90000"
+
+
+@pytest.mark.asyncio
+async def test_backfill_switch_title_id_on_existing_game(client):
+    """A game imported before this field existed (or whose importing device's
+    ROM filename lacked the bracketed tag) can have it backfilled later."""
+    await client.post("/games", json={"name": "Test Game", "console": "Switch"}, headers=AUTH)
+
+    r = await client.get("/games/test-game", headers=AUTH)
+    assert r.json()["switch_title_id"] == ""
+
+    r = await client.put(
+        "/games/test-game", json={"name": "Test Game", "switch_title_id": "0100000011D90000"}, headers=AUTH,
+    )
+    assert r.status_code == 200
+    assert r.json()["switch_title_id"] == "0100000011D90000"
+
+
 # ── game device config ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio

@@ -70,8 +70,10 @@ from cli.run_reconcile import (  # noqa: F401 — re-exported for existing calle
 )
 from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
 from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
+    _find_local_switch_save,
     _resolve_written_switch_save,
     _seed_switch_save,
+    _switch_title_id_from_rom,
 )
 
 
@@ -216,13 +218,16 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     # newest-wins/.bak reconcile logic is reused unchanged.
     game_name = ""
     console_abbr = ""
+    switch_title_id = ""
     try:
         _g = client.get_game(game_slug)
         game_name = (_g or {}).get("name", "") or ""
         console_abbr = (_g or {}).get("console", "") or ""
+        switch_title_id = (_g or {}).get("switch_title_id", "") or ""
     except Exception:
         game_name = ""
         console_abbr = ""
+        switch_title_id = ""
 
     # Cache the config so a future offline launch knows the paths + command, and
     # so the GUI can show this game while the server is unreachable (issue #383).
@@ -282,20 +287,43 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     exit_code = 0
     game_pid_file.write_text(str(os.getpid()))
     try:
+        # A learned-save-path game (Switch) whose destination isn't known yet
+        # on this device: match it by title ID against every existing Eden
+        # profile folder BEFORE reconciling, rather than only ever guessing
+        # from post-launch write detection. A device that has already played
+        # this game once then finds its own save deterministically on every
+        # subsequent launch, and gets full newest-wins reconciliation from the
+        # first matched launch onward instead of a one-off blind seed (#443).
+        if console_abbr == "Switch" and not save_path:
+            title_id = switch_title_id or _switch_title_id_from_rom(gd.rom_path)
+            local_match = _find_local_switch_save(title_id) if title_id else None
+            if local_match:
+                save_path = local_match
+                try:
+                    client.set_game_device(game_slug, GameDeviceConfig(
+                        rom_path=gd.rom_path, save_path=save_path, launch_command=gd.launch_command,
+                        state_path=gd.state_path, rom_folder_path=gd.rom_folder_path,
+                        rom_source=gd.rom_source, rom_rel_path=gd.rom_rel_path,
+                        local_rom_path=gd.local_rom_path, rom_sha256=gd.rom_sha256,
+                    ))
+                    click.echo(f"Found an existing local save for {game_slug} (matched by title ID).")
+                except Exception as exc:
+                    click.echo(f"Warning: failed to update save path: {exc}", err=True)
+
         # Reconcile the save before launch: push if the local save is newer than
         # the server's, pull if the server's is newer (newest wins; loser kept
         # as .bak). server_hash = what's authoritative on the server afterwards.
         # For a shared-memcard console this reconciles the console card (#295).
         server_hash = _reconcile_save(save_client, cfg, save_key, save_path)
 
-        # First-ever session on this device for a learned-save-path game
-        # (save_path still blank) plays blind — the NAND title folder isn't
-        # known until after the session. If the server already has real
-        # progress, pre-seed it into every existing Eden profile folder now,
-        # so whichever profile the player picks already has it loaded instead
-        # of starting fresh and clobbering synced progress (#443).
+        # Still no local match (device has never played this game): if the
+        # server already has real progress, pre-seed it into every existing
+        # Eden profile folder now, so whichever profile the player picks
+        # already has it loaded instead of starting fresh and clobbering
+        # synced progress (#443).
         if console_abbr == "Switch" and not save_path and server_hash:
-            seeded = _seed_switch_save(save_client, save_key, gd.rom_path)
+            title_id = switch_title_id or _switch_title_id_from_rom(gd.rom_path)
+            seeded = _seed_switch_save(save_client, save_key, title_id)
             if seeded:
                 click.echo(f"Seeded existing save into {len(seeded)} profile folder(s) before launch.")
 

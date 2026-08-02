@@ -22,6 +22,7 @@ from cli.detect import (
     _resolve_shared_memcard_save_state,
     _scan_rom_dir,
     _switch_display_name,
+    _switch_title_id_from_rom,
 )
 from cli.root import cli
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
@@ -460,7 +461,11 @@ def console_import() -> None:
     for i, entry in enumerate(to_import, 1):
         click.echo(f"  [{i}/{len(to_import)}] {entry['name']}… ", nl=False)
         try:
-            game = client.add_game(entry["name"], console_abbr)
+            # Stored server-side and shared across devices, so it doesn't
+            # depend on every device's local ROM filename still carrying the
+            # bracketed tag at launch time (#443).
+            title_id = _switch_title_id_from_rom(entry["rom_path"]) if console_def["key"] == "switch" else ""
+            game = client.add_game(entry["name"], console_abbr, title_id)
             slug = game["slug"]
             if rom_source == "network":
                 gd_cfg = _build_network_game_device(entry, network_root, local_root)

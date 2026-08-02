@@ -17,13 +17,12 @@ mirrors, and cli/run_wii.py for the Wii sibling this is a near-exact copy of).
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Optional
 
 import click
 
-from cli.detect import _SWITCH_TITLE_ID_RE
+from cli.detect import _switch_title_id_from_rom  # noqa: F401 — re-exported for existing callers/tests
 from cli.run_reconcile import _mtime
 
 # Native + flatpak Eden NAND roots (mirrors _WII_NAND_ROOTS in cli/run_wii.py).
@@ -84,21 +83,26 @@ def _resolve_written_switch_save(since: float) -> Optional[str]:
     return str(touched[0])
 
 
-def _switch_title_id_from_rom(rom_path: str) -> Optional[str]:
-    """The 16-hex title ID bracketed in *rom_path*'s filename, or None.
+def _find_local_switch_save(title_id: str) -> Optional[str]:
+    """A title-ID folder matching *title_id* that already exists locally and
+    has real data in it, across every profile, or None (#443).
 
-    Same scene convention _SWITCH_TITLE_ID_RE already filters base/update/DLC
-    files with (cli/detect.py, #419) — reused here because it's also the
-    title-ID folder name under each Eden profile, letting a save be pre-seeded
-    to its exact destination without ever having played the game (#443). A
-    filename without the tag returns None; the caller falls back to the
-    existing blind-first-play/learn behavior.
+    Matching by the (stable, per-game) title ID directly — rather than only
+    ever guessing from "what got touched since launch" — means a device that
+    has already played this game once finds its own save deterministically on
+    every subsequent launch, with no dependence on mtimes or on exactly one
+    title folder having changed this session. An empty/never-written folder
+    (e.g. one this device seeded but never actually got played) doesn't count
+    as "found" — nothing to reconcile against yet.
     """
-    match = _SWITCH_TITLE_ID_RE.search(os.path.basename(rom_path))
-    return match.group(1) if match else None
+    for profile_dir in _switch_profile_dirs():
+        candidate = profile_dir / title_id
+        if candidate.is_dir() and any(f.is_file() for f in candidate.rglob("*")):
+            return str(candidate)
+    return None
 
 
-def _seed_switch_save(save_client, save_key: str, rom_path: str) -> list[str]:
+def _seed_switch_save(save_client, save_key: str, title_id: str) -> list[str]:
     """Pre-seed the server's existing save into every profile folder that
     already exists on this device, before the game is ever launched here.
 
@@ -112,10 +116,9 @@ def _seed_switch_save(save_client, save_key: str, rom_path: str) -> list[str]:
     afterward, since seeded files get an mtime before the session starts and
     only the profile actually played gets touched during play.
 
-    Returns the destination paths actually seeded (empty if the title ID
-    can't be derived from the filename, or no profile folder exists yet).
+    Returns the destination paths actually seeded (empty if *title_id* is
+    blank, or no profile folder exists yet).
     """
-    title_id = _switch_title_id_from_rom(rom_path)
     if not title_id:
         return []
     seeded = []

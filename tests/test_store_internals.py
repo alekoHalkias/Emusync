@@ -244,6 +244,39 @@ def test_stuck_at_19_still_gets_rom_pull_requests_kind_column():
         assert "kind" in cols
 
 
+def test_migration_21_adds_switch_title_id_to_existing_games():
+    """Regression: a pre-#443 DB's `games` table has no `switch_title_id`
+    column. Opening it via Store() must add it (default '') without touching
+    existing rows' other data."""
+    import sqlite3
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "emusync.db"
+        conn = sqlite3.connect(db_path)
+        conn.executescript(
+            """
+            CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+            CREATE TABLE games (
+                slug TEXT PRIMARY KEY, name TEXT NOT NULL,
+                console TEXT DEFAULT '', sgdb_game_id INTEGER
+            );
+            INSERT INTO games (slug, name, console) VALUES ('zelda', 'Zelda', 'Switch');
+            """
+        )
+        conn.execute("PRAGMA user_version = 20")
+        conn.commit()
+        conn.close()
+
+        store = Store(tmpdir)
+
+        assert store._conn.execute("PRAGMA user_version").fetchone()[0] >= 21
+        cols = {c[1] for c in store._conn.execute("PRAGMA table_info(games)").fetchall()}
+        assert "switch_title_id" in cols
+        game = store.get_game("zelda")
+        assert game.name == "Zelda"
+        assert game.switch_title_id == ""
+
+
 # ── console-def seeding is additive (#202) ─────────────────────────────────────
 
 def test_seed_console_defs_picks_up_additions():

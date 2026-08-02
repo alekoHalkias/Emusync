@@ -19,6 +19,7 @@ class Game:
     name: str
     console: str = ""
     sgdb_game_id: Optional[int] = None
+    switch_title_id: str = ""
 
 
 @dataclass

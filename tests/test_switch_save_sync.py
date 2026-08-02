@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from cli.run_switch import (
+    _find_local_switch_save,
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
@@ -79,8 +80,8 @@ def test_switch_title_id_from_rom_extracts_bracketed_id():
     assert _switch_title_id_from_rom(rom) == "0100000011D90000"
 
 
-def test_switch_title_id_from_rom_none_when_untagged():
-    assert _switch_title_id_from_rom("/roms/switch/some_game.nsp") is None
+def test_switch_title_id_from_rom_empty_when_untagged():
+    assert _switch_title_id_from_rom("/roms/switch/some_game.nsp") == ""
 
 
 class _FakeSeedClient:
@@ -103,10 +104,9 @@ def test_seed_switch_save_writes_into_every_existing_profile(monkeypatch, tmp_pa
     profile_a.mkdir(parents=True)
     profile_b.mkdir(parents=True)
 
-    rom = "/roms/switch/Pokemon Legends Arceus [0100000011D90000][v0].nsp"
     client = _FakeSeedClient()
 
-    seeded = _seed_switch_save(client, "pokemon-legends-arceus", rom)
+    seeded = _seed_switch_save(client, "pokemon-legends-arceus", "0100000011D90000")
 
     assert sorted(seeded) == sorted([
         str(profile_a / "0100000011D90000"),
@@ -115,10 +115,10 @@ def test_seed_switch_save_writes_into_every_existing_profile(monkeypatch, tmp_pa
     assert {p for _, p in client.calls} == set(seeded)
 
 
-def test_seed_switch_save_returns_empty_when_title_id_unavailable(tmp_path):
+def test_seed_switch_save_returns_empty_when_title_id_blank(tmp_path):
     client = _FakeSeedClient()
 
-    seeded = _seed_switch_save(client, "some-game", "/roms/switch/untagged.nsp")
+    seeded = _seed_switch_save(client, "some-game", "")
 
     assert seeded == []
     assert client.calls == []
@@ -132,13 +132,43 @@ def test_seed_switch_save_tolerates_a_failed_profile(monkeypatch, tmp_path):
     profile_a.mkdir(parents=True)
     profile_b.mkdir(parents=True)
 
-    rom = "/roms/switch/game [0100000011D90000].nsp"
     failing_dest = str(profile_a / "0100000011D90000")
     client = _FakeSeedClient(fail_for={failing_dest})
 
-    seeded = _seed_switch_save(client, "some-game", rom)
+    seeded = _seed_switch_save(client, "some-game", "0100000011D90000")
 
     assert seeded == [str(profile_b / "0100000011D90000")]
+
+
+# ── matching an already-played title's save locally by ID (#443) ──────────────
+
+def test_find_local_switch_save_matches_by_title_id(monkeypatch, tmp_path):
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    title_dir = _make_title(nand_root, "profile-a", "0100000011D90000")
+    (title_dir / "save_data.bin").write_text("progress")
+
+    assert _find_local_switch_save("0100000011D90000") == str(title_dir)
+
+
+def test_find_local_switch_save_ignores_empty_folder(monkeypatch, tmp_path):
+    """A folder that exists but has never actually been written to (e.g. one
+    this device seeded but the player hasn't launched into yet) shouldn't
+    count as a real local save to reconcile against."""
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    _make_title(nand_root, "profile-a", "0100000011D90000")  # empty
+
+    assert _find_local_switch_save("0100000011D90000") is None
+
+
+def test_find_local_switch_save_none_when_no_profile_has_it(monkeypatch, tmp_path):
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    other = _make_title(nand_root, "profile-a", "0100000000010000")
+    (other / "save_data.bin").write_text("a different game")
+
+    assert _find_local_switch_save("0100000011D90000") is None
 
 
 def test_finds_title_under_emudeck_style_second_root(monkeypatch, tmp_path):

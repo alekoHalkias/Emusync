@@ -187,8 +187,12 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def add_game(self, name: str, console: str = "") -> dict:
-        r = self._client.post(self._url("/games"), json={"name": name, "console": console}, timeout=10)
+    def add_game(self, name: str, console: str = "", switch_title_id: str = "") -> dict:
+        r = self._client.post(
+            self._url("/games"),
+            json={"name": name, "console": console, "switch_title_id": switch_title_id},
+            timeout=10,
+        )
         r.raise_for_status()
         return r.json()
 

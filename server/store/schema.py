@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 20
+_SCHEMA_VERSION = 21
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -22,10 +22,11 @@ CREATE TABLE IF NOT EXISTS devices (
     last_seen_at TEXT
 );
 CREATE TABLE IF NOT EXISTS games (
-    slug          TEXT PRIMARY KEY,
-    name          TEXT NOT NULL,
-    console       TEXT DEFAULT '',
-    sgdb_game_id  INTEGER
+    slug             TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    console          TEXT DEFAULT '',
+    sgdb_game_id     INTEGER,
+    switch_title_id  TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS consoles (
     id                    TEXT PRIMARY KEY,
@@ -398,4 +399,14 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # fresh number is the only safe fix once any DB has advanced past a
         # version number, even a pre-release one.
         _try(conn, "ALTER TABLE rom_pull_requests ADD COLUMN kind TEXT NOT NULL DEFAULT 'rom'")
+    if from_version < 21:
+        # The Switch NAND save path is keyed by a 16-hex title ID that's
+        # stable per game and derivable from the scene's bracketed-tag ROM
+        # filename convention (_SWITCH_TITLE_ID_RE) — stored once, server-side
+        # and shared across every device, instead of re-derived from each
+        # device's own local filename on every launch (which silently breaks
+        # if a device's copy was renamed and lost the tag). Lets a device
+        # match/pre-seed its save deterministically by ID rather than only
+        # ever guessing from post-launch write detection (issue #443).
+        _try(conn, "ALTER TABLE games ADD COLUMN switch_title_id TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
