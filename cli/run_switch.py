@@ -25,9 +25,14 @@ import click
 from cli.run_reconcile import _mtime
 
 # Native + flatpak Eden NAND roots (mirrors _WII_NAND_ROOTS in cli/run_wii.py).
-# Eden has no Flathub package yet (AppImage-only), so there's no flatpak root.
+# Eden has no Flathub package yet (AppImage-only), so there's no flatpak root —
+# but EmuDeck-managed installs (common on Steam Deck) redirect Eden's whole
+# data directory to ~/Emulation/storage/eden/ instead of the XDG default, so
+# both roots are checked the same way native/flatpak both are for every other
+# standalone emulator (#441).
 _SWITCH_NAND_ROOTS = (
     Path.home() / ".local/share/eden/nand/user/save/0000000000000000",
+    Path.home() / "Emulation/storage/eden/nand/user/save/0000000000000000",
 )
 
 

@@ -66,3 +66,27 @@ def test_no_profile_folder_returns_none(tmp_path, monkeypatch):
     result = _resolve_written_switch_save(time.time())
 
     assert result is None
+
+
+def test_finds_title_under_emudeck_style_second_root(monkeypatch, tmp_path):
+    """Regression (#441): EmuDeck-managed installs (common on Steam Deck)
+    redirect Eden's whole data directory to ~/Emulation/storage/eden/ instead
+    of the XDG default ~/.local/share/eden/ — confirmed from a real deck's
+    `ps aux` showing Eden's load/ folder living under
+    ~/Emulation/storage/eden/. Both roots must be checked, the same way
+    native/flatpak both are for every other standalone emulator, or a
+    session's save is silently never found on such a device."""
+    xdg_root = tmp_path / "xdg" / "save"
+    emudeck_root = tmp_path / "emudeck" / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (xdg_root, emudeck_root))
+
+    # xdg_root doesn't even exist — matches a real EmuDeck install where
+    # nothing was ever written to the XDG-default location at all.
+    title_dir = _make_title(emudeck_root, "PROFILE", "0100000011D90000")
+    since = time.time()
+    time.sleep(0.01)
+    (title_dir / "main").write_text("save data")
+
+    result = _resolve_written_switch_save(since)
+
+    assert result == str(title_dir)
