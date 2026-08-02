@@ -361,7 +361,11 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             except Exception as exc:
                 click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
 
-        if Path(save_path).exists():
+        # save_path can still be blank here — Switch's real save path is only
+        # learned if this session's write was unambiguous (#441); Path("")
+        # resolves to the cwd, which must never be treated as a save (mirrors
+        # the identical guard in _reconcile_save).
+        if save_path and Path(save_path).exists():
             local_bytes = memcard_bytes(Path(save_path))
             local_hash = hashlib.sha256(local_bytes).hexdigest()
             if local_hash != server_hash:

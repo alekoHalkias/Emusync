@@ -415,6 +415,67 @@ def test_run_refuses_external_command_for_unimported_game(monkeypatch, tmp_path)
     assert exc.value.code == 1
 
 
+def test_run_switch_never_pushes_cwd_when_save_path_still_blank(monkeypatch, tmp_path):
+    """Regression (#441): if the post-launch write-detection finds nothing/is
+    ambiguous, save_path stays "". Path("") resolves to the cwd — the
+    post-launch push step must never treat that as the save (mirrors the
+    identical guard already in _reconcile_save)."""
+    import cli.run as run_mod
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "not_a_save.txt").write_text("decoy")  # would get swept up if the guard regresses
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local", device_name="deck")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+
+    gd = GameDeviceConfig(
+        rom_path=str(tmp_path / "game.nsp"), save_path="",
+        launch_command="eden game.nsp", state_path="", rom_folder_path=str(tmp_path),
+    )
+    (tmp_path / "game.nsp").write_bytes(b"ROM")
+
+    pushed_paths = []
+
+    class _C:
+        def health(self):
+            return True
+
+        def get_game_device(self, slug):
+            return gd
+
+        def get_game(self, slug):
+            return {"name": "Test Game", "console": "Switch"}
+
+        def get_lock(self, slug):
+            return {"locked": False}
+
+        def acquire_lock(self, slug):
+            pass
+
+        def release_lock(self, slug):
+            pass
+
+        def get_save_meta(self, slug):
+            return None
+
+        def push_save(self, slug, path):
+            pushed_paths.append(path)  # not raised — the real code catches Exception here
+
+        def set_game_device(self, slug, updated_gd):
+            pass
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+    monkeypatch.setattr(run_mod, "_launch_and_wait", lambda argv, pid_file: 0)
+    # Nothing found this session — the exact trigger: save_path stays blank,
+    # but the unguarded code used to fall through to Path("").exists() anyway.
+    monkeypatch.setattr(run_mod, "_resolve_written_switch_save", lambda since: None)
+
+    with pytest.raises(SystemExit) as exc:
+        run_mod.run_game.callback(game_slug="test-game", command=())
+    assert exc.value.code == 0
+    assert pushed_paths == []  # blank save_path must never be pushed (Path("") == cwd)
+
+
 # ── RetroArch content-name detection: filename vs database-label folder (#210) ────
 
 SINCE = 1_000_000.0  # arbitrary epoch baseline for "launch start"
