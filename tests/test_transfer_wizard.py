@@ -7,6 +7,9 @@ server (the `live_server` fixture) and drives the actual click commands via
 """
 from __future__ import annotations
 
+import io
+import tarfile
+
 from click.testing import CliRunner
 
 import server.config as cfg_module
@@ -217,6 +220,55 @@ def test_pull_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
     assert {f.name for f in dest_folder.iterdir()} == {"pbd.nsp", "pbd_update.nsp"}
     # Nothing else was dumped loose into the shared console root (#441).
     assert {p.name for p in console_root.iterdir()} == {"Pokemon Brilliant Diamond"}
+
+
+def test_receive_switch_folder_does_not_inherit_another_games_save_path(tmp_path, live_server):
+    """Regression (#441): the receiving device's auto-registration copies
+    save/launch/state patterns from another game of the same console already
+    there, by replacing one ROM filename stem with another inside the path —
+    which works for a filename-based save path but is a silent no-op against
+    a Switch NAND path (title-ID keyed, contains no filename at all). Without
+    the kind='rom-folder' guard, a freshly-received Switch game would
+    silently inherit the OTHER game's exact save folder."""
+    target = _device_client(live_server, "dev-target", "SteamDeck")
+    target.add_game("Pokemon Brilliant Diamond", console="Switch")
+    target.set_game_device("pokemon-brilliant-diamond", GameDeviceConfig(
+        rom_path="/home/deck/roms/switch/Pokemon Brilliant Diamond/pbd.nsp",
+        save_path="/home/deck/.local/share/eden/nand/user/save/0000000000000000/PROFILE/0100000011D90000",
+        launch_command='eden "/home/deck/roms/switch/Pokemon Brilliant Diamond/pbd.nsp"',
+    ))
+
+    target.add_game("Pokemon Legends Arceus", console="Switch")
+    tar_path = tmp_path / "arceus.tar"
+    with tarfile.open(tar_path, "w") as tf:
+        data = b"ARCEUSROMDATA"
+        info = tarfile.TarInfo(name="arceus.nsp")
+        info.size = len(data)
+        tf.addfile(info, io.BytesIO(data))
+
+    source = _device_client(live_server, "dev-source", "SourcePC")
+    source.create_rom_transfer(
+        "pokemon-legends-arceus", "dev-target",
+        "/home/deck/roms/switch/Pokemon Legends Arceus/arceus.nsp",
+        str(tar_path), kind="rom-folder",
+    )
+    transfers = target.list_pending_transfers()
+    assert len(transfers) == 1
+
+    destination_path = str(tmp_path / "deck_roms" / "Pokemon Legends Arceus" / "arceus.nsp")
+    ok = _receive_transfer(
+        target, transfers[0]["id"], destination_path,
+        "pokemon-legends-arceus", "Switch", "Pokemon Legends Arceus",
+        sha256=transfers[0].get("sha256"), kind="rom-folder",
+    )
+    assert ok
+
+    registered = target.get_game_device("pokemon-legends-arceus")
+    assert registered.save_path == ""  # not the Brilliant Diamond NAND folder
+    assert registered.state_path == ""
+    # launch_command IS safe to derive (a literal full-path substitution) and
+    # still should be, so the game is playable without manual setup.
+    assert registered.launch_command == f'eden "{destination_path}"'
 
 
 def test_push_rom_no_games_configured_exits_quietly(monkeypatch, tmp_path, live_server):

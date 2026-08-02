@@ -437,12 +437,22 @@ def _receive_transfer(
                 (g for g in my_games if g.get("console") == console and g.get("rom_path") and g["slug"] != slug),
                 None,
             )
-            if ref and ref.get("save_path"):
+            if ref and ref.get("launch_command"):
+                launch_command = ref["launch_command"].replace(ref["rom_path"], destination_path)
+            # save_path/state_path copying assumes a filename-based layout
+            # (savesRoot/GameName/GameName.ext) — replacing one game's ROM
+            # filename stem with another's inside the path. A Switch save
+            # path is a NAND folder keyed by title ID
+            # (.../profile-id/0100000011D90000/), which contains neither
+            # game's filename at all, so the replace is a silent no-op and
+            # this game would silently inherit the OTHER game's exact save
+            # folder — two different games' saves pointing at the same data.
+            # Left blank instead, exactly like at import time; the next play
+            # on this device learns this game's own folder (#441).
+            if ref and ref.get("save_path") and kind != "rom-folder":
                 old_stem = os.path.splitext(os.path.basename(ref["rom_path"]))[0]
                 new_stem = os.path.splitext(os.path.basename(destination_path))[0]
                 save_path = ref["save_path"].replace(old_stem, new_stem)
-                if ref.get("launch_command"):
-                    launch_command = ref["launch_command"].replace(ref["rom_path"], destination_path)
                 if ref.get("state_path"):
                     state_path = ref["state_path"].replace(old_stem, new_stem)
 
