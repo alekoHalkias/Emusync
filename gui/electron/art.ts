@@ -220,6 +220,7 @@ const CONSOLE_LOGO: Record<string, string> = {
   dc:        "Sega - Dreamcast",
   gamecube:  "Nintendo - GameCube",
   wii:       "Nintendo - Wii",
+  switch:    "Nintendo - Switch",
   saturn:    "Sega - Saturn",
   gg:        "Sega - Game Gear",
   msx:       "Microsoft - MSX",

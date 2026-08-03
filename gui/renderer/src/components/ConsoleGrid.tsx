@@ -21,6 +21,7 @@ const CONSOLE_COLOR: Record<string, string> = {
   gg:        "#064e3b",
   atari2600: "#78350f",
   lynx:      "#92400e",
+  switch:    "#e60012",
 };
 
 const DEFAULT_COLOR = "#374151";
