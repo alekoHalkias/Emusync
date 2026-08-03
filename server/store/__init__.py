@@ -27,6 +27,7 @@ from server.store.models import (
     SaveMeta,
 )
 from server.store.settings import SettingsMixin
+from server.store.switch_mods import SwitchModMixin
 from server.store.transfers import TransferMixin
 
 
@@ -42,6 +43,7 @@ class Store(
     ConsoleDefMixin,
     ConflictMixin,
     SettingsMixin,
+    SwitchModMixin,
     StoreBase,
 ):
     """SQLite-backed store. CRUD is split across the mixins above; connection and

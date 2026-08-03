@@ -5,6 +5,7 @@ import ArtworkTab from "./ArtworkTab";
 import GameConfig from "./GameConfig";
 import GameDeviceModal from "./game-list/GameDeviceModal";
 import SaveHistory from "./SaveHistory";
+import SwitchModsTab from "./SwitchModsTab";
 
 export type GameModalTarget = {
   slug: string;
@@ -17,7 +18,7 @@ export type GameModalTarget = {
   canPlay: boolean;
 };
 
-type Tab = "settings" | "artwork" | "devices" | "history" | "run";
+type Tab = "settings" | "artwork" | "devices" | "history" | "mods" | "run";
 
 export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   target: GameModalTarget;
@@ -34,6 +35,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
     { key: "artwork", label: "Artwork" },
     { key: "devices", label: "Devices" },
     { key: "history", label: "Save history" },
+    ...(isSwitch ? [{ key: "mods" as Tab, label: "Mods" }] : []),
     { key: "run", label: "Run", disabled: !canPlay },
   ];
 
@@ -83,6 +85,9 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
           )}
           {tab === "history" && (
             <SaveHistory embedded slug={slug} name={name} savePath={savePath} statePath={statePath} onClose={onClose} onRestored={onChanged} hideStates={isSwitch} />
+          )}
+          {tab === "mods" && isSwitch && (
+            <SwitchModsTab slug={slug} />
           )}
           {tab === "run" && (
             <RunTab slug={slug} name={name} canPlay={canPlay} onLaunch={onLaunch} onClose={onClose} />

@@ -36,6 +36,14 @@ _SWITCH_NAND_ROOTS = (
     Path.home() / "Emulation/storage/eden/nand/user/save/0000000000000000",
 )
 
+# Eden's mod folder, one sibling directory up from nand/ (issue #444): each
+# installed mod for a title lives in its own subfolder under
+# load/<title-id-hex>/<mod-name>/. Same dual-root story as the NAND save roots.
+_SWITCH_LOAD_ROOTS = (
+    Path.home() / ".local/share/eden/load",
+    Path.home() / "Emulation/storage/eden/load",
+)
+
 
 def _switch_profile_dirs() -> list[Path]:
     """Every existing profile-ID folder under each NAND save root."""
@@ -131,3 +139,79 @@ def _seed_switch_save(save_client, save_key: str, title_id: str) -> list[str]:
         if pulled:
             seeded.append(str(dest))
     return seeded
+
+
+# ── communal mod pool (issue #444) ─────────────────────────────────────────────
+
+def _local_switch_mods(title_id: str) -> dict[str, Path]:
+    """Every mod subfolder already on this device for *title_id*, name → path.
+
+    Checks both load roots; the first root that has a given mod name wins on
+    the rare chance both exist (shouldn't normally happen — a device only
+    really has one active Eden data directory).
+    """
+    mods: dict[str, Path] = {}
+    for root in _SWITCH_LOAD_ROOTS:
+        title_dir = root / title_id
+        if not title_dir.is_dir():
+            continue
+        for mod_dir in title_dir.iterdir():
+            if mod_dir.is_dir() and mod_dir.name not in mods:
+                mods[mod_dir.name] = mod_dir
+    return mods
+
+
+def _switch_load_root_for(title_id: str) -> Path:
+    """Which load root a newly-pulled mod for *title_id* should land under.
+
+    Prefers a root that already has this title's folder (so new mods land
+    next to existing ones), then any root that exists at all, then the
+    primary root as a last resort (created on first pull).
+    """
+    for root in _SWITCH_LOAD_ROOTS:
+        if (root / title_id).is_dir():
+            return root
+    for root in _SWITCH_LOAD_ROOTS:
+        if root.is_dir():
+            return root
+    return _SWITCH_LOAD_ROOTS[0]
+
+
+def _sync_switch_mods(client, title_id: str) -> tuple[list[str], list[str]]:
+    """Lightweight, name-only mod sync: push local mods missing from the
+    communal pool, pull pool mods missing locally (#444).
+
+    Deliberately never re-verifies content for a mod that already exists by
+    name on both sides — mod folders can be gigabytes (1.4GB seen in
+    practice), so re-hashing/re-transferring on every launch isn't
+    reasonable. Best-effort throughout: any failure here must never block a
+    game launch, so every step is swallowed rather than raised.
+    """
+    if not title_id:
+        return [], []
+    try:
+        local = _local_switch_mods(title_id)
+        pool_names = {m["mod_name"] for m in client.list_switch_mods(title_id)}
+    except Exception:
+        return [], []
+
+    pushed: list[str] = []
+    for name, folder in local.items():
+        if name in pool_names:
+            continue
+        try:
+            client.push_switch_mod(title_id, name, str(folder))
+            pushed.append(name)
+        except Exception:
+            continue
+
+    pulled: list[str] = []
+    dest_root = _switch_load_root_for(title_id)
+    for name in pool_names - local.keys():
+        try:
+            if client.pull_switch_mod(title_id, name, str(dest_root / title_id / name)):
+                pulled.append(name)
+        except Exception:
+            continue
+
+    return pushed, pulled

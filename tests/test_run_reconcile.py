@@ -697,6 +697,72 @@ def test_run_backfills_switch_title_id_from_post_launch_discovery(monkeypatch, t
     assert update_calls == [("pokemon-legends-arceus", "Pokemon Legends Arceus", "01001F5010DFA000")]
 
 
+def test_run_syncs_switch_mods_with_resolved_title_id_before_launch(monkeypatch, tmp_path):
+    """Feature (#444): a Switch launch triggers the lightweight mod sync using
+    whichever title ID was resolved (stored server-side here), and does so
+    before the emulator launches — mirrors the save-seeding ordering check."""
+    import cli.run as run_mod
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local", device_name="Arch")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+
+    rom_path = str(tmp_path / "game.nsp")
+    Path(rom_path).write_bytes(b"ROM")
+    save_dir = tmp_path / "save"
+    save_dir.mkdir()
+    (save_dir / "main").write_bytes(b"progress")
+    gd = GameDeviceConfig(
+        rom_path=rom_path, save_path=str(save_dir),
+        launch_command="eden", state_path="", rom_folder_path=str(tmp_path),
+    )
+
+    events = []
+
+    class _C:
+        def health(self):
+            return True
+
+        def get_game_device(self, slug):
+            return gd
+
+        def get_game(self, slug):
+            return {"name": "Test Game", "console": "Switch", "switch_title_id": "01001F5010DFA000"}
+
+        def get_lock(self, slug):
+            return {"locked": False}
+
+        def acquire_lock(self, slug):
+            pass
+
+        def release_lock(self, slug):
+            pass
+
+        def get_save_meta(self, slug):
+            return {"hash": "server-hash", "pushed_at": None}
+
+        def push_save(self, slug, path):
+            return "local-hash"
+
+        def set_game_device(self, slug, updated_gd):
+            pass
+
+    def _fake_sync_mods(client, title_id):
+        events.append(("sync_mods", title_id))
+        return [], []
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+    monkeypatch.setattr(run_mod, "_sync_switch_mods", _fake_sync_mods)
+    monkeypatch.setattr(run_mod, "_launch_and_wait", lambda argv, pid_file: events.append(("launch", None)) or 0)
+    monkeypatch.setattr(run_mod, "_resolve_written_switch_save", lambda since: None)
+
+    with pytest.raises(SystemExit) as exc:
+        run_mod.run_game.callback(game_slug="test-game", command=())
+    assert exc.value.code == 0
+
+    assert ("sync_mods", "01001F5010DFA000") in events
+    assert events.index(("sync_mods", "01001F5010DFA000")) < events.index(("launch", None))
+
+
 # ── RetroArch content-name detection: filename vs database-label folder (#210) ────
 
 SINCE = 1_000_000.0  # arbitrary epoch baseline for "launch start"
