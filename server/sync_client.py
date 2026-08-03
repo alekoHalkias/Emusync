@@ -440,6 +440,33 @@ class SyncClient:
         r.raise_for_status()
         return r.json()["hash"]
 
+    # ── communal Switch mod pool (issue #444) ────────────────────────────────────
+    # Keyed by title ID, not game slug — shared across every device with the game.
+
+    def list_switch_mods(self, title_id: str) -> list[dict]:
+        r = self._client.get(self._url(f"/switch/{title_id}/mods"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def push_switch_mod(self, title_id: str, mod_name: str, mod_folder: str) -> bool:
+        data = memcard_bytes(Path(mod_folder))
+        r = self._client.post(
+            self._url(f"/switch/{title_id}/mods/{mod_name}"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=60,
+        )
+        r.raise_for_status()
+        return r.json()["added"]
+
+    def pull_switch_mod(self, title_id: str, mod_name: str, dest_folder: str) -> bool:
+        r = self._client.get(self._url(f"/switch/{title_id}/mods/{mod_name}"), timeout=60)
+        if r.status_code == 204:
+            return False
+        r.raise_for_status()
+        _write_memcard(Path(dest_folder), r.content)
+        return True
+
     def pull_state(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
         """Write server state to disk. Returns (pulled, server_hash). pulled=False if no state exists."""
         r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)

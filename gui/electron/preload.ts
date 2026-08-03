@@ -118,6 +118,14 @@ contextBridge.exposeInMainWorld("emusync", {
     addFile: (slug: string, filePath: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("gamefolder:addFile", slug, filePath),
   },
+  switchMods: {
+    listLocal: (titleId: string): Promise<string[]> =>
+      ipcRenderer.invoke("switchMods:listLocal", titleId),
+    reveal: (titleId: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("switchMods:reveal", titleId),
+    sync: (slug: string): Promise<{ ok: boolean; output: string }> =>
+      ipcRenderer.invoke("switchMods:sync", slug),
+  },
   recovery: {
     listLocalBackups: (savePath: string, stateFolder: string): Promise<{
       saves: { path: string; kind: "save" | "state"; size: number; mtime: string; fileName: string }[];

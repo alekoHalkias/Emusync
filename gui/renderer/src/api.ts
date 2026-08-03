@@ -17,7 +17,7 @@ export type GameDeviceConfig = {
   device_local_folder?: string;
 };
 
-export type Game = { slug: string; name: string; console?: string; sgdb_game_id?: number | null };
+export type Game = { slug: string; name: string; console?: string; sgdb_game_id?: number | null; switch_title_id?: string };
 export type Device = { id: string; name: string; last_ip?: string | null; last_seen_at?: string | null };
 export type LockInfo = { locked: boolean; device_id?: string; acquired_at?: string };
 export type SaveMeta = { hash: string; pushed_at: string; device_id: string } | null;
@@ -257,3 +257,11 @@ export const listConflicts = (): Promise<SaveConflict[]> => _fetch("GET", "/conf
 /** Dismiss a conflict so it no longer shows in the panel. */
 export const dismissConflict = (id: string): Promise<{ ok: boolean }> =>
   _fetch("POST", `/conflicts/${id}/dismiss`);
+
+// ── communal Switch mod pool (issue #444) ───────────────────────────────────────
+
+export type SwitchModPoolEntry = { title_id: string; mod_name: string; size: number; pushed_by: string; pushed_at: string };
+
+/** Every mod in the communal pool for a title ID (Eden's load/<title-id>/). */
+export const listSwitchMods = (titleId: string): Promise<SwitchModPoolEntry[]> =>
+  _fetch("GET", `/switch/${encodeURIComponent(titleId)}/mods`);

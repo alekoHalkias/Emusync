@@ -74,6 +74,7 @@ from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
+    _sync_switch_mods,
 )
 
 
@@ -228,6 +229,13 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         game_name = ""
         console_abbr = ""
         switch_title_id = ""
+    # Resolved once here (not just inside the save-matching block below) so it's
+    # available for mod sync even on a launch where save_path is already known.
+    # Kept separate from switch_title_id itself, which must stay "what's
+    # actually stored server-side" for the backfill checks below to work.
+    resolved_title_id = switch_title_id or (
+        _switch_title_id_from_rom(gd.rom_path) if console_abbr == "Switch" else ""
+    )
 
     # Cache the config so a future offline launch knows the paths + command, and
     # so the GUI can show this game while the server is unreachable (issue #383).
@@ -295,7 +303,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # subsequent launch, and gets full newest-wins reconciliation from the
         # first matched launch onward instead of a one-off blind seed (#443).
         if console_abbr == "Switch" and not save_path:
-            title_id = switch_title_id or _switch_title_id_from_rom(gd.rom_path)
+            title_id = resolved_title_id
             local_match = _find_local_switch_save(title_id) if title_id else None
             if local_match:
                 save_path = local_match
@@ -331,10 +339,20 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # already has it loaded instead of starting fresh and clobbering
         # synced progress (#443).
         if console_abbr == "Switch" and not save_path and server_hash:
-            title_id = switch_title_id or _switch_title_id_from_rom(gd.rom_path)
-            seeded = _seed_switch_save(save_client, save_key, title_id)
+            seeded = _seed_switch_save(save_client, save_key, resolved_title_id)
             if seeded:
                 click.echo(f"Seeded existing save into {len(seeded)} profile folder(s) before launch.")
+
+        # Lightweight, name-only mod sync (#444): push any local-only mod up
+        # to the communal pool, pull any pool-only mod down, before launch —
+        # never re-verifies mods that already exist by name on both sides
+        # (they can be gigabytes), and never blocks launch on failure.
+        if console_abbr == "Switch" and resolved_title_id:
+            mods_pushed, mods_pulled = _sync_switch_mods(client, resolved_title_id)
+            if mods_pushed:
+                click.echo(f"Pushed {len(mods_pushed)} mod(s) to the shared pool: {', '.join(mods_pushed)}")
+            if mods_pulled:
+                click.echo(f"Pulled {len(mods_pulled)} mod(s) from the shared pool: {', '.join(mods_pulled)}")
 
         # Pull state if configured. For a shared sstates folder (PS2) use the
         # merge pull so other games' states in the folder aren't disturbed (#294).

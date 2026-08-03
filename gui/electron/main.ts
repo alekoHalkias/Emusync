@@ -11,6 +11,7 @@ import { registerServerIpc, stopSyncDaemon, killServerByPid, killOrphanServers }
 import { registerGameIpc } from "./game";
 import { registerFilesIpc } from "./files";
 import { registerGameFolderIpc } from "./gamefolder";
+import { registerSwitchModsIpc } from "./switchmods";
 import { registerSyncIpc } from "./sync";
 import { registerEmulatorIpc } from "./emulator/ipc";
 import { registerArtIpc } from "./art";
@@ -25,6 +26,7 @@ registerServerIpc();
 registerGameIpc();
 registerFilesIpc();
 registerGameFolderIpc();
+registerSwitchModsIpc();
 registerSyncIpc();
 registerEmulatorIpc();
 registerArtIpc();

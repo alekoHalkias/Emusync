@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 21
+_SCHEMA_VERSION = 22
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -166,6 +166,14 @@ CREATE TABLE IF NOT EXISTS console_saves (
 CREATE TABLE IF NOT EXISTS server_settings (
     key   TEXT PRIMARY KEY,
     value TEXT
+);
+CREATE TABLE IF NOT EXISTS switch_mods (
+    title_id   TEXT NOT NULL,
+    mod_name   TEXT NOT NULL,
+    size       INTEGER NOT NULL DEFAULT 0,
+    pushed_by  TEXT NOT NULL REFERENCES devices(id),
+    pushed_at  TEXT NOT NULL,
+    PRIMARY KEY (title_id, mod_name)
 );
 """
 
@@ -409,4 +417,19 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # match/pre-seed its save deterministically by ID rather than only
         # ever guessing from post-launch write detection (issue #443).
         _try(conn, "ALTER TABLE games ADD COLUMN switch_title_id TEXT NOT NULL DEFAULT ''")
+    if from_version < 22:
+        # A communal pool of Switch mod folders (Eden's load/<title-id>/<mod-
+        # name>/, issue #444), keyed by title ID rather than per-device — any
+        # device can push a mod it has locally, and every other device with
+        # the same game can pull it down. Purely additive: no history/
+        # versioning like saves have, and nothing here ever deletes a pool
+        # entry when a device removes its own local copy.
+        _try(conn, """CREATE TABLE IF NOT EXISTS switch_mods (
+            title_id   TEXT NOT NULL,
+            mod_name   TEXT NOT NULL,
+            size       INTEGER NOT NULL DEFAULT 0,
+            pushed_by  TEXT NOT NULL REFERENCES devices(id),
+            pushed_at  TEXT NOT NULL,
+            PRIMARY KEY (title_id, mod_name)
+        )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

@@ -80,6 +80,11 @@ export interface EmusyncBridge {
     reveal: (slug: string) => Promise<{ ok: boolean; error?: string }>;
     addFile: (slug: string, filePath: string) => Promise<{ ok: boolean; error?: string }>;
   };
+  switchMods: {
+    listLocal: (titleId: string) => Promise<string[]>;
+    reveal: (titleId: string) => Promise<{ ok: boolean; error?: string }>;
+    sync: (slug: string) => Promise<{ ok: boolean; output: string }>;
+  };
   recovery: {
     listLocalBackups: (savePath: string, stateFolder: string) => Promise<{
       saves: LocalBak[];
