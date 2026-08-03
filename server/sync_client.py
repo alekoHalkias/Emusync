@@ -203,8 +203,10 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def update_game(self, slug: str, name: str) -> None:
-        r = self._client.put(self._url(f"/games/{slug}"), json={"name": name}, timeout=10)
+    def update_game(self, slug: str, name: str, switch_title_id: str = "") -> None:
+        r = self._client.put(
+            self._url(f"/games/{slug}"), json={"name": name, "switch_title_id": switch_title_id}, timeout=10
+        )
         r.raise_for_status()
 
     def remove_game(self, slug: str) -> None:

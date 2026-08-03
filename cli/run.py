@@ -309,6 +309,15 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     click.echo(f"Found an existing local save for {game_slug} (matched by title ID).")
                 except Exception as exc:
                     click.echo(f"Warning: failed to update save path: {exc}", err=True)
+                # Backfill (#443): title_id was only derivable via this
+                # device's own filename fallback — persist it so every other
+                # device can match/seed by ID too, without depending on their
+                # own filename carrying the tag.
+                if not switch_title_id:
+                    try:
+                        client.update_game(game_slug, game_name, switch_title_id=title_id)
+                    except Exception as exc:
+                        click.echo(f"Warning: failed to store the Switch title ID: {exc}", err=True)
 
         # Reconcile the save before launch: push if the local save is newer than
         # the server's, pull if the server's is newer (newest wins; loser kept
@@ -400,6 +409,17 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 if actual_state_path and actual_state_path != state_path:
                     state_path = actual_state_path
                     click.echo(f"Updated state path to {state_path}")
+                # Self-heal (#443): the folder Eden actually wrote IS the real
+                # title ID (its own name), regardless of whether the ROM
+                # filename ever carried the scene's bracketed tag. Backfilling
+                # it here means every other device can match/seed by ID from
+                # now on, even for games where no device's filename has the
+                # tag at all.
+                if console_abbr == "Switch" and actual_save_path and not switch_title_id:
+                    try:
+                        client.update_game(game_slug, game_name, switch_title_id=Path(actual_save_path).name)
+                    except Exception as exc:
+                        click.echo(f"Warning: failed to store the Switch title ID: {exc}", err=True)
             except Exception as exc:
                 click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
 

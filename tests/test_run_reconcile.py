@@ -628,6 +628,75 @@ def test_run_matches_existing_local_save_by_stored_title_id(monkeypatch, tmp_pat
     assert ("push_save", str(title_dir)) in events
 
 
+def test_run_backfills_switch_title_id_from_post_launch_discovery(monkeypatch, tmp_path):
+    """Regression (#443): a ROM whose filename never carried the bracketed
+    scene tag (real-world case — neither Arch's nor deck's copy of "Pokemon
+    Legends Arceus.nsp" had one) can't derive a title ID from any device's
+    filename, and the server never had one stored either. Once ANY device
+    discovers the real folder post-launch (via mtime detection), its name IS
+    the real title ID — must be backfilled to the server so every other
+    device can match/seed by ID afterward, without depending on a filename
+    convention that may not exist anywhere."""
+    import cli.run as run_mod
+
+    nand_root = tmp_path / "nand"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local", device_name="Arch")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+
+    rom_path = str(tmp_path / "Pokemon Legends Arceus.nsp")  # no bracketed tag
+    Path(rom_path).write_bytes(b"ROM")
+    gd = GameDeviceConfig(
+        rom_path=rom_path, save_path="",
+        launch_command="eden", state_path="", rom_folder_path=str(tmp_path),
+    )
+    discovered_dir = nand_root / "profile-a" / "01001F5010DFA000"
+
+    update_calls = []
+
+    class _C:
+        def health(self):
+            return True
+
+        def get_game_device(self, slug):
+            return gd
+
+        def get_game(self, slug):
+            return {"name": "Pokemon Legends Arceus", "console": "Switch", "switch_title_id": ""}
+
+        def get_lock(self, slug):
+            return {"locked": False}
+
+        def acquire_lock(self, slug):
+            pass
+
+        def release_lock(self, slug):
+            pass
+
+        def get_save_meta(self, slug):
+            return None
+
+        def push_save(self, slug, path):
+            return "local-hash"
+
+        def set_game_device(self, slug, updated_gd):
+            pass
+
+        def update_game(self, slug, name, switch_title_id=""):
+            update_calls.append((slug, name, switch_title_id))
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+    monkeypatch.setattr(run_mod, "_launch_and_wait", lambda argv, pid_file: 0)
+    monkeypatch.setattr(run_mod, "_resolve_written_switch_save", lambda since: str(discovered_dir))
+
+    with pytest.raises(SystemExit) as exc:
+        run_mod.run_game.callback(game_slug="pokemon-legends-arceus", command=())
+    assert exc.value.code == 0
+
+    assert update_calls == [("pokemon-legends-arceus", "Pokemon Legends Arceus", "01001F5010DFA000")]
+
+
 # ── RetroArch content-name detection: filename vs database-label folder (#210) ────
 
 SINCE = 1_000_000.0  # arbitrary epoch baseline for "launch start"
