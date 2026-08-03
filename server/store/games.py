@@ -9,12 +9,13 @@ from server.store.models import Game, GameDevice
 class GameMixin:
     """Operates on `self._conn`; mixed into Store."""
 
-    def add_game(self, slug: str, name: str, console: str = "") -> Game:
+    def add_game(self, slug: str, name: str, console: str = "", switch_title_id: str = "") -> Game:
         self._conn.execute(
-            "INSERT OR IGNORE INTO games (slug, name, console) VALUES (?, ?, ?)", (slug, name, console)
+            "INSERT OR IGNORE INTO games (slug, name, console, switch_title_id) VALUES (?, ?, ?, ?)",
+            (slug, name, console, switch_title_id),
         )
         self._conn.commit()
-        return Game(slug=slug, name=name, console=console)
+        return Game(slug=slug, name=name, console=console, switch_title_id=switch_title_id)
 
     def update_game_name(self, slug: str, name: str) -> None:
         """Rename a game without touching its saves, locks, or device config."""
@@ -38,6 +39,16 @@ class GameMixin:
         )
         self._conn.commit()
 
+    def update_game_switch_title_id(self, slug: str, switch_title_id: str) -> None:
+        """Backfill a Switch game's title ID (issue #443) — e.g. a game imported
+        before this field existed, or on a device whose ROM filename didn't
+        carry the bracketed tag at import time. Shared across every device via
+        this same server-side row, like sgdb_game_id above."""
+        self._conn.execute(
+            "UPDATE games SET switch_title_id = ? WHERE slug = ?", (switch_title_id, slug)
+        )
+        self._conn.commit()
+
     def remove_game(self, slug: str) -> None:
         # Drop on-disk save/state blobs first; the rows go via FK cascade, but the
         # files would otherwise be orphaned (issue #239).
@@ -46,12 +57,14 @@ class GameMixin:
         self._conn.commit()
 
     def list_games(self) -> list[Game]:
-        rows = self._conn.execute("SELECT slug, name, console, sgdb_game_id FROM games").fetchall()
+        rows = self._conn.execute(
+            "SELECT slug, name, console, sgdb_game_id, switch_title_id FROM games"
+        ).fetchall()
         return [Game(**dict(r)) for r in rows]
 
     def get_game(self, slug: str) -> Optional[Game]:
         row = self._conn.execute(
-            "SELECT slug, name, console, sgdb_game_id FROM games WHERE slug = ?", (slug,)
+            "SELECT slug, name, console, sgdb_game_id, switch_title_id FROM games WHERE slug = ?", (slug,)
         ).fetchone()
         return Game(**dict(row)) if row else None
 

@@ -125,7 +125,10 @@ def _run_offline(cfg, game_slug: str, game_pid_file: Path, command: tuple[str, .
     from cli.run import _resolve_launch_command
 
     cached = _load_cached_game_device(cfg, game_slug)
-    if not cached or not cached.save_path:
+    # Not save_path: Switch's real save path is learned after its first launch
+    # (cli/run_switch.py, #441) and is intentionally blank in the cache before
+    # that — rom_path is what actually signals a cached, launchable config.
+    if not cached or not cached.rom_path:
         click.echo(
             f"EmuSync server unreachable and '{game_slug}' has no cached config "
             f"(it hasn't been imported / played online here), so it won't be launched.",

@@ -55,6 +55,70 @@ async def test_rom_transfer_queued(make_client, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_rom_transfer_defaults_to_rom_kind(make_client, tmp_path):
+    """A transfer with no X-Transfer-Kind header (every existing caller)
+    defaults to 'rom' — backward compatible with pre-#441 behavior."""
+    rom_file = tmp_path / "game.gba"
+    rom_file.write_bytes(b"ROMDATA")
+
+    c = await make_client(data_dir=str(tmp_path))
+    auth_src = _device_auth("dev-src", "PC")
+    auth_dst = _device_auth("dev-dst", "Steam Deck")
+    await c.get("/games", headers=auth_src)
+    await c.get("/games", headers=auth_dst)
+    await c.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=auth_src)
+
+    r = await c.post(
+        "/games/metroid/rom-transfer",
+        content=rom_file.read_bytes(),
+        headers={
+            **auth_src,
+            "Content-Type": "application/octet-stream",
+            "X-To-Device-ID": "dev-dst",
+            "X-Destination-Path": "/home/deck/Games/GBA/Metroid.gba",
+            "X-Filename": "Metroid.gba",
+        },
+    )
+    assert r.status_code == 200
+
+    pending = (await c.get("/rom-transfers/pending", headers=auth_dst)).json()
+    assert pending[0]["kind"] == "rom"
+
+
+@pytest.mark.asyncio
+async def test_rom_transfer_rom_folder_kind(make_client, tmp_path):
+    """A push tagged X-Transfer-Kind: rom-folder is recorded and surfaced as
+    such, so the receiving side extracts it into the game's whole folder
+    instead of writing one file (#441)."""
+    archive = tmp_path / "game.tar"
+    archive.write_bytes(b"TARDATA")
+
+    c = await make_client(data_dir=str(tmp_path))
+    auth_src = _device_auth("dev-src", "PC")
+    auth_dst = _device_auth("dev-dst", "Steam Deck")
+    await c.get("/games", headers=auth_src)
+    await c.get("/games", headers=auth_dst)
+    await c.post("/games", json={"name": "Pokemon Brilliant Diamond", "console": "Switch"}, headers=auth_src)
+
+    r = await c.post(
+        "/games/pokemon-brilliant-diamond/rom-transfer",
+        content=archive.read_bytes(),
+        headers={
+            **auth_src,
+            "Content-Type": "application/octet-stream",
+            "X-To-Device-ID": "dev-dst",
+            "X-Destination-Path": "pbd.nsp",
+            "X-Filename": "pbd.nsp",
+            "X-Transfer-Kind": "rom-folder",
+        },
+    )
+    assert r.status_code == 200
+
+    pending = (await c.get("/rom-transfers/pending", headers=auth_dst)).json()
+    assert pending[0]["kind"] == "rom-folder"
+
+
+@pytest.mark.asyncio
 async def test_rom_transfer_missing_game(make_client, tmp_path):
     """Transfer for a non-existent game returns 404."""
     c = await make_client(data_dir=str(tmp_path))
@@ -133,6 +197,30 @@ async def test_pull_request_queued(make_client, tmp_path):
     assert pending[0]["destination_path"] == "/home/deck/roms/Castlevania.gba"
     assert pending[0]["game_name"] == "Castlevania"
     assert pending[0]["console"] == "GBA"
+    assert pending[0]["kind"] == "rom"
+
+
+@pytest.mark.asyncio
+async def test_pull_request_rom_folder_kind(make_client, tmp_path):
+    """A pull request tagged kind='rom-folder' (#441) is recorded and
+    surfaced as such, so the fulfilling device tars its whole game folder
+    instead of uploading just the ROM file."""
+    c = await make_client(data_dir=str(tmp_path))
+    auth_src = _device_auth("src-device", "PC")
+    auth_dst = _device_auth("dst-device", "Deck")
+
+    await c.post("/games", json={"name": "Pokemon Brilliant Diamond", "console": "Switch"}, headers=auth_src)
+    await c.put("/games/pokemon-brilliant-diamond/device", json={"rom_path": "/roms/switch/pbd/pbd.nsp"}, headers=auth_src)
+
+    r = await c.post(
+        "/games/pokemon-brilliant-diamond/rom-pull-request",
+        json={"from_device_id": "src-device", "destination_path": "/home/deck/roms/pbd.nsp", "kind": "rom-folder"},
+        headers=auth_dst,
+    )
+    assert r.status_code == 200
+
+    pending = (await c.get("/rom-pull-requests/pending", headers=auth_src)).json()
+    assert pending[0]["kind"] == "rom-folder"
 
 
 @pytest.mark.asyncio

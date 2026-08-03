@@ -37,6 +37,7 @@ async def create_rom_transfer(
     x_to_device_id: str = Header(None),
     x_destination_path: str = Header(None),
     x_filename: str = Header("rom"),
+    x_transfer_kind: str = Header("rom"),
     device_id: str = Depends(_auth),
 ) -> dict:
     store = _get_store()
@@ -75,6 +76,7 @@ async def create_rom_transfer(
         destination_path=x_destination_path or "",
         staged_file=str(staged_path),
         sha256=sha256,
+        kind=x_transfer_kind or "rom",
     )
 
     target_name = next((d.name for d in devices if d.id == x_to_device_id), x_to_device_id)
@@ -91,6 +93,7 @@ async def create_rom_transfer(
             "console": game.console,
             "destination_path": x_destination_path or "",
             "sha256": sha256,
+            "kind": x_transfer_kind or "rom",
         })
 
     store.log_event("rom_transfer_queued", slug, device_id)
@@ -119,6 +122,7 @@ def list_pending_transfers(device_id: str = Depends(_auth)) -> list[dict]:
             "console": game.console if game else "",
             "game_name": game.name if game else t.slug,
             "sha256": t.sha256,
+            "kind": t.kind,
         })
     return result
 
@@ -179,6 +183,7 @@ async def create_pull_request(
     if not any(d.id == from_device_id for d in devices):
         raise HTTPException(status_code=404, detail="Source device not found")
 
+    kind = request_body.get("kind", "rom")
     pull_request_id = str(uuid.uuid4())
     store.create_pull_request(
         id=pull_request_id,
@@ -186,6 +191,7 @@ async def create_pull_request(
         from_device_id=from_device_id,
         to_device_id=device_id,
         destination_path=destination_path,
+        kind=kind,
     )
 
     with _presence_lock:
@@ -201,6 +207,7 @@ async def create_pull_request(
             "console": game.console,
             "to_device_id": device_id,
             "destination_path": destination_path,
+            "kind": kind,
         })
 
     source_name = next((d.name for d in devices if d.id == from_device_id), from_device_id)
@@ -225,6 +232,7 @@ def list_pending_pull_requests(device_id: str = Depends(_auth)) -> list[dict]:
             "requested_at": pr.requested_at,
             "console": game.console if game else "",
             "game_name": game.name if game else pr.slug,
+            "kind": pr.kind,
         })
     return result
 

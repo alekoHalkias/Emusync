@@ -252,6 +252,11 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                       {rom.statePath && rom.stateExists && (
                         <span className="ci-ok" style={{ flexShrink: 0 }}>✓ State</span>
                       )}
+                      {!!rom.switchSiblingCount && (
+                        <span className="ci-ok" style={{ flexShrink: 0 }} title="Synced as part of this game's folder">
+                          {rom.switchSiblingCount} other file(s) in folder
+                        </span>
+                      )}
                       {rom.linkedSlug && !rom.existingLocal && (
                         <span style={{ color: "var(--accent, #7c8cf8)", flexShrink: 0 }}>→ Links to {rom.linkedName}</span>
                       )}

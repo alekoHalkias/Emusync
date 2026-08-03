@@ -22,12 +22,18 @@ from typing import Optional
 
 import click
 
+from cli.detect import _switch_title_id_from_rom  # noqa: F401 — re-exported for existing callers/tests
 from cli.run_reconcile import _mtime
 
 # Native + flatpak Eden NAND roots (mirrors _WII_NAND_ROOTS in cli/run_wii.py).
-# Eden has no Flathub package yet (AppImage-only), so there's no flatpak root.
+# Eden has no Flathub package yet (AppImage-only), so there's no flatpak root —
+# but EmuDeck-managed installs (common on Steam Deck) redirect Eden's whole
+# data directory to ~/Emulation/storage/eden/ instead of the XDG default, so
+# both roots are checked the same way native/flatpak both are for every other
+# standalone emulator (#441).
 _SWITCH_NAND_ROOTS = (
     Path.home() / ".local/share/eden/nand/user/save/0000000000000000",
+    Path.home() / "Emulation/storage/eden/nand/user/save/0000000000000000",
 )
 
 
@@ -75,3 +81,53 @@ def _resolve_written_switch_save(since: float) -> Optional[str]:
         )
         return None
     return str(touched[0])
+
+
+def _find_local_switch_save(title_id: str) -> Optional[str]:
+    """A title-ID folder matching *title_id* that already exists locally and
+    has real data in it, across every profile, or None (#443).
+
+    Matching by the (stable, per-game) title ID directly — rather than only
+    ever guessing from "what got touched since launch" — means a device that
+    has already played this game once finds its own save deterministically on
+    every subsequent launch, with no dependence on mtimes or on exactly one
+    title folder having changed this session. An empty/never-written folder
+    (e.g. one this device seeded but never actually got played) doesn't count
+    as "found" — nothing to reconcile against yet.
+    """
+    for profile_dir in _switch_profile_dirs():
+        candidate = profile_dir / title_id
+        if candidate.is_dir() and any(f.is_file() for f in candidate.rglob("*")):
+            return str(candidate)
+    return None
+
+
+def _seed_switch_save(save_client, save_key: str, title_id: str) -> list[str]:
+    """Pre-seed the server's existing save into every profile folder that
+    already exists on this device, before the game is ever launched here.
+
+    Without this, a device's first-ever session for a learned-save-path game
+    plays blind (the destination folder isn't known until after that session),
+    discarding any progress already synced from another device (#443). Since
+    the title-ID part of the destination IS derivable up front (unlike the
+    emulator-generated profile-ID part), seeding every existing profile now
+    means whichever one the player actually picks in Eden already has the
+    synced save — _resolve_written_switch_save still works unchanged
+    afterward, since seeded files get an mtime before the session starts and
+    only the profile actually played gets touched during play.
+
+    Returns the destination paths actually seeded (empty if *title_id* is
+    blank, or no profile folder exists yet).
+    """
+    if not title_id:
+        return []
+    seeded = []
+    for profile_dir in _switch_profile_dirs():
+        dest = profile_dir / title_id
+        try:
+            pulled, _ = save_client.pull_save(save_key, str(dest))
+        except Exception:
+            continue
+        if pulled:
+            seeded.append(str(dest))
+    return seeded

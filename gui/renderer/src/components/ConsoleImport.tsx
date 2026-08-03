@@ -19,7 +19,7 @@ export default function ConsoleImport({ onClose, onImported, initialConsole }: P
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal"
-        style={{ width: 640, maxHeight: "85vh", display: "flex", flexDirection: "column" }}
+        style={{ width: "clamp(640px, 70vw, 960px)", maxHeight: "85vh", display: "flex", flexDirection: "column" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

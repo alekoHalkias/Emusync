@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 import click
 
 import server.config as cfg_module
-from server.sync_client import GameDeviceConfig, SyncClient
+from server.sync_client import GameDeviceConfig, SyncClient, memcard_bytes, _write_memcard
 
 from cli import netrom
 from cli.common import _client
@@ -166,12 +168,26 @@ def pull_rom() -> None:
             click.echo(f"  {label} not yet set up on this device.")
             dest_folder = click.prompt("  Which local folder should the ROM go in?")
 
-        destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
+        # Switch games live one-per-folder — the local suggested/chosen
+        # folder is the shared console ROM root (matching every other
+        # console), not a per-game folder, so an extra path segment (the
+        # source's own game-folder name) is needed here or the whole folder's
+        # contents would land loose in that shared root instead of their own
+        # subfolder (#441).
+        is_switch_folder = console == "Switch"
+        if is_switch_folder:
+            game_folder_name = os.path.basename(os.path.dirname(game["rom_path"]))
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), game_folder_name, rom_filename)
+        else:
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
 
         # Send pull request to server
         click.echo(f"  Requesting '{rom_filename}' from {source['name']}...")
         try:
-            result = client.create_pull_request(slug, source["id"], destination_path)
+            result = client.create_pull_request(
+                slug, source["id"], destination_path,
+                kind="rom-folder" if is_switch_folder else "rom",
+            )
         except Exception as e:
             click.echo(f"  Failed: {e}", err=True)
             continue
@@ -275,16 +291,61 @@ def push_rom() -> None:
             click.echo(f"  {label} not yet set up on {target['name']}.")
             dest_folder = click.prompt("  Which folder should the ROM go in?")
 
-        destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
+        # Switch games live one-per-folder — the target's suggested/chosen
+        # folder is its shared console ROM root (matching every other
+        # console), not a per-game folder, so an extra path segment (the
+        # source's own game-folder name) is needed here or the whole folder's
+        # contents would land loose in that shared root instead of their own
+        # subfolder (#441).
+        is_switch_folder = console == "Switch"
+        if is_switch_folder:
+            game_folder_name = os.path.basename(os.path.dirname(rom_path))
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), game_folder_name, rom_filename)
+        else:
+            destination_path = os.path.join(dest_folder.rstrip("/\\"), rom_filename)
+
+        # Sync the whole folder (base ROM + any update/DLC files sitting
+        # alongside it) as one tar archive rather than just the ROM file,
+        # reusing the same folder-tar machinery already used for Wii/PS2
+        # folder saves (#441). destination_path (above) already points at the
+        # ROM's own eventual path inside its own subfolder — the receiving
+        # side just extracts into that directory instead of copying one file.
+        upload_path = rom_path
+        tmp_tar_path: str | None = None
+        if is_switch_folder:
+            # dir=parent-of-the-game-folder: keeps the temp file on the same
+            # filesystem as the ROM library — the system temp dir (the
+            # tempfile default) can be a much smaller partition than game
+            # storage (e.g. Steam Deck's root vs. its games drive/SD card),
+            # and a multi-GB game folder can exhaust it even with plenty of
+            # room where it actually needs to end up. Must NOT be placed
+            # inside the game folder itself — memcard_bytes would archive the
+            # still-being-written tar into itself.
+            game_folder = os.path.dirname(rom_path)
+            # Walking + tar-packing a multi-GB folder in memory takes real
+            # time with no progress of its own — say so, or it looks hung
+            # between the destination prompt and the upload progress bar.
+            click.echo(f"  Packing {os.path.basename(game_folder)}...")
+            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(game_folder))
+            tmp.write(memcard_bytes(Path(game_folder)))
+            tmp.close()
+            tmp_tar_path = upload_path = tmp.name
 
         # Upload
-        file_mb = os.path.getsize(rom_path) / (1024 * 1024)
-        click.echo(f"  Uploading {rom_filename} ({file_mb:.1f} MB)...")
+        file_mb = os.path.getsize(upload_path) / (1024 * 1024)
+        folder_note = " (whole folder)" if is_switch_folder else ""
+        click.echo(f"  Uploading {rom_filename}{folder_note} ({file_mb:.1f} MB)...")
         try:
-            result = client.create_rom_transfer(slug, target["id"], destination_path, rom_path)
+            result = client.create_rom_transfer(
+                slug, target["id"], destination_path, upload_path,
+                kind="rom-folder" if is_switch_folder else "rom",
+            )
         except Exception as e:
             click.echo(f"  Failed: {e}", err=True)
             continue
+        finally:
+            if tmp_tar_path:
+                os.unlink(tmp_tar_path)
 
         if result.get("target_online"):
             click.echo(f"  {game_name} pushed to {target['name']} and will be available on it shortly.")
@@ -301,11 +362,41 @@ def _receive_transfer(
     game_name: str,
     log=click.echo,
     sha256: str | None = None,
+    kind: str = "rom",
 ) -> bool:
-    """Download one pending transfer, save it, register the game. Returns True on success."""
+    """Download one pending transfer, save it, register the game. Returns True
+    on success. kind='rom-folder' (#441): destination_path is still the ROM's
+    own eventual path (same convention as a single-file push), but the
+    downloaded bytes are a tar of the game's whole folder — base ROM plus any
+    update/DLC files sitting alongside it — extracted into that folder rather
+    than written as one file, reusing the same folder-tar machinery already
+    used for Wii/PS2 folder saves."""
     try:
         log(f"  Receiving {game_name}...")
-        client.download_transfer(transfer_id, destination_path, expected_hash=sha256)
+        if kind == "rom-folder":
+            folder = os.path.dirname(destination_path)
+            # Only the PARENT (the shared console root) needs to exist ahead
+            # of time, for the tempfile below — _write_memcard creates
+            # `folder` itself. Pre-creating `folder` here would make it look
+            # like an existing (empty) folder on a first-ever sync, so
+            # _write_memcard's own backup-before-extract step would back up
+            # nothing into a useless <folder>.bak every single time.
+            os.makedirs(os.path.dirname(folder), exist_ok=True)
+            # dir=parent-of-folder: same filesystem as the actual game
+            # library (not the system temp dir, which can be a much smaller
+            # partition — e.g. Steam Deck's root vs. its games drive), and
+            # outside `folder` itself so it's never swept into _write_memcard's
+            # own backup-then-extract of that folder.
+            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(folder))
+            tmp.close()
+            try:
+                client.download_transfer(transfer_id, tmp.name, expected_hash=sha256)
+                log(f"  Extracting into {folder}...")
+                _write_memcard(Path(folder), Path(tmp.name).read_bytes())
+            finally:
+                os.unlink(tmp.name)
+        else:
+            client.download_transfer(transfer_id, destination_path, expected_hash=sha256)
         client.complete_transfer(transfer_id)
         log(f"  Saved to {destination_path}")
     except Exception as e:
@@ -318,15 +409,20 @@ def _receive_transfer(
 
     # Organise ROM into a per-game subfolder if it sits directly in the
     # destination folder.  Convention: roms/GameName/GameName.gba
+    # Skipped for kind='rom-folder' — the folder is already organized (it's
+    # exactly the folder the sender had), and a single .nsp among update/DLC
+    # siblings would make an unrelated file its own subfolder incorrectly.
     scan_root = os.path.dirname(destination_path)
-    rom_stem = os.path.splitext(os.path.basename(destination_path))[0]
-    if os.path.basename(scan_root) != rom_stem:
-        subfolder = os.path.join(scan_root, rom_stem)
-        os.makedirs(subfolder, exist_ok=True)
-        new_path = os.path.join(subfolder, os.path.basename(destination_path))
-        os.rename(destination_path, new_path)
-        destination_path = new_path
-        log(f"  Organised into {subfolder}/")
+    if kind != "rom-folder":
+        rom_stem = os.path.splitext(os.path.basename(destination_path))[0]
+        if os.path.basename(scan_root) != rom_stem:
+            subfolder = os.path.join(scan_root, rom_stem)
+            os.makedirs(subfolder, exist_ok=True)
+            new_path = os.path.join(subfolder, os.path.basename(destination_path))
+            os.rename(destination_path, new_path)
+            destination_path = new_path
+            scan_root = subfolder
+            log(f"  Organised into {subfolder}/")
 
     # Auto-register the game on this device
     try:
@@ -341,12 +437,22 @@ def _receive_transfer(
                 (g for g in my_games if g.get("console") == console and g.get("rom_path") and g["slug"] != slug),
                 None,
             )
-            if ref and ref.get("save_path"):
+            if ref and ref.get("launch_command"):
+                launch_command = ref["launch_command"].replace(ref["rom_path"], destination_path)
+            # save_path/state_path copying assumes a filename-based layout
+            # (savesRoot/GameName/GameName.ext) — replacing one game's ROM
+            # filename stem with another's inside the path. A Switch save
+            # path is a NAND folder keyed by title ID
+            # (.../profile-id/0100000011D90000/), which contains neither
+            # game's filename at all, so the replace is a silent no-op and
+            # this game would silently inherit the OTHER game's exact save
+            # folder — two different games' saves pointing at the same data.
+            # Left blank instead, exactly like at import time; the next play
+            # on this device learns this game's own folder (#441).
+            if ref and ref.get("save_path") and kind != "rom-folder":
                 old_stem = os.path.splitext(os.path.basename(ref["rom_path"]))[0]
                 new_stem = os.path.splitext(os.path.basename(destination_path))[0]
                 save_path = ref["save_path"].replace(old_stem, new_stem)
-                if ref.get("launch_command"):
-                    launch_command = ref["launch_command"].replace(ref["rom_path"], destination_path)
                 if ref.get("state_path"):
                     state_path = ref["state_path"].replace(old_stem, new_stem)
 
@@ -372,8 +478,13 @@ def _handle_pull_request(
     destination_path: str,
     game_name: str,
     log=click.echo,
+    kind: str = "rom",
 ) -> bool:
-    """Fulfill a pull request: upload local ROM to server staging for the requester."""
+    """Fulfill a pull request: upload local ROM to server staging for the
+    requester. kind='rom-folder' (#441): tar up this device's whole game
+    folder instead of uploading just the ROM file — symmetric with the
+    push-side folder-sync in cli/transfer.py's push_rom."""
+    tmp_tar_path: str | None = None
     try:
         my_games = client.list_my_game_devices()
         game_cfg = next((g for g in my_games if g["slug"] == slug and g.get("rom_path")), None)
@@ -391,7 +502,20 @@ def _handle_pull_request(
             return False
 
         log(f"  Fulfilling pull request for '{game_name}'...")
-        client.create_rom_transfer(slug, to_device_id, destination_path, rom_path)
+        upload_path = rom_path
+        if kind == "rom-folder":
+            # See push_rom's identical comment: dir=parent-of-the-game-folder
+            # keeps this on the same filesystem as game storage (not a
+            # possibly much smaller system temp partition), and outside the
+            # game folder itself so memcard_bytes doesn't archive the tar
+            # into itself while it's still being written.
+            game_folder = os.path.dirname(rom_path)
+            log(f"  Packing {os.path.basename(game_folder)}...")
+            tmp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False, dir=os.path.dirname(game_folder))
+            tmp.write(memcard_bytes(Path(game_folder)))
+            tmp.close()
+            tmp_tar_path = upload_path = tmp.name
+        client.create_rom_transfer(slug, to_device_id, destination_path, upload_path, kind=kind)
         client.complete_pull_request(pull_request_id, status="fulfilled")
         log(f"  Sent '{game_name}' to requesting device")
         return True
@@ -402,6 +526,9 @@ def _handle_pull_request(
         except Exception:
             pass
         return False
+    finally:
+        if tmp_tar_path:
+            os.unlink(tmp_tar_path)
 
 
 def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
@@ -436,7 +563,7 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
                     return
                 _receive_transfer(client, t["id"], t["destination_path"],
                                   t["slug"], t.get("console", ""), t.get("game_name", t["slug"]), log,
-                                  sha256=t.get("sha256"))
+                                  sha256=t.get("sha256"), kind=t.get("kind", "rom"))
     except Exception as e:
         log(f"Warning: could not check pending transfers: {e}")
 
@@ -449,7 +576,8 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
                 if _stopping():
                     return
                 _handle_pull_request(client, pr["id"], pr["slug"], pr["to_device_id"],
-                                     pr["destination_path"], pr.get("game_name", pr["slug"]), log)
+                                     pr["destination_path"], pr.get("game_name", pr["slug"]), log,
+                                     kind=pr.get("kind", "rom"))
     except Exception as e:
         log(f"Warning: could not check pending pull requests: {e}")
 
@@ -470,6 +598,7 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
                         event.get("game_name", event.get("slug", event["transfer_id"])),
                         log,
                         sha256=event.get("sha256"),
+                        kind=event.get("kind", "rom"),
                     )
                 elif event.get("type") == "rom_pull_requested":
                     _handle_pull_request(
@@ -480,6 +609,7 @@ def _run_transfer_daemon(client: "SyncClient", device_name: str, log=click.echo,
                         event.get("destination_path", ""),
                         event.get("game_name", event.get("slug", event["pull_request_id"])),
                         log,
+                        kind=event.get("kind", "rom"),
                     )
         except KeyboardInterrupt:
             raise

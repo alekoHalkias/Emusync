@@ -120,6 +120,39 @@ def test_switch_base_game_vs_update_filter():
     assert _is_switch_base_game_file("weird_name.nsp") is True
 
 
+def test_count_switch_sibling_files(tmp_path):
+    """Switch games live one-per-folder, so update/DLC files aren't matched
+    individually — the whole folder syncs as one unit via emusync push/pull
+    (#441). This is just an FYI count shown at import time, no filtering."""
+    from cli.console import _count_switch_sibling_files
+
+    base = tmp_path / "base.nsp"
+    update = tmp_path / "update.nsp"
+    dlc = tmp_path / "dlc.xci"
+    unrelated = tmp_path / "readme.txt"
+    for f in (base, update, dlc, unrelated):
+        f.write_bytes(b"")
+
+    assert _count_switch_sibling_files(str(base)) == 2  # update.nsp + dlc.xci, not readme.txt
+
+
+def test_count_switch_sibling_files_none(tmp_path):
+    from cli.console import _count_switch_sibling_files
+    base = tmp_path / "base.nsp"
+    base.write_bytes(b"")
+    assert _count_switch_sibling_files(str(base)) == 0
+
+
+def test_switch_save_match_is_always_blank():
+    """Regression (#441): the import wizard must NEVER guess a save path for
+    Switch from the ROM's filename/location — Eden's real save folder is a
+    NAND path keyed by profile-ID + title-ID, unrelated to either, so a
+    filename-based guess (e.g. '<save_dir>/GameName/GameName.srm') is actively
+    wrong, not just unconfirmed, and was showing up as if it were real."""
+    from cli.console import _switch_save_match
+    assert _switch_save_match() == {"path": "", "exists": False}
+
+
 # ── core ↔ console matching via .info databases (#400) ────────────────────────
 
 def test_new_cores_match_their_console_and_not_psx(tmp_path):

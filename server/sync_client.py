@@ -187,8 +187,12 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def add_game(self, name: str, console: str = "") -> dict:
-        r = self._client.post(self._url("/games"), json={"name": name, "console": console}, timeout=10)
+    def add_game(self, name: str, console: str = "", switch_title_id: str = "") -> dict:
+        r = self._client.post(
+            self._url("/games"),
+            json={"name": name, "console": console, "switch_title_id": switch_title_id},
+            timeout=10,
+        )
         r.raise_for_status()
         return r.json()
 
@@ -199,8 +203,10 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def update_game(self, slug: str, name: str) -> None:
-        r = self._client.put(self._url(f"/games/{slug}"), json={"name": name}, timeout=10)
+    def update_game(self, slug: str, name: str, switch_title_id: str = "") -> None:
+        r = self._client.put(
+            self._url(f"/games/{slug}"), json={"name": name, "switch_title_id": switch_title_id}, timeout=10
+        )
         r.raise_for_status()
 
     def remove_game(self, slug: str) -> None:
@@ -262,9 +268,13 @@ class SyncClient:
         return r.json()
 
     def create_rom_transfer(
-        self, slug: str, to_device_id: str, destination_path: str, rom_path: str
+        self, slug: str, to_device_id: str, destination_path: str, rom_path: str, kind: str = "rom"
     ) -> dict:
-        """Upload a ROM to the server and queue it for delivery to target device."""
+        """Upload a ROM (or, with kind='rom-folder', a tar of the game's whole
+        containing folder — base ROM + any update/DLC files alongside it,
+        #441) to the server and queue it for delivery to target device.
+        `rom_path` is the local file actually being streamed (the tar itself
+        for 'rom-folder')."""
         path = Path(rom_path)
         file_size = path.stat().st_size
         mb_total = file_size / (1024 * 1024)
@@ -289,6 +299,7 @@ class SyncClient:
                 "X-To-Device-ID": to_device_id,
                 "X-Destination-Path": destination_path,
                 "X-Filename": path.name,
+                "X-Transfer-Kind": kind,
             },
             timeout=httpx.Timeout(None),
         )
@@ -505,11 +516,12 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def create_pull_request(self, slug: str, from_device_id: str, destination_path: str) -> dict:
-        """Request the source device to push a ROM to this device via the server."""
+    def create_pull_request(self, slug: str, from_device_id: str, destination_path: str, kind: str = "rom") -> dict:
+        """Request the source device to push a ROM (or, with kind='rom-folder',
+        the game's whole containing folder, #441) to this device via the server."""
         r = self._client.post(
             self._url(f"/games/{slug}/rom-pull-request"),
-            json={"from_device_id": from_device_id, "destination_path": destination_path},
+            json={"from_device_id": from_device_id, "destination_path": destination_path, "kind": kind},
             timeout=10,
         )
         r.raise_for_status()

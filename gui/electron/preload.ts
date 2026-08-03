@@ -112,6 +112,12 @@ contextBridge.exposeInMainWorld("emusync", {
     deleteFile: (absolutePath: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:deleteFile", absolutePath),
   },
+  gameFolder: {
+    reveal: (slug: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("gamefolder:reveal", slug),
+    addFile: (slug: string, filePath: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("gamefolder:addFile", slug, filePath),
+  },
   recovery: {
     listLocalBackups: (savePath: string, stateFolder: string): Promise<{
       saves: { path: string; kind: "save" | "state"; size: number; mtime: string; fileName: string }[];

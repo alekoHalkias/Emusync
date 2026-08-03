@@ -39,6 +39,9 @@ export type RomEntry = {
   // will upload its ROM to the share and convert it to network-source in place
   // (carries `linkedSlug`, so no duplicate game is created).
   existingLocal?: boolean;
+  // Other .nsp/.xci files next to romPath, FYI only — Switch games live
+  // one-per-folder and sync as a whole folder via emusync push/pull (#441).
+  switchSiblingCount?: number;
 };
 
 export type Phase =

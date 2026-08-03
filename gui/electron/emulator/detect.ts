@@ -199,12 +199,30 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
   // `native_bins` is a string[], and `dirs` carries `~`-templated save/state/
   // memcard dirs per launch flavour. Expand `~` against this device's home.
   const expand = (p: string): string => !p ? p : p.startsWith("~/") ? join(home, p.slice(2)) : p === "~" ? home : p;
+  // AppImages are user-downloaded and their filename casing varies by release
+  // (e.g. `Eden.AppImage` vs the `eden.AppImage` we check for) — Linux
+  // filesystems are case-sensitive, so a straight existsSync misses these.
+  // Falls back to a case-insensitive filename match in the same directory,
+  // returning the real on-disk path so execPath stays launchable.
+  const resolveCaseInsensitive = (p: string): string | null => {
+    if (existsSync(p)) return p;
+    const slash = p.lastIndexOf("/");
+    if (slash < 0) return null;
+    const dir = p.slice(0, slash), name = p.slice(slash + 1);
+    if (!name || !existsSync(dir)) return null;
+    const nameLower = name.toLowerCase();
+    try {
+      const match = readdirSync(dir).find(entry => entry.toLowerCase() === nameLower);
+      return match ? join(dir, match) : null;
+    } catch { return null; }
+  };
   for (const s of (consoleDef.standalones ?? []) as StandaloneDef[]) {
     const dirs = s.dirs ?? {};
     for (const bin of s.native_bins ?? []) {
-      if (existsSync(expand(bin))) {
+      const resolved = resolveCaseInsensitive(expand(bin));
+      if (resolved) {
         options.push({
-          id: `${s.id}-native`, label: s.label, execPath: expand(bin),
+          id: `${s.id}-native`, label: s.label, execPath: resolved,
           saveDir: expand(dirs.native?.save ?? s.save_dir_template ?? ""),
           stateDir: dirs.native?.state ? expand(dirs.native.state) : undefined,
           launchArgs: s.launch_args ?? [],

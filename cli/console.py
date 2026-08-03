@@ -22,9 +22,40 @@ from cli.detect import (
     _resolve_shared_memcard_save_state,
     _scan_rom_dir,
     _switch_display_name,
+    _switch_title_id_from_rom,
 )
 from cli.root import cli
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
+
+
+def _switch_save_match() -> dict:
+    """Eden's real save folder is a NAND path keyed by profile-ID + title-ID
+    (nand/user/save/0000000000000000/<profile>/<title>/) — nothing like the
+    ROM's own name or location, so a filename-based guess at import time is
+    actively wrong, not just imprecise (unlike every other console, where a
+    guessed path is at worst unconfirmed). Always blank; learned after first
+    play instead (cli/run_switch.py, #419/#441)."""
+    return {"path": "", "exists": False}
+
+
+def _count_switch_sibling_files(rom_path: str) -> int:
+    """Other .nsp/.xci files sitting next to *rom_path* — an FYI count shown
+    at import time. Switch games live one-per-folder, so the whole folder
+    (base ROM + any update/DLC alongside it) syncs as one unit via `emusync
+    push`/`pull` — no per-file detection/tracking needed here (#441)."""
+    folder = os.path.dirname(rom_path)
+    try:
+        entries = os.listdir(folder)
+    except OSError:
+        return 0
+    count = 0
+    for entry in entries:
+        path = os.path.join(folder, entry)
+        if path == rom_path or not os.path.isfile(path):
+            continue
+        if os.path.splitext(entry)[1].lstrip(".").lower() in ("nsp", "xci"):
+            count += 1
+    return count
 
 
 def _classify_network_roms(
@@ -299,6 +330,8 @@ def console_import() -> None:
 
         if shared_layout:
             save_match = shared_save_match
+        elif console_def["key"] == "switch":
+            save_match = _switch_save_match()
         else:
             system = _IMPORT_SYSTEMS.get(ext, {})
             save_exts = system.get("save_exts", default_save_exts)
@@ -387,7 +420,16 @@ def console_import() -> None:
         save_tag = "  [save found]" if e["save_exists"] else ""
         state_tag = "  [state found]" if e.get("state_path") else ""
         src_tag = _PRESENCE_TAG.get(e.get("presence", ""), "") if rom_source == "network" else ""
-        click.echo(f"  {i:>3}. {e['name']}{save_tag}{state_tag}{src_tag}")
+        # Switch games sync their whole containing folder (base ROM + any
+        # update/DLC files sitting alongside it) as one unit via `emusync
+        # push`/`pull`, so this is just an FYI count — no per-file tracking
+        # needed at import time (#441).
+        update_tag = ""
+        if console_def["key"] == "switch":
+            n_siblings = _count_switch_sibling_files(e["rom_path"])
+            if n_siblings:
+                update_tag = f"  [{n_siblings} other file(s) in folder]"
+        click.echo(f"  {i:>3}. {e['name']}{save_tag}{state_tag}{update_tag}{src_tag}")
 
     click.echo(
         "\nEnter numbers to exclude (comma-separated), or press Enter to import all:"
@@ -419,7 +461,11 @@ def console_import() -> None:
     for i, entry in enumerate(to_import, 1):
         click.echo(f"  [{i}/{len(to_import)}] {entry['name']}… ", nl=False)
         try:
-            game = client.add_game(entry["name"], console_abbr)
+            # Stored server-side and shared across devices, so it doesn't
+            # depend on every device's local ROM filename still carrying the
+            # bracketed tag at launch time (#443).
+            title_id = _switch_title_id_from_rom(entry["rom_path"]) if console_def["key"] == "switch" else ""
+            game = client.add_game(entry["name"], console_abbr, title_id)
             slug = game["slug"]
             if rom_source == "network":
                 gd_cfg = _build_network_game_device(entry, network_root, local_root)

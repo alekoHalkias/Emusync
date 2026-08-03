@@ -1,5 +1,5 @@
 // ROM directory scanning and save/state path resolution for the import wizard.
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import { join, basename, extname, dirname } from "path";
 import { rt } from "../runtime";
 import { findLatestFileInDir } from "../files";
@@ -130,6 +130,29 @@ function switchDisplayName(baseName: string): string {
   return baseName.replace(BRACKET_TAG_RE, "").trim();
 }
 
+/** Other .nsp/.xci files sitting next to `baseRomPath` — an FYI count shown
+ *  at import time. Switch games live one-per-folder, so the whole folder
+ *  (base ROM + any update/DLC alongside it) syncs as one unit via
+ *  `emusync push`/`pull` — no per-file detection/tracking needed here
+ *  (#441). Mirrors cli/console.py's _count_switch_sibling_files. */
+function countSwitchSiblingFiles(baseRomPath: string): number {
+  const folder = dirname(baseRomPath);
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(folder);
+  } catch { return 0; }
+  let count = 0;
+  for (const entry of entries) {
+    const path = join(folder, entry);
+    if (path === baseRomPath) continue;
+    const ext = extname(entry).slice(1).toLowerCase();
+    if (ext !== "nsp" && ext !== "xci") continue;
+    if (!statSync(path, { throwIfNoEntry: false })?.isFile()) continue;
+    count++;
+  }
+  return count;
+}
+
 /** Search saveDir for a file matching baseName + any of the given extensions. */
 function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { path: string; exists: boolean } {
   for (const ext of exts) {
@@ -198,6 +221,12 @@ export function runEmulatorScan(params: {
           // Shared-save console: every game's savePath is the same card (#295/#402).
           const cardPath = resolveSharedCard(consoleKey, emulatorOption.saveDir, saveRoot, emulatorOption.systemDir);
           m = { path: cardPath, exists: existsSync(cardPath) };
+        } else if (consoleKey === "switch") {
+          // Eden's real save folder is a NAND path keyed by profile-ID +
+          // title-ID, nothing like the ROM's own name or location — a
+          // filename-based guess here is actively wrong, not just imprecise.
+          // Left blank and learned after first play (cli/run_switch.py, #441).
+          m = { path: "", exists: false };
         } else {
           m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
           if (!m.exists) {
@@ -251,6 +280,7 @@ export function runEmulatorScan(params: {
           launchCommand,
           consoleName: system?.name ?? consoleDef.label,
           coreName: emulatorOption.coreFolderName,
+          switchSiblingCount: consoleKey === "switch" ? countSwitchSiblingFiles(romPath) : undefined,
         };
       });
   });

@@ -69,7 +69,12 @@ from cli.run_reconcile import (  # noqa: F401 — re-exported for existing calle
     _STATE_RE,
 )
 from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
-from cli.run_switch import _resolve_written_switch_save  # noqa: F401 — re-exported for existing callers/tests
+from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
+    _find_local_switch_save,
+    _resolve_written_switch_save,
+    _seed_switch_save,
+    _switch_title_id_from_rom,
+)
 
 
 def _resolve_launch_command(gd) -> Optional[str]:
@@ -156,9 +161,13 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
     gd = client.get_game_device(game_slug)
 
-    # A game is "imported" on this device when it has a save path configured (so
-    # EmuSync knows what to sync). Both launch modes require this.
-    if not gd or not gd.save_path:
+    # A game is "imported" on this device when it has a ROM path configured.
+    # Not save_path: Switch's real save path is a NAND folder that can't be
+    # guessed at import time and is only learned after this game's first
+    # launch (cli/run_switch.py, #441) — save_path is intentionally blank
+    # until then, so gating launch on it would make that first launch
+    # impossible.
+    if not gd or not gd.rom_path:
         if command:
             # Fallback path: an external launcher tried to run a game EmuSync
             # doesn't know about — refuse, since we can't sync its save.
@@ -169,8 +178,8 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             )
         else:
             click.echo(
-                f"No save path configured for '{game_slug}'. "
-                f"Run 'emusync game edit {game_slug} --save <path>' first.",
+                f"'{game_slug}' isn't imported into EmuSync on this device. "
+                f"Import it first (Add Console / 'emusync console import').",
                 err=True,
             )
         sys.exit(1)
@@ -209,13 +218,16 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     # newest-wins/.bak reconcile logic is reused unchanged.
     game_name = ""
     console_abbr = ""
+    switch_title_id = ""
     try:
         _g = client.get_game(game_slug)
         game_name = (_g or {}).get("name", "") or ""
         console_abbr = (_g or {}).get("console", "") or ""
+        switch_title_id = (_g or {}).get("switch_title_id", "") or ""
     except Exception:
         game_name = ""
         console_abbr = ""
+        switch_title_id = ""
 
     # Cache the config so a future offline launch knows the paths + command, and
     # so the GUI can show this game while the server is unreachable (issue #383).
@@ -275,11 +287,54 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     exit_code = 0
     game_pid_file.write_text(str(os.getpid()))
     try:
+        # A learned-save-path game (Switch) whose destination isn't known yet
+        # on this device: match it by title ID against every existing Eden
+        # profile folder BEFORE reconciling, rather than only ever guessing
+        # from post-launch write detection. A device that has already played
+        # this game once then finds its own save deterministically on every
+        # subsequent launch, and gets full newest-wins reconciliation from the
+        # first matched launch onward instead of a one-off blind seed (#443).
+        if console_abbr == "Switch" and not save_path:
+            title_id = switch_title_id or _switch_title_id_from_rom(gd.rom_path)
+            local_match = _find_local_switch_save(title_id) if title_id else None
+            if local_match:
+                save_path = local_match
+                try:
+                    client.set_game_device(game_slug, GameDeviceConfig(
+                        rom_path=gd.rom_path, save_path=save_path, launch_command=gd.launch_command,
+                        state_path=gd.state_path, rom_folder_path=gd.rom_folder_path,
+                        rom_source=gd.rom_source, rom_rel_path=gd.rom_rel_path,
+                        local_rom_path=gd.local_rom_path, rom_sha256=gd.rom_sha256,
+                    ))
+                    click.echo(f"Found an existing local save for {game_slug} (matched by title ID).")
+                except Exception as exc:
+                    click.echo(f"Warning: failed to update save path: {exc}", err=True)
+                # Backfill (#443): title_id was only derivable via this
+                # device's own filename fallback — persist it so every other
+                # device can match/seed by ID too, without depending on their
+                # own filename carrying the tag.
+                if not switch_title_id:
+                    try:
+                        client.update_game(game_slug, game_name, switch_title_id=title_id)
+                    except Exception as exc:
+                        click.echo(f"Warning: failed to store the Switch title ID: {exc}", err=True)
+
         # Reconcile the save before launch: push if the local save is newer than
         # the server's, pull if the server's is newer (newest wins; loser kept
         # as .bak). server_hash = what's authoritative on the server afterwards.
         # For a shared-memcard console this reconciles the console card (#295).
         server_hash = _reconcile_save(save_client, cfg, save_key, save_path)
+
+        # Still no local match (device has never played this game): if the
+        # server already has real progress, pre-seed it into every existing
+        # Eden profile folder now, so whichever profile the player picks
+        # already has it loaded instead of starting fresh and clobbering
+        # synced progress (#443).
+        if console_abbr == "Switch" and not save_path and server_hash:
+            title_id = switch_title_id or _switch_title_id_from_rom(gd.rom_path)
+            seeded = _seed_switch_save(save_client, save_key, title_id)
+            if seeded:
+                click.echo(f"Seeded existing save into {len(seeded)} profile folder(s) before launch.")
 
         # Pull state if configured. For a shared sstates folder (PS2) use the
         # merge pull so other games' states in the folder aren't disturbed (#294).
@@ -354,10 +409,25 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 if actual_state_path and actual_state_path != state_path:
                     state_path = actual_state_path
                     click.echo(f"Updated state path to {state_path}")
+                # Self-heal (#443): the folder Eden actually wrote IS the real
+                # title ID (its own name), regardless of whether the ROM
+                # filename ever carried the scene's bracketed tag. Backfilling
+                # it here means every other device can match/seed by ID from
+                # now on, even for games where no device's filename has the
+                # tag at all.
+                if console_abbr == "Switch" and actual_save_path and not switch_title_id:
+                    try:
+                        client.update_game(game_slug, game_name, switch_title_id=Path(actual_save_path).name)
+                    except Exception as exc:
+                        click.echo(f"Warning: failed to store the Switch title ID: {exc}", err=True)
             except Exception as exc:
                 click.echo(f"Warning: failed to update save/state paths: {exc}", err=True)
 
-        if Path(save_path).exists():
+        # save_path can still be blank here — Switch's real save path is only
+        # learned if this session's write was unambiguous (#441); Path("")
+        # resolves to the cwd, which must never be treated as a save (mirrors
+        # the identical guard in _reconcile_save).
+        if save_path and Path(save_path).exists():
             local_bytes = memcard_bytes(Path(save_path))
             local_hash = hashlib.sha256(local_bytes).hexdigest()
             if local_hash != server_hash:

@@ -57,6 +57,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
+  // Switch games sync their whole containing folder, not a states folder —
+  // Eden has no save-state feature at all (#441). Derived from romPath, not
+  // separately stored — there's no per-game "folder" field, just dirname(rom_path).
+  const [gameFolderError, setGameFolderError] = useState("");
+  const gameFolder = romPath ? romPath.replace(/[\\/][^\\/]*$/, "") : "";
 
   // Network-ROM source (issue #255): source + the on-demand local copy. The
   // path itself is lifted here since handleSave's rename logic needs it;
@@ -175,7 +180,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Game name is required.";
-    if (!savePath.trim()) e.savePath = "Save file path is required.";
+    // Switch's real save path is unknowable until learned after first play
+    // (cli/run_switch.py, #441) — never require it up front like every other
+    // console's save path.
+    if (!savePath.trim() && gameConsole !== "Switch") e.savePath = "Save file path is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -370,34 +378,70 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           )}
         </div>
 
-        <div className="input-group">
-          <label>States folder <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
-          <div className="input-row">
-            <input
-              type="text"
-              value={statePath}
-              onChange={(e) => setStatePath(e.target.value)}
-              placeholder="/home/user/.config/retroarch/states/GameName"
-            />
-            <button className="btn btn-icon" title="Browse folder" onClick={async () => {
-              const folder = await window.emusync.dialog.openFolder();
-              if (folder) setStatePath(folder);
-            }}>
-              📁
-            </button>
+        {gameConsole === "Switch" ? (
+          <div className="input-group">
+            <label>Game folder</label>
+            <div className="input-row">
+              <input type="text" value={gameFolder} readOnly placeholder="Set a ROM file above first" />
+              <button className="btn btn-icon" title="Open folder" disabled={!gameFolder || isNew}
+                onClick={async () => {
+                  const result = await window.emusync.gameFolder.reveal(slug!);
+                  if (!result.ok) setGameFolderError(result.error || "Failed to open folder");
+                }}>
+                📁
+              </button>
+              <button className="btn btn-icon" title="Add file to folder (e.g. an update or DLC)" disabled={!gameFolder || isNew}
+                onClick={async () => {
+                  setGameFolderError("");
+                  const picked = await window.emusync.dialog.openFile({
+                    title: "Select a file to add to this game's folder",
+                    filters: [{ name: "Switch update/DLC", extensions: ["nsp", "xci"] }],
+                  });
+                  if (!picked) return;
+                  const result = await window.emusync.gameFolder.addFile(slug!, picked);
+                  if (!result.ok) setGameFolderError(result.error || "Failed to add file");
+                }}>
+                ➕
+              </button>
+            </div>
+            {gameFolderError && <span className="error-msg">{gameFolderError}</span>}
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+              This whole folder syncs together when you push/pull this game — any
+              update or DLC file placed here rides along automatically. Eden has no
+              automatic install for them, so install via Eden's own
+              <strong> File &gt; Install Files to NAND...</strong> after they arrive.
+            </p>
           </div>
-          {!isNew && statePath && !sharedStateLayout && (
-            <SyncLine
-              localTime={sync.latestStateFile?.time ?? null}
-              serverTime={sync.serverStateMeta?.pushed_at ?? null}
-              op={sync.stateOp}
-              onPush={sync.handlePushState}
-              onPull={sync.handlePullState}
-              pushDisabled={!sync.latestStateFile}
-              pullDisabled={!sync.serverStateMeta}
-            />
-          )}
-        </div>
+        ) : (
+          <div className="input-group">
+            <label>States folder <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+            <div className="input-row">
+              <input
+                type="text"
+                value={statePath}
+                onChange={(e) => setStatePath(e.target.value)}
+                placeholder="/home/user/.config/retroarch/states/GameName"
+              />
+              <button className="btn btn-icon" title="Browse folder" onClick={async () => {
+                const folder = await window.emusync.dialog.openFolder();
+                if (folder) setStatePath(folder);
+              }}>
+                📁
+              </button>
+            </div>
+            {!isNew && statePath && !sharedStateLayout && (
+              <SyncLine
+                localTime={sync.latestStateFile?.time ?? null}
+                serverTime={sync.serverStateMeta?.pushed_at ?? null}
+                op={sync.stateOp}
+                onPush={sync.handlePushState}
+                onPull={sync.handlePullState}
+                pushDisabled={!sync.latestStateFile}
+                pullDisabled={!sync.serverStateMeta}
+              />
+            )}
+          </div>
+        )}
 
         <div className="input-group">
           <label>Launch command <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>

@@ -161,6 +161,28 @@ def _expand_home(path: str) -> str:
     return path
 
 
+def _resolve_case_insensitive(path: str) -> str | None:
+    """Resolve `path` on disk, falling back to a case-insensitive filename match.
+
+    AppImages are user-downloaded and their filename casing varies by release
+    (e.g. `Eden.AppImage` vs the `eden.AppImage` we check for) — Linux
+    filesystems are case-sensitive, so a straight os.path.exists misses these.
+    Returns the real on-disk path (correct casing) so exec_path stays launchable."""
+    if os.path.exists(path):
+        return path
+    parent, name = os.path.split(path)
+    if not name or not os.path.isdir(parent):
+        return None
+    name_lower = name.lower()
+    try:
+        for entry in os.listdir(parent):
+            if entry.lower() == name_lower:
+                return os.path.join(parent, entry)
+    except OSError:
+        pass
+    return None
+
+
 def _detect_emulators_for_console(console_def: dict) -> list[dict]:
     """Detect installed emulators/cores for a console. Mirrors detectEmulatorsForConsole in main.ts."""
     home = str(Path.home())
@@ -208,12 +230,13 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
     for s in console_def.get("standalones", []):
         dirs = s.get("dirs", {})
         for bin_path in s["native_bins"]:
-            if os.path.exists(_expand_home(bin_path)):
+            resolved = _resolve_case_insensitive(_expand_home(bin_path))
+            if resolved:
                 native_dirs = dirs.get("native", {})
                 options.append({
                     "id": f"{s['id']}-native",
                     "label": s["label"],
-                    "exec_path": _expand_home(bin_path),
+                    "exec_path": resolved,
                     "save_dir": _expand_home(native_dirs.get("save", "")),
                     "state_dir": _expand_home(native_dirs["state"]) if native_dirs.get("state") else None,
                     "core_path": None,
@@ -275,6 +298,22 @@ def _scan_rom_dir(directory: str, depth: int = 0) -> list[str]:
 # (#419), so this is the only reliable way to filter a ROM scan down to base
 # games — mirrors scan.ts's SWITCH_TITLE_ID_RE.
 _SWITCH_TITLE_ID_RE = re.compile(r"\[([0-9A-Fa-f]{16})\]")
+
+
+def _switch_title_id_from_rom(rom_path: str) -> str:
+    """The 16-hex title ID bracketed in *rom_path*'s filename, or "".
+
+    Same scene convention _SWITCH_TITLE_ID_RE already filters base/update/DLC
+    files with, above — reused because it's also the title-ID folder name
+    under each Eden profile, letting a save be matched/pre-seeded to its exact
+    destination without ever having played the game on this device (#443).
+    Stored on the game at import time (server-side, shared across devices) so
+    it doesn't depend on every device's local filename still carrying the tag.
+    A filename without the tag returns "" — the caller falls back to the
+    older blind-first-play/learn behavior.
+    """
+    match = _SWITCH_TITLE_ID_RE.search(os.path.basename(rom_path))
+    return match.group(1) if match else ""
 
 
 def _is_switch_base_game_file(path: str) -> bool:

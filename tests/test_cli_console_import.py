@@ -89,6 +89,29 @@ def test_detect_standalone_expands_tilde_native_bins(monkeypatch, tmp_path):
     assert options[0]["save_dir"] == str(home / ".config" / "PCSX2" / "memcards")
 
 
+def test_detect_standalone_matches_appimage_regardless_of_case(tmp_path):
+    """Eden ships as a user-downloaded AppImage whose filename casing varies by
+    release (e.g. `Eden.AppImage`) — the native_bins entry checks lowercase
+    `eden.AppImage`, so detection must fall back to a case-insensitive match
+    rather than missing it on Linux's case-sensitive filesystem."""
+    actual_bin = tmp_path / "Eden.AppImage"
+    actual_bin.write_text("")
+
+    console_def = {
+        "standalones": [{
+            "id": "eden", "label": "Eden",
+            "native_bins": [str(tmp_path / "eden.AppImage")],
+            "dirs": {"native": {"save": str(tmp_path / "save")}},
+        }],
+        "system_keys": [],
+    }
+
+    options = _detect_emulators_for_console(console_def)
+
+    assert len(options) == 1
+    assert options[0]["exec_path"] == str(actual_bin)
+
+
 def test_find_first_by_ext_finds_existing_card(tmp_path):
     (tmp_path / "Mcd001.ps2").write_text("card")
     found = _find_first_by_ext(str(tmp_path), ".ps2")
