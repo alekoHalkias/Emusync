@@ -23,8 +23,15 @@ const CACHE_PATH = join(homedir(), ".emusync", "switch_titledb.json");
 const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Local since electron/ doesn't share code with gui/renderer/src's helpers.ts.
+// NFD-normalize + strip combining marks first so accented letters (titledb's
+// "Pokémon™ Sword" vs. a plain-ASCII ROM dump's "Pokemon Sword") fold to their
+// base letter instead of being dropped outright — [^a-z0-9] alone silently
+// deleted the accented character rather than transliterating it, which broke
+// matching for most of the catalog.
 function slugify(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return name
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // strip combining diacritics
+    .toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
 let cachedMap: Map<string, string> | null = null; // slugified name -> title id, this process's lifetime
