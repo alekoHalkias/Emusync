@@ -4,7 +4,8 @@
 // gigabytes, so nothing here transfers automatically or re-verifies content —
 // see cli/run_switch.py's _sync_switch_mods for the actual name-only sync.
 import React, { useEffect, useState } from "react";
-import { getGame, listSwitchMods, setGameSwitchTitleId, SwitchModPoolEntry } from "../api";
+import { getGame, listSwitchMods, SwitchModPoolEntry } from "../api";
+import { applySwitchTitleId } from "./console-import/postImport";
 
 function fmtSize(n: number): string {
   if (!n) return "?";
@@ -77,7 +78,7 @@ export default function SwitchModsTab({ slug }: { slug: string }): React.ReactEl
     try {
       const id = await window.emusync.switchTitleDb.lookup(gameName);
       if (id) {
-        await setGameSwitchTitleId(slug, id);
+        await applySwitchTitleId(slug, id);
         await load();
       } else {
         setStatus("No catalog match found for this name — launch the game once instead.");

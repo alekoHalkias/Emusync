@@ -11,6 +11,8 @@ import { ipcMain } from "electron";
 import { existsSync, readFileSync, writeFileSync, statSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import { spawn } from "child_process";
+import { SCRIPT, PYTHON } from "./runtime";
 
 const TITLEDB_URL = "https://raw.githubusercontent.com/blawar/titledb/master/US.en.json";
 // ponytail: the raw catalog is ~85MB (it bundles descriptions/box-art URLs we
@@ -75,8 +77,28 @@ export async function lookupSwitchTitleId(gameName: string): Promise<string | nu
   }
 }
 
+// Creates an empty <profile>/<title-id>/ placeholder in every local Eden
+// profile, if one doesn't exist yet, once a title ID is known (issue #448) —
+// a pure destination directory, no save bytes written. Shells out to the CLI
+// (mirrors switchmods.ts's "sync now" spawn) since cli/run_switch.py already
+// owns the profile-enumeration logic; the real save still only arrives via
+// emusync run's reconcile/seed step or a manual pull.
+export function ensureSwitchSaveFolder(slug: string): Promise<{ ok: boolean; output: string }> {
+  return new Promise((resolve) => {
+    const proc = spawn(PYTHON, [SCRIPT, "game", "ensure-switch-save-folder", slug]);
+    let output = "";
+    proc.stdout.on("data", (d) => (output += d.toString()));
+    proc.stderr.on("data", (d) => (output += d.toString()));
+    proc.on("close", (code) => resolve({ ok: code === 0, output: output.trim() }));
+    proc.on("error", (e: Error) => resolve({ ok: false, output: e.message }));
+  });
+}
+
 export function registerSwitchTitleDbIpc(): void {
   ipcMain.handle("switchTitleDb:lookup", (_event, gameName: string): Promise<string | null> =>
     lookupSwitchTitleId(gameName)
+  );
+  ipcMain.handle("switchTitleDb:ensureSaveFolder", (_event, slug: string): Promise<{ ok: boolean; output: string }> =>
+    ensureSwitchSaveFolder(slug)
   );
 }

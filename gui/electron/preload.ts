@@ -171,6 +171,8 @@ contextBridge.exposeInMainWorld("emusync", {
   switchTitleDb: {
     lookup: (gameName: string): Promise<string | null> =>
       ipcRenderer.invoke("switchTitleDb:lookup", gameName),
+    ensureSaveFolder: (slug: string): Promise<{ ok: boolean; output: string }> =>
+      ipcRenderer.invoke("switchTitleDb:ensureSaveFolder", slug),
   },
   steam: {
     addGame: (slug: string, gameName: string, consoleName: string, consoleKey: string): Promise<{ ok: boolean; updated?: boolean; warning?: string; error?: string }> =>

@@ -113,6 +113,7 @@ export interface EmusyncBridge {
   };
   switchTitleDb: {
     lookup: (gameName: string) => Promise<string | null>;
+    ensureSaveFolder: (slug: string) => Promise<{ ok: boolean; output: string }>;
   };
   steam: {
     addGame: (slug: string, gameName: string, consoleName: string, consoleKey: string) => Promise<{ ok: boolean; updated?: boolean; warning?: string; error?: string }>;

@@ -43,6 +43,15 @@ export async function prefetchArt(
   }
 }
 
+// Persists a discovered title ID and ensures its Eden save folder exists in
+// every local profile (issue #448) — shared by the import wizard below, the
+// all-games startup backfill (App.tsx), and SwitchModsTab's manual lookup
+// button, so the "persist + create placeholder folder" pair only lives once.
+export async function applySwitchTitleId(slug: string, titleId: string): Promise<void> {
+  await setGameSwitchTitleId(slug, titleId);
+  try { await emusync.switchTitleDb.ensureSaveFolder(slug); } catch { /* best-effort */ }
+}
+
 // Discovers switch_title_id by name-matching a public title catalog (#448),
 // so ID-based save matching (#443) works from the very first launch instead
 // of waiting on the bracket-tag filename convention or post-launch self-heal.
@@ -52,7 +61,7 @@ export async function backfillSwitchTitleIds(entries: ImportedEntry[]): Promise<
   for (const entry of entries) {
     try {
       const id = await emusync.switchTitleDb.lookup(entry.name);
-      if (id) await setGameSwitchTitleId(entry.slug, id);
+      if (id) await applySwitchTitleId(entry.slug, id);
     } catch { /* best-effort */ }
   }
 }

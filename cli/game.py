@@ -10,7 +10,9 @@ from server.store import saves_path_to_states
 from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _print_table
+from cli.mod import _title_id_for
 from cli.root import cli
+from cli.run_switch import _switch_profile_dirs
 
 
 @cli.group()
@@ -181,3 +183,31 @@ def game_remove(slug: str, everywhere: bool) -> None:
 
     client.remove_game_device(slug)
     click.echo(f"Removed: {slug} (this device only)")
+
+
+@game.command("ensure-switch-save-folder")
+@click.argument("slug")
+def game_ensure_switch_save_folder(slug: str) -> None:
+    """Create an empty Eden save folder for SLUG in every local profile, if
+    one doesn't already exist (issue #448).
+
+    Pure placeholder — no save bytes are written. The title ID must already
+    be known (`switch_title_id` set server-side, e.g. via the GUI's catalog
+    lookup); an empty folder created here is deliberately excluded from
+    `_find_local_switch_save`'s "has real data" check, so it's inert until
+    the game is actually played or a save gets pulled/seeded via `emusync run`.
+    """
+    client = _client()
+    title_id = _title_id_for(client, slug)
+    created = []
+    for profile_dir in _switch_profile_dirs():
+        dest = profile_dir / title_id
+        if not dest.exists():
+            dest.mkdir(parents=True, exist_ok=True)
+            created.append(str(dest))
+    if created:
+        click.echo(f"Created {len(created)} folder(s):")
+        for path in created:
+            click.echo(f"  {path}")
+    else:
+        click.echo("Already present in every local profile (or no Eden profile exists yet).")

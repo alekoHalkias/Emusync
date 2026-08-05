@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { configure, configureDevice, gamesOverview, releaseLock } from "./api";
+import { configure, configureDevice, gamesOverview, listGames, releaseLock } from "./api";
 import { DeviceProvider } from "./DeviceContext";
 import Setup from "./components/Setup";
 import GameConfig from "./components/GameConfig";
@@ -9,6 +9,7 @@ import ConsoleGrid from "./components/ConsoleGrid";
 import GameGrid from "./components/GameGrid";
 import ConsoleImport from "./components/ConsoleImport";
 import { useGameList } from "./components/game-list/useGameList";
+import { applySwitchTitleId } from "./components/console-import/postImport";
 
 type Screen =
   | { name: "loading" }
@@ -47,6 +48,34 @@ export default function App(): React.ReactElement {
       }
     } catch { /* server offline */ }
   }
+
+  // Silently backfill switch_title_id for every already-imported Switch game
+  // that's still missing one (issue #448) — catches games imported before
+  // this feature existed, or whose name had no catalog match at the time.
+  // Best-effort, sequential, and non-blocking; a miss just leaves the game as
+  // it was (falls back to bracket-tag/post-launch discovery as before).
+  async function backfillAllSwitchTitleIds(): Promise<void> {
+    try {
+      const all = await listGames();
+      const missing = all.filter((g) => g.console === "Switch" && !g.switch_title_id);
+      for (const g of missing) {
+        try {
+          const id = await window.emusync.switchTitleDb.lookup(g.name);
+          if (id) await applySwitchTitleId(g.slug, id);
+        } catch { /* best-effort — try the next game */ }
+      }
+    } catch { /* server offline — nothing to backfill this session */ }
+  }
+
+  // Runs once per app session, as soon as useGameList's first load succeeds
+  // (its own poll already retries until the server is up — no need to
+  // duplicate that here).
+  const hasBackfilledRef = useRef(false);
+  useEffect(() => {
+    if (loading || hasBackfilledRef.current) return;
+    hasBackfilledRef.current = true;
+    backfillAllSwitchTitleIds();
+  }, [loading]);
 
   // Poll for locks held by this device to detect games launched outside the app (e.g. Steam)
   useEffect(() => {
