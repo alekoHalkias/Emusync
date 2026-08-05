@@ -111,6 +111,9 @@ export interface EmusyncBridge {
     setKey: (key: string) => Promise<{ ok: boolean; error?: string }>;
     openKeyPage: () => Promise<void>;
   };
+  switchTitleDb: {
+    lookup: (gameName: string) => Promise<string | null>;
+  };
   steam: {
     addGame: (slug: string, gameName: string, consoleName: string, consoleKey: string) => Promise<{ ok: boolean; updated?: boolean; warning?: string; error?: string }>;
     isAdded: (slug: string) => Promise<boolean>;

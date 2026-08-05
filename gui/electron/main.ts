@@ -18,6 +18,7 @@ import { registerArtIpc } from "./art";
 import { registerArtworkIpc } from "./artwork";
 import { registerSteamGridDbIpc } from "./steamgriddb";
 import { registerSteamIpc } from "./steam";
+import { registerSwitchTitleDbIpc } from "./switchtitledb";
 
 // Register all IPC handlers up front (renderer can only call them once a window
 // has loaded, which happens after app.whenReady below).
@@ -33,6 +34,7 @@ registerArtIpc();
 registerArtworkIpc();
 registerSteamGridDbIpc();
 registerSteamIpc();
+registerSwitchTitleDbIpc();
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 

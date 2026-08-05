@@ -4,7 +4,7 @@
 // auto-push behavior). Each function takes its React state setters as
 // parameters rather than closing over hook state, so it has no dependency on
 // useConsoleImport beyond the shared `window.emusync` bridge.
-import { getConsoleMemcardMeta, getDeviceGameDevices, getSaveMeta, getStateMeta, listDevices, type Device, type SaveMeta } from "../../api";
+import { getConsoleMemcardMeta, getDeviceGameDevices, getSaveMeta, getStateMeta, listDevices, setGameSwitchTitleId, type Device, type SaveMeta } from "../../api";
 import { usesSharedSaveLayout, usesSharedStateLayout } from "./helpers";
 import type { ImportedEntry, PushResult } from "./types";
 import { parseUtc } from "../../time";
@@ -40,6 +40,20 @@ export async function prefetchArt(
     // refreshAll, so a rate-limited/missing type doesn't stop the rest.
     try { await emusync.artwork.refreshAll(entries[i].slug, entries[i].name, consoleKey, null); } catch { /* best-effort */ }
     setArtProgress({ done: i + 1, total: entries.length });
+  }
+}
+
+// Discovers switch_title_id by name-matching a public title catalog (#448),
+// so ID-based save matching (#443) works from the very first launch instead
+// of waiting on the bracket-tag filename convention or post-launch self-heal.
+// Best-effort and non-blocking, like the other post-import steps here — a
+// miss just leaves switch_title_id blank, falling back to the existing paths.
+export async function backfillSwitchTitleIds(entries: ImportedEntry[]): Promise<void> {
+  for (const entry of entries) {
+    try {
+      const id = await emusync.switchTitleDb.lookup(entry.name);
+      if (id) await setGameSwitchTitleId(entry.slug, id);
+    } catch { /* best-effort */ }
   }
 }
 

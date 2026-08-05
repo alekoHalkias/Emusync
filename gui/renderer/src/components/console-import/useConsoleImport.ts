@@ -14,7 +14,7 @@ import {
   usesSharedStateLayout,
   stepIndex,
 } from "./helpers";
-import { autoPush, prefetchArt, pullFromServerIfNewer } from "./postImport";
+import { autoPush, backfillSwitchTitleIds, prefetchArt, pullFromServerIfNewer } from "./postImport";
 import { resolveImportPaths } from "./resolveRomPaths";
 import type {
   ConsoleOption,
@@ -346,6 +346,11 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
     // Local ROMs auto-push their bytes to peers as before.
     if (imported.length > 0 && romSource !== "network") {
       autoPush(imported, consoleAbbr, { pushSaves, pushStates }, setPushResults);
+    }
+    // Discover switch_title_id by name before the game is ever launched
+    // (#448) — best-effort, doesn't block the rest of the import.
+    if (imported.length > 0 && consoleAbbr === "Switch") {
+      backfillSwitchTitleIds(imported);
     }
     // If another device already has save/state data for these games (or, for a
     // shared-layout console, the console's memory card), pull it down to this
