@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getConsoleMemcardMeta, getSaveMeta, getStateMeta, type SaveMeta } from "../../api";
+import { getConsoleMemcardMeta, getGameDevice, getSaveMeta, getStateMeta, type SaveMeta } from "../../api";
 import { IDLE_OP, type SyncOp } from "./SyncLine";
 
 // Save/state/memcard sync status + push/pull handlers for GameConfig's sync
@@ -55,6 +55,31 @@ export function useGameSync(
     } else {
       setSaveOp({ status: "error", action: "push", msg: result.error || "Push failed" });
     }
+  }
+
+  // Switch-only: this device has no local save yet, so there's no savePath
+  // to pull *into* — seeds the server's save into whatever local Eden profile
+  // exists and persists the resulting path server-side (#456 follow-up).
+  // Returns the newly-adopted save path so the caller can pick it up, since
+  // savePath itself lives in GameConfig's state, not here.
+  async function handleSeedSwitchSave(): Promise<string | null> {
+    if (!slug) return null;
+    setSaveOp({ status: "busy", action: "pull", msg: "" });
+    const result = await window.emusync.save.pullSwitchSeed(slug);
+    if (!result.ok) {
+      setSaveOp({ status: "error", action: "pull", msg: result.error || "No server save yet" });
+      return null;
+    }
+    const gd = await getGameDevice(slug).catch(() => null);
+    if (!gd?.save_path) {
+      setSaveOp({ status: "error", action: "pull", msg: "Pulled, but couldn't resolve the save path" });
+      return null;
+    }
+    setSaveOp({ status: "ok", action: "pull", msg: "Pulled from server" });
+    await loadSyncInfo();
+    const t = await window.emusync.files.getSaveTime(gd.save_path).catch(() => null);
+    setLocalSaveTime(t);
+    return gd.save_path;
   }
 
   async function handlePullSave(): Promise<void> {
@@ -137,7 +162,7 @@ export function useGameSync(
   return {
     localSaveTime, serverSaveMeta, latestStateFile, serverStateMeta,
     saveOp, stateOp, serverMemcardMeta, memcardOp,
-    loadSyncInfo, handlePushSave, handlePullSave,
+    loadSyncInfo, handlePushSave, handlePullSave, handleSeedSwitchSave,
     handlePushMemcard, handlePullMemcard, handlePushState, handlePullState,
   };
 }

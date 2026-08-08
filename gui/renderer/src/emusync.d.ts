@@ -52,6 +52,7 @@ export interface EmusyncBridge {
   save: {
     push: (slug: string, savePath: string) => Promise<{ ok: boolean; error?: string }>;
     pull: (slug: string, savePath: string) => Promise<{ ok: boolean; pulled: boolean; error?: string }>;
+    pullSwitchSeed: (slug: string) => Promise<{ ok: boolean; error?: string }>;
   };
   state: {
     push: (slug: string, statePath: string) => Promise<{ ok: boolean; error?: string }>;

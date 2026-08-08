@@ -281,7 +281,12 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   // its card + states sync automatically as shared artifacts via `emusync run`,
   // and a per-game pull here would be wrong (and, for states, destructive to
   // other games' slots). Hide the manual sync rows for those consoles (#294/#295).
-  const showSyncPanel = !isNew && !!savePath && !sharedLayout;
+  // Switch is the one console where the panel is still useful with no savePath
+  // yet: a device that's never played this game (e.g. a Steam Deck being
+  // handed a save from another device) has nothing to push, but can still
+  // pull — the destination Eden profile folder is discovered server-side
+  // rather than needing a savePath up front (#456 follow-up).
+  const showSyncPanel = !isNew && !sharedLayout && (!!savePath || gameConsole === "Switch");
 
   return (
     <div>
@@ -353,7 +358,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               serverTime={sync.serverSaveMeta?.pushed_at ?? null}
               op={sync.saveOp}
               onPush={sync.handlePushSave}
-              onPull={sync.handlePullSave}
+              onPull={async () => {
+                if (savePath) { await sync.handlePullSave(); return; }
+                const path = await sync.handleSeedSwitchSave();
+                if (path) setSavePath(path);
+              }}
               pushDisabled={!sync.localSaveTime}
               pullDisabled={!sync.serverSaveMeta}
             />

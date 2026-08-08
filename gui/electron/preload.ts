@@ -70,6 +70,10 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("save:push", slug, savePath),
     pull: (slug: string, savePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> =>
       ipcRenderer.invoke("save:pull", slug, savePath),
+    // Switch-only: pull the server's save onto a device with no local save
+    // yet, into whatever Eden profile folder is found (#456 follow-up).
+    pullSwitchSeed: (slug: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("save:pullSwitchSeed", slug),
   },
   state: {
     push: (slug: string, statePath: string): Promise<{ ok: boolean; error?: string }> =>

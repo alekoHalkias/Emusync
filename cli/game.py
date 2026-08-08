@@ -12,7 +12,7 @@ from server.sync_client import GameDeviceConfig
 from cli.common import _client, _print_table
 from cli.mod import _title_id_for
 from cli.root import cli
-from cli.run_switch import _switch_profile_dirs
+from cli.run_switch import _seed_switch_save, _switch_profile_dirs
 
 
 @cli.group()
@@ -211,3 +211,38 @@ def game_ensure_switch_save_folder(slug: str) -> None:
             click.echo(f"  {path}")
     else:
         click.echo("Already present in every local profile (or no Eden profile exists yet).")
+
+
+@game.command("pull-switch-save")
+@click.argument("slug")
+def game_pull_switch_save(slug: str) -> None:
+    """Pull the server's Switch save for SLUG onto this device when it has no
+    local save yet, and adopt the destination as this device's save_path.
+
+    Backs the GUI's manual "Pull" button for a device with nothing local to
+    push/pull against yet (e.g. a Steam Deck picking up a game already played
+    elsewhere) — without this, save_path stays blank until the game is
+    actually launched once via `emusync run`, which is what normally
+    triggers the seed step (`_seed_switch_save`, #443). This is that same
+    seed, run on demand instead of pre-launch, with save_path persisted
+    immediately since there's no upcoming launch to adopt it afterward.
+    """
+    client = _client()
+    title_id = _title_id_for(client, slug)
+    seeded = _seed_switch_save(client, slug, title_id)
+    if not seeded:
+        click.echo("No save on the server yet, or no local Eden profile exists to seed into.", err=True)
+        sys.exit(1)
+    gd = client.get_game_device(slug)
+    client.set_game_device(slug, GameDeviceConfig(
+        rom_path=gd.rom_path if gd else "",
+        save_path=seeded[0],
+        launch_command=gd.launch_command if gd else "",
+        state_path=gd.state_path if gd else "",
+        rom_folder_path=gd.rom_folder_path if gd else "",
+        rom_source=gd.rom_source if gd else "local",
+        rom_rel_path=gd.rom_rel_path if gd else "",
+        local_rom_path=gd.local_rom_path if gd else "",
+        rom_sha256=gd.rom_sha256 if gd else "",
+    ))
+    click.echo(f"Pulled save into {seeded[0]}")

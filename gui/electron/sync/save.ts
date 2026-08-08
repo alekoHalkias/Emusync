@@ -3,10 +3,11 @@
 // memcard.ts (plain tar, matching Python's memcard_bytes()/_write_memcard()),
 // which the manual GUI push/pull buttons here never picked up.
 import { ipcMain } from "electron";
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, statSync, renameSync } from "fs";
 import { dirname } from "path";
 import { loadServerCfg } from "../config-store";
+import { SCRIPT, PYTHON } from "../runtime";
 
 export function registerSaveIpc(): void {
   ipcMain.handle("save:push", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; error?: string }> => {
@@ -94,5 +95,23 @@ export function registerSaveIpc(): void {
     } catch (e: any) {
       return { ok: false, pulled: false, error: e.message || "Pull failed" };
     }
+  });
+
+  // A device with no local Switch save yet has no savePath to pull *into* —
+  // save:pull above needs one. The destination (<Eden profile>/<title-id>)
+  // is only knowable server-side (cli/run_switch.py's _seed_switch_save), so
+  // this shells out to the CLI (mirrors switchmods.ts's "sync now") rather
+  // than duplicating that profile-discovery logic here. On success it
+  // persists save_path itself; the renderer re-fetches the device config
+  // afterward to pick it up.
+  ipcMain.handle("save:pullSwitchSeed", (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {
+    return new Promise((resolve) => {
+      const proc = spawn(PYTHON, [SCRIPT, "game", "pull-switch-save", slug]);
+      let output = "";
+      proc.stdout.on("data", (d) => (output += d.toString()));
+      proc.stderr.on("data", (d) => (output += d.toString()));
+      proc.on("close", (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: output.trim() || "Pull failed" }));
+      proc.on("error", (e: Error) => resolve({ ok: false, error: e.message }));
+    });
   });
 }
