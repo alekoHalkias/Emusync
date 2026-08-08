@@ -5,6 +5,7 @@
 // see cli/run_switch.py's _sync_switch_mods for the actual name-only sync.
 import React, { useEffect, useState } from "react";
 import { getGame, listSwitchMods, SwitchModPoolEntry } from "../api";
+import { applySwitchTitleId } from "./console-import/postImport";
 
 function fmtSize(n: number): string {
   if (!n) return "?";
@@ -17,10 +18,12 @@ function fmtSize(n: number): string {
 
 export default function SwitchModsTab({ slug }: { slug: string }): React.ReactElement {
   const [titleId, setTitleId] = useState<string | null>(null);
+  const [gameName, setGameName] = useState("");
   const [local, setLocal] = useState<string[]>([]);
   const [pool, setPool] = useState<SwitchModPoolEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -29,6 +32,7 @@ export default function SwitchModsTab({ slug }: { slug: string }): React.ReactEl
     setError(null);
     try {
       const game = await getGame(slug);
+      setGameName(game.name);
       const id = game.switch_title_id || "";
       setTitleId(id);
       if (!id) { setLoading(false); return; }
@@ -65,13 +69,41 @@ export default function SwitchModsTab({ slug }: { slug: string }): React.ReactEl
     if (!res.ok) setStatus(res.error || "Could not open folder");
   }
 
+  // Backfill for games imported before #448, or whose name has no public
+  // catalog match — same best-effort name lookup the import wizard runs,
+  // exposed here as a manual retry rather than a launch-and-hope wait.
+  async function lookupTitleId(): Promise<void> {
+    setLookingUp(true);
+    setStatus(null);
+    try {
+      const id = await window.emusync.switchTitleDb.lookup(gameName);
+      if (id) {
+        await applySwitchTitleId(slug, id);
+        await load();
+      } else {
+        setStatus("No catalog match found for this name — launch the game once instead.");
+      }
+    } catch {
+      setStatus("Lookup failed — launch the game once instead.");
+    } finally {
+      setLookingUp(false);
+    }
+  }
+
   if (loading) return <p style={{ color: "var(--text-muted)" }}>Loading…</p>;
   if (error) return <p style={{ color: "var(--danger, #e05555)" }}>{error}</p>;
   if (!titleId) {
     return (
-      <p style={{ color: "var(--text-muted)" }}>
-        This game's Switch title ID isn't known yet — launch it once via Run so its mod folder can be discovered.
-      </p>
+      <div>
+        <p style={{ color: "var(--text-muted)" }}>
+          This game's Switch title ID isn't known yet — launch it once via Run so its mod folder can be discovered,
+          or try a name-based lookup below.
+        </p>
+        <button className="btn btn-ghost" onClick={lookupTitleId} disabled={lookingUp}>
+          {lookingUp ? "Looking up…" : "Look up title ID"}
+        </button>
+        {status && <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>{status}</p>}
+      </div>
     );
   }
 

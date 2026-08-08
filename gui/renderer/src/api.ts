@@ -105,6 +105,13 @@ export const setGameSgdbId = async (slug: string, sgdbGameId: number): Promise<G
   return _fetch("PUT", `/games/${slug}`, { name: game.name, sgdb_game_id: sgdbGameId });
 };
 
+// Persists a title ID discovered by name lookup (issue #448) — same shape as
+// setGameSgdbId above, the PUT route requires `name` so fetch it first.
+export const setGameSwitchTitleId = async (slug: string, switchTitleId: string): Promise<Game> => {
+  const game = await getGame(slug);
+  return _fetch("PUT", `/games/${slug}`, { name: game.name, switch_title_id: switchTitleId });
+};
+
 export const getGameDevice = (slug: string): Promise<GameDeviceConfig> =>
   _fetch("GET", `/games/${slug}/device`);
 
