@@ -55,6 +55,39 @@ def _switch_profile_dirs() -> list[Path]:
     return dirs
 
 
+def _known_switch_profile_root(client, device_id: str) -> Optional[Path]:
+    """This device's previously-recorded Eden profile folder for Switch
+    saves, if one is already known — or None on a device that's never had a
+    Switch save matched/seeded yet (#455).
+
+    `consoles.device_save_folder` already gets set to `Path(save_path).parent`
+    for free, server-side, every time `set_game_device` is called for any
+    console (`upsert_console_for_game`) — so the very first time a Switch
+    save is matched or seeded on a device, this starts resolving to it on
+    every later call, with no separate storage of our own needed. Preferred
+    over scanning every profile dir under `_SWITCH_NAND_ROOTS` so a device
+    that happens to have more than one local Eden profile (a leftover/guest
+    one, say) doesn't get a save matched or seeded into the wrong one.
+    """
+    try:
+        consoles = client.get_device_consoles(device_id)
+    except Exception:
+        return None
+    for c in consoles:
+        if c.get("console_name") == "Switch" and c.get("device_save_folder"):
+            root = Path(c["device_save_folder"])
+            if root.is_dir():
+                return root
+    return None
+
+
+def _switch_profile_dirs_for(known_root: Optional[Path]) -> list[Path]:
+    """The profile dir(s) a Switch save lookup/seed should target: just the
+    known root if one was resolved, else every discoverable profile dir
+    (today's behavior — used until a device has its first known root)."""
+    return [known_root] if known_root else _switch_profile_dirs()
+
+
 def _switch_title_save_dirs() -> list[Path]:
     """Every title's save folder across every discovered profile."""
     return [
@@ -91,9 +124,15 @@ def _resolve_written_switch_save(since: float) -> Optional[str]:
     return str(touched[0])
 
 
-def _find_local_switch_save(title_id: str) -> Optional[str]:
+def _find_local_switch_save(title_id: str, known_root: Optional[Path] = None) -> Optional[str]:
     """A title-ID folder matching *title_id* that already exists locally and
-    has real data in it, across every profile, or None (#443).
+    has real data in it, or None (#443).
+
+    *known_root*, when given, restricts the search to that one profile dir
+    instead of scanning every discoverable one (#455) — once a device has a
+    recorded profile root, a stray second local profile should never get
+    matched against by accident. Falls back to scanning all of them (as
+    before) when no root is known yet.
 
     Matching by the (stable, per-game) title ID directly — rather than only
     ever guessing from "what got touched since launch" — means a device that
@@ -103,26 +142,32 @@ def _find_local_switch_save(title_id: str) -> Optional[str]:
     (e.g. one this device seeded but never actually got played) doesn't count
     as "found" — nothing to reconcile against yet.
     """
-    for profile_dir in _switch_profile_dirs():
+    for profile_dir in _switch_profile_dirs_for(known_root):
         candidate = profile_dir / title_id
         if candidate.is_dir() and any(f.is_file() for f in candidate.rglob("*")):
             return str(candidate)
     return None
 
 
-def _seed_switch_save(save_client, save_key: str, title_id: str) -> list[str]:
-    """Pre-seed the server's existing save into every profile folder that
-    already exists on this device, before the game is ever launched here.
+def _seed_switch_save(save_client, save_key: str, title_id: str, known_root: Optional[Path] = None) -> list[str]:
+    """Pre-seed the server's existing save into this device's Switch save
+    folder(s), before the game is ever launched here.
 
     Without this, a device's first-ever session for a learned-save-path game
     plays blind (the destination folder isn't known until after that session),
-    discarding any progress already synced from another device (#443). Since
-    the title-ID part of the destination IS derivable up front (unlike the
-    emulator-generated profile-ID part), seeding every existing profile now
-    means whichever one the player actually picks in Eden already has the
-    synced save — _resolve_written_switch_save still works unchanged
-    afterward, since seeded files get an mtime before the session starts and
-    only the profile actually played gets touched during play.
+    discarding any progress already synced from another device (#443).
+
+    *known_root*, when given, seeds only that one profile dir instead of
+    every discoverable one (#455) — a device that already has a recorded
+    profile shouldn't get a save spread into some other, unused local
+    profile. Without a known root yet (this device's very first Switch save
+    of any kind), the title-ID part of the destination IS derivable up front
+    (unlike the emulator-generated profile-ID part), so every existing
+    profile gets seeded — whichever one the player actually picks in Eden
+    already has the synced save. _resolve_written_switch_save still works
+    unchanged afterward either way, since seeded files get an mtime before
+    the session starts and only the profile actually played gets touched
+    during play.
 
     Returns the destination paths actually seeded (empty if *title_id* is
     blank, or no profile folder exists yet).
@@ -130,7 +175,7 @@ def _seed_switch_save(save_client, save_key: str, title_id: str) -> list[str]:
     if not title_id:
         return []
     seeded = []
-    for profile_dir in _switch_profile_dirs():
+    for profile_dir in _switch_profile_dirs_for(known_root):
         dest = profile_dir / title_id
         try:
             pulled, _ = save_client.pull_save(save_key, str(dest))

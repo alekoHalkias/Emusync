@@ -51,18 +51,30 @@ export default function App(): React.ReactElement {
 
   // Silently backfill switch_title_id for every already-imported Switch game
   // that's still missing one (issue #448) — catches games imported before
-  // this feature existed, or whose name had no catalog match at the time.
-  // Best-effort, sequential, and non-blocking; a miss just leaves the game as
-  // it was (falls back to bracket-tag/post-launch discovery as before).
-  async function backfillAllSwitchTitleIds(): Promise<void> {
+  // this feature existed, or whose name had no catalog match at the time —
+  // then, for every Switch game whose title ID is already known (whether
+  // just resolved above or discovered earlier by some other device), makes
+  // sure THIS device has a save folder for it, seeding real save data from
+  // the server if another device already has some (#453). Without this
+  // second pass, a device that pairs after the ID was already known would
+  // never get its own folder/seed until the game happens to be launched.
+  // Best-effort, sequential, and non-blocking throughout; a miss just leaves
+  // the game as it was (falls back to bracket-tag/post-launch discovery, or
+  // emusync run's own seed-on-first-launch step, as before).
+  async function backfillAllSwitchSaves(): Promise<void> {
     try {
       const all = await listGames();
-      const missing = all.filter((g) => g.console === "Switch" && !g.switch_title_id);
+      const switchGames = all.filter((g) => g.console === "Switch");
+      const missing = switchGames.filter((g) => !g.switch_title_id);
       for (const g of missing) {
         try {
           const id = await window.emusync.switchTitleDb.lookup(g.name);
           if (id) await applySwitchTitleId(g.slug, id);
         } catch { /* best-effort — try the next game */ }
+      }
+      const known = switchGames.filter((g) => g.switch_title_id);
+      for (const g of known) {
+        try { await window.emusync.switchTitleDb.ensureSaveFolder(g.slug); } catch { /* best-effort */ }
       }
     } catch { /* server offline — nothing to backfill this session */ }
   }
@@ -74,7 +86,7 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     if (loading || hasBackfilledRef.current) return;
     hasBackfilledRef.current = true;
-    backfillAllSwitchTitleIds();
+    backfillAllSwitchSaves();
   }, [loading]);
 
   // Poll for locks held by this device to detect games launched outside the app (e.g. Steam)
