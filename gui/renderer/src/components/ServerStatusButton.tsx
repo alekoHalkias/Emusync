@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { configure, configureDevice, health, listEvents, type ActivityEvent } from "../api";
+import { configure, configureDevice, health, listEvents, whoami, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
 import DevicesPanel from "./DevicesPanel";
 import { useDevices } from "../DeviceContext";
@@ -52,6 +52,10 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   const poll = useCallback(async () => {
     const ok = await health();
     setServerState(ok ? "online" : "offline");
+    // Heartbeat: keeps this device's server-side presence fresh while the
+    // GUI is open, so an idle-but-open app doesn't get logged as "went
+    // offline" (issue #450). Best-effort — no-op before pairing / bad PIN.
+    whoami().catch(() => {});
   }, []);
 
   useEffect(() => {

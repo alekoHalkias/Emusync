@@ -65,6 +65,7 @@ export async function health(): Promise<boolean> {
   }
 }
 
+
 export type GameOverview = {
   slug: string;
   name: string;
@@ -175,6 +176,9 @@ export const getConsoleMemcardMeta = async (consoleKey: string): Promise<SaveMet
 };
 
 export const listDevices = (): Promise<Device[]> => _fetch("GET", "/devices");
+// Authenticated no-op. Also double-duty as a presence heartbeat — polled
+// every 5s by ServerStatusButton alongside health() so an idle-but-open GUI
+// keeps this device's last_seen_at fresh instead of "going offline" (#450).
 export const whoami = (): Promise<{ device_id: string }> => _fetch("GET", "/whoami");
 export const removeDevice = (deviceId: string): Promise<void> => _fetch("DELETE", `/devices/${deviceId}`);
 

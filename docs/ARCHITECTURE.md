@@ -192,7 +192,7 @@ The server prints real-time activity to stdout for operator visibility, every li
 |------|-------|------|
 | `EmuSync server ready` / `EmuSync server running on :<port>` | `cli/server.py` | startup (`main.ts` matches `EmuSync server ready` via `.includes()` — keep that substring intact) |
 | `new device paired called <name> at ip:<ip>` | `api._auth()` | first INSERT for a device |
-| `<name> online` / `<name> went offline` | presence tracking | device seen / idle > 5 min |
+| `<name> online` / `<name> went offline` | presence tracking | device seen / idle > 5 min (an open GUI heartbeats `GET /whoami` every 5s, `ServerStatusButton.tsx`, so it won't idle out while running, #450) |
 | `<name> unpaired` | `DELETE /devices/{id}` | device removed |
 | `<game> is running on <device>` / `stopped on` | lock acquire/release | |
 | `save pushed`/`pulled`, `state pushed`/`pulled` | save/state sync | pull only logs on a real hit, not a 204 |
