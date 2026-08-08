@@ -6,13 +6,19 @@ import sys
 
 import click
 
+import server.config as cfg_module
 from server.store import saves_path_to_states
 from server.sync_client import GameDeviceConfig
 
 from cli.common import _client, _print_table
 from cli.mod import _title_id_for
 from cli.root import cli
-from cli.run_switch import _find_local_switch_save, _seed_switch_save, _switch_profile_dirs
+from cli.run_switch import (
+    _find_local_switch_save,
+    _known_switch_profile_root,
+    _seed_switch_save,
+    _switch_profile_dirs_for,
+)
 
 
 @cli.group()
@@ -210,9 +216,18 @@ def game_ensure_switch_save_folder(slug: str) -> None:
     the player actually uses isn't decided yet, so guessing wrong here would
     point sync at the wrong folder — post-launch adoption (#443) still
     resolves that case once the game's actually played.
+
+    Every step below is restricted to this device's already-known profile
+    root, if it has one (`_known_switch_profile_root`, #455) — reading
+    `consoles.device_save_folder`, which gets set for free as a side effect
+    of the `set_game_device` call above, the first time any Switch save is
+    matched or seeded here. Without a known root yet, every local Eden
+    profile is scanned/seeded, same as before.
     """
-    client = _client()
+    cfg = cfg_module.load()
+    client = _client(cfg)
     title_id = _title_id_for(client, slug)
+    known_root = _known_switch_profile_root(client, cfg.device_id)
 
     def _persist_save_path(path: str) -> None:
         gd = client.get_game_device(slug)
@@ -224,13 +239,13 @@ def game_ensure_switch_save_folder(slug: str) -> None:
         except Exception as exc:
             click.echo(f"Warning: failed to record the save location: {exc}", err=True)
 
-    existing = _find_local_switch_save(title_id)
+    existing = _find_local_switch_save(title_id, known_root)
     if existing:
         _persist_save_path(existing)
         click.echo("Already has a real save on this device — nothing to do.")
         return
 
-    seeded = _seed_switch_save(client, slug, title_id)
+    seeded = _seed_switch_save(client, slug, title_id, known_root)
     if seeded:
         if len(seeded) == 1:
             _persist_save_path(seeded[0])
@@ -240,7 +255,7 @@ def game_ensure_switch_save_folder(slug: str) -> None:
         return
 
     created = []
-    for profile_dir in _switch_profile_dirs():
+    for profile_dir in _switch_profile_dirs_for(known_root):
         dest = profile_dir / title_id
         if not dest.exists():
             dest.mkdir(parents=True, exist_ok=True)

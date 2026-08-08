@@ -11,6 +11,7 @@ from pathlib import Path
 
 from cli.run_switch import (
     _find_local_switch_save,
+    _known_switch_profile_root,
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
@@ -193,3 +194,72 @@ def test_finds_title_under_emudeck_style_second_root(monkeypatch, tmp_path):
     result = _resolve_written_switch_save(since)
 
     assert result == str(title_dir)
+
+
+# ── restricting to one known profile root instead of every local one (#455) ────
+
+class _FakeConsolesClient:
+    """Stands in for SyncClient.get_device_consoles for _known_switch_profile_root."""
+
+    def __init__(self, consoles: list[dict] | None = None, raises: bool = False) -> None:
+        self._consoles = consoles or []
+        self._raises = raises
+
+    def get_device_consoles(self, device_id: str) -> list[dict]:
+        if self._raises:
+            raise RuntimeError("server offline")
+        return self._consoles
+
+
+def test_known_switch_profile_root_reads_device_save_folder(tmp_path):
+    root = tmp_path / "profile-a"
+    root.mkdir()
+    client = _FakeConsolesClient([{"console_name": "Switch", "device_save_folder": str(root)}])
+
+    assert _known_switch_profile_root(client, "dev-a") == root
+
+
+def test_known_switch_profile_root_none_when_no_switch_console(tmp_path):
+    client = _FakeConsolesClient([{"console_name": "GC", "device_save_folder": str(tmp_path)}])
+    assert _known_switch_profile_root(client, "dev-a") is None
+
+
+def test_known_switch_profile_root_none_when_folder_no_longer_exists(tmp_path):
+    client = _FakeConsolesClient([{"console_name": "Switch", "device_save_folder": str(tmp_path / "gone")}])
+    assert _known_switch_profile_root(client, "dev-a") is None
+
+
+def test_known_switch_profile_root_none_on_request_failure():
+    assert _known_switch_profile_root(_FakeConsolesClient(raises=True), "dev-a") is None
+
+
+def test_find_local_switch_save_restricted_to_known_root_ignores_other_profiles(monkeypatch, tmp_path):
+    """Regression: a device with more than one local Eden profile (a stray
+    leftover/guest one, say) must not get matched against a profile other
+    than the one it's already recorded — the whole point of #455."""
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    known_dir = _make_title(nand_root, "profile-known", "0100000011D90000")
+    (known_dir / "save_data.bin").write_text("the real progress")
+    # A second, unrelated local profile happens to have a match too — must be
+    # ignored once a known root is given.
+    other_dir = _make_title(nand_root, "profile-other", "0100000011D90000")
+    (other_dir / "save_data.bin").write_text("stray/guest profile data")
+
+    known_root = nand_root / "profile-known"
+    assert _find_local_switch_save("0100000011D90000", known_root) == str(known_dir)
+
+
+def test_seed_switch_save_restricted_to_known_root(monkeypatch, tmp_path):
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    profile_a = nand_root / "profile-a"
+    profile_b = nand_root / "profile-b"
+    profile_a.mkdir(parents=True)
+    profile_b.mkdir(parents=True)
+
+    client = _FakeSeedClient()
+    seeded = _seed_switch_save(client, "pokemon-legends-arceus", "0100000011D90000", profile_a)
+
+    assert seeded == [str(profile_a / "0100000011D90000")]
+    assert not (profile_b / "0100000011D90000").exists()

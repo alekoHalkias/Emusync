@@ -71,6 +71,7 @@ from cli.run_reconcile import (  # noqa: F401 — re-exported for existing calle
 from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
 from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
     _find_local_switch_save,
+    _known_switch_profile_root,
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
@@ -296,15 +297,20 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     game_pid_file.write_text(str(os.getpid()))
     try:
         # A learned-save-path game (Switch) whose destination isn't known yet
-        # on this device: match it by title ID against every existing Eden
-        # profile folder BEFORE reconciling, rather than only ever guessing
+        # on this device: match it by title ID against this device's known
+        # Eden profile BEFORE reconciling, rather than only ever guessing
         # from post-launch write detection. A device that has already played
         # this game once then finds its own save deterministically on every
         # subsequent launch, and gets full newest-wins reconciliation from the
         # first matched launch onward instead of a one-off blind seed (#443).
+        # Restricted to the device's already-known profile root once it has
+        # one (#455) — scans every local profile only the first time ever.
+        switch_profile_root = (
+            _known_switch_profile_root(client, cfg.device_id) if console_abbr == "Switch" else None
+        )
         if console_abbr == "Switch" and not save_path:
             title_id = resolved_title_id
-            local_match = _find_local_switch_save(title_id) if title_id else None
+            local_match = _find_local_switch_save(title_id, switch_profile_root) if title_id else None
             if local_match:
                 save_path = local_match
                 try:
@@ -339,7 +345,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # already has it loaded instead of starting fresh and clobbering
         # synced progress (#443).
         if console_abbr == "Switch" and not save_path and server_hash:
-            seeded = _seed_switch_save(save_client, save_key, resolved_title_id)
+            seeded = _seed_switch_save(save_client, save_key, resolved_title_id, switch_profile_root)
             if seeded:
                 click.echo(f"Seeded existing save into {len(seeded)} profile folder(s) before launch.")
 
