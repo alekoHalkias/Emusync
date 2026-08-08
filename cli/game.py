@@ -12,7 +12,7 @@ from server.sync_client import GameDeviceConfig
 from cli.common import _client, _print_table
 from cli.mod import _title_id_for
 from cli.root import cli
-from cli.run_switch import _switch_profile_dirs
+from cli.run_switch import _find_local_switch_save, _seed_switch_save, _switch_profile_dirs
 
 
 @cli.group()
@@ -188,17 +188,33 @@ def game_remove(slug: str, everywhere: bool) -> None:
 @game.command("ensure-switch-save-folder")
 @click.argument("slug")
 def game_ensure_switch_save_folder(slug: str) -> None:
-    """Create an empty Eden save folder for SLUG in every local profile, if
-    one doesn't already exist (issue #448).
+    """Make sure SLUG has a save folder on this device, seeding real save
+    data from the server if another device already has some (issue #453,
+    building on #443/#448).
 
-    Pure placeholder — no save bytes are written. The title ID must already
-    be known (`switch_title_id` set server-side, e.g. via the GUI's catalog
-    lookup); an empty folder created here is deliberately excluded from
-    `_find_local_switch_save`'s "has real data" check, so it's inert until
-    the game is actually played or a save gets pulled/seeded via `emusync run`.
+    The title ID must already be known (`switch_title_id` set server-side,
+    e.g. via the GUI's catalog lookup). If this device already has a real
+    save for the game (`_find_local_switch_save`), nothing is touched. Else
+    `_seed_switch_save` is tried first — same helper `emusync run` uses to
+    pre-seed a first-ever session, reused here so pairing a new device no
+    longer means starting blind until the game is actually launched. Only
+    when the server has nothing to seed either does this fall back to an
+    empty placeholder in every local profile that doesn't already have one,
+    same as #448's original behavior.
     """
     client = _client()
     title_id = _title_id_for(client, slug)
+    if _find_local_switch_save(title_id):
+        click.echo("Already has a real save on this device — nothing to do.")
+        return
+
+    seeded = _seed_switch_save(client, slug, title_id)
+    if seeded:
+        click.echo(f"Seeded existing save into {len(seeded)} folder(s):")
+        for path in seeded:
+            click.echo(f"  {path}")
+        return
+
     created = []
     for profile_dir in _switch_profile_dirs():
         dest = profile_dir / title_id
@@ -206,7 +222,7 @@ def game_ensure_switch_save_folder(slug: str) -> None:
             dest.mkdir(parents=True, exist_ok=True)
             created.append(str(dest))
     if created:
-        click.echo(f"Created {len(created)} folder(s):")
+        click.echo(f"Created {len(created)} placeholder folder(s):")
         for path in created:
             click.echo(f"  {path}")
     else:

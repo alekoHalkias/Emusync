@@ -77,12 +77,13 @@ export async function lookupSwitchTitleId(gameName: string): Promise<string | nu
   }
 }
 
-// Creates an empty <profile>/<title-id>/ placeholder in every local Eden
-// profile, if one doesn't exist yet, once a title ID is known (issue #448) —
-// a pure destination directory, no save bytes written. Shells out to the CLI
-// (mirrors switchmods.ts's "sync now" spawn) since cli/run_switch.py already
-// owns the profile-enumeration logic; the real save still only arrives via
-// emusync run's reconcile/seed step or a manual pull.
+// Makes sure this device has a save folder for a game once its title ID is
+// known (issue #448, extended by #453): seeds a real save from the server if
+// another device already has one, otherwise creates an empty
+// <profile>/<title-id>/ placeholder in every local Eden profile that doesn't
+// have one yet. Shells out to the CLI (mirrors switchmods.ts's "sync now"
+// spawn) since cli/run_switch.py already owns the profile-enumeration and
+// seeding logic — see cli/game.py's ensure-switch-save-folder command.
 export function ensureSwitchSaveFolder(slug: string): Promise<{ ok: boolean; output: string }> {
   return new Promise((resolve) => {
     const proc = spawn(PYTHON, [SCRIPT, "game", "ensure-switch-save-folder", slug]);
