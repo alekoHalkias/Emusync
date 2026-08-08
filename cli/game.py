@@ -194,22 +194,46 @@ def game_ensure_switch_save_folder(slug: str) -> None:
 
     The title ID must already be known (`switch_title_id` set server-side,
     e.g. via the GUI's catalog lookup). If this device already has a real
-    save for the game (`_find_local_switch_save`), nothing is touched. Else
-    `_seed_switch_save` is tried first — same helper `emusync run` uses to
-    pre-seed a first-ever session, reused here so pairing a new device no
-    longer means starting blind until the game is actually launched. Only
-    when the server has nothing to seed either does this fall back to an
-    empty placeholder in every local profile that doesn't already have one,
-    same as #448's original behavior.
+    save for the game (`_find_local_switch_save`), nothing on disk is
+    touched. Else `_seed_switch_save` is tried first — same helper
+    `emusync run` uses to pre-seed a first-ever session, reused here so
+    pairing a new device no longer means starting blind until the game is
+    actually launched. Only when the server has nothing to seed either does
+    this fall back to an empty placeholder in every local profile that
+    doesn't already have one, same as #448's original behavior.
+
+    Either way, once a real save is known to exist locally, `save_path` is
+    persisted via `set_game_device` — this command previously only touched
+    the filesystem, so the GUI's Settings/Save-history tabs (which read
+    `save_path`, not the disk) never reflected a save this found or seeded.
+    Skipped for a seed spread across more than one Eden profile: which one
+    the player actually uses isn't decided yet, so guessing wrong here would
+    point sync at the wrong folder — post-launch adoption (#443) still
+    resolves that case once the game's actually played.
     """
     client = _client()
     title_id = _title_id_for(client, slug)
-    if _find_local_switch_save(title_id):
+
+    def _persist_save_path(path: str) -> None:
+        gd = client.get_game_device(slug)
+        if gd is None:
+            return
+        gd.save_path = path
+        try:
+            client.set_game_device(slug, gd)
+        except Exception as exc:
+            click.echo(f"Warning: failed to record the save location: {exc}", err=True)
+
+    existing = _find_local_switch_save(title_id)
+    if existing:
+        _persist_save_path(existing)
         click.echo("Already has a real save on this device — nothing to do.")
         return
 
     seeded = _seed_switch_save(client, slug, title_id)
     if seeded:
+        if len(seeded) == 1:
+            _persist_save_path(seeded[0])
         click.echo(f"Seeded existing save into {len(seeded)} folder(s):")
         for path in seeded:
             click.echo(f"  {path}")

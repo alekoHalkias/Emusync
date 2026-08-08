@@ -11,7 +11,7 @@ from click.testing import CliRunner
 
 import server.config as cfg_module
 from cli.game import game_ensure_switch_save_folder
-from server.sync_client import SyncClient
+from server.sync_client import GameDeviceConfig, SyncClient
 
 
 def _device_client(live_server, device_id: str, device_name: str) -> SyncClient:
@@ -70,6 +70,35 @@ def test_does_not_touch_a_device_that_already_has_a_real_save(monkeypatch, tmp_p
     assert "Already has a real save" in result.output
 
 
+def test_persists_save_path_for_a_real_save_the_gui_didnt_know_about(monkeypatch, tmp_path, live_server):
+    """Regression: the folder existing on disk isn't enough — the GUI's
+    Settings/Save-history tabs read `save_path` off the device's game config,
+    which this command must actually persist once it finds real data,
+    otherwise a real save stays invisible in the GUI forever."""
+    client = _device_client(live_server, "dev-a", "DeviceA")
+    client.add_game("Pokemon Sword", console="Switch", switch_title_id="0100ABF008968000")
+    _write_cfg(monkeypatch, tmp_path, live_server, "dev-a", "DeviceA")
+    # This device already has a rom_path/launch_command configured (as it
+    # would from a normal import) but save_path was never set.
+    client.set_game_device("pokemon-sword", GameDeviceConfig(
+        rom_path="/roms/Pokemon Sword.xci", launch_command="eden '/roms/Pokemon Sword.xci'",
+    ))
+
+    root = tmp_path / "eden_nand"
+    existing = root / "profile-one" / "0100ABF008968000"
+    existing.mkdir(parents=True)
+    (existing / "already_here.bin").write_bytes(b"real save data")
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (root,))
+
+    runner = CliRunner()
+    result = runner.invoke(game_ensure_switch_save_folder, ["pokemon-sword"])
+
+    assert result.exit_code == 0, result.output
+    gd = client.get_game_device("pokemon-sword")
+    assert gd.save_path == str(existing)
+    assert gd.rom_path == "/roms/Pokemon Sword.xci"  # untouched
+
+
 def test_seeds_an_existing_server_save_instead_of_a_placeholder(monkeypatch, tmp_path, live_server):
     # Device B already pushed a real save up to the server.
     dev_b = _device_client(live_server, "dev-b", "DeviceB")
@@ -79,8 +108,10 @@ def test_seeds_an_existing_server_save_instead_of_a_placeholder(monkeypatch, tmp
     (save_src / "save.dat").write_bytes(b"real progress")
     dev_b.push_save("pokemon-sword", str(save_src))
 
-    # Device A has never played it — no local save anywhere yet.
-    _device_client(live_server, "dev-a", "DeviceA")
+    # Device A has never played it — no local save anywhere yet, but does
+    # have a normal device config (rom_path etc. from import).
+    dev_a = _device_client(live_server, "dev-a", "DeviceA")
+    dev_a.set_game_device("pokemon-sword", GameDeviceConfig(rom_path="/roms/Pokemon Sword.xci"))
     _write_cfg(monkeypatch, tmp_path, live_server, "dev-a", "DeviceA")
 
     root = tmp_path / "eden_nand"
@@ -94,6 +125,10 @@ def test_seeds_an_existing_server_save_instead_of_a_placeholder(monkeypatch, tmp
     dest = root / "profile-one" / "0100ABF008968000" / "save.dat"
     assert dest.read_bytes() == b"real progress"
     assert "Seeded existing save into 1 folder(s)" in result.output
+    # Seeded into exactly one profile — safe to persist as save_path so the
+    # GUI reflects it immediately, same regression as the "already has a
+    # real save" case above.
+    assert dev_a.get_game_device("pokemon-sword").save_path == str(dest.parent)
 
 
 def test_falls_back_to_a_placeholder_when_server_has_no_save_either(monkeypatch, tmp_path, live_server):
