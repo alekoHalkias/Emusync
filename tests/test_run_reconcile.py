@@ -402,7 +402,7 @@ def test_run_refuses_external_command_for_unimported_game(monkeypatch, tmp_path)
     monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
 
     class _C:
-        def health(self):
+        def health(self, retries=0, retry_delay=1.5):
             return True
 
         def get_game_device(self, slug):
@@ -437,7 +437,7 @@ def test_run_switch_never_pushes_cwd_when_save_path_still_blank(monkeypatch, tmp
     pushed_paths = []
 
     class _C:
-        def health(self):
+        def health(self, retries=0, retry_delay=1.5):
             return True
 
         def get_game_device(self, slug):
@@ -503,7 +503,7 @@ def test_run_seeds_existing_save_before_first_switch_launch(monkeypatch, tmp_pat
     seeded_dest = str(profile_dir / "0100000011D90000")
 
     class _C:
-        def health(self):
+        def health(self, retries=0, retry_delay=1.5):
             return True
 
         def get_game_device(self, slug):
@@ -582,7 +582,7 @@ def test_run_matches_existing_local_save_by_stored_title_id(monkeypatch, tmp_pat
     persisted_paths = []
 
     class _C:
-        def health(self):
+        def health(self, retries=0, retry_delay=1.5):
             return True
 
         def get_game_device(self, slug):
@@ -656,7 +656,7 @@ def test_run_backfills_switch_title_id_from_post_launch_discovery(monkeypatch, t
     update_calls = []
 
     class _C:
-        def health(self):
+        def health(self, retries=0, retry_delay=1.5):
             return True
 
         def get_game_device(self, slug):
@@ -719,7 +719,7 @@ def test_run_syncs_switch_mods_with_resolved_title_id_before_launch(monkeypatch,
     events = []
 
     class _C:
-        def health(self):
+        def health(self, retries=0, retry_delay=1.5):
             return True
 
         def get_game_device(self, slug):
