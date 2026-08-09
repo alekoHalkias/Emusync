@@ -45,13 +45,21 @@ _monitor_started: bool = False
 # (issue #285): {slug: {"save": <verdict>, "state": <verdict>}}.
 _integrity_status: dict[str, dict] = {}
 
+# A device with no request in this long is declared offline (and any lock it
+# holds force-released, issue #238). Module-level so cli/run.py's lock-heartbeat
+# can size its own interval safely under it — see that module for why the two
+# must stay in sync (issue #458 follow-up: a headless "emusync run" session,
+# e.g. Steam Deck Gaming Mode with no GUI /whoami heartbeat, has nothing else
+# touching presence, so its own heartbeat cadence IS the only signal keeping it
+# "online" for the whole play session).
+OFFLINE_TIMEOUT_SECONDS = 5 * 60
+
 
 def _monitor_presence() -> None:
     """Background thread: emit 'went offline' for idle devices every 30 seconds."""
     import time
     from datetime import datetime, timezone
 
-    OFFLINE_TIMEOUT_SECONDS = 5 * 60
     while True:
         time.sleep(30)
         if _store is None:

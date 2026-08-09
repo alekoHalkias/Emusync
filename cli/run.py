@@ -107,10 +107,23 @@ def _sigterm_handler(*_) -> None:
 signal.signal(signal.SIGTERM, _sigterm_handler)
 
 
-# Refresh the lock at a quarter of the TTL so a play session longer than the TTL
+# Refresh the lock well inside the TTL so a play session longer than the TTL
 # never lets another device steal the lock mid-game (issue #238). A re-acquire by
 # the same holder just bumps `acquired_at`, so it's a cheap keep-alive.
-_HEARTBEAT_INTERVAL_SECONDS = max(60, int(LOCK_TTL_HOURS * 3600) // 4)
+#
+# Also capped well under the server's presence OFFLINE_TIMEOUT_SECONDS (5 min,
+# server/api/_core.py) — every acquire_lock call is an authenticated request,
+# which is what marks this device "online" server-side. A GUI session gets
+# extra presence pings for free from its own /whoami heartbeat (#450), but a
+# headless `emusync run` (Steam Deck Gaming Mode, no GUI running) has *only*
+# this heartbeat keeping presence alive for the whole session. The old
+# quarter-of-4-hour-TTL cadence (1 hour) was far longer than that 5-minute
+# window, so any Gaming Mode session past 5 minutes got silently marked
+# offline mid-game and had its lock force-released — and, unaware, kept
+# playing until close, at which point the normal post-close push still ran,
+# but a second device could already have raced in on the "abandoned" lock
+# (issue #458 follow-up).
+_HEARTBEAT_INTERVAL_SECONDS = min(120, max(60, int(LOCK_TTL_HOURS * 3600) // 4))
 
 
 def _start_lock_heartbeat(client, game_slug: str, stop: threading.Event) -> threading.Thread:
