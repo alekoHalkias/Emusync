@@ -313,13 +313,23 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
 
       <div className="modal-actions" style={{ marginTop: 12 }}>
         <button className="btn btn-ghost" onClick={vm.backToEmulator}>← Back</button>
-        <button
-          className="btn btn-primary"
-          disabled={selectedCount === 0 || nameWarnings.length > 0}
-          onClick={vm.doImport}
-        >
-          Import {selectedCount > 0 ? `${selectedCount} game${selectedCount !== 1 ? "s" : ""}` : "…"}
-        </button>
+        {selectedCount === 0 ? (
+          // Nothing selected (e.g. every ROM here is already imported) — offer to
+          // move on instead of just sitting disabled. In the bulk-library queue
+          // this advances to the next console; standalone "Add console" closes
+          // the modal, same as Cancel (#462 follow-up).
+          <button className="btn btn-primary" onClick={vm.onClose}>
+            Skip →
+          </button>
+        ) : (
+          <button
+            className="btn btn-primary"
+            disabled={nameWarnings.length > 0}
+            onClick={vm.doImport}
+          >
+            Import {selectedCount} game{selectedCount !== 1 ? "s" : ""}
+          </button>
+        )}
       </div>
     </>
   );
