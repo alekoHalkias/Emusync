@@ -74,8 +74,24 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
         mtime_src = max((f.stat().st_mtime for f in p.rglob("*") if f.is_file()), default=p.stat().st_mtime) if p.is_dir() else p.stat().st_mtime
         local_mtime = datetime.fromtimestamp(mtime_src, tz=timezone.utc)
 
-    # A true divergence = both sides have a save and they differ.
-    diverged = local_hash is not None and meta is not None and local_hash != meta.get("hash")
+    # A true divergence = BOTH sides moved away from this device's own last
+    # known sync point since they last agreed — not just "local's stored hash
+    # differs from whatever the server has right now", which is also true for
+    # a routine catch-up pull (this device hasn't touched its copy since it
+    # last synced, but some *other* device pushed in the meantime) and used to
+    # get flagged as a conflict every time (issue #460). No baseline (this
+    # device has never completed a save sync for this game before) falls back
+    # to the old, more conservative behavior — mathematically identical to it,
+    # since a None baseline can't equal either hash.
+    try:
+        baseline = client.get_save_sync_baseline(game_slug)
+    except Exception:
+        baseline = None
+    baseline_hash = baseline.get("hash") if baseline else None
+    server_hash_now = meta.get("hash") if meta else None
+    local_changed = local_hash is not None and local_hash != baseline_hash
+    server_changed = server_hash_now is not None and server_hash_now != baseline_hash
+    diverged = local_changed and server_changed and local_hash != server_hash_now
 
     action = _decide_save_action(local_hash, local_mtime, meta)
     if action == "push":

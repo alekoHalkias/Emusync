@@ -116,6 +116,52 @@ async def test_two_device_save_sync(client):
     assert r.headers["x-save-hash"] == hash_v2
 
 
+# ── per-device save-sync baseline (issue #460) ──────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sync_baseline_missing_returns_204(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    r = await client.get("/games/zelda/save/sync-baseline", headers=AUTH)
+    assert r.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_push_records_pushing_devices_own_baseline(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    data = b"local save"
+    r = await client.post("/games/zelda/save", content=data, headers=AUTH)
+    pushed_hash = r.json()["hash"]
+
+    baseline = (await client.get("/games/zelda/save/sync-baseline", headers=AUTH)).json()
+    assert baseline["hash"] == pushed_hash == hashlib.sha256(data).hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_pull_records_pulling_devices_own_baseline(client):
+    auth_a = _device_auth("device-a", "Gaming PC")
+    auth_b = _device_auth("device-b", "Steam Deck")
+    await client.post("/games", json={"name": "Zelda"}, headers=auth_a)
+
+    data = b"pushed by A"
+    r = await client.post("/games/zelda/save", content=data, headers=auth_a)
+    pushed_hash = r.json()["hash"]
+
+    # B hasn't pulled yet — no baseline of its own, even though A has one.
+    assert (await client.get("/games/zelda/save/sync-baseline", headers=auth_b)).status_code == 204
+
+    await client.get("/games/zelda/save", headers=auth_b)
+    baseline_b = (await client.get("/games/zelda/save/sync-baseline", headers=auth_b)).json()
+    assert baseline_b["hash"] == pushed_hash
+
+
+@pytest.mark.asyncio
+async def test_state_push_pull_does_not_touch_save_baseline(client):
+    """Baseline tracking is save-only — a state sync must never update it."""
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    await client.post("/games/zelda/state", content=b"a state blob", headers=AUTH)
+    assert (await client.get("/games/zelda/save/sync-baseline", headers=AUTH)).status_code == 204
+
+
 # ── save history & rollback (issue #7) ──────────────────────────────────────────
 
 @pytest.mark.asyncio

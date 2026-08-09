@@ -49,6 +49,11 @@ def _pull(kind: _BlobKind, slug: str, device_id: str) -> Response:
     if path is None:
         return Response(status_code=204)
     _print_activity(f"{kind.noun} pulled: {_game_label(slug)} by {_device_label(device_id)}")
+    if kind is _SAVE:
+        # This device's copy now agrees with the server as of this hash — record
+        # it so a later reconcile on this device can tell "unchanged since I last
+        # synced" from a real local edit (issue #460).
+        _get_store().set_save_sync_baseline(slug, device_id, meta.hash, meta.pushed_at)
     # FileResponse streams from disk instead of loading the blob into memory.
     return FileResponse(
         path,
@@ -68,6 +73,10 @@ async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) ->
         store = _get_store()
         m = getattr(store, f"push_{kind.noun}_file")(slug, device_id, tmp, h, size)
         store.log_event(kind.synced_event, slug, device_id)
+        if kind is _SAVE:
+            # The pushing device trivially agrees with the server on its own
+            # push — record it as this device's baseline too (issue #460).
+            store.set_save_sync_baseline(slug, device_id, m.hash, m.pushed_at)
         return m
 
     # Offload the synchronous move + DB write so it doesn't block the event loop.
@@ -139,6 +148,17 @@ async def push_save(slug: str, request: Request, device_id: str = Depends(_auth)
 @router.get("/games/{slug}/save/meta")
 def get_save_meta(slug: str, device_id: str = Depends(_auth)) -> Response:
     return _meta(_SAVE, slug)
+
+
+@router.get("/games/{slug}/save/sync-baseline")
+def get_save_sync_baseline(slug: str, device_id: str = Depends(_auth)) -> Response:
+    """The save hash *this* device (from its auth header) last successfully
+    pushed or pulled for this game — lets it tell a real conflict apart from a
+    routine catch-up pull (issue #460)."""
+    baseline = _get_store().get_save_sync_baseline(slug, device_id)
+    if not baseline:
+        return Response(status_code=204)
+    return Response(content=json.dumps(baseline), media_type="application/json")
 
 
 @router.get("/games/{slug}/save/history")

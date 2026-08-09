@@ -591,6 +591,15 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def get_save_sync_baseline(self, slug: str) -> Optional[dict]:
+        """The save hash this device last agreed with the server on for *slug*,
+        or None if it never has (issue #460)."""
+        r = self._client.get(self._url(f"/games/{slug}/save/sync-baseline"), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
     def _list_history(self, kind: str, slug: str) -> list[dict]:
         """Return every retained generation of `kind` ('save'/'state') for a game."""
         r = self._client.get(self._url(f"/games/{slug}/{kind}/history"), timeout=10)
