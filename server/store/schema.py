@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 22
+_SCHEMA_VERSION = 23
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -174,6 +174,13 @@ CREATE TABLE IF NOT EXISTS switch_mods (
     pushed_by  TEXT NOT NULL REFERENCES devices(id),
     pushed_at  TEXT NOT NULL,
     PRIMARY KEY (title_id, mod_name)
+);
+CREATE TABLE IF NOT EXISTS save_sync_baseline (
+    game_slug  TEXT NOT NULL,
+    device_id  TEXT NOT NULL,
+    hash       TEXT NOT NULL,
+    synced_at  TEXT NOT NULL,
+    PRIMARY KEY (game_slug, device_id)
 );
 """
 
@@ -431,5 +438,25 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             pushed_by  TEXT NOT NULL REFERENCES devices(id),
             pushed_at  TEXT NOT NULL,
             PRIMARY KEY (title_id, mod_name)
+        )""")
+    if from_version < 23:
+        # Per-device save-sync baseline (issue #460): the hash each device last
+        # successfully pushed or pulled for a game's save, recorded automatically
+        # by the push/pull API handlers. A separate table rather than columns on
+        # `game_devices` — that table's `set_game_device` does INSERT OR REPLACE,
+        # so an unrelated update (save-path adoption, title-ID backfill) would
+        # silently wipe a baseline column back to blank if it lived there.
+        # Lets `_reconcile_save` tell "this device's own copy hasn't changed
+        # since it last agreed with the server" (routine catch-up pull, not a
+        # conflict) apart from "both sides changed independently since we last
+        # agreed" (a genuine divergence) — previously any hash mismatch between
+        # local and server was flagged as a conflict, which fired on every
+        # ordinary cross-device pull.
+        _try(conn, """CREATE TABLE IF NOT EXISTS save_sync_baseline (
+            game_slug  TEXT NOT NULL,
+            device_id  TEXT NOT NULL,
+            hash       TEXT NOT NULL,
+            synced_at  TEXT NOT NULL,
+            PRIMARY KEY (game_slug, device_id)
         )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

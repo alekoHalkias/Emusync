@@ -5,6 +5,7 @@ These cover the pure decision logic and the on-disk helpers — no server needed
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -196,15 +197,19 @@ class _FakeClient:
     """Minimal stand-in for SyncClient — records which sync action ran.
     (Not a DB mock; the project's no-mocks rule is about SQLite.)"""
 
-    def __init__(self, meta, server_hash="server-hash"):
+    def __init__(self, meta, server_hash="server-hash", baseline=None):
         self._meta = meta
         self._server_hash = server_hash
+        self._baseline = baseline
         self.pushed = False
         self.pulled = False
         self.reported_conflict = None
 
     def get_save_meta(self, slug):
         return self._meta
+
+    def get_save_sync_baseline(self, slug):
+        return self._baseline
 
     def push_save(self, slug, path):
         self.pushed = True
@@ -275,6 +280,46 @@ def test_reconcile_no_conflict_logged_when_not_diverged(tmp_path):
 
     assert client.pushed
     assert not (tmp_path / "save_conflicts.json").exists()
+
+
+def test_reconcile_stale_local_untouched_since_baseline_is_not_a_conflict(tmp_path):
+    """Regression (#460): pull-to-A -> play -> push -> pull-to-B, where B has an
+    old local save it hasn't touched since it last actually synced. B's stored
+    hash differs from the server's current hash (A moved it), but B's local
+    file is exactly what B last agreed on — not a real divergence, just B
+    catching up. Must pull quietly: no conflict log, no server report."""
+    save = tmp_path / "s.srm"
+    old_data = b"OLD-UNTOUCHED-BY-B"
+    _write_save(save, old_data, EARLIER)
+    old_hash = hashlib.sha256(old_data).hexdigest()
+    server_meta = {"hash": "server-new-from-A", "pushed_at": NOW.isoformat(), "device_id": "dev-a"}
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-b")
+    client = _FakeClient(server_meta, baseline={"hash": old_hash, "synced_at": EARLIER.isoformat()})
+
+    _reconcile_save(client, cfg, "metroid", str(save))
+
+    assert client.pulled and not client.pushed
+    assert not (tmp_path / "save_conflicts.json").exists()
+    assert client.reported_conflict is None
+
+
+def test_reconcile_both_sides_moved_past_baseline_is_a_real_conflict(tmp_path):
+    """Both this device and the server changed since the last point they
+    actually agreed on (the baseline) — a genuine divergence, still auto-
+    resolved and warned about exactly as before (#460)."""
+    save = tmp_path / "s.srm"
+    _write_save(save, b"LOCAL-CHANGED-SINCE-BASELINE", NOW)  # newer than server
+    server_meta = {"hash": "server-changed-too", "pushed_at": EARLIER.isoformat(), "device_id": "dev-server"}
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local")
+    client = _FakeClient(server_meta, baseline={"hash": "common-ancestor-hash", "synced_at": "2026-01-01T00:00:00+00:00"})
+
+    _reconcile_save(client, cfg, "metroid", str(save))
+
+    assert client.pushed and not client.pulled
+    conflicts = json.loads((tmp_path / "save_conflicts.json").read_text())
+    assert len(conflicts) == 1
+    assert conflicts[0]["winner"] == "local"
+    assert client.reported_conflict is not None
 
 
 def test_reconcile_detects_dirty_nested_gci_folder_card(tmp_path):

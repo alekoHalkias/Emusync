@@ -104,6 +104,14 @@ class _MemcardClient:
         # per-game Conflicts panel; the local log + notification still happen.
         return None
 
+    def get_save_sync_baseline(self, _slug: str):
+        # Per-device baseline tracking (issue #460) is per-game-slug only — a
+        # shared console card has no game row to key it by. Always returning
+        # None keeps `_reconcile_save`'s divergence check mathematically
+        # identical to its pre-#460 behavior for shared-memcard consoles
+        # (out of scope for that issue), rather than raising AttributeError.
+        return None
+
 
 # PCSX2 records per-game play data in inis/playtime.dat, keyed by disc serial:
 #   <SERIAL>   <total_seconds>   <last_played_unix>

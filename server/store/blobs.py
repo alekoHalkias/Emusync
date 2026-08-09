@@ -293,6 +293,28 @@ class SaveStateMixin:
     def restore_save(self, game_slug: str, version_id: str) -> Optional[SaveMeta]:
         return self._restore_blob("saves", game_slug, version_id)
 
+    # ── per-device save-sync baseline (issue #460) ───────────────────────────────
+    # Not touched by state sync — conflict warnings only ever fire for saves.
+
+    def set_save_sync_baseline(self, game_slug: str, device_id: str, h: str, synced_at: str) -> None:
+        """Record *h* as the save hash *device_id* is now known to agree with the
+        server on for *game_slug* — called by the push/pull API handlers after
+        every successful transfer, so it covers `emusync run`, GUI manual
+        push/pull, and any future caller uniformly."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO save_sync_baseline (game_slug, device_id, hash, synced_at) "
+            "VALUES (?, ?, ?, ?)",
+            (game_slug, device_id, h, synced_at),
+        )
+        self._conn.commit()
+
+    def get_save_sync_baseline(self, game_slug: str, device_id: str) -> Optional[dict]:
+        row = self._conn.execute(
+            "SELECT hash, synced_at FROM save_sync_baseline WHERE game_slug = ? AND device_id = ?",
+            (game_slug, device_id),
+        ).fetchone()
+        return dict(row) if row else None
+
     # ── states ─────────────────────────────────────────────────────────────────
 
     def push_state(self, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
