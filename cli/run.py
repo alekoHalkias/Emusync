@@ -156,7 +156,13 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
     # Server unreachable → launch offline and record the play window instead of
     # bailing out, so the game is still playable away from the LAN (issue #5).
-    if not client.health():
+    if not client.health(retries=2):
+        click.echo(
+            f"Warning: couldn't reach the EmuSync server after retrying — "
+            f"launching '{game_slug}' offline. The save will sync automatically "
+            f"next time this device is online (issue #458).",
+            err=True,
+        )
         _run_offline(cfg, game_slug, game_pid_file, command)
         return  # _run_offline exits
 

@@ -4,6 +4,7 @@ import io
 import os
 import shutil
 import tarfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -170,12 +171,27 @@ class SyncClient:
     def _url(self, path: str) -> str:
         return f"{self._base}{path}"
 
-    def health(self) -> bool:
-        try:
-            r = self._client.get(self._url("/health"), timeout=5)
-            return r.status_code == 200
-        except Exception:
-            return False
+    def health(self, retries: int = 0, retry_delay: float = 1.5) -> bool:
+        """True if the server answers /health.
+
+        *retries* defaults to 0 (single attempt, existing behavior) since most
+        callers already loop or just want a quick reachability check. `emusync
+        run` passes retries=2: a single missed 5s window there (server briefly
+        busy, a wifi blip) used to send the whole play session down the
+        offline-only path — no reconcile, no push, no sync until the *next*
+        launch — for what's often a one-off hiccup rather than an actually-down
+        server (issue #458).
+        """
+        for attempt in range(retries + 1):
+            try:
+                r = self._client.get(self._url("/health"), timeout=5)
+                if r.status_code == 200:
+                    return True
+            except Exception:
+                pass
+            if attempt < retries:
+                time.sleep(retry_delay)
+        return False
 
     def list_devices(self) -> list[dict]:
         r = self._client.get(self._url("/devices"), timeout=10)
