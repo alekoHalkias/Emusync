@@ -7,7 +7,7 @@ import ServerStatusButton from "./components/ServerStatusButton";
 import ConflictsButton from "./components/ConflictsButton";
 import ConsoleGrid from "./components/ConsoleGrid";
 import GameGrid from "./components/GameGrid";
-import ConsoleImport from "./components/ConsoleImport";
+import ImportWizard from "./components/ImportWizard";
 import { useGameList } from "./components/game-list/useGameList";
 import { applySwitchTitleId } from "./components/console-import/postImport";
 
@@ -332,7 +332,7 @@ export default function App(): React.ReactElement {
 
       {/* Console import modal — accessible from anywhere via topbar button */}
       {importOpen && (
-        <ConsoleImport
+        <ImportWizard
           onClose={() => setImportOpen(false)}
           onImported={() => reload(true)}
         />

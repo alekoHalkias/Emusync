@@ -107,6 +107,19 @@ async def test_console_folder_names_returns_dict(seeded_client):
 
 
 @pytest.mark.asyncio
+async def test_console_folder_names_carries_real_aliases(seeded_client):
+    # Regression for #462: _prepare_console_seed_data used to hardcode
+    # "folder_names": [] regardless of what each console dict declared, so
+    # this table (meant to drive both single-folder ROM-dir auto-detection
+    # and the bulk-library import scan) was always empty.
+    r = await seeded_client.get("/console-folder-names", headers=AUTH)
+    assert r.status_code == 200
+    names = r.json()
+    assert "ps1" in names["psx"]
+    assert "megadrive" in names["genesis"]
+
+
+@pytest.mark.asyncio
 async def test_standalones_requires_auth(client):
     r = await client.get("/standalones/ps2")
     assert r.status_code == 401

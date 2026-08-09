@@ -53,7 +53,18 @@ export type Phase =
   | "importing"  // import in progress
   | "done";      // finished
 
-export type Props = { onClose: () => void; onImported: () => void; initialConsole?: string };
+export type Props = {
+  onClose: () => void;
+  onImported: () => void;
+  initialConsole?: string;
+  // Bulk-library import (#462): when set (alongside initialConsole), seeds
+  // the scan folder(s) with these instead of the console's persisted "recent
+  // import folders" — the library wizard already knows exactly which folder
+  // this console's ROMs live in and shouldn't scan unrelated leftovers.
+  initialRomDirs?: string[];
+  // Header override so the library wizard can show progress ("SNES — 2 of 7").
+  title?: string;
+};
 
 export type ImportedEntry = { slug: string; name: string; savePath: string; statePath: string };
 export type PushStatus = "pushing" | "ok" | "offline" | "error";

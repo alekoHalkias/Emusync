@@ -41,6 +41,9 @@ export interface EmusyncBridge {
     consoles: () => Promise<{ key: string; label: string; abbr?: string }[]>;
     detect: (consoleKey: string) => Promise<{ options: any[]; suggestions: string[] }>;
     scan: (consoleKey: string, emulatorOption: any, extraPaths: string[]) => Promise<{ emulators: any[]; romDirs: string[]; roms: any[] }>;
+    // Bulk-library import (#462): non-recursive scan of a library root's
+    // immediate subfolders, each tagged with a matched console key (or null).
+    scanLibrary: (libraryRoot: string) => Promise<{ path: string; folderName: string; consoleKey: string | null }[]>;
   };
   files: {
     ensureSave: (savePath: string) => Promise<{ created: boolean }>;

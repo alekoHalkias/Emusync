@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld("emusync", {
       extraPaths: string[],
     ): Promise<import("./emulator/types").EmulatorScanResult> =>
       ipcRenderer.invoke("emulator:scan", { consoleKey, emulatorOption, extraPaths }),
+    scanLibrary: (libraryRoot: string): Promise<import("./emulator/library").LibraryFolderMatch[]> =>
+      ipcRenderer.invoke("emulator:scanLibrary", libraryRoot),
   },
   files: {
     ensureSave: (savePath: string): Promise<{ created: boolean }> =>
