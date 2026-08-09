@@ -5,6 +5,7 @@ import { rt } from "../runtime";
 import { loadConsoleDefinitionsIfNeeded } from "./console-defs";
 import { detectEmulatorsForConsole } from "./detect";
 import { runEmulatorScan } from "./scan";
+import { scanLibraryFolders, type LibraryFolderMatch } from "./library";
 import type { DetectedEmulatorOption, EmulatorScanResult } from "./types";
 
 export function registerEmulatorIpc(): void {
@@ -32,5 +33,12 @@ export function registerEmulatorIpc(): void {
   }): Promise<EmulatorScanResult> => {
     await loadConsoleDefinitionsIfNeeded();
     return runEmulatorScan(params);
+  });
+
+  // Bulk-library import (#462): non-recursive scan of a library root's
+  // immediate subfolders, each matched against known console names.
+  ipcMain.handle("emulator:scanLibrary", async (_event, libraryRoot: string): Promise<LibraryFolderMatch[]> => {
+    await loadConsoleDefinitionsIfNeeded();
+    return scanLibraryFolders(libraryRoot);
   });
 }

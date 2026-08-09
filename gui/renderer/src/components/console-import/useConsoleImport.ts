@@ -29,7 +29,7 @@ import type {
 // IPC bridge (typing deferred to the typed-bridge work in #228).
 const emusync = window.emusync;
 
-export function useConsoleImport({ onClose, onImported, initialConsole }: Props) {
+export function useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs }: Props) {
   const [phase, setPhase]         = useState<Phase>(initialConsole ? "detecting" : "console");
   const [consoles, setConsoles]   = useState<ConsoleOption[]>([]);
   const [consoleSel, setConsoleSel] = useState(initialConsole ?? "");
@@ -73,8 +73,12 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
           ]);
           setEmulators(options);
           setSuggestions(sugg);
-          setSavedFolders(saved);
-          setExtraPaths(saved);
+          // A caller-provided folder (bulk-library import, #462) takes over
+          // scanning entirely — union with unrelated recent folders would
+          // silently widen the scan to leftovers from a past single-console import.
+          const initial = initialRomDirs && initialRomDirs.length > 0 ? initialRomDirs : saved;
+          setSavedFolders(initial);
+          setExtraPaths(initial);
           const lastSource = cfg?.import_rom_source?.[consoleSel];
           setRomSource(lastSource === "network" ? "network" : "local");
           setLocalRomRoot(cfg?.import_local_folder?.[consoleSel] ?? "");
@@ -86,7 +90,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole }: Props)
         }
       })();
     }
-  }, [initialConsole, consoleSel, phase]);
+  }, [initialConsole, consoleSel, phase, initialRomDirs]);
 
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");
