@@ -108,6 +108,7 @@ window.emusync.game.stopExternal()         // kill emulator + emusync via .game_
 window.emusync.game.hasPidFile()           // true if .game_pid exists, process is alive, cmdline contains emusync/python
 window.emusync.game.isRunning()            // boolean
 window.emusync.game.offlineList()          // {slug, name, console, savePath?, statePath?}[] — fallback game list when the server can't be reached
+window.emusync.game.offlineDeviceConfig(slug) // {console, config: GameDeviceConfig} | null — fallback for GameConfig's Settings tab when getGame/getGameDevice can't reach the server (#464)
 window.emusync.game.onExited(cb)           // subscribe to game:exited
 window.emusync.game.offExited(cb)          // unsubscribe
 
@@ -152,7 +153,7 @@ window.emusync.artwork.refreshAll(slug, gameName, consoleKey, sgdbGameId) // re-
 | `~/.emusync/blobs/{saves,states}/{row-id}` | Save/state blob bytes (one file per retained generation); `blobs/.uploads/` holds in-flight streamed uploads |
 | `~/.emusync/rom_staging/` | Staged ROM files for pending transfers |
 | `~/.emusync/game_cache/{slug}.json` | Cached per-device game config, written by `emusync run` on each online launch |
-| `~/.emusync/game_cache/_offline_index.json` | `{slug: {name, console}}`, upserted alongside the per-slug cache; read by the GUI's `game:offlineList` IPC |
+| `~/.emusync/game_cache/_offline_index.json` | `{slug: {name, console}}`, upserted alongside the per-slug cache; read by the GUI's `game:offlineList`/`game:offlineDeviceConfig` IPCs |
 | `~/.emusync/offline_plays.json` | Append-only log of offline plays for save-conflict resolution |
 | `~/.emusync/ps2_serials.json` | `{slug: serial}` map for PS2 games, learned from PCSX2's `playtime.dat`; joined with the live file so the GUI shows per-game last-played despite the shared card |
 | `~/.emusync/art/<consoleKey>/<slug>/<type>.png` | Cached artwork, one file per SteamGridDB asset type |

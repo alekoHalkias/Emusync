@@ -138,6 +138,20 @@ export interface EmusyncBridge {
     stopExternal: () => Promise<{ ok: boolean }>;
     hasPidFile: () => Promise<boolean>;
     offlineList: () => Promise<{ slug: string; name: string; console: string; savePath?: string; statePath?: string }[]>;
+    offlineDeviceConfig: (slug: string) => Promise<{
+      console: string;
+      config: {
+        rom_path: string;
+        save_path: string;
+        launch_command: string;
+        state_path?: string;
+        rom_folder_path?: string;
+        rom_source?: string;
+        rom_rel_path?: string;
+        local_rom_path?: string;
+        rom_sha256?: string;
+      };
+    } | null>;
     onExited: (cb: () => void) => void;
     offExited: (cb: () => void) => void;
   };

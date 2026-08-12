@@ -57,6 +57,9 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
+  // True when the form was populated from this device's local offline cache
+  // (~/.emusync/game_cache/) instead of a live server fetch (#464).
+  const [offlineData, setOfflineData] = useState(false);
   // Switch games sync their whole containing folder, not a states folder —
   // Eden has no save-state feature at all (#441). Derived from romPath, not
   // separately stored — there's no per-game "folder" field, just dirname(rom_path).
@@ -101,7 +104,30 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           rom_folder_path: cfg.rom_folder_path ?? "",
         };
       })
-      .catch(() => setLoadError("Could not load device config — the server may be unreachable."));
+      .catch(async () => {
+        // Server unreachable — fall back to this device's local offline cache
+        // (same data cli/run.py already caches for offline launches, #464)
+        // instead of leaving the whole form blank.
+        const cached = await window.emusync.game.offlineDeviceConfig(slug).catch(() => null);
+        if (!cached) {
+          setLoadError("Could not load device config — the server may be unreachable.");
+          return;
+        }
+        const cfg = cached.config;
+        setGameConsole(cached.console);
+        setRomPath(cfg.rom_path);
+        setSavePath(cfg.save_path);
+        setStatePath(cfg.state_path ?? "");
+        setLaunchCommand(cfg.launch_command);
+        setRomSource(cfg.rom_source ?? "local");
+        setLocalRomPath(cfg.local_rom_path ?? "");
+        netExtraRef.current = {
+          rom_rel_path: cfg.rom_rel_path ?? "",
+          rom_sha256: cfg.rom_sha256 ?? "",
+          rom_folder_path: cfg.rom_folder_path ?? "",
+        };
+        setOfflineData(true);
+      });
   }, [slug]);
 
   async function pickFile(setter: (p: string) => void, title: string): Promise<void> {
@@ -300,6 +326,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
       )}
 
+      {offlineData && (
+        <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+          ⚠ Showing cached data from this device's last sync — server unreachable.
+        </p>
+      )}
       {loadError && <p className="error-msg" style={{ marginBottom: 16 }}>{loadError}</p>}
       {errors._global && <p className="error-msg" style={{ marginBottom: 16 }}>{errors._global}</p>}
 
