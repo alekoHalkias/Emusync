@@ -198,6 +198,20 @@ contextBridge.exposeInMainWorld("emusync", {
     hasPidFile: (): Promise<boolean> => ipcRenderer.invoke("game:hasPidFile"),
     offlineList: (): Promise<{ slug: string; name: string; console: string; savePath?: string; statePath?: string }[]> =>
       ipcRenderer.invoke("game:offlineList"),
+    offlineDeviceConfig: (slug: string): Promise<{
+      console: string;
+      config: {
+        rom_path: string;
+        save_path: string;
+        launch_command: string;
+        state_path?: string;
+        rom_folder_path?: string;
+        rom_source?: string;
+        rom_rel_path?: string;
+        local_rom_path?: string;
+        rom_sha256?: string;
+      };
+    } | null> => ipcRenderer.invoke("game:offlineDeviceConfig", slug),
     onExited: (cb: () => void): void => { ipcRenderer.on("game:exited", cb); },
     offExited: (cb: () => void): void => { ipcRenderer.removeListener("game:exited", cb); },
   },

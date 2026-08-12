@@ -85,6 +85,30 @@ export function registerGameIpc(): void {
     return games;
   });
 
+  // Offline fallback for a single game's device config (issue #464): GameConfig's
+  // Settings tab does a live getGame/getGameDevice fetch with no fallback, so it
+  // renders blank when the server's never been reached — even though the same
+  // data is already cached here (same cacheDir game:offlineList reads).
+  ipcMain.handle("game:offlineDeviceConfig", (_event, slug: string) => {
+    const cacheDir = join(homedir(), ".emusync", "game_cache");
+    const indexPath = join(cacheDir, "_offline_index.json");
+    const gdPath = join(cacheDir, `${slug}.json`);
+    if (!existsSync(gdPath)) return null;
+    try {
+      const gd = JSON.parse(readFileSync(gdPath, "utf-8"));
+      let console_ = "";
+      if (existsSync(indexPath)) {
+        try {
+          const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+          console_ = index?.[slug]?.console || "";
+        } catch { /* index unreadable — console stays blank */ }
+      }
+      return { console: console_, config: gd };
+    } catch {
+      return null;
+    }
+  });
+
   ipcMain.handle("game:hasPidFile", () => {
     const gamePidFile = join(homedir(), ".emusync", ".game_pid");
     if (!existsSync(gamePidFile)) return false;
