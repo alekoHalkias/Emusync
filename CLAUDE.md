@@ -107,7 +107,7 @@ Integration tests use a real SQLite DB (no mocks), spinning up the full store an
 
 ### Claude agents — testing requirements
 
-**Before marking any task complete, run `make test` and confirm it passes.**
+**Before marking any task complete, run `make test-changed` and confirm it passes.** It maps changed files (vs. `main`) to the test files that mention their module name and runs only those — fast feedback scoped to what you touched. It falls back to the full suite automatically when nothing matches (or nothing changed), so it's always safe to run as-is. The full suite (`make test`) still runs in CI (`.github/workflows/ci.yml`) on every push and PR — that's the merge safety net, not something to re-run locally by hand unless you're chasing a cross-module regression `test-changed` wouldn't catch.
 
 Write tests when:
 - You added a new API route (relevant `server/api/` router) → integration test for the happy path + main error case (404/403/409/etc.)
