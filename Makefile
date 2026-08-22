@@ -39,7 +39,14 @@ install-service:
 	systemctl --user daemon-reload; \
 	systemctl --user enable --now emusync-server; \
 	echo "emusync-server service installed and started."; \
-	echo "It will start automatically on login (including Steam Deck Gaming Mode)."
+	echo "It will start automatically on login (including Steam Deck Gaming Mode)."; \
+	if [ "$$(loginctl show-user "$$USER" -p Linger --value 2>/dev/null)" != "yes" ]; then \
+		echo ""; \
+		echo "WARNING: lingering is not enabled for $$USER."; \
+		echo "Without it, this systemd --user service (and the whole user session) is killed on logout/SSH disconnect,"; \
+		echo "making the server look like it 'goes offline' until someone logs back in."; \
+		echo "Fix once, as root: sudo loginctl enable-linger $$USER"; \
+	fi
 
 uninstall-service:
 	-systemctl --user disable --now emusync-server 2>/dev/null; \
