@@ -197,7 +197,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
             <div
               style={{
                 aspectRatio: type === "hero" ? "16 / 6" : type === "wide_grid" ? "460 / 215" : type === "grid" ? "3 / 4" : "1 / 1",
-                background: "#0a0a0a",
+                background: "var(--bg)",
                 borderRadius: "var(--radius)",
                 overflow: "hidden",
                 border: "1px solid var(--border)",
@@ -261,7 +261,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                     key={c.id}
                     src={c.thumb}
                     onClick={() => pickCandidate(c.url)}
-                    style={{ width: "100%", cursor: "pointer", borderRadius: "var(--radius)", border: "1px solid var(--border)", objectFit: "contain", background: "#0a0a0a" }}
+                    style={{ width: "100%", cursor: "pointer", borderRadius: "var(--radius)", border: "1px solid var(--border)", objectFit: "contain", background: "var(--bg)" }}
                   />
                 ))}
               </div>
