@@ -60,7 +60,7 @@ button, input, select, textarea {
    every button-like clickable (.btn variants, card action buttons, topbar
    controls, filter/header buttons) via a single attribute-free rule rather
    than repeating it per class. */
-button:focus-visible {
+button:focus-visible, [role="button"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

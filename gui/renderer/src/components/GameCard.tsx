@@ -40,6 +40,9 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
       className={`game-card${selected ? " game-card-selected" : ""}`}
       style={{ "--card-accent": consoleAccent, cursor: "pointer" } as React.CSSProperties}
       onClick={() => onSettings(game)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSettings(game); } }}
+      role="button"
+      tabIndex={0}
       title="Settings, history & devices"
     >
       {/* Art area */}
