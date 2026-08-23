@@ -11,6 +11,7 @@ import { ConsoleStep } from "./console-import/ConsoleStep";
 import { EmulatorStep } from "./console-import/EmulatorStep";
 import { ResultsStep } from "./console-import/ResultsStep";
 import { DoneStep } from "./console-import/DoneStep";
+import { CloseIcon } from "./icons";
 
 export default function ConsoleImport({ onClose, onImported, initialConsole, initialRomDirs, title }: Props): ReactElement {
   const vm = useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs });
@@ -25,7 +26,7 @@ export default function ConsoleImport({ onClose, onImported, initialConsole, ini
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h3 style={{ margin: 0 }}>{title ?? "Add console"}</h3>
-          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
         </div>
 
         {vm.showStepper && <Stepper currentStep={vm.currentStep} />}

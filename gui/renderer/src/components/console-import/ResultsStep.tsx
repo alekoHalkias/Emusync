@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { findReplace, groupByDir, replaceUnderscores } from "./helpers";
 import type { RomEntry } from "./types";
 import type { ConsoleImportVM } from "./useConsoleImport";
+import { CloseIcon } from "../icons";
 
 type StatusFilter = "all" | "new" | "linked" | "save" | "state";
 
@@ -109,7 +110,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                 style={{ fontSize: 11, padding: "1px 6px" }}
                 onClick={() => extraPaths.includes(p) ? vm.removeExtraPath(p) : vm.removeRomDir(p)}
                 title={extraPaths.includes(p) ? "Remove folder" : "Ignore this folder"}
-              >✕</button>
+              ><CloseIcon /></button>
             )}
           </div>
         ))}

@@ -3,6 +3,7 @@ import { configure, configureDevice, health, listEvents, whoami, type ActivityEv
 import { RelTime } from "../time";
 import DevicesPanel from "./DevicesPanel";
 import { useDevices } from "../DeviceContext";
+import { CloseIcon } from "./icons";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
@@ -250,7 +251,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
           <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3>Server connection</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setOpen(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setOpen(false)}><CloseIcon /></button>
             </div>
 
             {/* Status row — click to open activity popup */}
@@ -437,7 +438,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
           <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3>Paired devices</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowDevices(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowDevices(false)}><CloseIcon /></button>
             </div>
             <DevicesPanel />
           </div>
@@ -452,7 +453,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
           <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3>SteamGridDB art</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowArtKey(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowArtKey(false)}><CloseIcon /></button>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
               <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
@@ -482,7 +483,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
           <div className="modal" style={{ width: 480 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3>Server activity</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowActivity(false)}>✕</button>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowActivity(false)}><CloseIcon /></button>
             </div>
             {eventsLoading ? (
               <div style={{ textAlign: "center", padding: 40 }}><span className="spinner" style={{ width: 22, height: 22 }} /></div>

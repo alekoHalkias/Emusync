@@ -6,6 +6,7 @@ import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
 import { useGameSync } from "./game-config/useGameSync";
 import SteamRestartModal from "./SteamRestartModal";
+import { PlayIcon } from "./icons";
 
 /**
  * Swap the basename of a portable ROM rel-path to a new base, keeping the
@@ -321,7 +322,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           <button className="btn btn-ghost" onClick={onBack}>← Back</button>
           <h2>{isNew ? "Add game" : "Game settings"}</h2>
           {!isNew && onPlay && (
-            <button className="btn btn-primary" onClick={() => onPlay(slug!)}>▶ Play</button>
+            <button className="btn btn-primary" onClick={() => onPlay(slug!)}><PlayIcon /> Play</button>
           )}
         </div>
       )}

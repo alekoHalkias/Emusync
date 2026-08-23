@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import ConsoleImport from "./ConsoleImport";
 import { Spinner } from "./console-import/Spinner";
+import { CloseIcon } from "./icons";
 import type { ConsoleOption } from "./console-import/types";
 
 const emusync = window.emusync;
@@ -119,7 +120,7 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h3 style={{ margin: 0 }}>Import library</h3>
-          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
         </div>
 
         {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}

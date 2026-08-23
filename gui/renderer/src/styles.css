@@ -514,19 +514,27 @@ input.error { border-color: var(--red); }
 }
 
 /* appearance: none above strips the <select>'s native arrow, so redraw it
-   as the same "⏷" glyph the filter button uses, in the same position (left
-   of the label, same size/color) for a truly matching look. */
+   in the same position (left of the label, same size/color) as the filter
+   button's chevron, for a truly matching look — see the CSS-drawn chevron
+   comment below. */
 .game-grid-select-wrap { position: relative; flex-shrink: 0; }
 .game-grid-select-wrap .game-grid-art-type { padding-left: 24px; }
+/* CSS-drawn chevron (border corner, rotated) instead of the "⏷" glyph, to
+   match GameFilterButton's inline-SVG ChevronDownIcon — same shape, no font
+   rendering differences between the two. */
 .game-grid-select-wrap::before {
-  content: "⏷";
+  content: "";
   position: absolute;
   top: 50%;
-  left: 10px;
-  transform: translateY(-50%);
-  color: var(--text);
+  left: 11px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.6px solid var(--text);
+  border-bottom: 1.6px solid var(--text);
+  transform: translateY(-65%) rotate(45deg);
   pointer-events: none;
 }
+.game-grid-filter-btn { display: inline-flex; align-items: center; gap: 5px; }
 .game-grid-filter-btn:hover { background: var(--surface2); }
 
 /* Match the dropdown/search box model exactly (padding + border + a fixed
