@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { GameRow } from "./game-list/types";
 import { RelTime } from "../time";
+import { PlayIcon } from "./icons";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -40,6 +41,9 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
       className={`game-card${selected ? " game-card-selected" : ""}`}
       style={{ "--card-accent": consoleAccent, cursor: "pointer" } as React.CSSProperties}
       onClick={() => onSettings(game)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSettings(game); } }}
+      role="button"
+      tabIndex={0}
       title="Settings, history & devices"
     >
       {/* Art area */}
@@ -113,7 +117,7 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
           disabled={game.locked || !game.isLocal}
           onClick={(e) => { e.stopPropagation(); if (canPlay) onPlay(game.slug, game.name); }}
         >
-          ▶
+          <PlayIcon />
         </button>
       </div>
     </div>

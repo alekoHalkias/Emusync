@@ -2,6 +2,7 @@
 // for artwork presence, save presence, and local-ROM availability. Checkboxes
 // combine OR-within-group, AND-across-groups — an empty group applies no filter.
 import React, { useEffect, useRef, useState } from "react";
+import { ChevronDownIcon } from "./icons";
 
 export type ArtworkFilterValue = "with" | "without";
 export type SavesFilterValue = "on" | "off";
@@ -57,15 +58,15 @@ export default function GameFilterButton({ filters, onChange }: Props): React.Re
         className="game-grid-filter-btn"
         onClick={() => setOpen((v) => !v)}
       >
-        ⏷ Filter{count > 0 ? ` (${count})` : ""}
+        <ChevronDownIcon /> Filter{count > 0 ? ` (${count})` : ""}
       </button>
       {open && (
         <div
           style={{
             position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20,
-            background: "var(--surface, var(--bg))", border: "1px solid var(--border)",
+            background: "var(--surface, var(--bg))", border: "2px solid var(--border)",
             borderRadius: "var(--radius)", padding: 12, width: 220,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+            boxShadow: "var(--shadow-card)",
           }}
         >
           <FilterGroup

@@ -6,6 +6,7 @@ import GameConfig from "./GameConfig";
 import GameDeviceModal from "./game-list/GameDeviceModal";
 import SaveHistory from "./SaveHistory";
 import SwitchModsTab from "./SwitchModsTab";
+import { CloseIcon, PlayIcon } from "./icons";
 
 export type GameModalTarget = {
   slug: string;
@@ -44,10 +45,10 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
       <div className="modal" style={{ width: 760, maxWidth: "92vw" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <h3 style={{ margin: 0 }}>{name}</h3>
-          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
         </div>
 
-        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 4, borderBottom: "2px solid var(--border)", marginBottom: 16 }}>
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -126,7 +127,7 @@ function RunTab({ slug, name, canPlay, onLaunch, onClose }: {
         disabled={!canPlay}
         onClick={launch}
       >
-        ▶ Launch now
+        <PlayIcon /> Launch now
       </button>
 
       <p style={{ marginBottom: 6, fontWeight: 500 }}>Add to Steam</p>

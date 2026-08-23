@@ -44,7 +44,7 @@ function DeviceRow({ d, dim, displayIp }: { d: Device; dim: boolean; displayIp?:
   const freshness = deviceFreshness(d.last_seen_at);
   const ip = displayIp ?? d.last_ip;
   return (
-    <li style={{ padding: "6px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: dim ? 0.6 : 1 }}>
+    <li style={{ padding: "6px 0", borderBottom: "2px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: dim ? 0.6 : 1 }}>
       <span>🖥</span>
       <span>{d.name}</span>
       <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}>●</span>
@@ -157,7 +157,7 @@ export default function GameDeviceModal({ slug, name, gameConsole, gameIsLocal, 
                     const ts = transfers[d.id];
                     const canPull = !gameIsLocal && d.id !== currentDeviceId;
                     return (
-                      <li key={d.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <li key={d.id} style={{ borderBottom: "2px solid var(--border)" }}>
                         <DeviceRow d={d} dim={false} displayIp={d.id === currentDeviceId ? localIp : undefined} />
                         {canPull && (
                           <div style={{ padding: "4px 0 8px 28px" }}>
@@ -186,7 +186,7 @@ export default function GameDeviceModal({ slug, name, gameConsole, gameIsLocal, 
                     const ts = transfers[d.id];
                     const canPush = gameIsLocal && d.id !== currentDeviceId;
                     return (
-                      <li key={d.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <li key={d.id} style={{ borderBottom: "2px solid var(--border)" }}>
                         <DeviceRow d={d} dim={true} displayIp={d.id === currentDeviceId ? localIp : undefined} />
                         {canPush && (
                           <div style={{ padding: "4px 0 8px 28px" }}>

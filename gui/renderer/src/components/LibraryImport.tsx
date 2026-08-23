@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import ConsoleImport from "./ConsoleImport";
 import { Spinner } from "./console-import/Spinner";
+import { CloseIcon } from "./icons";
 import type { ConsoleOption } from "./console-import/types";
 
 const emusync = window.emusync;
@@ -119,7 +120,7 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h3 style={{ margin: 0 }}>Import library</h3>
-          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
         </div>
 
         {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
@@ -187,7 +188,7 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
               {entries.map(e => (
                 <div
                   key={e.path}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--border)" }}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "2px solid var(--border)" }}
                 >
                   <span className="truncate" style={{ flex: 1, fontSize: 13 }}>{e.folderName}</span>
                   {!e.consoleKey && <span title="No console match found" style={{ color: "var(--text-muted)" }}>⚠</span>}

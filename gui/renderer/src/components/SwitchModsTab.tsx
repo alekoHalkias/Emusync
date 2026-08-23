@@ -135,7 +135,7 @@ export default function SwitchModsTab({ slug }: { slug: string }): React.ReactEl
               const inLocal = local.includes(name);
               const poolEntry = pool.find((m) => m.mod_name === name);
               return (
-                <tr key={name} style={{ borderTop: "1px solid var(--border)" }}>
+                <tr key={name} style={{ borderTop: "2px solid var(--border)" }}>
                   <td style={{ padding: "6px" }}>{name}</td>
                   <td style={{ padding: "6px" }}>{inLocal ? "✓" : ""}</td>
                   <td style={{ padding: "6px" }}>{poolEntry ? "✓" : ""}</td>

@@ -1,17 +1,28 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #1a1a2e;
-  --surface: #16213e;
-  --surface2: #0f3460;
+  /* Dark-grey scale with a light purple tint (#470) — replaces the old
+     navy-blue palette. Each step is a flat lightness increase, same hue
+     throughout, so surfaces stack predictably: --bg (page) < --surface
+     (cards/panels) < --surface2 (hover/elevated) < --surface3 (topmost
+     layer: modal). */
+  --bg: #1f1c26;
+  --surface: #292432;
+  --surface2: #363042;
+  --surface3: #2e2839;
   --accent: #e94560;
   --accent-hover: #c73652;
   --text: #eaeaea;
   --text-muted: #8892a4;
   --green: #4ade80;
   --red: #f87171;
-  --border: #2d3748;
+  --border: #3e3849;
   --radius: 8px;
+  --radius-lg: 12px;
+  /* One shared elevation for every card-like surface (console/game cards,
+     modal) instead of each picking its own blur/opacity. */
+  --shadow-card: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.6);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -45,18 +56,26 @@ button, input, select, textarea {
   white-space: nowrap;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Keyboard-nav focus ring — buttons had none, only text inputs did. Covers
+   every button-like clickable (.btn variants, card action buttons, topbar
+   controls, filter/header buttons) via a single attribute-free rule rather
+   than repeating it per class. */
+button:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-ghost { background: transparent; color: var(--text); border: 2px solid var(--border); }
 .btn-ghost:hover:not(:disabled) { background: var(--surface2); }
 .btn-danger { background: #7f1d1d; color: #fff; }
 .btn-danger:hover:not(:disabled) { background: #991b1b; }
-.btn-icon { padding: 6px 10px; background: transparent; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius); }
+.btn-icon { padding: 6px 10px; background: transparent; color: var(--text-muted); border: 2px solid var(--border); border-radius: var(--radius); }
 .btn-icon:hover:not(:disabled) { color: var(--text); background: var(--surface2); }
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
 }
@@ -67,7 +86,7 @@ button, input, select, textarea {
 input[type="text"], input[type="number"], input[type="password"] {
   flex: 1;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
   padding: 8px 12px;
@@ -90,7 +109,7 @@ input.error { border-color: var(--red); }
 }
 .modal {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius);
   padding: 28px;
   width: 400px;
@@ -105,7 +124,7 @@ input.error { border-color: var(--red); }
   width: 100%;
   height: 10px;
   background: var(--surface2, var(--border));
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: 5px;
   overflow: hidden;
 }
@@ -136,7 +155,7 @@ input.error { border-color: var(--red); }
 .setup-choices { display: flex; flex-direction: column; gap: 12px; }
 .setup-choice {
   display: flex; align-items: flex-start; gap: 14px;
-  padding: 18px; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px; border: 2px solid var(--border); border-radius: var(--radius);
   background: var(--bg); cursor: pointer; transition: border-color 0.15s;
   -webkit-app-region: no-drag;
 }
@@ -147,7 +166,7 @@ input.error { border-color: var(--red); }
 
 .token-display {
   display: flex; align-items: center; gap: 8px;
-  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius);
   padding: 10px 14px; font-family: monospace; font-size: 13px;
   margin: 12px 0;
 }
@@ -156,7 +175,7 @@ input.error { border-color: var(--red); }
 .server-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .server-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 14px; background: var(--bg); border: 1px solid var(--border);
+  padding: 12px 14px; background: var(--bg); border: 2px solid var(--border);
   border-radius: var(--radius); cursor: pointer;
 }
 .server-item:hover { border-color: var(--accent); }
@@ -165,7 +184,7 @@ input.error { border-color: var(--red); }
 .layout { display: flex; flex-direction: column; height: 100vh; }
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 20px; height: 52px; border-bottom: 1px solid var(--border);
+  padding: 0 20px; height: 52px; border-bottom: 2px solid var(--border);
   background: var(--surface); flex-shrink: 0;
 }
 .topbar-title { font-weight: 700; font-size: 16px; }
@@ -175,7 +194,7 @@ input.error { border-color: var(--red); }
 .game-table {
   display: grid;
   width: 100%;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -218,7 +237,7 @@ input.error { border-color: var(--red); }
   align-items: center;
   padding: 8px 12px;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -231,7 +250,7 @@ input.error { border-color: var(--red); }
 
 .console-section-header {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 16px; background: var(--surface2); border-bottom: 1px solid var(--border);
+  padding: 8px 16px; background: var(--surface2); border-bottom: 2px solid var(--border);
   cursor: pointer; font-weight: 600; font-size: 13px;
   user-select: none; transition: background 0.15s;
 }
@@ -288,8 +307,8 @@ input.error { border-color: var(--red); }
 
 /* ── Topbar enhancements ────────────────────────────────────────────────────── */
 .topbar {
-  background: linear-gradient(90deg, var(--surface) 0%, #1a2040 100%);
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--surface) 0%, var(--bg) 100%);
+  border-bottom: 2px solid var(--border);
 }
 .topbar-title {
   font-size: 17px;
@@ -335,8 +354,9 @@ input.error { border-color: var(--red); }
 /* ── Modal depth ────────────────────────────────────────────────────────────── */
 .modal-overlay { backdrop-filter: blur(3px); }
 .modal {
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
-  background: #1c2240;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  background: var(--surface3);
   border-color: rgba(255,255,255,0.08);
 }
 
@@ -355,8 +375,8 @@ input.error { border-color: var(--red); }
   gap: 8px;
   padding: 24px 16px 20px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
   text-align: center;
@@ -374,7 +394,7 @@ input.error { border-color: var(--red); }
 }
 .console-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--console-accent, var(--border));
+  box-shadow: var(--shadow-card), 0 0 0 1px var(--console-accent, var(--border));
   border-color: var(--console-accent, var(--border));
 }
 .console-card:hover::before { opacity: 0.22; }
@@ -432,7 +452,7 @@ input.error { border-color: var(--red); }
   margin-top: -14px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
 }
 .game-grid-abbr {
   font-size: 20px;
@@ -461,7 +481,7 @@ input.error { border-color: var(--red); }
    `flex: 0 0 <width>` below actually controls the size. */
 .game-grid-header .game-grid-search {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
   padding: 7px 12px;
@@ -481,7 +501,7 @@ input.error { border-color: var(--red); }
   appearance: none;
   -webkit-appearance: none;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
   padding: 7px 10px;
@@ -494,19 +514,27 @@ input.error { border-color: var(--red); }
 }
 
 /* appearance: none above strips the <select>'s native arrow, so redraw it
-   as the same "⏷" glyph the filter button uses, in the same position (left
-   of the label, same size/color) for a truly matching look. */
+   in the same position (left of the label, same size/color) as the filter
+   button's chevron, for a truly matching look — see the CSS-drawn chevron
+   comment below. */
 .game-grid-select-wrap { position: relative; flex-shrink: 0; }
 .game-grid-select-wrap .game-grid-art-type { padding-left: 24px; }
+/* CSS-drawn chevron (border corner, rotated) instead of the "⏷" glyph, to
+   match GameFilterButton's inline-SVG ChevronDownIcon — same shape, no font
+   rendering differences between the two. */
 .game-grid-select-wrap::before {
-  content: "⏷";
+  content: "";
   position: absolute;
   top: 50%;
-  left: 10px;
-  transform: translateY(-50%);
-  color: var(--text);
+  left: 11px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.6px solid var(--text);
+  border-bottom: 1.6px solid var(--text);
+  transform: translateY(-65%) rotate(45deg);
   pointer-events: none;
 }
+.game-grid-filter-btn { display: inline-flex; align-items: center; gap: 5px; }
 .game-grid-filter-btn:hover { background: var(--surface2); }
 
 /* Match the dropdown/search box model exactly (padding + border + a fixed
@@ -517,7 +545,7 @@ input.error { border-color: var(--red); }
    even once padding matches (issue #347). */
 .game-grid-header-btn {
   padding: 7px 12px;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   height: 32px;
 }
 
@@ -541,15 +569,15 @@ input.error { border-color: var(--red); }
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   transition: transform 0.15s, box-shadow 0.15s;
   position: relative;
 }
 .game-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+  box-shadow: var(--shadow-card);
 }
 
 .game-card-art {
@@ -581,7 +609,7 @@ input.error { border-color: var(--red); }
 }
 .game-card-art-logo,
 .game-card-art-icon {
-  background: #0a0a0a;
+  background: var(--bg);
 }
 .game-card-art-logo {
   aspect-ratio: 3 / 2;
@@ -696,7 +724,7 @@ input.error { border-color: var(--red); }
 .game-card-btn {
   flex: 1;
   padding: 5px 0;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
@@ -704,12 +732,13 @@ input.error { border-color: var(--red); }
   -webkit-app-region: no-drag;
 }
 .game-card-btn-play {
-  background: transparent;
-  color: var(--green);
-  border-color: rgba(74,222,128,0.3);
+  background: var(--green);
+  color: #0a1f0f;
+  font-weight: 600;
+  border-color: var(--green);
 }
 .game-card-btn-play:hover:not(:disabled) {
-  background: rgba(74,222,128,0.15);
-  border-color: var(--green);
+  background: #6ee89a;
+  border-color: #6ee89a;
 }
 .game-card-btn-play:disabled { opacity: 0.35; cursor: not-allowed; }

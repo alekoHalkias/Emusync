@@ -24,7 +24,7 @@ export function DoneStep({ vm }: { vm: ConsoleImportVM }) {
       </div>
 
       {pushResults.length > 0 && (
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginBottom: 8 }}>
+        <div style={{ borderTop: "2px solid var(--border)", paddingTop: 12, marginBottom: 8 }}>
           <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 8, color: "var(--text-muted)" }}>
             Syncing to other devices
           </p>

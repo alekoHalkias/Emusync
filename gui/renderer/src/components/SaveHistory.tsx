@@ -181,12 +181,12 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
     const busy = busyKey !== null;
     const restoring = busyKey === e.key;
     const kindTag = (
-      <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--text-muted)", border: "1px solid var(--border)", borderRadius: 3, padding: "1px 4px", marginRight: 6 }}>
+      <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--text-muted)", border: "2px solid var(--border)", borderRadius: 3, padding: "1px 4px", marginRight: 6 }}>
         {e.kind}
       </span>
     );
     return (
-      <li key={e.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+      <li key={e.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "2px solid var(--border)" }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13 }}>
             {kindTag}
