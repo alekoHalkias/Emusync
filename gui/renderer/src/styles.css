@@ -58,11 +58,11 @@ button, input, select, textarea {
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-ghost { background: transparent; color: var(--text); border: 2px solid var(--border); }
 .btn-ghost:hover:not(:disabled) { background: var(--surface2); }
 .btn-danger { background: #7f1d1d; color: #fff; }
 .btn-danger:hover:not(:disabled) { background: #991b1b; }
-.btn-icon { padding: 6px 10px; background: transparent; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius); }
+.btn-icon { padding: 6px 10px; background: transparent; color: var(--text-muted); border: 2px solid var(--border); border-radius: var(--radius); }
 .btn-icon:hover:not(:disabled) { color: var(--text); background: var(--surface2); }
 
 .card {
@@ -493,7 +493,7 @@ input.error { border-color: var(--red); }
   appearance: none;
   -webkit-appearance: none;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
   padding: 7px 10px;
@@ -529,7 +529,7 @@ input.error { border-color: var(--red); }
    even once padding matches (issue #347). */
 .game-grid-header-btn {
   padding: 7px 12px;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   height: 32px;
 }
 
@@ -708,7 +708,7 @@ input.error { border-color: var(--red); }
 .game-card-btn {
   flex: 1;
   padding: 5px 0;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;

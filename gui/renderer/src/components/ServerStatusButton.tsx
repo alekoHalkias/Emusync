@@ -231,7 +231,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
         onClick={() => setOpen(true)}
         style={{
           display: "flex", alignItems: "center", gap: 7,
-          background: "transparent", border: "1px solid var(--border)",
+          background: "transparent", border: "2px solid var(--border)",
           borderRadius: "var(--radius)", padding: "5px 12px",
           cursor: "pointer", color: "var(--text)", fontSize: 12,
           transition: "background 0.15s",
@@ -260,7 +260,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                 display: "flex", alignItems: "center", gap: 10,
                 width: "100%", padding: "12px 14px", marginBottom: 14,
                 background: "var(--bg)", borderRadius: "var(--radius)",
-                border: "1px solid var(--border)", cursor: "pointer", textAlign: "left",
+                border: "2px solid var(--border)", cursor: "pointer", textAlign: "left",
               }}
             >
               <span style={{ width: 10, height: 10, borderRadius: "50%", background: dot, display: "inline-block", flexShrink: 0 }} />
