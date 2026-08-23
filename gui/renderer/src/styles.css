@@ -56,6 +56,14 @@ button, input, select, textarea {
   white-space: nowrap;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Keyboard-nav focus ring — buttons had none, only text inputs did. Covers
+   every button-like clickable (.btn variants, card action buttons, topbar
+   controls, filter/header buttons) via a single attribute-free rule rather
+   than repeating it per class. */
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-ghost { background: transparent; color: var(--text); border: 2px solid var(--border); }
