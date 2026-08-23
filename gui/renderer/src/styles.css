@@ -6,17 +6,17 @@
      throughout, so surfaces stack predictably: --bg (page) < --surface
      (cards/panels) < --surface2 (hover/elevated) < --surface3 (topmost
      layer: modal). */
-  --bg: #201a29;
-  --surface: #2b2338;
-  --surface2: #392e49;
-  --surface3: #30263e;
+  --bg: #1f1c26;
+  --surface: #292432;
+  --surface2: #363042;
+  --surface3: #2e2839;
   --accent: #e94560;
   --accent-hover: #c73652;
   --text: #eaeaea;
   --text-muted: #8892a4;
   --green: #4ade80;
   --red: #f87171;
-  --border: #423a52;
+  --border: #3e3849;
   --radius: 8px;
   --radius-lg: 12px;
   /* One shared elevation for every card-like surface (console/game cards,
