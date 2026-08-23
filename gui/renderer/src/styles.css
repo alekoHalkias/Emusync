@@ -298,7 +298,7 @@ input.error { border-color: var(--red); }
 
 /* ── Topbar enhancements ────────────────────────────────────────────────────── */
 .topbar {
-  background: linear-gradient(90deg, var(--surface) 0%, var(--surface2) 100%);
+  background: linear-gradient(90deg, var(--surface) 0%, var(--bg) 100%);
   border-bottom: 1px solid var(--border);
 }
 .topbar-title {
@@ -715,12 +715,13 @@ input.error { border-color: var(--red); }
   -webkit-app-region: no-drag;
 }
 .game-card-btn-play {
-  background: transparent;
-  color: var(--green);
-  border-color: rgba(74,222,128,0.3);
+  background: var(--green);
+  color: #0a1f0f;
+  font-weight: 600;
+  border-color: var(--green);
 }
 .game-card-btn-play:hover:not(:disabled) {
-  background: rgba(74,222,128,0.15);
-  border-color: var(--green);
+  background: #6ee89a;
+  border-color: #6ee89a;
 }
 .game-card-btn-play:disabled { opacity: 0.35; cursor: not-allowed; }
