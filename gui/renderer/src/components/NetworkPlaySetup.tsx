@@ -209,7 +209,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
             </p>
 
             {/* Option A — network drive */}
-            <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
+            <div style={{ border: "2px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
               <div style={{ fontWeight: 500, fontSize: 14 }}>🌐 Set up this console & play</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
                 {networkMount
@@ -228,7 +228,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
             </div>
 
             {/* Option B — pull to this device */}
-            <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
+            <div style={{ border: "2px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
               <div style={{ fontWeight: 500, fontSize: 14 }}>💾 Pull the ROM to this device</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
                 {sources.length

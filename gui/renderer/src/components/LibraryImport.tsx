@@ -187,7 +187,7 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
               {entries.map(e => (
                 <div
                   key={e.path}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--border)" }}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "2px solid var(--border)" }}
                 >
                   <span className="truncate" style={{ flex: 1, fontSize: 13 }}>{e.folderName}</span>
                   {!e.consoleKey && <span title="No console match found" style={{ color: "var(--text-muted)" }}>⚠</span>}

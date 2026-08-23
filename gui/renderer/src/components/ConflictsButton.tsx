@@ -123,7 +123,7 @@ export default function ConflictsButton(): React.ReactElement | null {
             ) : (
               <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0" }}>
                 {conflicts.map(c => (
-                  <li key={c.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+                  <li key={c.id} style={{ padding: "10px 0", borderBottom: "2px solid var(--border)" }}>
                     <div style={{ fontWeight: 500 }}>{c.game_name}</div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 8px" }}>
                       <RelTime iso={c.resolved_at} /> · kept {deviceName(c, "winner")}'s save;

@@ -63,7 +63,7 @@ export default function GameFilterButton({ filters, onChange }: Props): React.Re
         <div
           style={{
             position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20,
-            background: "var(--surface, var(--bg))", border: "1px solid var(--border)",
+            background: "var(--surface, var(--bg))", border: "2px solid var(--border)",
             borderRadius: "var(--radius)", padding: 12, width: 220,
             boxShadow: "var(--shadow-card)",
           }}

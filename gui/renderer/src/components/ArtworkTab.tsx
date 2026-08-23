@@ -157,7 +157,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
 
       {/* Results list — ~4 rows visible, scrolls for more */}
       {results.length > 0 && (
-        <div style={{ maxHeight: 128, overflowY: "auto", border: "1px solid var(--border)", borderRadius: "var(--radius)", marginBottom: 16 }}>
+        <div style={{ maxHeight: 128, overflowY: "auto", border: "2px solid var(--border)", borderRadius: "var(--radius)", marginBottom: 16 }}>
           {results.map((r) => (
             <div
               key={r.id}
@@ -165,7 +165,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
               style={{
                 padding: "4px 10px", cursor: "pointer", fontSize: 12, lineHeight: 1.5,
                 background: selectedId === r.id ? "var(--surface2)" : "transparent",
-                borderBottom: "1px solid var(--border)",
+                borderBottom: "2px solid var(--border)",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}
             >
@@ -200,7 +200,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                 background: "var(--bg)",
                 borderRadius: "var(--radius)",
                 overflow: "hidden",
-                border: "1px solid var(--border)",
+                border: "2px solid var(--border)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -233,7 +233,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                   <img
                     src={current[pickerType]!}
                     alt="Current"
-                    style={{ width: "100%", borderRadius: "var(--radius)", border: "1px solid var(--border)", display: "block" }}
+                    style={{ width: "100%", borderRadius: "var(--radius)", border: "2px solid var(--border)", display: "block" }}
                   />
                   <button
                     onClick={clearCurrent}
@@ -261,7 +261,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                     key={c.id}
                     src={c.thumb}
                     onClick={() => pickCandidate(c.url)}
-                    style={{ width: "100%", cursor: "pointer", borderRadius: "var(--radius)", border: "1px solid var(--border)", objectFit: "contain", background: "var(--bg)" }}
+                    style={{ width: "100%", cursor: "pointer", borderRadius: "var(--radius)", border: "2px solid var(--border)", objectFit: "contain", background: "var(--bg)" }}
                   />
                 ))}
               </div>

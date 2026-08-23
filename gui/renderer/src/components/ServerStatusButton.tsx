@@ -329,7 +329,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                 )}
 
                 {/* PIN management */}
-                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                <div style={{ borderTop: "2px solid var(--border)", paddingTop: 10 }}>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                     PIN <span style={{ opacity: 0.6 }}>(optional — if no PIN, any device can connect)</span>
                   </div>
@@ -368,7 +368,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
 
             {/* Connect to server section — only show if this machine is NOT the server */}
             {!isServer && (
-              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+              <div style={{ borderTop: "2px solid var(--border)", paddingTop: 12 }}>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
                   Connect to server
                 </div>
@@ -419,7 +419,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
             )}
 
             {/* Secondary settings — folded out into their own popups to keep this modal short */}
-            <div style={{ display: "flex", gap: 8, marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 14, borderTop: "2px solid var(--border)", paddingTop: 14 }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowDevices(true)}>
                 Paired devices ({devices.length}) →
               </button>
@@ -504,7 +504,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                     save_synced: (ev) => `${ev.game_slug} synced${ev.device_name ? ` from ${ev.device_name}` : ""}`,
                   };
                   return (
-                    <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "8px 4px", borderBottom: i < events.length - 1 ? "1px solid var(--border)" : "none" }}>
+                    <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "8px 4px", borderBottom: i < events.length - 1 ? "2px solid var(--border)" : "none" }}>
                       <span style={{ fontSize: 13, minWidth: 18, textAlign: "center" }}>{icons[e.type] ?? "•"}</span>
                       <span style={{ flex: 1, fontSize: 13 }}>{(descriptions[e.type] ?? (() => e.type))(e)}</span>
                       <RelTime iso={e.occurred_at} fallback="" style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }} />

@@ -47,7 +47,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
 
-        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 4, borderBottom: "2px solid var(--border)", marginBottom: 16 }}>
           {tabs.map((t) => (
             <button
               key={t.key}

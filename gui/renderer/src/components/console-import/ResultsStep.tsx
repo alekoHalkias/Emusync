@@ -194,7 +194,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
       )}
 
       {/* ROM list */}
-      <div style={{ flex: 1, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6 }}>
+      <div style={{ flex: 1, overflowY: "auto", border: "2px solid var(--border)", borderRadius: 6 }}>
         {roms.length === 0 ? (
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
             No ROMs found. Try adding a folder above.
@@ -210,7 +210,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                   key={rom.romPath}
                   style={{
                     display: "flex", alignItems: "flex-start", gap: 10,
-                    padding: "10px 12px", borderBottom: "1px solid var(--border)",
+                    padding: "10px 12px", borderBottom: "2px solid var(--border)",
                     cursor: "pointer",
                   }}
                   onClick={() => vm.toggleRom(rom.romPath)}
