@@ -166,9 +166,21 @@ export function useGamepadNav(): void {
 
     function moveFocus(dir: Direction): void {
       const active = document.activeElement as HTMLElement | null;
-      const inScope = active && active !== document.body && focusScope().contains(active);
-      const next = inScope ? findNextFocusable(active, dir) : getFocusables()[0];
-      next?.focus();
+      const scope = focusScope();
+      const inScope = active && active !== document.body && scope.contains(active);
+      if (inScope) {
+        findNextFocusable(active, dir)?.focus();
+        return;
+      }
+      // Nothing focused yet: skip the topbar (Import/Conflicts/Server
+      // buttons) and start on the first console/game card instead of
+      // whatever's first in raw DOM order. Only applies with no modal open —
+      // scope is the whole document then, and main.content is exactly the
+      // console grid or game grid depending on which screen is showing.
+      const content = scope === document ? document.querySelector(".content") : null;
+      const candidates = getFocusables();
+      const first = content ? candidates.find((el) => content.contains(el)) : candidates[0];
+      first?.focus();
     }
 
     function launchFocusedGame(active: HTMLElement | null): void {
