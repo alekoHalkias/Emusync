@@ -10,6 +10,7 @@ import { spawnSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, statSync, renameSync } from "fs";
 import { dirname } from "path";
 import { loadServerCfg } from "../config-store";
+import { FMT_RAW, FMT_TAR, packEnvelope, unpackEnvelope } from "./envelope";
 
 export function registerMemcardIpc(): void {
   ipcMain.handle("memcard:push", async (_event, consoleKey: string, cardPath: string): Promise<{ ok: boolean; error?: string }> => {
@@ -26,10 +27,11 @@ export function registerMemcardIpc(): void {
         if (tarResult.error || tarResult.status !== 0) {
           return { ok: false, error: `Failed to pack memory card folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
         }
-        data = tarResult.stdout as Buffer;
-        if (!data || data.length === 0) return { ok: false, error: "Memory card folder is empty" };
+        const tarData = tarResult.stdout as Buffer;
+        if (!tarData || tarData.length === 0) return { ok: false, error: "Memory card folder is empty" };
+        data = packEnvelope(FMT_TAR, tarData);
       } else {
-        data = readFileSync(cardPath);
+        data = packEnvelope(FMT_RAW, readFileSync(cardPath));
       }
       const res = await fetch(`http://${host}:${port}/consoles/${consoleKey}/memcard`, {
         method: "POST",
@@ -60,13 +62,16 @@ export function registerMemcardIpc(): void {
         return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
       }
       const buf = Buffer.from(await res.arrayBuffer());
+      const { fmt, payload } = unpackEnvelope(buf);
 
-      // Write to a temp file so we can probe it with tar before deciding where it goes.
+      // Write to a temp file: it holds exactly what gets extracted/renamed
+      // below, and doubles as the probe target for a legacy (fmt === null,
+      // predates #478) blob with no declared format.
       const tmpPath = `${cardPath}.pull.tmp`;
-      writeFileSync(tmpPath, buf);
+      writeFileSync(tmpPath, fmt === null ? buf : payload);
       try {
-        const probe = spawnSync("tar", ["-tf", tmpPath], { stdio: "pipe" });
-        if (probe.status === 0) {
+        const isTar = fmt === FMT_TAR || (fmt === null && spawnSync("tar", ["-tf", tmpPath], { stdio: "pipe" }).status === 0);
+        if (isTar) {
           // Folder-based memcard — received a tar archive. Back up the whole
           // existing memcard (file or folder) as a single <name>.bak sibling.
           const bakPath = `${cardPath}.bak`;

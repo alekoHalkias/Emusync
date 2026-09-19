@@ -12,6 +12,37 @@ from typing import Optional
 import httpx
 
 
+# ── transfer envelope (#478) ─────────────────────────────────────────────────
+# Every save/state/memcard/mod blob is prefixed with a small declared-format
+# header instead of the receiver guessing the shape by trying to parse it as a
+# tar and catching the failure — four independent places used to each sniff
+# this in a slightly different way (this file's old _write_memcard, pull_state,
+# pull_state_merge, and gui/electron/sync/save.ts's separate tar-CLI probe).
+# The server itself never inspects blob bytes (server/api/blobs.py just
+# streams/hashes/stores them), so the format only needs to travel inside the
+# bytes themselves — that also means it survives save-history/restore for
+# free, no schema change needed.
+_ENVELOPE_MAGIC = b"ES1\0"
+_ENVELOPE_HEADER_LEN = len(_ENVELOPE_MAGIC) + 1  # magic + 1 format byte
+_FMT_RAW = 0     # single file, payload is its raw bytes
+_FMT_TAR = 1     # folder, payload is an uncompressed tar
+_FMT_TARGZ = 2   # folder, payload is a gzip'd tar (states)
+
+
+def _pack_envelope(fmt: int, payload: bytes) -> bytes:
+    return _ENVELOPE_MAGIC + bytes([fmt]) + payload
+
+
+def _unpack_envelope(data: bytes) -> tuple[Optional[int], bytes]:
+    """(format, payload) if *data* has the envelope header, else (None, data) —
+    the None case means "no envelope; blob predates #478" and callers should
+    fall back to their old sniff-by-parsing logic so already-stored blobs
+    (existing saves, save history, console_saves) keep working unchanged."""
+    if data[:4] == _ENVELOPE_MAGIC:
+        return data[4], data[5:]
+    return None, data
+
+
 def _extract_state_folder(content: bytes, folder: Path) -> None:
     """Overwrite a states folder with a tar.gz archive, keeping a one-generation
     ``.bak`` backup of every file it replaces.
@@ -27,6 +58,15 @@ def _extract_state_folder(content: bytes, folder: Path) -> None:
     for existing in list(folder.iterdir()):
         if existing.is_file() and not existing.name.endswith(".bak"):
             os.replace(str(existing), str(existing) + ".bak")
+    fmt, payload = _unpack_envelope(content)
+    if fmt == _FMT_RAW:
+        (folder / f"{folder.name}.state").write_bytes(payload)
+        return
+    if fmt == _FMT_TARGZ:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
+            _safe_extract_tar(tar, folder)
+        return
+    # No envelope (blob predates #478) — sniff like before.
     try:
         with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
             _safe_extract_tar(tar, folder)
@@ -44,18 +84,30 @@ def _merge_extract_state_folder(content: bytes, folder: Path) -> None:
     states — so a pull for one game must not disturb other games' state files
     (issue #294)."""
     folder.mkdir(parents=True, exist_ok=True)
+
+    def _merge(tar: tarfile.TarFile) -> None:
+        for member in tar.getmembers():
+            if not member.isfile():
+                continue
+            target = folder / Path(member.name).name
+            if target.exists():  # back up only what we're about to overwrite
+                os.replace(str(target), str(target) + ".bak")
+        _safe_extract_tar(tar, folder)
+
+    fmt, payload = _unpack_envelope(content)
+    if fmt == _FMT_RAW:
+        # A shared folder has no single canonical filename, so a raw blob
+        # can't be placed safely — ignore it (PS2 states are always tar archives).
+        return
+    if fmt == _FMT_TARGZ:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
+            _merge(tar)
+        return
+    # No envelope (blob predates #478) — sniff like before.
     try:
         with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
-            for member in tar.getmembers():
-                if not member.isfile():
-                    continue
-                target = folder / Path(member.name).name
-                if target.exists():  # back up only what we're about to overwrite
-                    os.replace(str(target), str(target) + ".bak")
-            _safe_extract_tar(tar, folder)
+            _merge(tar)
     except tarfile.TarError:
-        # A shared folder has no single canonical filename, so a legacy raw blob
-        # can't be placed safely — ignore it (PS2 states are always tar archives).
         pass
 
 
@@ -94,17 +146,27 @@ class GameDeviceConfig:
     device_local_folder: str = ""
 
 
-def memcard_bytes(card_path: Path) -> bytes:
-    """Serialize a memcard for network transfer and local hashing.
+def _memcard_payload_bytes(card_path: Path) -> bytes:
+    """Serialize a memcard's *content* — no transfer envelope — for local
+    hashing (_reconcile_save's #460 divergence check, cli/run.py's post-launch
+    push-if-changed compare). Kept envelope-free so content hashes stay stable
+    across #478 landing: hashing the enveloped wire bytes instead would have
+    changed every existing hash on day one, and _reconcile_save's "did this
+    actually change since we last agreed" logic would misread that global
+    hash-format bump as a real conflict on literally every game, every
+    device, the first time each was reconciled post-upgrade — not a narrow
+    one-time nuisance. server/api/blobs.py's _stage_upload mirrors this by
+    hashing the uploaded bytes minus the envelope header, so a fresh push's
+    server-recorded hash matches what this function returns for the same
+    content, same as pre-#478.
 
     Folder-based memcards (PCSX2 .ps2 folders) are packed as a deterministic
     plain tar archive (sorted entries, mtime=0) so the SHA-256 is stable across
-    calls for unchanged content — required for _reconcile_save's hash comparison.
-    Walks the whole tree (``rglob``, not a single-level ``iterdir``): PCSX2
-    nests each game's saves one level down in its own subfolder, so a
-    top-level-only walk would silently drop every game's data and push just
-    the loose top-level files (e.g. ``_pcsx2_superblock``). File-based
-    memcards are returned as raw bytes.
+    calls for unchanged content. Walks the whole tree (``rglob``, not a
+    single-level ``iterdir``): PCSX2 nests each game's saves one level down in
+    its own subfolder, so a top-level-only walk would silently drop every
+    game's data and push just the loose top-level files (e.g.
+    ``_pcsx2_superblock``). File-based memcards are raw bytes.
     """
     if card_path.is_dir():
         buf = io.BytesIO()
@@ -122,37 +184,68 @@ def memcard_bytes(card_path: Path) -> bytes:
     return card_path.read_bytes()
 
 
-def _write_memcard(card: Path, data: bytes) -> None:
-    """Write received memcard bytes to disk.
-
-    Detects tar archives (folder-based memcards) by attempting to open the
-    bytes as a tar; falls back to writing raw bytes (file-based memcard).
-    Backs up any existing file before overwriting, preserving the tar's
-    relative subfolder structure — PCSX2 nests each game's saves under its
-    own subfolder (e.g. ``GAME1/GAME1``, ``GAME1/icon.sys``), so backing up
-    by basename alone collides with the subfolder itself (a directory, not
-    a file) and crashes. Extraction goes through ``_safe_extract_tar`` so a
-    member can't escape *card* the same way a state archive can't.
+def memcard_bytes(card_path: Path) -> bytes:
+    """Serialize a memcard for network transfer — _memcard_payload_bytes'
+    content, wrapped in the transfer envelope (#478) so the receiver reads
+    the declared format instead of guessing. Not used for hashing; see
+    _memcard_payload_bytes for that.
     """
+    payload = _memcard_payload_bytes(card_path)
+    fmt = _FMT_TAR if card_path.is_dir() else _FMT_RAW
+    return _pack_envelope(fmt, payload)
+
+
+def _write_memcard_tar_bytes(card: Path, tar_bytes: bytes) -> None:
+    """Extract a tar archive into *card* (a folder-based memcard), backing up
+    whatever was there before. Preserves the tar's relative subfolder
+    structure — PCSX2 nests each game's saves under its own subfolder (e.g.
+    ``GAME1/GAME1``, ``GAME1/icon.sys``), so backing up by basename alone
+    collides with the subfolder itself (a directory, not a file) and
+    crashes. Extraction goes through ``_safe_extract_tar`` so a member can't
+    escape *card* the same way a state archive can't. Raises
+    ``tarfile.TarError`` (before any of the above happens) if *tar_bytes*
+    isn't actually a tar.
+    """
+    tf = tarfile.open(fileobj=io.BytesIO(tar_bytes))
+    bak = card.parent / (card.name + ".bak")
+    if card.is_dir():
+        if bak.exists():
+            shutil.rmtree(bak)
+        shutil.copytree(card, bak)
+    elif card.is_file():
+        shutil.copy2(card, bak)
+        card.unlink()
+    card.mkdir(parents=True, exist_ok=True)
+    _safe_extract_tar(tf, card)
+    tf.close()
+
+
+def _write_memcard_raw_bytes(card: Path, raw: bytes) -> None:
+    """Write *raw* to *card* (a file-based memcard), backing up whatever was there."""
+    if card.exists() and card.is_file():
+        shutil.copy2(card, card.parent / (card.name + ".bak"))
+    if not card.exists() or card.is_file():
+        card.parent.mkdir(parents=True, exist_ok=True)
+        card.write_bytes(raw)
+
+
+def _write_memcard(card: Path, data: bytes) -> None:
+    """Write received memcard bytes to disk — folder-based or file-based,
+    dispatched on the transfer envelope's declared format (#478). Blobs that
+    predate the envelope (already-stored saves/history/console_saves) have no
+    magic header, so they fall back to the old sniff-by-parsing-as-tar logic.
+    """
+    fmt, payload = _unpack_envelope(data)
+    if fmt == _FMT_TAR:
+        _write_memcard_tar_bytes(card, payload)
+        return
+    if fmt == _FMT_RAW:
+        _write_memcard_raw_bytes(card, payload)
+        return
     try:
-        tf = tarfile.open(fileobj=io.BytesIO(data))
-        bak = card.parent / (card.name + ".bak")
-        if card.is_dir():
-            if bak.exists():
-                shutil.rmtree(bak)
-            shutil.copytree(card, bak)
-        elif card.is_file():
-            shutil.copy2(card, bak)
-            card.unlink()
-        card.mkdir(parents=True, exist_ok=True)
-        _safe_extract_tar(tf, card)
-        tf.close()
+        _write_memcard_tar_bytes(card, data)
     except tarfile.TarError:
-        if card.exists() and card.is_file():
-            shutil.copy2(card, card.parent / (card.name + ".bak"))
-        if not card.exists() or card.is_file():
-            card.parent.mkdir(parents=True, exist_ok=True)
-            card.write_bytes(data)
+        _write_memcard_raw_bytes(card, data)
 
 
 class SyncClient:
@@ -495,10 +588,11 @@ class SyncClient:
             # .bak of every file it overwrites (non-destructive).
             _extract_state_folder(r.content, p)
         else:
+            _, payload = _unpack_envelope(r.content)  # None-fmt legacy blobs are already raw
             if p.exists():
                 shutil.copy2(p, p.with_suffix(p.suffix + ".bak"))
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(r.content)
+            p.write_bytes(payload)
         return True, r.headers.get("X-State-Hash")
 
     def pull_state_merge(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
@@ -526,9 +620,9 @@ class SyncClient:
                     if name_prefix is not None and not f.name.startswith(name_prefix):
                         continue
                     tar.add(str(f), arcname=f.name)
-            data = buf.getvalue()
+            data = _pack_envelope(_FMT_TARGZ, buf.getvalue())
         else:
-            data = p.read_bytes()
+            data = _pack_envelope(_FMT_RAW, p.read_bytes())
         r = self._client.post(
             self._url(f"/games/{slug}/state"),
             content=data,

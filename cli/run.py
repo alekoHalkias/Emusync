@@ -26,7 +26,7 @@ import click
 
 import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
-from server.sync_client import GameDeviceConfig, memcard_bytes
+from server.sync_client import GameDeviceConfig, _memcard_payload_bytes
 
 from cli.common import _client, _get_device_name, _show_game_running_popup
 from cli.netrom import resolve_rom_path
@@ -476,7 +476,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # resolves to the cwd, which must never be treated as a save (mirrors
         # the identical guard in _reconcile_save).
         if save_path and Path(save_path).exists():
-            local_bytes = memcard_bytes(Path(save_path))
+            local_bytes = _memcard_payload_bytes(Path(save_path))
             local_hash = hashlib.sha256(local_bytes).hexdigest()
             if local_hash != server_hash:
                 # Guard against pushing a truncated/zero-byte save from a crashed

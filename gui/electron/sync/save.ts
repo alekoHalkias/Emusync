@@ -8,6 +8,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, statSyn
 import { dirname } from "path";
 import { loadServerCfg } from "../config-store";
 import { SCRIPT, PYTHON } from "../runtime";
+import { FMT_RAW, FMT_TAR, packEnvelope, unpackEnvelope } from "./envelope";
 
 export function registerSaveIpc(): void {
   ipcMain.handle("save:push", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; error?: string }> => {
@@ -22,10 +23,11 @@ export function registerSaveIpc(): void {
         if (tarResult.error || tarResult.status !== 0) {
           return { ok: false, error: `Failed to pack save folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
         }
-        data = tarResult.stdout as Buffer;
-        if (!data || data.length === 0) return { ok: false, error: "Save folder is empty" };
+        const tarData = tarResult.stdout as Buffer;
+        if (!tarData || tarData.length === 0) return { ok: false, error: "Save folder is empty" };
+        data = packEnvelope(FMT_TAR, tarData);
       } else {
-        data = readFileSync(savePath);
+        data = packEnvelope(FMT_RAW, readFileSync(savePath));
       }
       const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
         method: "POST",
@@ -56,13 +58,16 @@ export function registerSaveIpc(): void {
         return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
       }
       const buf = Buffer.from(await res.arrayBuffer());
+      const { fmt, payload } = unpackEnvelope(buf);
 
-      // Write to a temp file so we can probe it with tar before deciding where it goes.
+      // Write to a temp file: it holds exactly what gets extracted/renamed
+      // below, and doubles as the probe target for a legacy (fmt === null,
+      // predates #478) blob with no declared format.
       const tmpPath = `${savePath}.pull.tmp`;
-      writeFileSync(tmpPath, buf);
+      writeFileSync(tmpPath, fmt === null ? buf : payload);
       try {
-        const probe = spawnSync("tar", ["-tf", tmpPath], { stdio: "pipe" });
-        if (probe.status === 0) {
+        const isTar = fmt === FMT_TAR || (fmt === null && spawnSync("tar", ["-tf", tmpPath], { stdio: "pipe" }).status === 0);
+        if (isTar) {
           // Folder-based save (Wii/Switch NAND folder) — received a tar archive.
           const bakPath = `${savePath}.bak`;
           if (existsSync(savePath)) {
