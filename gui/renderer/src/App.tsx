@@ -10,6 +10,7 @@ import GameGrid from "./components/GameGrid";
 import ImportWizard from "./components/ImportWizard";
 import { useGameList } from "./components/game-list/useGameList";
 import { applySwitchTitleId } from "./components/console-import/postImport";
+import { useGamepadNav } from "./useGamepadNav";
 
 type Screen =
   | { name: "loading" }
@@ -27,6 +28,8 @@ export default function App(): React.ReactElement {
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
   const [runningGameSlug, setRunningGameSlug] = useState<string | null>(null);
   const [myDeviceId, setMyDeviceId] = useState<string | null>(null);
+
+  useGamepadNav();
 
   // Shared game list — data source for both ConsoleGrid and GameGrid.
   // Only active after setup is complete; the hook starts polling on mount.
