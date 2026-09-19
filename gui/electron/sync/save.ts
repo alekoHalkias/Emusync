@@ -1,105 +1,38 @@
-// Save-file push/pull IPC. Wii/Switch saves are a whole NAND folder, not a
-// single file (#431/#419) — mirrors the folder-vs-file branching already in
-// memcard.ts (plain tar, matching Python's memcard_bytes()/_write_memcard()),
-// which the manual GUI push/pull buttons here never picked up.
+// Save-file push/pull IPC. Routes through the CLI (`emusync game push-save`/
+// `pull-save`, #479) instead of reimplementing the file-vs-folder tar/sniff
+// transfer logic here in TypeScript — that logic already lives once in
+// server/sync_client.py (#478's transfer envelope), and a second, independent
+// copy in this file was exactly the "two implementations of the same thing"
+// problem #456 already bit us on once. Mirrors the existing save:pullSwitchSeed
+// pattern below.
 import { ipcMain } from "electron";
-import { spawn, spawnSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, statSync, renameSync } from "fs";
-import { dirname } from "path";
-import { loadServerCfg } from "../config-store";
+import { spawn } from "child_process";
 import { SCRIPT, PYTHON } from "../runtime";
-import { FMT_RAW, FMT_TAR, packEnvelope, unpackEnvelope } from "./envelope";
+
+// Exit codes from `emusync game push-save`/`pull-save`: 0 = success, 1 = real
+// error, 2 = pull found nothing on the server yet (not an error).
+function runCliTransfer(args: string[]): Promise<{ code: number | null; output: string }> {
+  return new Promise((resolve) => {
+    const proc = spawn(PYTHON, [SCRIPT, ...args]);
+    let output = "";
+    proc.stdout.on("data", (d) => (output += d.toString()));
+    proc.stderr.on("data", (d) => (output += d.toString()));
+    proc.on("close", (code) => resolve({ code, output: output.trim() }));
+    proc.on("error", (e: Error) => resolve({ code: 1, output: e.message }));
+  });
+}
 
 export function registerSaveIpc(): void {
   ipcMain.handle("save:push", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; error?: string }> => {
-    try {
-      if (!existsSync(savePath)) return { ok: false, error: "Save file not found" };
-      const { host, port, authHeaders } = loadServerCfg();
-      let data: Buffer;
-      if (statSync(savePath).isDirectory()) {
-        const tarResult = spawnSync("tar", ["-cf", "-", "--exclude=*.bak", "-C", savePath, "."], {
-          maxBuffer: 512 * 1024 * 1024,
-        });
-        if (tarResult.error || tarResult.status !== 0) {
-          return { ok: false, error: `Failed to pack save folder: ${tarResult.stderr?.toString().trim() ?? ""}` };
-        }
-        const tarData = tarResult.stdout as Buffer;
-        if (!tarData || tarData.length === 0) return { ok: false, error: "Save folder is empty" };
-        data = packEnvelope(FMT_TAR, tarData);
-      } else {
-        data = packEnvelope(FMT_RAW, readFileSync(savePath));
-      }
-      const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
-        method: "POST",
-        headers: { ...authHeaders, "Content-Type": "application/octet-stream" },
-        body: data,
-        signal: AbortSignal.timeout(30000),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ detail: res.statusText }));
-        return { ok: false, error: (body as any).detail ?? res.statusText };
-      }
-      return { ok: true };
-    } catch (e: any) {
-      return { ok: false, error: e.message || "Push failed" };
-    }
+    const { code, output } = await runCliTransfer(["game", "push-save", slug, savePath]);
+    return code === 0 ? { ok: true } : { ok: false, error: output || "Push failed" };
   });
 
   ipcMain.handle("save:pull", async (_event, slug: string, savePath: string): Promise<{ ok: boolean; pulled: boolean; error?: string }> => {
-    try {
-      const { host, port, authHeaders } = loadServerCfg();
-      const res = await fetch(`http://${host}:${port}/games/${slug}/save`, {
-        headers: authHeaders,
-        signal: AbortSignal.timeout(30000),
-      });
-      if (res.status === 204) return { ok: true, pulled: false };
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ detail: res.statusText }));
-        return { ok: false, pulled: false, error: (body as any).detail ?? res.statusText };
-      }
-      const buf = Buffer.from(await res.arrayBuffer());
-      const { fmt, payload } = unpackEnvelope(buf);
-
-      // Write to a temp file: it holds exactly what gets extracted/renamed
-      // below, and doubles as the probe target for a legacy (fmt === null,
-      // predates #478) blob with no declared format.
-      const tmpPath = `${savePath}.pull.tmp`;
-      writeFileSync(tmpPath, fmt === null ? buf : payload);
-      try {
-        const isTar = fmt === FMT_TAR || (fmt === null && spawnSync("tar", ["-tf", tmpPath], { stdio: "pipe" }).status === 0);
-        if (isTar) {
-          // Folder-based save (Wii/Switch NAND folder) — received a tar archive.
-          const bakPath = `${savePath}.bak`;
-          if (existsSync(savePath)) {
-            if (existsSync(bakPath)) spawnSync("rm", ["-rf", bakPath]);
-            if (statSync(savePath).isDirectory()) {
-              spawnSync("cp", ["-r", savePath, bakPath]);
-            } else {
-              writeFileSync(bakPath, readFileSync(savePath));
-              unlinkSync(savePath);
-            }
-          }
-          mkdirSync(savePath, { recursive: true });
-          const extract = spawnSync("tar", ["-xf", tmpPath, "-C", savePath]);
-          if (extract.status !== 0) {
-            return { ok: false, pulled: false, error: `Failed to extract save: ${extract.stderr?.toString().trim() ?? ""}` };
-          }
-        } else {
-          // File-based save — write raw bytes directly.
-          if (existsSync(savePath) && statSync(savePath).isFile()) {
-            writeFileSync(`${savePath}.bak`, readFileSync(savePath));
-          }
-          mkdirSync(dirname(savePath), { recursive: true });
-          renameSync(tmpPath, savePath);
-          return { ok: true, pulled: true };
-        }
-      } finally {
-        try { if (existsSync(tmpPath)) unlinkSync(tmpPath); } catch {}
-      }
-      return { ok: true, pulled: true };
-    } catch (e: any) {
-      return { ok: false, pulled: false, error: e.message || "Pull failed" };
-    }
+    const { code, output } = await runCliTransfer(["game", "pull-save", slug, savePath]);
+    if (code === 0) return { ok: true, pulled: true };
+    if (code === 2) return { ok: true, pulled: false };
+    return { ok: false, pulled: false, error: output || "Pull failed" };
   });
 
   // A device with no local Switch save yet has no savePath to pull *into* —
@@ -109,14 +42,8 @@ export function registerSaveIpc(): void {
   // than duplicating that profile-discovery logic here. On success it
   // persists save_path itself; the renderer re-fetches the device config
   // afterward to pick it up.
-  ipcMain.handle("save:pullSwitchSeed", (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {
-    return new Promise((resolve) => {
-      const proc = spawn(PYTHON, [SCRIPT, "game", "pull-switch-save", slug]);
-      let output = "";
-      proc.stdout.on("data", (d) => (output += d.toString()));
-      proc.stderr.on("data", (d) => (output += d.toString()));
-      proc.on("close", (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: output.trim() || "Pull failed" }));
-      proc.on("error", (e: Error) => resolve({ ok: false, error: e.message }));
-    });
+  ipcMain.handle("save:pullSwitchSeed", async (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {
+    const { code, output } = await runCliTransfer(["game", "pull-switch-save", slug]);
+    return code === 0 ? { ok: true } : { ok: false, error: output || "Pull failed" };
   });
 }

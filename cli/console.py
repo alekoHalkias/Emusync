@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 import click
 
@@ -25,7 +26,7 @@ from cli.detect import (
     _switch_title_id_from_rom,
 )
 from cli.root import cli
-from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
+from cli.run import _MemcardClient, _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
 
 
 def _switch_save_match() -> dict:
@@ -498,3 +499,48 @@ def console_import() -> None:
         click.echo(f"Failed: {', '.join(errors)}")
     if rom_source == "network":
         click.echo("Network ROMs aren't copied to peers — every device reads from the share.")
+
+
+@console.command("push-memcard")
+@click.argument("console_key")
+@click.argument("card_path")
+def console_push_memcard(console_key: str, card_path: str) -> None:
+    """Push this device's shared memory card for CONSOLE_KEY to the server
+    (manual push, e.g. PS2/DC/GC/PSP/3DS).
+
+    Backs the GUI's manual "Push memory card" button (#479) via _MemcardClient
+    — the same adapter `emusync run` uses, so a GC card push gets the format
+    tag (#428) the GUI's own TypeScript implementation never sent.
+    """
+    client = _MemcardClient(_client(), console_key, _cfg.load())
+    try:
+        client.push_save(console_key, card_path)
+    except Exception as exc:
+        click.echo(f"Push failed: {exc}", err=True)
+        sys.exit(1)
+    click.echo(f"Pushed memory card for {console_key}.")
+
+
+@console.command("pull-memcard")
+@click.argument("console_key")
+@click.argument("card_path")
+def console_pull_memcard(console_key: str, card_path: str) -> None:
+    """Pull the server's shared memory card for CONSOLE_KEY onto this device
+    (manual pull, e.g. PS2/DC/GC/PSP/3DS).
+
+    Backs the GUI's manual "Pull memory card" button (#479). Exits 2 (not an
+    error) when there's nothing to pull — either no card on the server yet,
+    or (GC only) a Dolphin card-format mismatch (#428), which _MemcardClient
+    already warns about via stderr + a desktop notification.
+    """
+    client = _MemcardClient(_client(), console_key, _cfg.load())
+    try:
+        client.get_save_meta(console_key)  # populates _last_meta for the GC format check
+        pulled, _hash = client.pull_save(console_key, card_path)
+    except Exception as exc:
+        click.echo(f"Pull failed: {exc}", err=True)
+        sys.exit(1)
+    if not pulled:
+        click.echo("Nothing pulled — see above.")
+        sys.exit(2)
+    click.echo(f"Pulled memory card for {console_key}.")
