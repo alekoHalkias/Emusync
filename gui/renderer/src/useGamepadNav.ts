@@ -99,6 +99,10 @@ export function useGamepadNav(): void {
     let prevB = false;
     let prevX = false;
     let prevStart = false;
+    // A text field only blocks D-pad navigation once explicitly "entered"
+    // with A — landing on one via D-pad nav (it's just another focusable
+    // element) must not trap the stick/D-pad there with no way back out.
+    let editingInput: HTMLElement | null = null;
 
     function tick(): void {
       rafId = requestAnimationFrame(tick);
@@ -113,9 +117,11 @@ export function useGamepadNav(): void {
       if (!gp) return;
 
       const active = document.activeElement as HTMLElement | null;
-      const typing = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+      if (editingInput && active !== editingInput) editingInput = null; // focus moved by other means
+      const isTextField = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+      const editing = isTextField && active === editingInput;
 
-      if (!typing) {
+      if (!editing) {
         const dir = currentDirection(gp);
         const now = performance.now();
         if (dir && dir !== lastDirection) {
@@ -129,16 +135,25 @@ export function useGamepadNav(): void {
       }
 
       const aPressed = !!gp.buttons[BTN_A]?.pressed;
-      if (aPressed && !prevA) active?.click();
+      if (aPressed && !prevA) {
+        if (isTextField && !editing) editingInput = active; // enter edit mode, same as clicking into it
+        else active?.click();
+      }
       prevA = aPressed;
 
-      // B mirrors Escape — every modal already closes on Escape via
-      // useEscapeToClose/useEscapeToCloseTopmost's own window keydown
-      // listeners (#474), so dispatching a synthetic Escape keydown reuses
-      // that wiring for free instead of duplicating close logic per modal.
+      // B backs out of an entered text field first, then mirrors Escape —
+      // every modal already closes on Escape via useEscapeToClose/
+      // useEscapeToCloseTopmost's own window keydown listeners (#474), so
+      // dispatching a synthetic Escape keydown reuses that wiring for free
+      // instead of duplicating close logic per modal.
       const bPressed = !!gp.buttons[BTN_B]?.pressed;
       if (bPressed && !prevB) {
-        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+        if (editing) {
+          editingInput?.blur();
+          editingInput = null;
+        } else {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+        }
       }
       prevB = bPressed;
 
