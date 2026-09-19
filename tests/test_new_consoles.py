@@ -13,7 +13,7 @@ import tarfile
 from cli.consoles_data import _IMPORT_CONSOLES, _ROM_EXTENSIONS
 from cli.detect import _dolphin_card_format, _discover_cores_by_info, _resolve_shared_memcard_save_state
 from cli.run import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
-from server.sync_client import _write_memcard, memcard_bytes
+from server.sync_client import _unpack_envelope, _write_memcard, memcard_bytes
 
 _BY_KEY = {c["key"]: c for c in _IMPORT_CONSOLES}
 
@@ -460,7 +460,8 @@ def test_psp_savedata_folder_card_round_trips(tmp_path):
     (src / "UCUS98687DATA01" / "DATA.BIN").write_bytes(b"other-save")
 
     data = memcard_bytes(src)
-    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(data)).getmembers()}
+    _, payload = _unpack_envelope(data)
+    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(payload)).getmembers()}
     assert names == {"ULUS10041DATA00/DATA.BIN", "ULUS10041DATA00/PARAM.SFO",
                      "UCUS98687DATA01/DATA.BIN"}
 

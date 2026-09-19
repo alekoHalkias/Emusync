@@ -12,7 +12,7 @@ import io
 import tarfile
 from pathlib import Path
 
-from server.sync_client import _write_memcard, memcard_bytes
+from server.sync_client import _unpack_envelope, _write_memcard, memcard_bytes
 
 
 def _make_folder_card(root: Path) -> None:
@@ -32,7 +32,8 @@ def test_memcard_bytes_includes_nested_game_subfolders(tmp_path):
 
     data = memcard_bytes(card)
 
-    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(data)).getmembers()}
+    _, payload = _unpack_envelope(data)
+    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(payload)).getmembers()}
     assert names == {"_pcsx2_superblock", "GAME1/GAME1", "GAME1/icon.sys"}
 
 
@@ -89,7 +90,8 @@ def test_memcard_bytes_includes_nested_gci_folder_saves(tmp_path):
 
     data = memcard_bytes(card)
 
-    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(data)).getmembers()}
+    _, payload = _unpack_envelope(data)
+    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(payload)).getmembers()}
     assert names == {
         "USA/Card A/GALE01/01-GALE-ZeldaWW.gci",
         "USA/Card A/GALE01/01-GALE-ZeldaWW.gci.bnr",
@@ -135,4 +137,17 @@ def test_write_memcard_legacy_fallback_does_not_crash_on_directory_target(tmp_pa
 
     _write_memcard(dest, b"NOT-A-TAR-ARCHIVE")  # must not raise
 
-    assert dest.is_dir()
+
+def test_memcard_bytes_round_trips_a_single_file_via_the_envelope(tmp_path):
+    """A file-based memcard packs through the declared-format envelope (#478),
+    not just raw bytes with no marker — and _write_memcard reads it back via
+    the declared format rather than falling into the legacy sniff path."""
+    src = tmp_path / "src.ps2"
+    src.write_bytes(b"FILE-CARD-CONTENT")
+
+    data = memcard_bytes(src)
+    assert data.startswith(b"ES1\0")  # declared, not a bare legacy blob
+
+    dest = tmp_path / "dest.ps2"
+    _write_memcard(dest, data)
+    assert dest.read_bytes() == b"FILE-CARD-CONTENT"

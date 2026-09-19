@@ -61,6 +61,68 @@ def test_extract_state_folder_legacy_raw_blob(tmp_path):
     assert (folder / "Zelda.state").read_bytes() == b"not-a-tar-archive"
 
 
+# ── transfer envelope (#478) ────────────────────────────────────────────────
+
+def test_envelope_round_trips_raw_and_tar():
+    from server.sync_client import _FMT_RAW, _FMT_TAR, _pack_envelope, _unpack_envelope
+
+    raw = _pack_envelope(_FMT_RAW, b"hello")
+    assert _unpack_envelope(raw) == (_FMT_RAW, b"hello")
+
+    tar = _pack_envelope(_FMT_TAR, b"tar-bytes-here")
+    assert _unpack_envelope(tar) == (_FMT_TAR, b"tar-bytes-here")
+
+
+def test_unpack_envelope_none_for_legacy_blob():
+    """A blob with no magic header (predates #478) reports format=None so
+    callers fall back to their old sniff-by-parsing logic."""
+    from server.sync_client import _unpack_envelope
+
+    fmt, payload = _unpack_envelope(b"just some raw bytes, no header")
+    assert fmt is None
+    assert payload == b"just some raw bytes, no header"
+
+
+def test_extract_state_folder_reads_enveloped_targz(tmp_path):
+    """A properly-enveloped tar.gz (the new format) extracts via the declared
+    format, not the legacy try/except sniff."""
+    from server.sync_client import _FMT_TARGZ, _extract_state_folder, _pack_envelope
+
+    folder = tmp_path / "states" / "Metroid"
+    folder.mkdir(parents=True)
+    enveloped = _pack_envelope(_FMT_TARGZ, _make_state_archive({"game.state": b"NEW"}))
+
+    _extract_state_folder(enveloped, folder)
+
+    assert (folder / "game.state").read_bytes() == b"NEW"
+
+
+def test_extract_state_folder_reads_enveloped_raw(tmp_path):
+    """A properly-enveloped raw blob (single-file state) writes as <name>.state
+    via the declared format, same as the legacy fallback's output shape."""
+    from server.sync_client import _FMT_RAW, _extract_state_folder, _pack_envelope
+
+    folder = tmp_path / "states" / "Zelda"
+    folder.mkdir(parents=True)
+    enveloped = _pack_envelope(_FMT_RAW, b"single-file-state-bytes")
+
+    _extract_state_folder(enveloped, folder)
+
+    assert (folder / "Zelda.state").read_bytes() == b"single-file-state-bytes"
+
+
+def test_merge_extract_reads_enveloped_targz(tmp_path):
+    from server.sync_client import _FMT_TARGZ, _merge_extract_state_folder, _pack_envelope
+
+    sstates = tmp_path / "sstates"
+    sstates.mkdir()
+    enveloped = _pack_envelope(_FMT_TARGZ, _make_state_archive({"SLUS-20062 (1B2E).00.p2s": b"gameA-new"}))
+
+    _merge_extract_state_folder(enveloped, sstates)
+
+    assert (sstates / "SLUS-20062 (1B2E).00.p2s").read_bytes() == b"gameA-new"
+
+
 # ── shared sstates folder: serial-filtered sync (PS2, #294) ─────────────────────
 
 def test_merge_extract_leaves_other_games_states_untouched(tmp_path):
