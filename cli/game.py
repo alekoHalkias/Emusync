@@ -246,3 +246,86 @@ def game_pull_switch_save(slug: str) -> None:
         rom_sha256=gd.rom_sha256 if gd else "",
     ))
     click.echo(f"Pulled save into {seeded[0]}")
+
+
+@game.command("push-save")
+@click.argument("slug")
+@click.argument("save_path")
+def game_push_save(slug: str, save_path: str) -> None:
+    """Push this device's save for SLUG to the server (manual push).
+
+    Mirrors the automatic push inside `emusync run`'s reconcile step, run on
+    demand instead. Backs the GUI's manual "Push" button (#479) — the GUI
+    used to reimplement the file-vs-folder tar/sniff logic itself in
+    TypeScript rather than share this same code path.
+    """
+    client = _client()
+    try:
+        client.push_save(slug, save_path)
+    except Exception as exc:
+        click.echo(f"Push failed: {exc}", err=True)
+        sys.exit(1)
+    click.echo(f"Pushed save for {slug}.")
+
+
+@game.command("pull-save")
+@click.argument("slug")
+@click.argument("save_path")
+def game_pull_save(slug: str, save_path: str) -> None:
+    """Pull the server's save for SLUG onto this device (manual pull).
+
+    Backs the GUI's manual "Pull" button (#479). Exits 2 (not an error) when
+    the server has no save yet, so callers can tell that apart from a real
+    failure — matching push/pull's existing (pulled, hash) return shape.
+    """
+    client = _client()
+    try:
+        pulled, _hash = client.pull_save(slug, save_path)
+    except Exception as exc:
+        click.echo(f"Pull failed: {exc}", err=True)
+        sys.exit(1)
+    if not pulled:
+        click.echo("No save on the server yet.")
+        sys.exit(2)
+    click.echo(f"Pulled save for {slug}.")
+
+
+@game.command("push-state")
+@click.argument("slug")
+@click.argument("state_path")
+def game_push_state(slug: str, state_path: str) -> None:
+    """Push this device's save states for SLUG to the server (manual push).
+
+    Backs the GUI's manual state "Push" button (#479) — gui/electron/sync/
+    state.ts used to reimplement the tar.gz pack/backup logic itself,
+    independently of server/sync_client.py's push_state, the same
+    duplication-of-transfer-logic problem #479 fixed for saves/memcards.
+    """
+    client = _client()
+    try:
+        client.push_state(slug, state_path)
+    except Exception as exc:
+        click.echo(f"Push failed: {exc}", err=True)
+        sys.exit(1)
+    click.echo(f"Pushed states for {slug}.")
+
+
+@game.command("pull-state")
+@click.argument("slug")
+@click.argument("state_path")
+def game_pull_state(slug: str, state_path: str) -> None:
+    """Pull the server's save states for SLUG onto this device (manual pull).
+
+    Backs the GUI's manual state "Pull" button (#479). Exits 2 (not an
+    error) when the server has no states yet.
+    """
+    client = _client()
+    try:
+        pulled, _hash = client.pull_state(slug, state_path)
+    except Exception as exc:
+        click.echo(f"Pull failed: {exc}", err=True)
+        sys.exit(1)
+    if not pulled:
+        click.echo("No states on the server yet.")
+        sys.exit(2)
+    click.echo(f"Pulled states for {slug}.")
