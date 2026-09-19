@@ -173,13 +173,16 @@ export function useGamepadNav(): void {
         return;
       }
       // Nothing focused yet: skip the topbar (Import/Conflicts/Server
-      // buttons) and start on the first console/game card instead of
-      // whatever's first in raw DOM order. Only applies with no modal open —
-      // scope is the whole document then, and main.content is exactly the
-      // console grid or game grid depending on which screen is showing.
+      // buttons) and land on the first console/game card, not just the
+      // first focusable thing in .content (GameGrid's search box sits
+      // before the cards in DOM order and would otherwise win). Only
+      // applies with no modal open — scope is the whole document then.
       const content = scope === document ? document.querySelector(".content") : null;
       const candidates = getFocusables();
-      const first = content ? candidates.find((el) => content.contains(el)) : candidates[0];
+      const first = content
+        ? candidates.find((el) => content.contains(el) && el.matches(".console-card, .game-card"))
+          ?? candidates.find((el) => content.contains(el))
+        : candidates[0];
       first?.focus();
     }
 
