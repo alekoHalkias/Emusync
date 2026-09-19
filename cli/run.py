@@ -98,10 +98,21 @@ def _resolve_launch_command(gd) -> Optional[str]:
 
 
 def _sigterm_handler(*_) -> None:
+    """Kill the emulator child on SIGTERM (Steam Gaming Mode sends this when a
+    game is closed from its UI) — and then get out of the way.
+
+    Deliberately does NOT sys.exit() here: SystemExit isn't an Exception, so
+    it would skip straight past run_game's `except Exception` and land in its
+    outer `finally`, meaning the entire post-launch save/state push block
+    would never run for a game closed this way (issue #472). Returning
+    normally instead lets the interrupted `child.wait()` call in
+    _launch_and_wait retry (PEP 475) — it completes as soon as the child we
+    just killed actually exits, and control flows back into run_game exactly
+    as it would on a normal, non-signaled exit: push runs, lock releases.
+    """
     child = _run_offline_mod._child_proc
     if child is not None and child.poll() is None:
         child.kill()
-    sys.exit(0)
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)

@@ -26,6 +26,7 @@ from cli.run import (
     _resolve_written_state,
     _run_offline,
     _save_is_safe_to_push,
+    _sigterm_handler,
 )
 from server.sync_client import GameDeviceConfig
 
@@ -906,3 +907,34 @@ def test_cache_game_device_warns_on_write_failure(tmp_path, caplog):
         _cache_game_device(cfg, "zelda", gd)
 
     assert any("cache game config" in r.getMessage() for r in caplog.records)
+
+
+def test_sigterm_handler_kills_child_without_exiting(monkeypatch):
+    """Regression (#472): Steam Gaming Mode sends SIGTERM to `emusync run` when
+    a game is closed from its UI. The old handler killed the child then called
+    sys.exit(0) — SystemExit isn't an Exception, so it skipped past run_game's
+    `except Exception` straight to the outer `finally`, meaning the whole
+    post-launch save/state-push block never ran for a game closed this way.
+
+    The handler must kill the child and return normally (no exit) so the
+    interrupted child.wait() call retries (PEP 475) and control flows back
+    into run_game's normal post-launch push path, same as any other exit."""
+    import cli.run as run_mod
+    import cli.run_offline as run_offline_mod
+
+    class _FakeChild:
+        def __init__(self):
+            self.killed = False
+
+        def poll(self):
+            return None  # still running
+
+        def kill(self):
+            self.killed = True
+
+    fake_child = _FakeChild()
+    monkeypatch.setattr(run_offline_mod, "_child_proc", fake_child)
+
+    run_mod._sigterm_handler()  # must not raise SystemExit
+
+    assert fake_child.killed
