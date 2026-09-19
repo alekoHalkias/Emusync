@@ -145,6 +145,22 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener("mouseup", handleMouseNav);
   }, []);
 
+  // Escape backtracks out of a console page to the console grid, mirroring
+  // the topbar's "‹ Back" link — same relationship as the mouse-nav effect
+  // above. Only acts when no modal is open: every modal already closes on
+  // Escape itself (#474/#476), and that should take priority over changing
+  // screens out from under it.
+  useEffect(() => {
+    function handleEscapeBack(e: KeyboardEvent): void {
+      if (e.key !== "Escape") return;
+      if (screenRef.current.name !== "console") return;
+      if (document.querySelector(".modal-overlay")) return;
+      setScreen({ name: "games" });
+    }
+    window.addEventListener("keydown", handleEscapeBack);
+    return () => window.removeEventListener("keydown", handleEscapeBack);
+  }, []);
+
   useEffect(() => {
     async function init(): Promise<void> {
       const cfg = await window.emusync.config.load();
