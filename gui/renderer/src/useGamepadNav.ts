@@ -84,6 +84,17 @@ function cardSelector(el: HTMLElement | null): string | null {
   return null;
 }
 
+type Zone = "consoles" | "games";
+
+// Which top-level screen is currently showing, detected from the DOM rather
+// than React state (this hook has no access to App.tsx's screen state) —
+// .console-grid is ConsoleGrid's root, .game-grid-body is GameGrid's card area.
+function currentZone(): Zone | null {
+  if (document.querySelector(".console-grid")) return "consoles";
+  if (document.querySelector(".game-grid-body")) return "games";
+  return null;
+}
+
 function currentDirection(gp: Gamepad): Direction | null {
   if (gp.buttons[BTN_DPAD_UP]?.pressed) return "up";
   if (gp.buttons[BTN_DPAD_DOWN]?.pressed) return "down";
@@ -114,15 +125,18 @@ export function useGamepadNav(): void {
     // with A — landing on one via D-pad nav (it's just another focusable
     // element) must not trap the stick/D-pad there with no way back out.
     let editingInput: HTMLElement | null = null;
-    // Last console/game card focused at the top level (no modal open) — restored
-    // when a modal that covered it closes, so going into a game and backing out
-    // returns focus to that same card instead of resetting to the first one.
-    // Tracked by stable identity (slug/console key via a selector), not the raw
-    // DOM node — GameGrid deliberately remounts a card (new React key) when its
-    // modal closes to force its art to re-check, so the *old* node is already
+    // Last card focused in each top-level screen (no modal open) — restored
+    // when returning to that screen, whether via a modal closing back into it
+    // or the console <-> games screen switch (App.tsx's Back/Escape-backtrack),
+    // so going into a game/console and backing out returns focus to that same
+    // card instead of resetting to the first one. Tracked by stable identity
+    // (slug/console key via a selector), not the raw DOM node — GameGrid
+    // deliberately remounts a card (new React key) when its modal closes to
+    // force its art to re-check, so a held node reference would already be
     // detached by the time this runs; re-querying finds the replacement.
-    let lastCardSelector: string | null = null;
+    const lastCardSelector: Record<Zone, string | null> = { consoles: null, games: null };
     let wasInModal = false;
+    let lastZone: Zone | null = null;
 
     function tick(): void {
       rafId = requestAnimationFrame(tick);
@@ -140,19 +154,21 @@ export function useGamepadNav(): void {
       if (inModal) {
         wasInModal = true;
       } else {
-        if (wasInModal) {
-          // Just closed: real focus drops to <body> if it had moved onto
-          // something inside the modal (e.g. via D-pad nav while it was open).
-          wasInModal = false;
-          const el = document.activeElement as HTMLElement | null;
-          if (!el || el === document.body) {
-            const restored = lastCardSelector ? document.querySelector<HTMLElement>(lastCardSelector) : null;
-            restored?.focus();
-          }
-        }
+        const zone = currentZone();
         const el = document.activeElement as HTMLElement | null;
-        const sel = cardSelector(el);
-        if (sel) lastCardSelector = sel;
+        const nothingFocused = !el || el === document.body;
+        // Restore on either transition: a modal just closed back into this
+        // screen, or the screen itself just switched (console <-> games).
+        if (nothingFocused && zone && (wasInModal || zone !== lastZone)) {
+          const restored = lastCardSelector[zone] ? document.querySelector<HTMLElement>(lastCardSelector[zone]!) : null;
+          restored?.focus();
+        }
+        wasInModal = false;
+        lastZone = zone;
+
+        const activeNow = document.activeElement as HTMLElement | null;
+        const sel = cardSelector(activeNow);
+        if (sel && zone) lastCardSelector[zone] = sel;
       }
 
       const active = document.activeElement as HTMLElement | null;
