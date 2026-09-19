@@ -217,6 +217,13 @@ export const listStateHistory = (slug: string): Promise<SaveVersion[]> =>
 export const restoreState = (slug: string, versionId: string): Promise<{ hash: string; pushed_at: string }> =>
   _fetch("POST", `/games/${slug}/state/restore`, { version_id: versionId });
 
+/** Retained generations of a shared console memcard, newest first (issue #480). */
+export const listConsoleSaveHistory = (consoleKey: string): Promise<SaveVersion[]> =>
+  _fetch("GET", `/consoles/${consoleKey}/memcard/history`);
+/** Make a past shared-memcard version current on the server. */
+export const restoreConsoleSave = (consoleKey: string, versionId: string): Promise<{ hash: string; pushed_at: string }> =>
+  _fetch("POST", `/consoles/${consoleKey}/memcard/restore`, { version_id: versionId });
+
 // ── integrity / recovery (issue #285) ───────────────────────────────────────────
 
 export type IntegrityReason = "zero_byte" | "shrank" | "hash_mismatch" | "file_missing";

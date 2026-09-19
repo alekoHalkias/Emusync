@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -343,6 +344,11 @@ class SaveStateMixin:
     # PS2 uses a single memory card shared across every game on the console, which
     # doesn't fit the per-game save model. It's stored once per console_key, single
     # generation (overwrite), bytes on disk under blobs/console_saves/<key>.
+    #
+    # console_save_history (issue #480) is a separate, additive generation log —
+    # console_saves keeps meaning "the current card" (its shape/callers are
+    # unchanged), while every push also records a retained copy in history,
+    # mirroring saves/states' per-game HISTORY_LIMIT-generation model.
 
     def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int,
                                 card_format: str = "") -> dict:
@@ -361,6 +367,7 @@ class SaveStateMixin:
         if row and row["hash"] == h:
             Path(src).unlink(missing_ok=True)  # identical content — keep what's there
             return dict(row)
+        self._push_console_history_row(console_key, device_id, h, size, now, card_format, src)
         dest = self._blob_path("console_saves", console_key)
         dest.parent.mkdir(parents=True, exist_ok=True)
         os.replace(src, dest)
@@ -390,3 +397,76 @@ class SaveStateMixin:
             (console_key,),
         ).fetchone()
         return dict(row) if row else None
+
+    # ── console-scoped shared save history (issue #480) ──────────────────────────
+
+    def _push_console_history_row(self, console_key: str, device_id: str, h: str, size: int, now: str,
+                                    card_format: str, src: Path) -> None:
+        """Record a new history generation, deduping against the newest one —
+        mirrors _push_blob. *src* is copied (not moved): the caller still needs
+        it intact to move into the live console_saves slot afterward."""
+        current = self._conn.execute(
+            "SELECT hash FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC LIMIT 1",
+            (console_key,),
+        ).fetchone()
+        if current and current["hash"] == h:
+            return
+        blob_id = str(uuid.uuid4())
+        hist_path = self._blob_path("console_save_history", blob_id)
+        hist_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, hist_path)
+        self._conn.execute(
+            "INSERT INTO console_save_history (id, console_key, device_id, hash, pushed_at, size, card_format) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (blob_id, console_key, device_id, h, now, size, card_format),
+        )
+        self._prune_console_history(console_key)
+
+    def _prune_console_history(self, console_key: str) -> None:
+        """Delete all but the newest HISTORY_LIMIT generations (rows + files)."""
+        ids = [
+            r["id"] for r in self._conn.execute(
+                "SELECT id FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC", (console_key,)
+            ).fetchall()
+        ]
+        for blob_id in ids[HISTORY_LIMIT:]:
+            self._blob_path("console_save_history", blob_id).unlink(missing_ok=True)
+        self._conn.execute(
+            """DELETE FROM console_save_history
+                WHERE console_key = ? AND rowid NOT IN (
+                    SELECT rowid FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC LIMIT ?
+                )""",
+            (console_key, console_key, HISTORY_LIMIT),
+        )
+
+    def list_console_save_history(self, console_key: str) -> list[dict]:
+        """Every retained generation of a console's shared card, newest first."""
+        rows = self._conn.execute(
+            """SELECT id, device_id, hash, pushed_at, size, card_format
+                FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC""",
+            (console_key,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def restore_console_save(self, console_key: str, version_id: str) -> Optional[dict]:
+        """Make a past generation of a console's shared card current, by
+        re-pushing its bytes through push_console_save_file — subject to the
+        same dedupe/prune/history rules as a normal push, so restoring never
+        destroys history; the timeline just keeps growing forward (mirrors
+        _restore_blob's per-game behavior). None if the version doesn't exist."""
+        row = self._conn.execute(
+            "SELECT device_id, card_format FROM console_save_history WHERE id = ? AND console_key = ?",
+            (version_id, console_key),
+        ).fetchone()
+        if not row:
+            return None
+        src = self._blob_path("console_save_history", version_id)
+        if not src.exists():
+            return None
+        data = src.read_bytes()
+        tmp = self.new_upload_path()
+        tmp.write_bytes(data)
+        h = hashlib.sha256(data).hexdigest()
+        return self.push_console_save_file(
+            console_key, row["device_id"], tmp, h, len(data), row["card_format"] or ""
+        )

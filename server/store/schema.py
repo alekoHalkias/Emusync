@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 23
+_SCHEMA_VERSION = 24
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -181,6 +181,15 @@ CREATE TABLE IF NOT EXISTS save_sync_baseline (
     hash       TEXT NOT NULL,
     synced_at  TEXT NOT NULL,
     PRIMARY KEY (game_slug, device_id)
+);
+CREATE TABLE IF NOT EXISTS console_save_history (
+    id           TEXT PRIMARY KEY,
+    console_key  TEXT NOT NULL,
+    device_id    TEXT NOT NULL,
+    hash         TEXT NOT NULL,
+    pushed_at    TEXT NOT NULL,
+    size         INTEGER NOT NULL DEFAULT 0,
+    card_format  TEXT NOT NULL DEFAULT ''
 );
 """
 
@@ -458,5 +467,22 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             hash       TEXT NOT NULL,
             synced_at  TEXT NOT NULL,
             PRIMARY KEY (game_slug, device_id)
+        )""")
+    if from_version < 24:
+        # Generation history for a shared console memcard (PS2/DC/GC/PSP/3DS,
+        # issue #480) — `console_saves` only ever kept the single current copy,
+        # so those 5 consoles had no equivalent of the per-game `saves`/`states`
+        # tables' 20-generation rollback (SaveHistory/restore silently did
+        # nothing for them). Same shape as saves/states plus `card_format`, so a
+        # restored GC generation carries its format tag forward for the
+        # push-time mismatch check (#428) instead of losing it on rollback.
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_save_history (
+            id           TEXT PRIMARY KEY,
+            console_key  TEXT NOT NULL,
+            device_id    TEXT NOT NULL,
+            hash         TEXT NOT NULL,
+            pushed_at    TEXT NOT NULL,
+            size         INTEGER NOT NULL DEFAULT 0,
+            card_format  TEXT NOT NULL DEFAULT ''
         )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

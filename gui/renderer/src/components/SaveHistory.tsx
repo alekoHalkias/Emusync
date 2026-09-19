@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   listSaveHistory, restoreSave, listStateHistory, restoreState,
+  listConsoleSaveHistory, restoreConsoleSave,
   getGameIntegrity, type SaveVersion, type GameIntegrity, type BlobIntegrity, type IntegrityReason,
 } from "../api";
 import { RelTime } from "../time";
@@ -22,6 +23,14 @@ type Props = {
    *  all, unlike every other emulator here, so there's never anything to
    *  show (#441). */
   hideStates?: boolean;
+  /** Shared-memcard consoles (PS2/DC/GC/PSP/3DS, #480) have no per-game save
+   *  row to look up — when set, save history/restore is scoped to this
+   *  console's shared card instead of `slug`'s per-game save. `savePath` is
+   *  still the local disk target (it already points at the card for these
+   *  consoles, same as any other game's save_path). State history/integrity
+   *  are always skipped in this mode (out of scope — only PS2 shares states,
+   *  a separate axis from the shared-card save history this backs). */
+  consoleKey?: string;
 };
 
 /** One row in the merged recovery timeline: a server generation or a local .bak. */
@@ -65,8 +74,9 @@ function reasonsText(reasons: IntegrityReason[]): string {
  * (when the game is local) writes it to disk; restoring a `.bak` recovers a copy
  * that may never have reached the server. Nothing is auto-acted on.
  */
-export default function SaveHistory({ slug, name, savePath, statePath, onClose, onRestored, embedded, hideStates }: Props): React.ReactElement {
+export default function SaveHistory({ slug, name, savePath, statePath, onClose, onRestored, embedded, hideStates, consoleKey }: Props): React.ReactElement {
   const { devices } = useDevices();
+  const skipStates = hideStates || !!consoleKey;
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [integrity, setIntegrity] = useState<GameIntegrity | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,11 +93,15 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
       // degrade to no local backups rather than throwing on the property access.
       const listBaks = window.emusync.recovery?.listLocalBackups;
       const [saveHist, stateHist, integ, baks] = await Promise.all([
-        listSaveHistory(slug).catch(() => [] as SaveVersion[]),
-        hideStates ? Promise.resolve([] as SaveVersion[]) : listStateHistory(slug).catch(() => [] as SaveVersion[]),
-        getGameIntegrity(slug).catch(() => null),
+        consoleKey ? listConsoleSaveHistory(consoleKey).catch(() => [] as SaveVersion[])
+                   : listSaveHistory(slug).catch(() => [] as SaveVersion[]),
+        skipStates ? Promise.resolve([] as SaveVersion[]) : listStateHistory(slug).catch(() => [] as SaveVersion[]),
+        // No per-game blob backs a shared console card, so there's nothing for
+        // the integrity endpoint to classify — damaged-badge/restore-last-good
+        // is a per-game feature only, out of scope for #480.
+        consoleKey ? Promise.resolve(null) : getGameIntegrity(slug).catch(() => null),
         listBaks
-          ? listBaks(savePath ?? "", hideStates ? "" : statePath ?? "").catch(() => ({ saves: [], states: [] }))
+          ? listBaks(savePath ?? "", skipStates ? "" : statePath ?? "").catch(() => ({ saves: [], states: [] }))
           : Promise.resolve({ saves: [], states: [] }),
       ]);
       setIntegrity(integ);
@@ -105,7 +119,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
         });
       };
       addServer("save", saveHist, integ?.save);
-      if (!hideStates) addServer("state", stateHist, integ?.state);
+      if (!skipStates) addServer("state", stateHist, integ?.state);
 
       const addBaks = (kind: Kind, list: { path: string; size: number; mtime: string }[]): void => {
         for (const b of list) {
@@ -127,18 +141,21 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
     }
   }
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [slug]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [slug, consoleKey]);
 
   /** Restore a server generation (the current "restore last good" or an older row). */
   async function restoreServer(kind: Kind, versionId: string, key: string): Promise<void> {
     setBusyKey(key);
     setStatus(null);
     try {
-      if (kind === "save") await restoreSave(slug, versionId);
+      if (consoleKey) await restoreConsoleSave(consoleKey, versionId);
+      else if (kind === "save") await restoreSave(slug, versionId);
       else await restoreState(slug, versionId);
       const local = localPathFor(kind);
       if (local) {
-        const res = kind === "save"
+        const res = consoleKey
+          ? await window.emusync.memcard.pull(consoleKey, local)
+          : kind === "save"
           ? await window.emusync.save.pull(slug, local)
           : await window.emusync.state.pull(slug, local);
         if (!res.ok) throw new Error(res.error || "Restored on server, but failed to write locally");
@@ -246,7 +263,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
     );
   }
 
-  const anyDamaged = integrity && (integrity.save.status === "damaged" || (!hideStates && integrity.state.status === "damaged"));
+  const anyDamaged = integrity && (integrity.save.status === "damaged" || (!skipStates && integrity.state.status === "damaged"));
 
   const body = (
     <>
@@ -262,7 +279,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
       ) : error && entries.length === 0 ? (
         <p style={{ color: "var(--red)" }}>{error}</p>
       ) : entries.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>{hideStates ? "No save history yet for this game." : "No save or state history yet for this game."}</p>
+        <p style={{ color: "var(--text-muted)" }}>{skipStates ? "No save history yet." : "No save or state history yet for this game."}</p>
       ) : (
         <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0" }}>
           {entries.map(renderRow)}
