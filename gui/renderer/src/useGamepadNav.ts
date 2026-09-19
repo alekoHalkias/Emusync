@@ -99,8 +99,11 @@ export function useGamepadNav(): void {
 
     function tick(): void {
       rafId = requestAnimationFrame(tick);
-      const pads = navigator.getGamepads();
-      const gp = pads[0];
+      // A gamepad's index is assigned by the browser in connection order and
+      // is NOT guaranteed to be 0 — Steam's virtual-controller layer in
+      // particular is known to register extra device slots, leaving the real
+      // pad at a non-zero index while slot 0 sits null.
+      const gp = Array.from(navigator.getGamepads()).find((p): p is Gamepad => p !== null);
       if (!gp) return;
 
       const active = document.activeElement as HTMLElement | null;
