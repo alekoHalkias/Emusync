@@ -3,6 +3,7 @@ import { useEffect } from "react";
 // Standard Gamepad API mapping ("standard" gamepad_mapping) — Xbox-style
 // layout, which is what Steam Input/SDL present Deck controls as too.
 const BTN_A = 0;
+const BTN_B = 1;
 const BTN_X = 2;
 const BTN_START = 9;
 const BTN_DPAD_UP = 12;
@@ -87,13 +88,15 @@ function currentDirection(gp: Gamepad): Direction | null {
 
 // Global controller navigation (#476): D-pad/left-stick moves focus between
 // the app's existing focusable elements, A clicks whatever's focused, X/Start
-// launches the focused game card directly. Mount once at the app root.
+// launches the focused game card directly, B closes the topmost modal. Mount
+// once at the app root.
 export function useGamepadNav(): void {
   useEffect(() => {
     let rafId: number;
     let lastDirection: Direction | null = null;
     let nextMoveAt = 0;
     let prevA = false;
+    let prevB = false;
     let prevX = false;
     let prevStart = false;
 
@@ -128,6 +131,16 @@ export function useGamepadNav(): void {
       const aPressed = !!gp.buttons[BTN_A]?.pressed;
       if (aPressed && !prevA) active?.click();
       prevA = aPressed;
+
+      // B mirrors Escape — every modal already closes on Escape via
+      // useEscapeToClose/useEscapeToCloseTopmost's own window keydown
+      // listeners (#474), so dispatching a synthetic Escape keydown reuses
+      // that wiring for free instead of duplicating close logic per modal.
+      const bPressed = !!gp.buttons[BTN_B]?.pressed;
+      if (bPressed && !prevB) {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      }
+      prevB = bPressed;
 
       const xPressed = !!gp.buttons[BTN_X]?.pressed;
       const startPressed = !!gp.buttons[BTN_START]?.pressed;
