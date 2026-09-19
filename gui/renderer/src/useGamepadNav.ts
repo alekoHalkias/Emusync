@@ -100,10 +100,13 @@ export function useGamepadNav(): void {
     function tick(): void {
       rafId = requestAnimationFrame(tick);
       // A gamepad's index is assigned by the browser in connection order and
-      // is NOT guaranteed to be 0 — Steam's virtual-controller layer in
-      // particular is known to register extra device slots, leaving the real
-      // pad at a non-zero index while slot 0 sits null.
-      const gp = Array.from(navigator.getGamepads()).find((p): p is Gamepad => p !== null);
+      // is NOT guaranteed to be 0 — other HID devices that present a joystick-
+      // shaped interface (e.g. some keyboard dongles) can occupy a lower slot
+      // than the real controller. Standard Gamepad Mapping is what the button/
+      // axis indices below assume, so require it explicitly rather than just
+      // taking the first non-null slot — that also filters out those unrelated
+      // non-gamepad devices, which report mapping "" (empty), not "standard".
+      const gp = Array.from(navigator.getGamepads()).find((p): p is Gamepad => p !== null && p.mapping === "standard");
       if (!gp) return;
 
       const active = document.activeElement as HTMLElement | null;
