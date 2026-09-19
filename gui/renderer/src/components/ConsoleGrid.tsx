@@ -120,6 +120,7 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
           <button
             key={c.key}
             className="console-card"
+            data-console-key={c.key}
             onClick={() => onSelectConsole(c.key, c.label, c.abbr)}
             style={{ "--console-accent": color } as React.CSSProperties}
           >

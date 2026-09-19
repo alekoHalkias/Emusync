@@ -73,6 +73,17 @@ function findNextFocusable(current: HTMLElement, dir: Direction): HTMLElement | 
   return best;
 }
 
+// A CSS-attribute-selector identity for a console/game card, keyed by the
+// stable data-slug/data-console-key attribute rather than the DOM node
+// itself, so it survives the card being remounted under a new key.
+function cardSelector(el: HTMLElement | null): string | null {
+  const slug = el?.matches(".game-card") ? el.dataset.slug : undefined;
+  if (slug) return `.game-card[data-slug="${CSS.escape(slug)}"]`;
+  const consoleKey = el?.matches(".console-card") ? el.dataset.consoleKey : undefined;
+  if (consoleKey) return `.console-card[data-console-key="${CSS.escape(consoleKey)}"]`;
+  return null;
+}
+
 function currentDirection(gp: Gamepad): Direction | null {
   if (gp.buttons[BTN_DPAD_UP]?.pressed) return "up";
   if (gp.buttons[BTN_DPAD_DOWN]?.pressed) return "down";
@@ -106,7 +117,11 @@ export function useGamepadNav(): void {
     // Last console/game card focused at the top level (no modal open) — restored
     // when a modal that covered it closes, so going into a game and backing out
     // returns focus to that same card instead of resetting to the first one.
-    let lastCardFocus: HTMLElement | null = null;
+    // Tracked by stable identity (slug/console key via a selector), not the raw
+    // DOM node — GameGrid deliberately remounts a card (new React key) when its
+    // modal closes to force its art to re-check, so the *old* node is already
+    // detached by the time this runs; re-querying finds the replacement.
+    let lastCardSelector: string | null = null;
     let wasInModal = false;
 
     function tick(): void {
@@ -130,12 +145,14 @@ export function useGamepadNav(): void {
           // something inside the modal (e.g. via D-pad nav while it was open).
           wasInModal = false;
           const el = document.activeElement as HTMLElement | null;
-          if ((!el || el === document.body) && lastCardFocus && document.contains(lastCardFocus)) {
-            lastCardFocus.focus();
+          if (!el || el === document.body) {
+            const restored = lastCardSelector ? document.querySelector<HTMLElement>(lastCardSelector) : null;
+            restored?.focus();
           }
         }
         const el = document.activeElement as HTMLElement | null;
-        if (el?.matches(".console-card, .game-card")) lastCardFocus = el;
+        const sel = cardSelector(el);
+        if (sel) lastCardSelector = sel;
       }
 
       const active = document.activeElement as HTMLElement | null;
