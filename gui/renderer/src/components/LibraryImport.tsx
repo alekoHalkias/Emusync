@@ -10,6 +10,7 @@ import ConsoleImport from "./ConsoleImport";
 import { Spinner } from "./console-import/Spinner";
 import { CloseIcon } from "./icons";
 import type { ConsoleOption } from "./console-import/types";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 const emusync = window.emusync;
 
@@ -30,6 +31,7 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
 
+  useEscapeToClose(onClose);
   useEffect(() => { emusync.emulator.consoles().then(setConsoles); }, []);
 
   async function pickLibraryRoot(): Promise<void> {
@@ -118,7 +120,7 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
         style={{ width: "clamp(640px, 70vw, 960px)", maxHeight: "85vh", display: "flex", flexDirection: "column" }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div className="modal-header">
           <h3 style={{ margin: 0 }}>Import library</h3>
           <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
         </div>

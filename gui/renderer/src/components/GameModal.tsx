@@ -7,6 +7,7 @@ import GameDeviceModal from "./game-list/GameDeviceModal";
 import SaveHistory from "./SaveHistory";
 import SwitchModsTab from "./SwitchModsTab";
 import { CloseIcon, PlayIcon } from "./icons";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 export type GameModalTarget = {
   slug: string;
@@ -31,6 +32,8 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   const isSwitch = consoleKey === "switch";
   const [tab, setTab] = useState<Tab>("settings");
 
+  useEscapeToClose(onClose);
+
   const tabs: { key: Tab; label: string; disabled?: boolean }[] = [
     { key: "settings", label: "Settings" },
     { key: "artwork", label: "Artwork" },
@@ -43,7 +46,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ width: 760, maxWidth: "92vw" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div className="modal-header">
           <h3 style={{ margin: 0 }}>{name}</h3>
           <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
         </div>
@@ -67,7 +70,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
           ))}
         </div>
 
-        <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
+        <div>
           {tab === "settings" && (
             <GameConfig
               embedded

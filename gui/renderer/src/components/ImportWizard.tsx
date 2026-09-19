@@ -6,12 +6,14 @@ import type { ReactElement } from "react";
 import ConsoleImport from "./ConsoleImport";
 import LibraryImport from "./LibraryImport";
 import { CloseIcon } from "./icons";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 type Mode = "choice" | "console" | "library";
 type Props = { onClose: () => void; onImported: () => void };
 
 export default function ImportWizard({ onClose, onImported }: Props): ReactElement {
   const [mode, setMode] = useState<Mode>("choice");
+  useEscapeToClose(onClose);
 
   if (mode === "console") return <ConsoleImport onClose={onClose} onImported={onImported} />;
   if (mode === "library") return <LibraryImport onClose={onClose} onImported={onImported} />;

@@ -4,6 +4,7 @@ import {
   type SaveConflict,
 } from "../api";
 import { RelTime } from "../time";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 /**
  * Top-bar "Conflicts" panel (issue #243). EmuSync auto-resolves a true save
@@ -21,6 +22,7 @@ export default function ConflictsButton(): React.ReactElement | null {
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [status, setStatus] = useState<Record<string, string>>({});
+  useEscapeToClose(() => setOpen(false));
 
   const load = useCallback(async () => {
     try {

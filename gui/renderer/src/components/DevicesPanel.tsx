@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { listEvents, removeDevice, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 export default function DevicesPanel(): React.ReactElement {
   const { devices, currentDeviceId, refresh } = useDevices();
@@ -12,6 +13,9 @@ export default function DevicesPanel(): React.ReactElement {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  // ponytail: doesn't take priority over the host "Paired devices" popup's own
+  // escape handler, so Escape may close both at once — fine for a rare nested case.
+  useEscapeToClose(() => !removing && setConfirmRemove(null));
 
   const loadEvents = useCallback(async () => {
     setEventsLoading(true);

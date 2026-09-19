@@ -11,6 +11,7 @@ import {
   type GameNetworkSource,
 } from "../api";
 import ConsoleImport from "./ConsoleImport";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 type Props = {
   slug: string;
@@ -45,6 +46,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   const [networkMount, setNetworkMount] = useState<string | null>(null);
   const [gameNetworkSource, setGameNetworkSource] = useState<GameNetworkSource | null>(null);
   const autoAttempted = useRef(false);
+  useEscapeToClose(onClose);
 
   useEffect(() => {
     (async () => {
