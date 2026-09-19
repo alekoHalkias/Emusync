@@ -103,6 +103,11 @@ export function useGamepadNav(): void {
     // with A — landing on one via D-pad nav (it's just another focusable
     // element) must not trap the stick/D-pad there with no way back out.
     let editingInput: HTMLElement | null = null;
+    // Last console/game card focused at the top level (no modal open) — restored
+    // when a modal that covered it closes, so going into a game and backing out
+    // returns focus to that same card instead of resetting to the first one.
+    let lastCardFocus: HTMLElement | null = null;
+    let wasInModal = false;
 
     function tick(): void {
       rafId = requestAnimationFrame(tick);
@@ -115,6 +120,23 @@ export function useGamepadNav(): void {
       // non-gamepad devices, which report mapping "" (empty), not "standard".
       const gp = Array.from(navigator.getGamepads()).find((p): p is Gamepad => p !== null && p.mapping === "standard");
       if (!gp) return;
+
+      const inModal = focusScope() !== document;
+      if (inModal) {
+        wasInModal = true;
+      } else {
+        if (wasInModal) {
+          // Just closed: real focus drops to <body> if it had moved onto
+          // something inside the modal (e.g. via D-pad nav while it was open).
+          wasInModal = false;
+          const el = document.activeElement as HTMLElement | null;
+          if ((!el || el === document.body) && lastCardFocus && document.contains(lastCardFocus)) {
+            lastCardFocus.focus();
+          }
+        }
+        const el = document.activeElement as HTMLElement | null;
+        if (el?.matches(".console-card, .game-card")) lastCardFocus = el;
+      }
 
       const active = document.activeElement as HTMLElement | null;
       if (editingInput && active !== editingInput) editingInput = null; // focus moved by other means
