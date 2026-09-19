@@ -10,6 +10,7 @@ import GameGrid from "./components/GameGrid";
 import ImportWizard from "./components/ImportWizard";
 import { useGameList } from "./components/game-list/useGameList";
 import { applySwitchTitleId } from "./components/console-import/postImport";
+import { useGamepadNav } from "./useGamepadNav";
 
 type Screen =
   | { name: "loading" }
@@ -27,6 +28,8 @@ export default function App(): React.ReactElement {
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
   const [runningGameSlug, setRunningGameSlug] = useState<string | null>(null);
   const [myDeviceId, setMyDeviceId] = useState<string | null>(null);
+
+  useGamepadNav();
 
   // Shared game list — data source for both ConsoleGrid and GameGrid.
   // Only active after setup is complete; the hook starts polling on mount.
@@ -140,6 +143,22 @@ export default function App(): React.ReactElement {
     }
     window.addEventListener("mouseup", handleMouseNav);
     return () => window.removeEventListener("mouseup", handleMouseNav);
+  }, []);
+
+  // Escape backtracks out of a console page to the console grid, mirroring
+  // the topbar's "‹ Back" link — same relationship as the mouse-nav effect
+  // above. Only acts when no modal is open: every modal already closes on
+  // Escape itself (#474/#476), and that should take priority over changing
+  // screens out from under it.
+  useEffect(() => {
+    function handleEscapeBack(e: KeyboardEvent): void {
+      if (e.key !== "Escape") return;
+      if (screenRef.current.name !== "console") return;
+      if (document.querySelector(".modal-overlay")) return;
+      setScreen({ name: "games" });
+    }
+    window.addEventListener("keydown", handleEscapeBack);
+    return () => window.removeEventListener("keydown", handleEscapeBack);
   }, []);
 
   useEffect(() => {

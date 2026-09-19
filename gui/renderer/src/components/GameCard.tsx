@@ -39,6 +39,7 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
   return (
     <div
       className={`game-card${selected ? " game-card-selected" : ""}`}
+      data-slug={game.slug}
       style={{ "--card-accent": consoleAccent, cursor: "pointer" } as React.CSSProperties}
       onClick={() => onSettings(game)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSettings(game); } }}
