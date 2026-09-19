@@ -27,6 +27,24 @@ async def test_push_and_pull_save(client):
 
 
 @pytest.mark.asyncio
+async def test_push_save_hash_excludes_transfer_envelope(client):
+    """A push wrapped in the transfer envelope (#478) is hashed by its
+    content, not the wire framing — the server's recorded hash must match
+    what a client computes locally (server/sync_client.py's
+    _memcard_payload_bytes) for the same content, or _reconcile_save's #460
+    divergence check misreads every ordinary sync as a conflict."""
+    from server.sync_client import _pack_envelope, _FMT_RAW
+
+    await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
+
+    content = b"the actual save content"
+    enveloped = _pack_envelope(_FMT_RAW, content)
+    r = await client.post("/games/pokemon-emerald/save", content=enveloped, headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["hash"] == hashlib.sha256(content).hexdigest()
+
+
+@pytest.mark.asyncio
 async def test_push_save_updates_version(client):
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 

@@ -23,6 +23,7 @@ import httpx
 # bytes themselves — that also means it survives save-history/restore for
 # free, no schema change needed.
 _ENVELOPE_MAGIC = b"ES1\0"
+_ENVELOPE_HEADER_LEN = len(_ENVELOPE_MAGIC) + 1  # magic + 1 format byte
 _FMT_RAW = 0     # single file, payload is its raw bytes
 _FMT_TAR = 1     # folder, payload is an uncompressed tar
 _FMT_TARGZ = 2   # folder, payload is a gzip'd tar (states)
@@ -145,19 +146,27 @@ class GameDeviceConfig:
     device_local_folder: str = ""
 
 
-def memcard_bytes(card_path: Path) -> bytes:
-    """Serialize a memcard for network transfer and local hashing.
+def _memcard_payload_bytes(card_path: Path) -> bytes:
+    """Serialize a memcard's *content* — no transfer envelope — for local
+    hashing (_reconcile_save's #460 divergence check, cli/run.py's post-launch
+    push-if-changed compare). Kept envelope-free so content hashes stay stable
+    across #478 landing: hashing the enveloped wire bytes instead would have
+    changed every existing hash on day one, and _reconcile_save's "did this
+    actually change since we last agreed" logic would misread that global
+    hash-format bump as a real conflict on literally every game, every
+    device, the first time each was reconciled post-upgrade — not a narrow
+    one-time nuisance. server/api/blobs.py's _stage_upload mirrors this by
+    hashing the uploaded bytes minus the envelope header, so a fresh push's
+    server-recorded hash matches what this function returns for the same
+    content, same as pre-#478.
 
     Folder-based memcards (PCSX2 .ps2 folders) are packed as a deterministic
     plain tar archive (sorted entries, mtime=0) so the SHA-256 is stable across
-    calls for unchanged content — required for _reconcile_save's hash comparison.
-    Walks the whole tree (``rglob``, not a single-level ``iterdir``): PCSX2
-    nests each game's saves one level down in its own subfolder, so a
-    top-level-only walk would silently drop every game's data and push just
-    the loose top-level files (e.g. ``_pcsx2_superblock``). File-based
-    memcards are packed as raw bytes. Either way the result is wrapped in the
-    transfer envelope (#478) so the receiver reads the declared format instead
-    of guessing.
+    calls for unchanged content. Walks the whole tree (``rglob``, not a
+    single-level ``iterdir``): PCSX2 nests each game's saves one level down in
+    its own subfolder, so a top-level-only walk would silently drop every
+    game's data and push just the loose top-level files (e.g.
+    ``_pcsx2_superblock``). File-based memcards are raw bytes.
     """
     if card_path.is_dir():
         buf = io.BytesIO()
@@ -171,8 +180,19 @@ def memcard_bytes(card_path: Path) -> bytes:
                 info.size = len(data)
                 info.mtime = 0
                 tar.addfile(info, io.BytesIO(data))
-        return _pack_envelope(_FMT_TAR, buf.getvalue())
-    return _pack_envelope(_FMT_RAW, card_path.read_bytes())
+        return buf.getvalue()
+    return card_path.read_bytes()
+
+
+def memcard_bytes(card_path: Path) -> bytes:
+    """Serialize a memcard for network transfer — _memcard_payload_bytes'
+    content, wrapped in the transfer envelope (#478) so the receiver reads
+    the declared format instead of guessing. Not used for hashing; see
+    _memcard_payload_bytes for that.
+    """
+    payload = _memcard_payload_bytes(card_path)
+    fmt = _FMT_TAR if card_path.is_dir() else _FMT_RAW
+    return _pack_envelope(fmt, payload)
 
 
 def _write_memcard_tar_bytes(card: Path, tar_bytes: bytes) -> None:

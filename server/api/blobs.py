@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from ..store import SaveMeta
+from ..sync_client import _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC
 from ._core import (
     _auth, _get_store, _print_activity, _device_label, _game_label,
     _run_integrity_sweep, get_integrity_status,
@@ -116,17 +117,44 @@ async def _stage_upload(request: Request):
     Returns (path, sha256_hex, size) so a multi-MB save/state is never held whole in
     memory (issue #239). The store moves the file into place on a same-filesystem
     rename; on a dedupe hit it's discarded.
+
+    The hash excludes the transfer envelope's magic+format header (#478
+    follow-up) — every push now carries that header, but content identity
+    must stay independent of transport framing so an unchanged save/state
+    keeps hashing the same across #478 landing. Hashing the full enveloped
+    upload instead would have bumped every existing hash the instant this
+    shipped, and _reconcile_save's #460 divergence check would misread that
+    global format change as a real conflict on literally every game, every
+    device, the first time each reconciled post-upgrade. The full bytes
+    (envelope included) are still written to disk as-is — pull/extraction
+    needs the header to know the shape.
     """
     store = _get_store()
     tmp = store.new_upload_path()
     hasher = hashlib.sha256()
     size = 0
+    header_buf = b""
+    hashing_started = False
     try:
         with open(tmp, "wb") as f:
             async for chunk in request.stream():
                 f.write(chunk)
-                hasher.update(chunk)
                 size += len(chunk)
+                if not hashing_started:
+                    header_buf += chunk
+                    if len(header_buf) < _ENVELOPE_HEADER_LEN:
+                        continue  # still buffering enough to check the magic
+                    payload_start = header_buf[_ENVELOPE_HEADER_LEN:] if header_buf[:4] == _ENVELOPE_MAGIC else header_buf
+                    hasher.update(payload_start)
+                    hashing_started = True
+                else:
+                    hasher.update(chunk)
+            if not hashing_started:
+                # Upload smaller than the header itself (shouldn't happen for
+                # real save/state data) — hash what's there, minus the header
+                # if it happens to be a (truncated) match.
+                payload_start = header_buf[_ENVELOPE_HEADER_LEN:] if header_buf[:4] == _ENVELOPE_MAGIC else header_buf
+                hasher.update(payload_start)
     except BaseException:
         tmp.unlink(missing_ok=True)  # don't leave a half-written .part behind
         raise

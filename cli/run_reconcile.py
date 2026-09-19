@@ -12,7 +12,7 @@ import click
 
 from cli.common import _parse_iso_utc
 from cli.run_conflicts import _warn_save_conflict
-from server.sync_client import memcard_bytes
+from server.sync_client import _memcard_payload_bytes
 
 
 def _decide_save_action(
@@ -68,7 +68,7 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
     local_hash: Optional[str] = None
     local_mtime: Optional[datetime] = None
     if p.exists():
-        local_hash = hashlib.sha256(memcard_bytes(p)).hexdigest()
+        local_hash = hashlib.sha256(_memcard_payload_bytes(p)).hexdigest()
         # rglob, not iterdir: folder cards nest content (PCSX2 GAME1/GAME1,
         # PPSSPP SAVEDATA/<GAME>/, Dolphin GC/) whose changes must count (#402).
         mtime_src = max((f.stat().st_mtime for f in p.rglob("*") if f.is_file()), default=p.stat().st_mtime) if p.is_dir() else p.stat().st_mtime
