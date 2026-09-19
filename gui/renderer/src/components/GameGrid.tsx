@@ -8,6 +8,7 @@ import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
 import SteamRestartModal from "./SteamRestartModal";
 import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
+import { useEscapeToCloseTopmost } from "../useEscapeToClose";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -60,6 +61,10 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   // and needs its own strong confirmation before it actually runs.
   const [bulkDeleteNetworkRom, setBulkDeleteNetworkRom] = useState(false);
   const [confirmBulkNetworkDelete, setConfirmBulkNetworkDelete] = useState(false);
+  useEscapeToCloseTopmost(
+    [confirmBulkNetworkDelete && !deleting, () => setConfirmBulkNetworkDelete(false)],
+    [confirmDelete && !deleting, () => setConfirmDelete(false)],
+  );
   const [artType, setArtType] = useState<ArtType>("grid");
   // Bumped per-slug when the settings modal closes, so that game's GameCard
   // remounts and re-fetches art (it may have just been edited in the

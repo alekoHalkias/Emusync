@@ -4,6 +4,7 @@ import { RelTime } from "../time";
 import DevicesPanel from "./DevicesPanel";
 import { useDevices } from "../DeviceContext";
 import { CloseIcon } from "./icons";
+import { useEscapeToCloseTopmost } from "../useEscapeToClose";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
@@ -38,6 +39,12 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   // SteamGridDB art key (issue #322)
   const [artKeyInput, setArtKeyInput] = useState("");
   const [artKeyBusy, setArtKeyBusy] = useState(false);
+  useEscapeToCloseTopmost(
+    [showActivity, () => setShowActivity(false)],
+    [showArtKey, () => setShowArtKey(false)],
+    [showDevices, () => setShowDevices(false)],
+    [open, () => setOpen(false)],
+  );
   const [artKeySaved, setArtKeySaved] = useState(false);
   const [artKeyError, setArtKeyError] = useState("");
 
@@ -249,7 +256,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       {open && (
         <div className="modal-overlay" onClick={() => setOpen(false)}>
           <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div className="modal-header">
               <h3>Server connection</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setOpen(false)}><CloseIcon /></button>
             </div>
@@ -436,7 +443,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       {showDevices && (
         <div className="modal-overlay" onClick={() => setShowDevices(false)}>
           <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div className="modal-header">
               <h3>Paired devices</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowDevices(false)}><CloseIcon /></button>
             </div>
@@ -451,7 +458,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       {showArtKey && (
         <div className="modal-overlay" onClick={() => setShowArtKey(false)}>
           <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div className="modal-header">
               <h3>SteamGridDB art</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowArtKey(false)}><CloseIcon /></button>
             </div>
@@ -481,7 +488,7 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
       {showActivity && (
         <div className="modal-overlay" onClick={() => setShowActivity(false)}>
           <div className="modal" style={{ width: 480 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div className="modal-header">
               <h3>Server activity</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowActivity(false)}><CloseIcon /></button>
             </div>

@@ -2,6 +2,7 @@
 // GameConfig's single add and GameGrid's bulk add. Purely presentational;
 // the caller owns the shutdown → add → relaunch orchestration.
 import React from "react";
+import { useEscapeToClose } from "../useEscapeToClose";
 
 type Props = {
   count: number;         // how many games the pending add covers (for the label)
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export default function SteamRestartModal({ count, busy, onYes, onNo }: Props): React.ReactElement {
+  useEscapeToClose(() => !busy && onNo());
   return (
     <div className="modal-overlay" onClick={() => !busy && onNo()}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
