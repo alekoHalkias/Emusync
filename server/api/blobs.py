@@ -322,3 +322,19 @@ def get_console_memcard_meta(console_key: str, device_id: str = Depends(_auth)) 
                             "card_format": meta.get("card_format", "")}),
         media_type="application/json",
     )
+
+
+@router.get("/consoles/{console_key}/memcard/history")
+def list_console_memcard_history(console_key: str, device_id: str = Depends(_auth)) -> list[dict]:
+    """Every retained generation of a console's shared card, newest first (#480)."""
+    return _get_store().list_console_save_history(console_key)
+
+
+@router.post("/consoles/{console_key}/memcard/restore")
+def restore_console_memcard(console_key: str, req: RestoreRequest, device_id: str = Depends(_auth)) -> dict:
+    """Make a past generation of a console's shared card current (#480)."""
+    meta = _get_store().restore_console_save(console_key, req.version_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="Memory card version not found")
+    _print_activity(f"memcard restored: {console_key} by {_device_label(device_id)}")
+    return {"hash": meta["hash"], "pushed_at": meta["pushed_at"]}

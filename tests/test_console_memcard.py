@@ -148,3 +148,120 @@ async def test_memcard_card_format_defaults_empty_when_not_sent(client):
     await client.post("/consoles/PS2/memcard", content=card, headers=AUTH)
     r = await client.get("/consoles/PS2/memcard/meta", headers=AUTH)
     assert r.json()["card_format"] == ""
+
+
+# ── shared-card history & rollback (issue #480) ─────────────────────────────────
+
+def test_console_save_history_accumulates_generations():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        for payload in (b"gen-one", b"gen-two-bigger", b"gen-three"):
+            up = store.new_upload_path()
+            up.write_bytes(payload)
+            store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
+
+        history = store.list_console_save_history("PS2")
+        assert len(history) == 3
+        assert history[0]["hash"] == hashlib.sha256(b"gen-three").hexdigest()
+        assert history[-1]["hash"] == hashlib.sha256(b"gen-one").hexdigest()
+
+
+def test_console_save_history_dedupes_identical_pushes():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        for _ in range(2):
+            up = store.new_upload_path()
+            up.write_bytes(b"same")
+            store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(b"same").hexdigest(), 4)
+        assert len(store.list_console_save_history("PS2")) == 1
+
+
+def test_console_save_history_pruned_to_limit():
+    from server.store.blobs import HISTORY_LIMIT
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        for i in range(HISTORY_LIMIT + 5):
+            payload = f"gen-{i}".encode()
+            up = store.new_upload_path()
+            up.write_bytes(payload)
+            store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
+        history = store.list_console_save_history("PS2")
+        assert len(history) == HISTORY_LIMIT
+        assert history[0]["hash"] == hashlib.sha256(f"gen-{HISTORY_LIMIT + 4}".encode()).hexdigest()
+
+
+def test_restore_console_save_makes_old_version_current():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        for payload in (b"good-card", b"bad-card"):
+            up = store.new_upload_path()
+            up.write_bytes(payload)
+            store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
+
+        history = store.list_console_save_history("PS2")
+        good_version = next(v for v in history if v["hash"] == hashlib.sha256(b"good-card").hexdigest())
+
+        meta = store.restore_console_save("PS2", good_version["id"])
+        assert meta["hash"] == hashlib.sha256(b"good-card").hexdigest()
+
+        path, _ = store.pull_console_save_path("PS2")
+        assert path.read_bytes() == b"good-card"
+        # Restore added a forward generation rather than dropping anything.
+        assert len(store.list_console_save_history("PS2")) == 3
+
+
+def test_restore_console_save_carries_card_format_forward():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        up = store.new_upload_path()
+        up.write_bytes(b"gc card v1")
+        store.push_console_save_file("GC", "dev-1", up, hashlib.sha256(b"gc card v1").hexdigest(), 10,
+                                      card_format="GCIFolder")
+        up2 = store.new_upload_path()
+        up2.write_bytes(b"gc card v2")
+        store.push_console_save_file("GC", "dev-1", up2, hashlib.sha256(b"gc card v2").hexdigest(), 10,
+                                      card_format="GCIFolder")
+
+        old_version = store.list_console_save_history("GC")[-1]
+        meta = store.restore_console_save("GC", old_version["id"])
+        assert meta["card_format"] == "GCIFolder"
+        assert store.get_console_save_meta("GC")["card_format"] == "GCIFolder"
+
+
+def test_restore_console_save_unknown_version_returns_none():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        assert store.restore_console_save("PS2", "no-such-id") is None
+
+
+@pytest.mark.asyncio
+async def test_memcard_history_route_accumulates_and_restores(client):
+    await client.post("/consoles/PS2/memcard", content=b"good-card", headers=AUTH)
+    await client.post("/consoles/PS2/memcard", content=b"bad-card", headers=AUTH)
+
+    r = await client.get("/consoles/PS2/memcard/history", headers=AUTH)
+    assert r.status_code == 200
+    history = r.json()
+    assert len(history) == 2
+    good_version = next(v for v in history if v["hash"] == hashlib.sha256(b"good-card").hexdigest())
+
+    r = await client.post("/consoles/PS2/memcard/restore", json={"version_id": good_version["id"]}, headers=AUTH)
+    assert r.status_code == 200
+    assert r.json()["hash"] == hashlib.sha256(b"good-card").hexdigest()
+
+    pulled = await client.get("/consoles/PS2/memcard", headers=AUTH)
+    assert pulled.content == b"good-card"
+
+
+@pytest.mark.asyncio
+async def test_memcard_restore_unknown_version_returns_404(client):
+    await client.post("/consoles/PS2/memcard", content=b"x", headers=AUTH)
+    r = await client.post("/consoles/PS2/memcard/restore", json={"version_id": "no-such-id"}, headers=AUTH)
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_memcard_history_empty_for_unknown_console(client):
+    r = await client.get("/consoles/GHOST/memcard/history", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json() == []

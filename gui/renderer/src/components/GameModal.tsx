@@ -8,6 +8,7 @@ import SaveHistory from "./SaveHistory";
 import SwitchModsTab from "./SwitchModsTab";
 import { CloseIcon, PlayIcon } from "./icons";
 import { useEscapeToClose } from "../useEscapeToClose";
+import { usesSharedSaveLayout } from "./console-import/helpers";
 
 export type GameModalTarget = {
   slug: string;
@@ -88,7 +89,11 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
             <GameDeviceModal embedded slug={slug} name={name} gameConsole={gameConsole} gameIsLocal={gameIsLocal} onClose={onClose} />
           )}
           {tab === "history" && (
-            <SaveHistory embedded slug={slug} name={name} savePath={savePath} statePath={statePath} onClose={onClose} onRestored={onChanged} hideStates={isSwitch} />
+            <SaveHistory
+              embedded slug={slug} name={name} savePath={savePath} statePath={statePath}
+              onClose={onClose} onRestored={onChanged} hideStates={isSwitch}
+              consoleKey={usesSharedSaveLayout(consoleKey) ? gameConsole : undefined}
+            />
           )}
           {tab === "mods" && isSwitch && (
             <SwitchModsTab slug={slug} />
