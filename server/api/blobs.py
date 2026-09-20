@@ -285,6 +285,9 @@ def pull_console_memcard(console_key: str, device_id: str = Depends(_auth)) -> R
     path, meta = _get_store().pull_console_save_path(console_key)
     if path is None:
         return Response(status_code=204)
+    # This device's copy now agrees with the server as of this hash (#481,
+    # mirrors _pull's per-game baseline write).
+    _get_store().set_console_save_sync_baseline(console_key, device_id, meta["hash"], meta["pushed_at"])
     _print_activity(f"memcard pulled: {console_key} by {_device_label(device_id)}")
     return FileResponse(
         path,
@@ -304,7 +307,12 @@ async def push_console_memcard(console_key: str, request: Request, device_id: st
     card_format = request.headers.get("X-Card-Format", "")
 
     def _store_it() -> dict:
-        return _get_store().push_console_save_file(console_key, device_id, tmp, h, size, card_format)
+        store = _get_store()
+        m = store.push_console_save_file(console_key, device_id, tmp, h, size, card_format)
+        # The pushing device trivially agrees with the server on its own push —
+        # record it as this device's baseline too (#481, mirrors _push).
+        store.set_console_save_sync_baseline(console_key, device_id, m["hash"], m["pushed_at"])
+        return m
 
     meta = await asyncio.to_thread(_store_it)
     _print_activity(f"memcard pushed: {console_key} from {_device_label(device_id)}")
@@ -322,6 +330,17 @@ def get_console_memcard_meta(console_key: str, device_id: str = Depends(_auth)) 
                             "card_format": meta.get("card_format", "")}),
         media_type="application/json",
     )
+
+
+@router.get("/consoles/{console_key}/memcard/sync-baseline")
+def get_console_memcard_sync_baseline(console_key: str, device_id: str = Depends(_auth)) -> Response:
+    """The shared-card hash *this* device last successfully pushed or pulled
+    for CONSOLE_KEY — lets it tell a real conflict apart from a routine
+    catch-up pull, the same as /games/{slug}/save/sync-baseline (#460/#481)."""
+    baseline = _get_store().get_console_save_sync_baseline(console_key, device_id)
+    if not baseline:
+        return Response(status_code=204)
+    return Response(content=json.dumps(baseline), media_type="application/json")
 
 
 @router.get("/consoles/{console_key}/memcard/history")

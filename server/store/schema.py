@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 24
+_SCHEMA_VERSION = 25
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -190,6 +190,13 @@ CREATE TABLE IF NOT EXISTS console_save_history (
     pushed_at    TEXT NOT NULL,
     size         INTEGER NOT NULL DEFAULT 0,
     card_format  TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS console_save_sync_baseline (
+    console_key  TEXT NOT NULL,
+    device_id    TEXT NOT NULL,
+    hash         TEXT NOT NULL,
+    synced_at    TEXT NOT NULL,
+    PRIMARY KEY (console_key, device_id)
 );
 """
 
@@ -484,5 +491,20 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             pushed_at    TEXT NOT NULL,
             size         INTEGER NOT NULL DEFAULT 0,
             card_format  TEXT NOT NULL DEFAULT ''
+        )""")
+    if from_version < 25:
+        # Console-scoped equivalent of save_sync_baseline (#460) for the shared-
+        # memcard consoles (PS2/DC/GC/PSP/3DS, issue #481) — those 5 consoles
+        # were the one place #460's fix never reached: _MemcardClient.
+        # get_save_sync_baseline hardcoded None, so they kept the old, noisier
+        # "any hash mismatch = conflict" behavior every other console stopped
+        # seeing months ago. Same shape as save_sync_baseline, keyed by
+        # console_key instead of game_slug.
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_save_sync_baseline (
+            console_key  TEXT NOT NULL,
+            device_id    TEXT NOT NULL,
+            hash         TEXT NOT NULL,
+            synced_at    TEXT NOT NULL,
+            PRIMARY KEY (console_key, device_id)
         )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

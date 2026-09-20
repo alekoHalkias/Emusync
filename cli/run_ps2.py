@@ -105,12 +105,13 @@ class _MemcardClient:
         return None
 
     def get_save_sync_baseline(self, _slug: str):
-        # Per-device baseline tracking (issue #460) is per-game-slug only — a
-        # shared console card has no game row to key it by. Always returning
-        # None keeps `_reconcile_save`'s divergence check mathematically
-        # identical to its pre-#460 behavior for shared-memcard consoles
-        # (out of scope for that issue), rather than raising AttributeError.
-        return None
+        # Console-scoped equivalent of save_sync_baseline, keyed by console_key
+        # instead of game_slug (issue #481) — extends #460's conflict-
+        # suppression (a routine catch-up pull isn't a real divergence unless
+        # BOTH sides moved past the last-agreed hash) to shared-memcard
+        # consoles, which previously always reported no baseline and so kept
+        # the old, noisier "any hash mismatch = conflict" behavior.
+        return self._client.get_console_save_sync_baseline(self._key)
 
 
 # PCSX2 records per-game play data in inis/playtime.dat, keyed by disc serial:
