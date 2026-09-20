@@ -332,3 +332,23 @@ def test_memcard_client_get_save_sync_baseline_delegates_to_console_scoped_endpo
 
     assert fake.requested_key == "PS2"
     assert baseline["hash"] == "the-baseline-hash"
+
+
+def test_memcard_client_report_conflict_delegates_to_console_scoped_endpoint():
+    """_MemcardClient.report_conflict used to be a hardcoded no-op — confirm it
+    now actually reports the divergence instead (#482)."""
+    class _FakeSyncClient:
+        def __init__(self):
+            self.call = None
+
+        def report_console_conflict(self, console_key, winner_device_id, loser_device_id, winner_hash, loser_hash):
+            self.call = (console_key, winner_device_id, loser_device_id, winner_hash, loser_hash)
+            return {"id": "c1", "resolved_at": "2026-01-01T00:00:00+00:00"}
+
+    from cli.run_ps2 import _MemcardClient
+
+    fake = _FakeSyncClient()
+    mc = _MemcardClient(fake, "PS2", cfg=None)
+    mc.report_conflict("PS2", "dev-a", "dev-b", "hash-a", "hash-b")
+
+    assert fake.call == ("PS2", "dev-a", "dev-b", "hash-a", "hash-b")

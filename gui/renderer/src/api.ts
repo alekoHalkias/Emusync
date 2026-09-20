@@ -259,8 +259,11 @@ export const createPullRequest = (slug: string, fromDeviceId: string, destinatio
 
 export type SaveConflict = {
   id: string;
-  game_slug: string;
-  game_name: string;
+  // Exactly one of (game_slug, game_name) / console_key is set — a shared-
+  // memcard console's card conflict has no game row to key it by (#482).
+  game_slug: string | null;
+  game_name: string | null;
+  console_key: string | null;
   winner_device_id: string;
   loser_device_id: string;
   winner_hash: string;
@@ -270,11 +273,18 @@ export type SaveConflict = {
   loser_device_name: string | null;
 };
 
-/** Open (un-dismissed) save conflicts across all games, newest first. */
+/** Open (un-dismissed) save conflicts across all games AND shared-memcard
+ * consoles, newest first (#482). */
 export const listConflicts = (): Promise<SaveConflict[]> => _fetch("GET", "/conflicts");
 /** Dismiss a conflict so it no longer shows in the panel. */
 export const dismissConflict = (id: string): Promise<{ ok: boolean }> =>
   _fetch("POST", `/conflicts/${id}/dismiss`);
+
+/** This device's own configured games (slug/name/console/paths) — used to find
+ * a shared-memcard console's local card path when recovering a console-level
+ * conflict, since any game on that console has the same save_path (#482). */
+export type MyGameDevice = { slug: string; name: string; console: string; save_path?: string };
+export const listMyGameDevices = (): Promise<MyGameDevice[]> => _fetch("GET", "/game-devices");
 
 // ── communal Switch mod pool (issue #444) ───────────────────────────────────────
 

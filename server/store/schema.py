@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 25
+_SCHEMA_VERSION = 26
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -197,6 +197,16 @@ CREATE TABLE IF NOT EXISTS console_save_sync_baseline (
     hash         TEXT NOT NULL,
     synced_at    TEXT NOT NULL,
     PRIMARY KEY (console_key, device_id)
+);
+CREATE TABLE IF NOT EXISTS console_save_conflicts (
+    id                TEXT PRIMARY KEY,
+    console_key       TEXT NOT NULL,
+    winner_device_id  TEXT NOT NULL DEFAULT '',
+    loser_device_id   TEXT NOT NULL DEFAULT '',
+    winner_hash       TEXT NOT NULL DEFAULT '',
+    loser_hash        TEXT NOT NULL DEFAULT '',
+    resolved_at       TEXT NOT NULL,
+    status            TEXT NOT NULL DEFAULT 'open'
 );
 """
 
@@ -506,5 +516,24 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             hash         TEXT NOT NULL,
             synced_at    TEXT NOT NULL,
             PRIMARY KEY (console_key, device_id)
+        )""")
+    if from_version < 26:
+        # Console-scoped equivalent of save_conflicts (#243) for shared-memcard
+        # consoles (PS2/DC/GC/PSP/3DS, issue #482) — save_conflicts.game_slug is
+        # a hard FK to games(slug), so a divergence on a console-wide card (no
+        # game row backs it) had nowhere to go; _MemcardClient.report_conflict
+        # was a hardcoded no-op. Same shape as save_conflicts minus the games FK,
+        # keyed by console_key instead. A separate table rather than making
+        # game_slug nullable on save_conflicts — keeps that table's existing FK
+        # cascade-on-game-delete behavior intact for the per-game rows.
+        _try(conn, """CREATE TABLE IF NOT EXISTS console_save_conflicts (
+            id                TEXT PRIMARY KEY,
+            console_key       TEXT NOT NULL,
+            winner_device_id  TEXT NOT NULL DEFAULT '',
+            loser_device_id   TEXT NOT NULL DEFAULT '',
+            winner_hash       TEXT NOT NULL DEFAULT '',
+            loser_hash        TEXT NOT NULL DEFAULT '',
+            resolved_at       TEXT NOT NULL,
+            status            TEXT NOT NULL DEFAULT 'open'
         )""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

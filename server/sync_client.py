@@ -732,6 +732,23 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def report_console_conflict(self, console_key: str, winner_device_id: str, loser_device_id: str,
+                                winner_hash: str, loser_hash: str) -> dict:
+        """Console-key equivalent of report_conflict for a shared-memcard
+        console's card (issue #482)."""
+        r = self._client.post(
+            self._url(f"/consoles/{console_key}/conflicts"),
+            json={
+                "winner_device_id": winner_device_id,
+                "loser_device_id": loser_device_id,
+                "winner_hash": winner_hash or "",
+                "loser_hash": loser_hash or "",
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+
     def list_save_history(self, slug: str) -> list[dict]:
         return self._list_history("save", slug)
 
