@@ -470,3 +470,27 @@ class SaveStateMixin:
         return self.push_console_save_file(
             console_key, row["device_id"], tmp, h, len(data), row["card_format"] or ""
         )
+
+    # ── console-scoped save-sync baseline (issue #481) ───────────────────────────
+    # Console-key equivalent of save_sync_baseline (#460) — see that section for
+    # the full rationale. Extends the same conflict-suppression to shared-memcard
+    # consoles (PS2/DC/GC/PSP/3DS), which _MemcardClient.get_save_sync_baseline
+    # previously always reported as having no baseline.
+
+    def set_console_save_sync_baseline(self, console_key: str, device_id: str, h: str, synced_at: str) -> None:
+        """Record *h* as the shared-card hash *device_id* is now known to agree
+        with the server on for *console_key* — called by the console memcard
+        push/pull API handlers after every successful transfer."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO console_save_sync_baseline (console_key, device_id, hash, synced_at) "
+            "VALUES (?, ?, ?, ?)",
+            (console_key, device_id, h, synced_at),
+        )
+        self._conn.commit()
+
+    def get_console_save_sync_baseline(self, console_key: str, device_id: str) -> Optional[dict]:
+        row = self._conn.execute(
+            "SELECT hash, synced_at FROM console_save_sync_baseline WHERE console_key = ? AND device_id = ?",
+            (console_key, device_id),
+        ).fetchone()
+        return dict(row) if row else None

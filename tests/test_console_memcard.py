@@ -265,3 +265,70 @@ async def test_memcard_history_empty_for_unknown_console(client):
     r = await client.get("/consoles/GHOST/memcard/history", headers=AUTH)
     assert r.status_code == 200
     assert r.json() == []
+
+
+# ── shared-card sync baseline (issue #481) ──────────────────────────────────────
+
+def test_console_save_sync_baseline_round_trips():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        assert store.get_console_save_sync_baseline("PS2", "dev-1") is None
+        store.set_console_save_sync_baseline("PS2", "dev-1", "abc123", "2026-01-01T00:00:00+00:00")
+        baseline = store.get_console_save_sync_baseline("PS2", "dev-1")
+        assert baseline["hash"] == "abc123"
+        assert baseline["synced_at"] == "2026-01-01T00:00:00+00:00"
+        # A different device has no baseline of its own.
+        assert store.get_console_save_sync_baseline("PS2", "dev-2") is None
+
+
+@pytest.mark.asyncio
+async def test_memcard_sync_baseline_missing_returns_204(client):
+    r = await client.get("/consoles/PS2/memcard/sync-baseline", headers=AUTH)
+    assert r.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_memcard_push_records_pushing_devices_own_baseline(client):
+    data = b"pushed card bytes"
+    r = await client.post("/consoles/PS2/memcard", content=data, headers=AUTH)
+    pushed_hash = r.json()["hash"]
+
+    baseline = (await client.get("/consoles/PS2/memcard/sync-baseline", headers=AUTH)).json()
+    assert baseline["hash"] == pushed_hash == hashlib.sha256(data).hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_memcard_pull_records_pulling_devices_own_baseline(client):
+    auth_a = _device_auth("device-a", "Gaming PC")
+    auth_b = _device_auth("device-b", "Steam Deck")
+    data = b"pushed by A"
+    r = await client.post("/consoles/PS2/memcard", content=data, headers=auth_a)
+    pushed_hash = r.json()["hash"]
+
+    # B hasn't pulled yet — no baseline of its own, even though A has one.
+    assert (await client.get("/consoles/PS2/memcard/sync-baseline", headers=auth_b)).status_code == 204
+
+    await client.get("/consoles/PS2/memcard", headers=auth_b)
+    baseline_b = (await client.get("/consoles/PS2/memcard/sync-baseline", headers=auth_b)).json()
+    assert baseline_b["hash"] == pushed_hash
+
+
+def test_memcard_client_get_save_sync_baseline_delegates_to_console_scoped_endpoint():
+    """_MemcardClient (cli/run_ps2.py) used to hardcode None here — confirm it
+    now actually reads the console-scoped baseline instead (#481)."""
+    class _FakeSyncClient:
+        def __init__(self):
+            self.requested_key = None
+
+        def get_console_save_sync_baseline(self, console_key):
+            self.requested_key = console_key
+            return {"hash": "the-baseline-hash", "synced_at": "2026-01-01T00:00:00+00:00"}
+
+    from cli.run_ps2 import _MemcardClient
+
+    fake = _FakeSyncClient()
+    mc = _MemcardClient(fake, "PS2", cfg=None)
+    baseline = mc.get_save_sync_baseline("PS2")  # arg is ignored, self._key is used
+
+    assert fake.requested_key == "PS2"
+    assert baseline["hash"] == "the-baseline-hash"

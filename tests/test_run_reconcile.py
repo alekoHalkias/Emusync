@@ -323,6 +323,40 @@ def test_reconcile_both_sides_moved_past_baseline_is_a_real_conflict(tmp_path):
     assert client.reported_conflict is not None
 
 
+def test_reconcile_shared_memcard_stale_local_untouched_is_not_a_conflict(tmp_path, live_server):
+    """End-to-end proof for #481: the same #460 false-conflict scenario, but
+    through a real _MemcardClient/SyncClient pair against a live server —
+    _MemcardClient.get_save_sync_baseline used to hardcode None, so shared-
+    memcard consoles never got #460's fix and kept flagging routine catch-up
+    pulls as conflicts."""
+    from cli.run_ps2 import _MemcardClient
+    from server.sync_client import SyncClient
+
+    client_a = SyncClient(live_server["host"], live_server["port"], "", "dev-a", "DeviceA")
+    client_b = SyncClient(live_server["host"], live_server["port"], "", "dev-b", "DeviceB")
+
+    card_a = tmp_path / "a" / "Mcd001.ps2"
+    card_a.parent.mkdir(parents=True)
+    card_a.write_bytes(b"OLD-UNTOUCHED-BY-B")
+    client_a.push_console_memcard("PS2", str(card_a))
+
+    # B pulls once — this is what establishes B's own baseline server-side.
+    card_b = tmp_path / "b" / "Mcd001.ps2"
+    card_b.parent.mkdir(parents=True)
+    mc_b = _MemcardClient(client_b, "PS2", cfg=None)
+    mc_b.pull_save("PS2", str(card_b))
+
+    # A pushes something new; B hasn't touched its own copy since its last sync.
+    card_a.write_bytes(b"NEW-FROM-A")
+    client_a.push_console_memcard("PS2", str(card_a))
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-b")
+    _reconcile_save(mc_b, cfg, "PS2", str(card_b))
+
+    assert card_b.read_bytes() == b"NEW-FROM-A"  # pulled quietly
+    assert not (tmp_path / "save_conflicts.json").exists()
+
+
 def test_reconcile_detects_dirty_nested_gci_folder_card(tmp_path):
     """Dolphin's GCI-folder card nests changes two levels down
     (region/slot/game/*.gci) — the mtime-dirty rglob must reach that depth,

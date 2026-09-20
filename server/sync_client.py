@@ -549,6 +549,16 @@ class SyncClient:
         r.raise_for_status()
         return r.json()["hash"]
 
+    def get_console_save_sync_baseline(self, console_key: str) -> Optional[dict]:
+        """The shared-card hash this device last agreed with the server on for
+        CONSOLE_KEY, or None if it never has (issue #481, console-scoped
+        equivalent of get_save_sync_baseline)."""
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard/sync-baseline"), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
     # ── communal Switch mod pool (issue #444) ────────────────────────────────────
     # Keyed by title ID, not game slug — shared across every device with the game.
 
