@@ -99,10 +99,12 @@ class _MemcardClient:
                 return False, None
         return self._client.pull_console_memcard(self._key, path)
 
-    def report_conflict(self, *args, **kwargs) -> None:
-        # No game row backs a console artifact, so there's nothing to record in the
-        # per-game Conflicts panel; the local log + notification still happen.
-        return None
+    def report_conflict(self, _slug: str, winner_device_id: str, loser_device_id: str,
+                         winner_hash: str, loser_hash: str) -> None:
+        # Console-key equivalent of the per-game report (#482) — the local log +
+        # notification already happen regardless; this makes the resolution
+        # visible in the GUI Conflicts panel too, the same as a per-game one.
+        self._client.report_console_conflict(self._key, winner_device_id, loser_device_id, winner_hash, loser_hash)
 
     def get_save_sync_baseline(self, _slug: str):
         # Console-scoped equivalent of save_sync_baseline, keyed by console_key

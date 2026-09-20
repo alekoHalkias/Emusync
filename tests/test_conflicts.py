@@ -80,3 +80,68 @@ async def test_removing_game_cascades_conflicts(client):
     assert len((await client.get("/conflicts", headers=AUTH)).json()) == 1
     await client.delete("/games/zelda", headers=AUTH)
     assert (await client.get("/conflicts", headers=AUTH)).json() == []
+
+
+# ── shared-memcard console conflicts (issue #482) ───────────────────────────────
+
+def _report_console(client, console_key, **kw):
+    body = {"winner_device_id": "", "loser_device_id": "", "winner_hash": "", "loser_hash": "", **kw}
+    return client.post(f"/consoles/{console_key}/conflicts", json=body, headers=AUTH)
+
+
+@pytest.mark.asyncio
+async def test_report_console_conflict_lists_and_dismisses(client):
+    """No game row needed at all — console_key is just a string (#482)."""
+    r = await _report_console(client, "PS2",
+                              winner_device_id="dev-a", loser_device_id="dev-b",
+                              winner_hash="h-win", loser_hash="h-lose")
+    assert r.status_code == 200
+    conflict_id = r.json()["id"]
+
+    listed = (await client.get("/conflicts", headers=AUTH)).json()
+    assert len(listed) == 1
+    c = listed[0]
+    assert c["console_key"] == "PS2"
+    assert c["game_slug"] is None
+    assert c["game_name"] is None
+    assert c["loser_hash"] == "h-lose"
+
+    r = await client.post(f"/conflicts/{conflict_id}/dismiss", headers=AUTH)
+    assert r.status_code == 200
+    assert (await client.get("/conflicts", headers=AUTH)).json() == []
+
+
+@pytest.mark.asyncio
+async def test_console_conflict_duplicate_report_is_deduped(client):
+    r1 = await _report_console(client, "PS2", winner_hash="w", loser_hash="l")
+    r2 = await _report_console(client, "PS2", winner_hash="w", loser_hash="l")
+    assert r1.json()["id"] == r2.json()["id"]
+    assert len((await client.get("/conflicts", headers=AUTH)).json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_console_conflict_resolves_device_names(client):
+    auth_a = _device_auth("dev-a", "Steam Deck")
+    auth_b = _device_auth("dev-b", "Gaming PC")
+    await client.get("/health")
+    await client.get("/games", headers=auth_a)
+    await client.get("/games", headers=auth_b)
+
+    await _report_console(client, "PS2", winner_device_id="dev-a", loser_device_id="dev-b")
+    c = (await client.get("/conflicts", headers=AUTH)).json()[0]
+    assert c["winner_device_name"] == "Steam Deck"
+    assert c["loser_device_name"] == "Gaming PC"
+
+
+@pytest.mark.asyncio
+async def test_game_and_console_conflicts_merge_into_one_list(client):
+    """The GUI polls a single /conflicts endpoint for both kinds (#482)."""
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    await _report(client, "zelda", winner_hash="w1", loser_hash="l1")
+    await _report_console(client, "PS2", winner_hash="w2", loser_hash="l2")
+
+    listed = (await client.get("/conflicts", headers=AUTH)).json()
+    assert len(listed) == 2
+    kinds = {(c["game_slug"], c["console_key"]) for c in listed}
+    assert ("zelda", None) in kinds
+    assert (None, "PS2") in kinds

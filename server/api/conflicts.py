@@ -33,9 +33,21 @@ def report_conflict(slug: str, req: ConflictReport, device_id: str = Depends(_au
     return {"id": rec["id"], "resolved_at": rec["resolved_at"]}
 
 
+@router.post("/consoles/{console_key}/conflicts")
+def report_console_conflict(console_key: str, req: ConflictReport, device_id: str = Depends(_auth)) -> dict:
+    """Console-key equivalent of report_conflict for a shared-memcard console's
+    card (#482) — no game row to check, console_key is just a string."""
+    rec = _get_store().add_console_conflict(
+        console_key, req.winner_device_id, req.loser_device_id, req.winner_hash, req.loser_hash,
+    )
+    _print_activity(f"save conflict on {console_key} memory card resolved (reported by {_device_label(device_id)})")
+    return {"id": rec["id"], "resolved_at": rec["resolved_at"]}
+
+
 @router.get("/conflicts")
 def list_conflicts(device_id: str = Depends(_auth)) -> list[dict]:
-    """All open (un-dismissed) conflicts across games, newest first."""
+    """All open (un-dismissed) conflicts across games AND shared-memcard
+    consoles, newest first (#482)."""
     return _get_store().list_open_conflicts()
 
 

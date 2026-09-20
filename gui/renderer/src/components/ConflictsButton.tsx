@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   listConflicts, dismissConflict, listSaveHistory, restoreSave, getGameDevice,
+  listConsoleSaveHistory, restoreConsoleSave, listMyGameDevices,
   type SaveConflict,
 } from "../api";
 import { RelTime } from "../time";
@@ -9,13 +10,17 @@ import { useEscapeToClose } from "../useEscapeToClose";
 /**
  * Top-bar "Conflicts" panel (issue #243). EmuSync auto-resolves a true save
  * divergence newest-wins and records it on the server; this lists the open ones
- * and lets the user recover the losing copy.
+ * and lets the user recover the losing copy. Includes shared-memcard consoles'
+ * (PS2/DC/GC/PSP/3DS) card-level conflicts alongside per-game ones (#482) —
+ * distinguished by `console_key` being set instead of `game_slug`/`game_name`.
  *
  * Recovery reuses the existing save history/restore: the loser is found in the
- * game's history by hash and restored (made current), then written to this device
- * if it has the game. When the *server* won, the loser was this device's pre-pull
- * copy, which lives only as a local .bak and isn't in server history — that case
- * is detected and the user is pointed at the .bak instead.
+ * game's (or console's) history by hash and restored (made current), then
+ * written to this device if it has the game (or any game on that console, for
+ * the shared-card case — they all share the same local card path). When the
+ * *server* won, the loser was this device's pre-pull copy, which lives only as
+ * a local .bak and isn't in server history — that case is detected and the
+ * user is pointed at the .bak instead.
  */
 export default function ConflictsButton(): React.ReactElement | null {
   const [conflicts, setConflicts] = useState<SaveConflict[]>([]);
@@ -47,7 +52,10 @@ export default function ConflictsButton(): React.ReactElement | null {
     setBusyId(c.id);
     setStatus(s => ({ ...s, [c.id]: "" }));
     try {
-      const history = await listSaveHistory(c.game_slug);
+      const isConsole = !!c.console_key;
+      const history = isConsole
+        ? await listConsoleSaveHistory(c.console_key!)
+        : await listSaveHistory(c.game_slug!);
       const loser = c.loser_hash ? history.find(v => v.hash === c.loser_hash) : undefined;
       if (!loser) {
         setStatus(s => ({
@@ -57,18 +65,31 @@ export default function ConflictsButton(): React.ReactElement | null {
         }));
         return;
       }
-      await restoreSave(c.game_slug, loser.id);
-      // Write the now-current (recovered) save to this device if it has the game.
+      if (isConsole) await restoreConsoleSave(c.console_key!, loser.id);
+      else await restoreSave(c.game_slug!, loser.id);
+
+      // Write the now-current (recovered) save to this device if it has the
+      // game (or, for a shared card, any game on that console — they all
+      // point at the same local card path).
       let wrote = false;
       try {
-        const gd = await getGameDevice(c.game_slug);
-        if (gd?.save_path) {
-          const res = await window.emusync.save.pull(c.game_slug, gd.save_path);
+        let localPath: string | undefined;
+        if (isConsole) {
+          const mine = await listMyGameDevices();
+          localPath = mine.find(g => g.console === c.console_key)?.save_path;
+        } else {
+          const gd = await getGameDevice(c.game_slug!);
+          localPath = gd?.save_path;
+        }
+        if (localPath) {
+          const res = isConsole
+            ? await window.emusync.memcard.pull(c.console_key!, localPath)
+            : await window.emusync.save.pull(c.game_slug!, localPath);
           if (!res.ok) throw new Error(res.error || "wrote on server, but not to this device");
           wrote = true;
         }
       } catch {
-        /* game not configured locally — server restore still stands */
+        /* game/console not configured locally — server restore still stands */
       }
       await dismissConflict(c.id);
       setStatus(s => ({
@@ -126,7 +147,14 @@ export default function ConflictsButton(): React.ReactElement | null {
               <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0" }}>
                 {conflicts.map(c => (
                   <li key={c.id} style={{ padding: "10px 0", borderBottom: "2px solid var(--border)" }}>
-                    <div style={{ fontWeight: 500 }}>{c.game_name}</div>
+                    <div style={{ fontWeight: 500 }}>
+                      {c.console_key ? `${c.console_key} memory card` : c.game_name}
+                      {c.console_key && (
+                        <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--text-muted)", border: "2px solid var(--border)", borderRadius: 3, padding: "1px 4px", marginLeft: 8 }}>
+                          shared card
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 8px" }}>
                       <RelTime iso={c.resolved_at} /> · kept {deviceName(c, "winner")}'s save;
                       {" "}{deviceName(c, "loser")}'s copy was replaced
