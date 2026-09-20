@@ -5,25 +5,40 @@ import type { ConsoleOption, Phase, RomEntry } from "./types";
 
 export const STEP_LABELS = ["Console", "Emulator", "ROMs"];
 
-// Consoles whose SAVE lives in ONE shared location across every game on the
-// console — PS2's memory card (#294/#295), Dreamcast's VMU, Dolphin's GC cards,
-// PPSSPP's SAVEDATA folder (#402), Azahar's 3DS SD-card title tree (#418). For
-// these the per-game on-disk save must never be renamed, moved, or pushed
-// per-game; the shared card is synced by `emusync run` + the console-scoped
-// memcard endpoint. Accepts a console key ("ps2", "gamecube") or stored
-// abbreviation ("PS2", "GC"). Keep in sync with run_ps2.py's
-// _SHARED_MEMCARD_CONSOLES and scan.ts's SHARED_MEMCARD_CONSOLES.
-const _SHARED_SAVE_LAYOUT = new Set(["ps2", "dc", "gamecube", "gc", "psp", "3ds"]);
-export function usesSharedSaveLayout(consoleKeyOrAbbr: string): boolean {
-  return _SHARED_SAVE_LAYOUT.has((consoleKeyOrAbbr || "").toLowerCase());
+// Whether a console's SAVE (and, separately, its save STATES) lives in ONE
+// shared location across every game — PS2's memory card (#294/#295),
+// Dreamcast's VMU, Dolphin's GC cards, PPSSPP's SAVEDATA folder (#402),
+// Azahar's 3DS SD-card title tree (#418) — is now a DB-backed console_defs
+// flag (sharedMemcard/sharedState) fetched once via the /console-defs API
+// (App.tsx calls setConsoleDefsForLayout on startup) instead of a hardcoded
+// Set here (issue #490 — this and run_ps2.py's/scan.ts's equivalents used to
+// be three independently maintained copies, two of which had already drifted
+// out of sync with each other). The tiny Sets below are only a bootstrap
+// fallback for calls made before that first fetch resolves.
+let _consoleLayoutFlags: Record<string, { sharedMemcard?: boolean; sharedState?: boolean }> = {};
+
+export function setConsoleDefsForLayout(defs: ConsoleOption[]): void {
+  const flags: typeof _consoleLayoutFlags = {};
+  for (const def of defs) {
+    const entry = { sharedMemcard: !!def.sharedMemcard, sharedState: !!def.sharedState };
+    if (def.key) flags[def.key.toLowerCase()] = entry;
+    if (def.abbr) flags[def.abbr.toLowerCase()] = entry;
+  }
+  _consoleLayoutFlags = flags;
 }
 
-// Consoles whose save STATES are also shared (PS2's serial-named sstates/,
-// #294) — dc/gamecube/psp cores write normal per-content RetroArch states, so
-// their per-game state rename/push/pull stays fully enabled (#402).
-const _SHARED_STATE_LAYOUT = new Set(["ps2"]);
+const _FALLBACK_SHARED_SAVE_LAYOUT = new Set(["ps2", "dc", "gamecube", "gc", "psp", "3ds"]);
+export function usesSharedSaveLayout(consoleKeyOrAbbr: string): boolean {
+  const k = (consoleKeyOrAbbr || "").toLowerCase();
+  const flags = _consoleLayoutFlags[k];
+  return flags ? !!flags.sharedMemcard : _FALLBACK_SHARED_SAVE_LAYOUT.has(k);
+}
+
+const _FALLBACK_SHARED_STATE_LAYOUT = new Set(["ps2"]);
 export function usesSharedStateLayout(consoleKeyOrAbbr: string): boolean {
-  return _SHARED_STATE_LAYOUT.has((consoleKeyOrAbbr || "").toLowerCase());
+  const k = (consoleKeyOrAbbr || "").toLowerCase();
+  const flags = _consoleLayoutFlags[k];
+  return flags ? !!flags.sharedState : _FALLBACK_SHARED_STATE_LAYOUT.has(k);
 }
 
 export function stepIndex(phase: Phase): number {

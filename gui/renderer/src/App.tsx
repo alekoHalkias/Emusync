@@ -10,6 +10,7 @@ import GameGrid from "./components/GameGrid";
 import ImportWizard from "./components/ImportWizard";
 import { useGameList } from "./components/game-list/useGameList";
 import { applySwitchTitleId } from "./components/console-import/postImport";
+import { setConsoleDefsForLayout } from "./components/console-import/helpers";
 import { useGamepadNav } from "./useGamepadNav";
 
 type Screen =
@@ -39,6 +40,16 @@ export default function App(): React.ReactElement {
     window.emusync.config.load().then((cfg) => {
       if (cfg?.device_id) setMyDeviceId(cfg.device_id as string);
     });
+  }, []);
+
+  // Populate helpers.ts's shared-save/state-layout flags from the DB-backed
+  // console_defs API response, once per app session (issue #490) — the
+  // hardcoded fallback Sets in helpers.ts cover any call made before this
+  // resolves or while the server is unreachable.
+  useEffect(() => {
+    window.emusync.emulator.consoles()
+      .then(setConsoleDefsForLayout)
+      .catch(() => {/* server offline — fallback sets stay in effect */});
   }, []);
 
   async function releaseStaleLocks(deviceId: string): Promise<void> {

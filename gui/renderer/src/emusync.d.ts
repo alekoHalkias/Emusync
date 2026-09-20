@@ -38,7 +38,7 @@ export interface EmusyncBridge {
     openFolder: () => Promise<string | null>;
   };
   emulator: {
-    consoles: () => Promise<{ key: string; label: string; abbr?: string }[]>;
+    consoles: () => Promise<{ key: string; label: string; abbr?: string; sharedMemcard?: boolean; sharedState?: boolean }[]>;
     detect: (consoleKey: string) => Promise<{ options: any[]; suggestions: string[] }>;
     scan: (consoleKey: string, emulatorOption: any, extraPaths: string[]) => Promise<{ emulators: any[]; romDirs: string[]; roms: any[] }>;
     // Bulk-library import (#462): non-recursive scan of a library root's

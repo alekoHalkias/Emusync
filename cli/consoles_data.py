@@ -171,29 +171,33 @@ _IMPORT_CONSOLES = [
      "rom_extensions": ["iso", "chd", "bin"],
      "databases": ["Sony - PlayStation 2"],
      "folder_names": ["ps2", "playstation2", "playstation 2"],
-     "standalones": [_PCSX2], "suggestions": ["PCSX2 standalone"]},
+     "standalones": [_PCSX2], "suggestions": ["PCSX2 standalone"],
+     "shared_memcard": True, "shared_state": True},
     # dc / gamecube / psp (#402) follow the PS2 pattern: no `system_keys` (so
     # PSX's disc cores never surface for shared .iso/.chd/.bin), explicit
     # `rom_extensions`, cores matched purely via `databases` ↔ .info files
-    # (#400). All three are shared-save consoles (console-scoped card, see
-    # _SHARED_MEMCARD_CONSOLES / usesSharedSaveLayout); states are normal
-    # per-content RetroArch states.
+    # (#400). All three are shared-save consoles (console-scoped card, flagged
+    # via `shared_memcard` — the single source seeding console_defs.
+    # shared_memcard/shared_state, #490); states are normal per-content
+    # RetroArch states.
     {"key": "dc",      "label": "Sega Dreamcast",             "abbr": "DC",
      "system_keys": [],
      "rom_extensions": ["gdi", "cdi", "chd", "cue"],
      "databases": ["Sega - Dreamcast"],
      "folder_names": ["dc", "dreamcast", "sega dreamcast"],
-     "standalones": [], "suggestions": ["RetroArch with Flycast core"]},
+     "standalones": [], "suggestions": ["RetroArch with Flycast core"],
+     "shared_memcard": True},
     {"key": "gamecube", "label": "GameCube",                  "abbr": "GC",
      "system_keys": [],
      "rom_extensions": ["iso", "gcm", "rvz"],
      "databases": ["Nintendo - GameCube"],
      "folder_names": ["gc", "gamecube", "game cube"],
      "standalones": [_DOLPHIN],
-     "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"]},
+     "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"],
+     "shared_memcard": True},
     # Wii is its own console (#430, split from the former combined "GameCube /
-    # Wii" entry) but shares Dolphin as its emulator. Deliberately NOT in
-    # _SHARED_MEMCARD_CONSOLES: unlike GC's whole-card sync, Wii saves sync
+    # Wii" entry) but shares Dolphin as its emulator. Deliberately has no
+    # shared_memcard flag: unlike GC's whole-card sync, Wii saves sync
     # per-game, keyed by the game's own NAND title-ID folder
     # (Wii/title/00010000/<hex-id>/data/) — never the sibling content/ folder
     # (install-time tickets) or 00000001/* (system titles: Shop Channel,
@@ -214,7 +218,8 @@ _IMPORT_CONSOLES = [
      "rom_extensions": ["iso", "cso", "pbp"],
      "databases": ["Sony - PlayStation Portable"],
      "folder_names": ["psp", "playstation portable"],
-     "standalones": [], "suggestions": ["RetroArch with PPSSPP core"]},
+     "standalones": [], "suggestions": ["RetroArch with PPSSPP core"],
+     "shared_memcard": True},
     # 3DS is standalone-only (no viable libretro core) and shares the
     # PS2/dc/gamecube/psp shared-save-layout pattern — Azahar's SD-card save
     # tree nests per-title, same shape as PSP's SAVEDATA folder (#418).
@@ -223,10 +228,11 @@ _IMPORT_CONSOLES = [
      "rom_extensions": ["3ds", "cci", "cxi"],
      "databases": ["Nintendo - Nintendo 3DS"],
      "folder_names": ["3ds", "nintendo 3ds"],
-     "standalones": [_AZAHAR], "suggestions": ["Azahar standalone"]},
+     "standalones": [_AZAHAR], "suggestions": ["Azahar standalone"],
+     "shared_memcard": True},
     # Switch is standalone-only (no libretro core) and, like Wii, saves
-    # per-game via a learned NAND folder rather than a shared card — NOT a
-    # _SHARED_MEMCARD_CONSOLES member despite the issue title's suggestion
+    # per-game via a learned NAND folder rather than a shared card — has no
+    # shared_memcard flag despite the issue title's suggestion
     # (#419). See cli/run_switch.py / the _EDEN comment above. Base game,
     # update, and DLC all ship as .nsp, so extension alone can't tell them
     # apart — the scan step filters .nsp files by Nintendo's title-ID
@@ -391,6 +397,8 @@ def _prepare_console_seed_data() -> list[dict]:
             "systems": {},
             "folder_names": console_def.get("folder_names", []),
             "standalones": console_def.get("standalones", []),
+            "shared_memcard": console_def.get("shared_memcard", False),
+            "shared_state": console_def.get("shared_state", False),
         }
         for sys_key in console_def.get("system_keys", []):
             if sys_key in _IMPORT_SYSTEMS:

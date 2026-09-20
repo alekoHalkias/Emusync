@@ -11,7 +11,10 @@ import type { DetectedEmulatorOption, EmulatorScanResult } from "./types";
 export function registerEmulatorIpc(): void {
   ipcMain.handle("emulator:consoles", async () => {
     await loadConsoleDefinitionsIfNeeded();
-    return Object.values(rt.cachedConsoleDefs || {}).map(c => ({ key: c.key, label: c.label, abbr: c.abbr }));
+    return Object.values(rt.cachedConsoleDefs || {}).map(c => ({
+      key: c.key, label: c.label, abbr: c.abbr,
+      sharedMemcard: !!c.sharedMemcard, sharedState: !!c.sharedState,
+    }));
   });
 
   ipcMain.handle("emulator:detect", async (_event, consoleKey: string): Promise<{

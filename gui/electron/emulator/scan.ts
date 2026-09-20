@@ -5,15 +5,12 @@ import { rt } from "../runtime";
 import { findLatestFileInDir } from "../files";
 import { ROM_EXTENSIONS, DEFAULT_SAVE_EXTS, RomEntry, EmulatorScanResult, DetectedEmulatorOption } from "./types";
 
-// Consoles whose save is a single card/folder shared across every game on the
-// console, reconciled per-console — not per-game — by `emusync run` (#295):
-// PS2 memory card, Dreamcast VMU, Dolphin GC cards, PPSSPP SAVEDATA (#402),
-// Azahar's 3DS SD-card title tree (#418). Keep in sync with run_ps2.py's
-// _SHARED_MEMCARD_CONSOLES and console-import/helpers.ts's _SHARED_SAVE_LAYOUT.
-const SHARED_MEMCARD_CONSOLES = new Set(["ps2", "dc", "gamecube", "psp", "3ds"]);
-// Consoles whose save STATES are also shared (PS2's serial-named sstates/) —
-// dc/gamecube/psp cores write normal per-content RetroArch states.
-const SHARED_STATE_CONSOLES = new Set(["ps2"]);
+// Whether a console's save/state is a single card/folder shared across every
+// game (reconciled per-console, not per-game, by `emusync run`, #295) is now a
+// DB-backed console_defs flag (sharedMemcard/sharedState, issue #490) read off
+// rt.cachedConsoleDefs instead of a hardcoded Set here — this and
+// console-import/helpers.ts's equivalent used to be two independently
+// maintained copies that had already drifted out of sync with each other.
 
 /** Resolve the shared card path for a shared-save console: the first existing
  *  candidate, else the canonical default (registered before it exists). */
@@ -215,7 +212,7 @@ export function runEmulatorScan(params: {
         // Priority: content-dir path first, then legacy core-subfolder / flat root.
         // Target path: savesRoot/GameName/GameName.ext  (no core-name layer)
         const gameFolderName = contentSubfolder ?? base;
-        const isSharedMemcard = SHARED_MEMCARD_CONSOLES.has(consoleKey);
+        const isSharedMemcard = !!rt.cachedConsoleDefs?.[consoleKey]?.sharedMemcard;
         let m: { path: string; exists: boolean };
         if (isSharedMemcard) {
           // Shared-save console: every game's savePath is the same card (#295/#402).
@@ -257,7 +254,7 @@ export function runEmulatorScan(params: {
         let sm: { path: string; exists: boolean } | undefined;
         if (emulatorOption.stateDir) {
           const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
-          if (SHARED_STATE_CONSOLES.has(consoleKey)) {
+          if (rt.cachedConsoleDefs?.[consoleKey]?.sharedState) {
             // Shared sstates folder (PS2): every game's states live flat in one
             // folder, named per serial — point at the folder itself; `emusync run`
             // syncs only this game's serial files (issue #294). dc/gamecube/psp
