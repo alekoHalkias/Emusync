@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 26
+_SCHEMA_VERSION = 27
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -115,7 +115,9 @@ CREATE TABLE IF NOT EXISTS console_defs (
     abbr             TEXT NOT NULL,
     suggestions      TEXT NOT NULL DEFAULT '',
     rom_extensions   TEXT NOT NULL DEFAULT '',
-    databases        TEXT NOT NULL DEFAULT ''
+    databases        TEXT NOT NULL DEFAULT '',
+    shared_memcard   INTEGER NOT NULL DEFAULT 0,
+    shared_state     INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS system_defs (
     extension        TEXT PRIMARY KEY,
@@ -536,4 +538,15 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
             resolved_at       TEXT NOT NULL,
             status            TEXT NOT NULL DEFAULT 'open'
         )""")
+    if from_version < 27:
+        # Which consoles share a single memcard/state layout across every game
+        # used to be three independently hardcoded literals (run_ps2.py's
+        # _SHARED_MEMCARD_CONSOLES/_SHARED_STATE_CONSOLES plus two separate TS
+        # copies in scan.ts and console-import/helpers.ts, the latter two
+        # already drifted out of sync with each other) — issue #490. Now a
+        # DB-backed flag on console_defs itself, seeded from
+        # cli/consoles_data.py, so the GUI reads it off the /console-defs API
+        # response it already fetches instead of maintaining its own copy.
+        _try(conn, "ALTER TABLE console_defs ADD COLUMN shared_memcard INTEGER NOT NULL DEFAULT 0")
+        _try(conn, "ALTER TABLE console_defs ADD COLUMN shared_state INTEGER NOT NULL DEFAULT 0")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

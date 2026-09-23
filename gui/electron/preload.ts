@@ -40,7 +40,7 @@ contextBridge.exposeInMainWorld("emusync", {
     openFolder: (): Promise<string | null> => ipcRenderer.invoke("dialog:openFolder"),
   },
   emulator: {
-    consoles: (): Promise<{ key: string; label: string }[]> =>
+    consoles: (): Promise<{ key: string; label: string; abbr?: string; sharedMemcard?: boolean; sharedState?: boolean }[]> =>
       ipcRenderer.invoke("emulator:consoles"),
     detect: (consoleKey: string): Promise<{
       options: import("./emulator/types").DetectedEmulatorOption[];

@@ -272,9 +272,48 @@ def test_migration_21_adds_switch_title_id_to_existing_games():
         assert store._conn.execute("PRAGMA user_version").fetchone()[0] >= 21
         cols = {c[1] for c in store._conn.execute("PRAGMA table_info(games)").fetchall()}
         assert "switch_title_id" in cols
+
         game = store.get_game("zelda")
         assert game.name == "Zelda"
         assert game.switch_title_id == ""
+
+
+def test_migration_27_adds_shared_memcard_state_columns_to_console_defs():
+    """Regression: a pre-#490 DB's `console_defs` table has no shared_memcard/
+    shared_state columns. Opening it via Store() must add both, defaulted to 0,
+    without touching existing rows' other data."""
+    import sqlite3
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "emusync.db"
+        conn = sqlite3.connect(db_path)
+        conn.executescript(
+            """
+            CREATE TABLE console_defs (
+                key              TEXT PRIMARY KEY,
+                label            TEXT NOT NULL,
+                abbr             TEXT NOT NULL,
+                suggestions      TEXT NOT NULL DEFAULT '',
+                rom_extensions   TEXT NOT NULL DEFAULT '',
+                databases        TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO console_defs (key, label, abbr) VALUES ('ps2', 'PlayStation 2', 'PS2');
+            """
+        )
+        conn.execute("PRAGMA user_version = 26")
+        conn.commit()
+        conn.close()
+
+        store = Store(tmpdir)
+
+        assert store._conn.execute("PRAGMA user_version").fetchone()[0] >= 27
+        cols = {c[1] for c in store._conn.execute("PRAGMA table_info(console_defs)").fetchall()}
+        assert "shared_memcard" in cols
+        assert "shared_state" in cols
+        row = store._conn.execute("SELECT label, shared_memcard, shared_state FROM console_defs WHERE key = 'ps2'").fetchone()
+        assert row["label"] == "PlayStation 2"
+        assert row["shared_memcard"] == 0
+        assert row["shared_state"] == 0
 
 
 # ── console-def seeding is additive (#202) ─────────────────────────────────────
@@ -465,6 +504,40 @@ def test_get_console_defs_empty_suggestions_is_empty_list():
         }])
         defs = {c["key"]: c for c in store.get_console_defs()}
         assert defs["nes"]["suggestions"] == []
+
+
+def test_shared_memcard_state_flags_round_trip():
+    """sharedMemcard/sharedState (#490) round-trip through seed → get_console_defs,
+    replacing what used to be three independently hardcoded Sets/literals."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs([
+            {"key": "ps2", "label": "PlayStation 2", "abbr": "PS2", "suggestions": [],
+             "system_keys": [], "systems": {}, "folder_names": [], "standalones": [],
+             "shared_memcard": True, "shared_state": True},
+            {"key": "gba", "label": "Game Boy Advance", "abbr": "GBA", "suggestions": [],
+             "system_keys": [], "systems": {}, "folder_names": [], "standalones": []},
+        ])
+        defs = {c["key"]: c for c in store.get_console_defs()}
+        assert defs["ps2"]["sharedMemcard"] is True
+        assert defs["ps2"]["sharedState"] is True
+        # A console with no shared_memcard/shared_state key at all defaults to False.
+        assert defs["gba"]["sharedMemcard"] is False
+        assert defs["gba"]["sharedState"] is False
+
+
+def test_real_seed_data_flags_shared_memcard_consoles():
+    """The actual import seed data flags exactly PS2/DC/GC/PSP/3DS as shared-memcard
+    and only PS2 as shared-state (issue #490) — matches cli.run_ps2's derived sets."""
+    from cli.consoles_data import _prepare_console_seed_data
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs(_prepare_console_seed_data())
+        defs = {c["key"]: c for c in store.get_console_defs()}
+        shared_memcard_keys = {k for k, d in defs.items() if d["sharedMemcard"]}
+        shared_state_keys = {k for k, d in defs.items() if d["sharedState"]}
+        assert shared_memcard_keys == {"ps2", "dc", "gamecube", "psp", "3ds"}
+        assert shared_state_keys == {"ps2"}
 
 
 # ── saves→states path helper (#202) ────────────────────────────────────────────

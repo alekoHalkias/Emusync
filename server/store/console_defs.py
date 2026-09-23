@@ -30,17 +30,20 @@ class ConsoleDefMixin:
             suggestions = ";".join(console.get("suggestions", []))
             rom_extensions = ";".join(console.get("rom_extensions", []))
             databases = ";".join(console.get("databases", []))
+            shared_memcard = 1 if console.get("shared_memcard") else 0
+            shared_state = 1 if console.get("shared_state") else 0
             # The whole row is server-owned seed data (never user-edited), so
             # every column is overwritten on every startup — INSERT OR IGNORE
             # alone would leave a row seeded under an older cli/consoles_data.py
             # (e.g. a stale label/rom_extensions from before a console split)
             # permanently stuck at its first-ever values (#400, #430).
             self._conn.execute(
-                "INSERT INTO console_defs (key, label, abbr, suggestions, rom_extensions, databases) "
-                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET "
+                "INSERT INTO console_defs (key, label, abbr, suggestions, rom_extensions, databases, shared_memcard, shared_state) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET "
                 "label=excluded.label, abbr=excluded.abbr, suggestions=excluded.suggestions, "
-                "rom_extensions=excluded.rom_extensions, databases=excluded.databases",
-                (key, label, abbr, suggestions, rom_extensions, databases)
+                "rom_extensions=excluded.rom_extensions, databases=excluded.databases, "
+                "shared_memcard=excluded.shared_memcard, shared_state=excluded.shared_state",
+                (key, label, abbr, suggestions, rom_extensions, databases, shared_memcard, shared_state)
             )
             for sys_key in console["system_keys"]:
                 sys_info = console["systems"].get(sys_key)
@@ -79,7 +82,7 @@ class ConsoleDefMixin:
 
     def get_console_defs(self) -> list[dict]:
         """Return all console definitions with systemKeys and standalones."""
-        rows = self._conn.execute("SELECT key, label, abbr, suggestions, rom_extensions, databases FROM console_defs ORDER BY key").fetchall()
+        rows = self._conn.execute("SELECT key, label, abbr, suggestions, rom_extensions, databases, shared_memcard, shared_state FROM console_defs ORDER BY key").fetchall()
         result = []
         for row in rows:
             console_key = row["key"]
@@ -112,6 +115,12 @@ class ConsoleDefMixin:
                 # Libretro database names, matched against installed cores'
                 # .info `database` field by the import wizard's detection (#400).
                 "databases": row["databases"].split(";") if row["databases"] else [],
+                # Whether this console's save/state is a single shared card/
+                # folder across every game rather than per-game (#490) — the
+                # single DB-backed source the GUI reads instead of maintaining
+                # its own hardcoded copy (scan.ts, console-import/helpers.ts).
+                "sharedMemcard": bool(row["shared_memcard"]),
+                "sharedState": bool(row["shared_state"]),
                 "standalones": standalones,
             })
         return result
