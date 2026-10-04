@@ -230,6 +230,17 @@ const CONSOLE_LOGO: Record<string, string> = {
   wsc:       "Bandai - WonderSwan Color",
 };
 
+// EmuSync console key → es-theme-carbon folder, whose art/system.svg is the
+// system's colour wordmark logo (#505). Carbon has no 3DS/Switch — those fall
+// back to the XMB icon above.
+const CARBON_FOLDER: Record<string, string> = {
+  nes: "nes", snes: "snes", n64: "n64", nds: "nds", gb: "gb", gbc: "gbc", gba: "gba",
+  genesis: "genesis", sms: "mastersystem", pce: "pcengine", psx: "psx", ps2: "ps2", psp: "psp",
+  dc: "dreamcast", gamecube: "gc", wii: "wii", saturn: "saturn", gg: "gamegear", msx: "msx",
+  atari2600: "atari2600", lynx: "atarilynx", ws: "wonderswan", wsc: "wonderswancolor",
+};
+const CARBON_BASE = "https://raw.githubusercontent.com/RetroPie/es-theme-carbon/master";
+
 const RETROARCH_ASSETS_BASE =
   "https://raw.githubusercontent.com/libretro/retroarch-assets/master/xmb/monochrome/png";
 
@@ -270,6 +281,28 @@ export function registerArtIpc(): void {
 
         await download(url, dest);
         return existsSync(dest) ? toDataUrl(dest) : null;
+      } catch {
+        return null;
+      }
+    },
+  );
+
+  // Full-colour wordmark logo (#505) — used by the Big Picture wheel; the
+  // desktop grid keeps the monochrome getConsoleIcon.
+  ipcMain.handle(
+    "art:getConsoleLogo",
+    async (_event, consoleKey: string): Promise<string | null> => {
+      try {
+        mkdirSync(CONSOLE_DIR, { recursive: true });
+        const dest = join(CONSOLE_DIR, `${consoleKey}-logo.svg`);
+        const toUrl = () => `data:image/svg+xml;base64,${readFileSync(dest).toString("base64")}`;
+        if (existsSync(dest)) return toUrl();
+
+        const folder = CARBON_FOLDER[consoleKey.toLowerCase()];
+        if (!folder) return null;
+
+        await download(`${CARBON_BASE}/${folder}/art/system.svg`, dest);
+        return existsSync(dest) ? toUrl() : null;
       } catch {
         return null;
       }
