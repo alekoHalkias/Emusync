@@ -35,7 +35,6 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.on("display:changed", handler);
       return () => { ipcRenderer.removeListener("display:changed", handler); };
     },
-    toggleBigPicture: (): Promise<boolean> => ipcRenderer.invoke("display:toggleBigPicture"),
     cycleScale: (): Promise<number> => ipcRenderer.invoke("display:cycleScale"),
     toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke("display:toggleFullscreen"),
   },
