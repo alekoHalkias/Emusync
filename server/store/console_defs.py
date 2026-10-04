@@ -14,14 +14,14 @@ class ConsoleDefMixin:
     def seed_console_defs(self, consoles_data: list[dict]) -> None:
         """Populate console definition tables from structured data.
 
-        Idempotent and additive. The top-level `console_defs` row is fully
-        server-owned, so it's an upsert (overwritten every startup, including
-        on a key that already existed — #430). Everything nested under a
-        console (systems/cores/standalones/folder names) stays INSERT OR
-        IGNORE: adding a new one to an already-seeded console in
-        cli/consoles_data.py gets picked up on the next startup without wiping
-        the DB. (The old early-out `continue` skipped existing consoles
-        entirely, so additions were silently ignored.)
+        Idempotent and additive. Every row written here is server-owned seed
+        data (no API route edits these tables), so each is an upsert:
+        overwritten every startup, including on a key that already existed
+        (#430, #488) — a changed native_bins/dirs/launch_args in
+        cli/consoles_data.py reaches DBs seeded under the old values.
+        `console_folder_names` is the exception: its primary key is the whole
+        row, so INSERT OR IGNORE already is its upsert. Rows removed from
+        consoles_data.py are not pruned.
         """
         for console in consoles_data:
             key = console["key"]
@@ -50,12 +50,16 @@ class ConsoleDefMixin:
                 if not sys_info:
                     continue
                 self._conn.execute(
-                    "INSERT OR IGNORE INTO system_defs (extension, name, save_exts) VALUES (?, ?, ?)",
+                    "INSERT INTO system_defs (extension, name, save_exts) VALUES (?, ?, ?) "
+                    "ON CONFLICT(extension) DO UPDATE SET name=excluded.name, save_exts=excluded.save_exts",
                     (sys_key, sys_info["name"], ";".join(sys_info["save_exts"]))
                 )
                 for core in sys_info.get("cores", []):
                     self._conn.execute(
-                        "INSERT OR IGNORE INTO core_defs (id, console_key, system_extension, lib_name, folder_name) VALUES (?, ?, ?, ?, ?)",
+                        "INSERT INTO core_defs (id, console_key, system_extension, lib_name, folder_name) VALUES (?, ?, ?, ?, ?) "
+                        "ON CONFLICT(id) DO UPDATE SET console_key=excluded.console_key, "
+                        "system_extension=excluded.system_extension, lib_name=excluded.lib_name, "
+                        "folder_name=excluded.folder_name",
                         (f"{sys_key}-{core['lib']}", key, sys_key, core["lib"], core["folder"])
                     )
             for folder_name in console.get("folder_names", []):
@@ -69,7 +73,12 @@ class ConsoleDefMixin:
                 # GUI reads the richer `dirs` blob (save/state/memcard templates).
                 native_save = (dirs.get("native") or {}).get("save", "") or standalone.get("save_dir_template", "")
                 self._conn.execute(
-                    "INSERT OR IGNORE INTO standalone_emulators (id, console_key, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json, launch_args) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO standalone_emulators (id, console_key, label, native_bins, flatpak_id, flatpak_exec, save_dir_template, dirs_json, launch_args) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
+                    "console_key=excluded.console_key, label=excluded.label, native_bins=excluded.native_bins, "
+                    "flatpak_id=excluded.flatpak_id, flatpak_exec=excluded.flatpak_exec, "
+                    "save_dir_template=excluded.save_dir_template, dirs_json=excluded.dirs_json, "
+                    "launch_args=excluded.launch_args",
                     (f"{key}-{standalone['id']}", key, standalone["label"],
                      ";".join(standalone.get("native_bins", [])),
                      standalone.get("flatpak_id", ""),
