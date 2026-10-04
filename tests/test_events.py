@@ -115,3 +115,22 @@ async def test_game_added_event_only_when_rom_path(client):
     events = r.json()
     game_added = next((e for e in events if e["type"] == "game_added"), None)
     assert game_added is None, "game_added event should not fire for empty rom_path"
+
+
+def test_events_pruned_to_limit_and_survive_device_removal():
+    from server.store.events import EVENT_LIMIT
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("gone", "Old PC")
+        store.log_event("first", device_id="gone")
+        for i in range(EVENT_LIMIT + 4):
+            store.log_event(f"e{i}")
+        events = store.list_events(limit=EVENT_LIMIT + 50)
+        assert len(events) == EVENT_LIMIT
+        assert events[0]["type"] == f"e{EVENT_LIMIT + 3}"
+        assert events[-1]["type"] == "e4"  # "first" and e0..e3 pruned
+
+        store.log_event("from-gone", device_id="gone")
+        store.remove_device("gone")
+        assert store.list_events(limit=1)[0]["device_name"] == "Old PC"
