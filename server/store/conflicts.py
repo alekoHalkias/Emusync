@@ -13,8 +13,11 @@ single endpoint.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+
+DISMISSED_CONFLICT_RETENTION_DAYS = 90  # dismissed rows older than this are pruned on dismiss
 
 
 class ConflictMixin:
@@ -108,6 +111,12 @@ class ConflictMixin:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def _prune_dismissed_conflicts(self) -> None:
+        # resolved_at is an ISO UTC string, so a text compare against the cutoff is correct
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=DISMISSED_CONFLICT_RETENTION_DAYS)).isoformat()
+        for table in ("save_conflicts", "console_save_conflicts"):
+            self._conn.execute(f"DELETE FROM {table} WHERE status = 'dismissed' AND resolved_at < ?", (cutoff,))
+
     def dismiss_conflict(self, conflict_id: str) -> bool:
         """Mark a conflict dismissed — tries the per-game table first, then the
         console-scoped one (#482); ids are UUIDs, globally unique either way, so
@@ -118,11 +127,13 @@ class ConflictMixin:
             (conflict_id,),
         )
         if cur.rowcount > 0:
+            self._prune_dismissed_conflicts()
             self._conn.commit()
             return True
         cur = self._conn.execute(
             "UPDATE console_save_conflicts SET status = 'dismissed' WHERE id = ? AND status = 'open'",
             (conflict_id,),
         )
+        self._prune_dismissed_conflicts()
         self._conn.commit()
         return cur.rowcount > 0
