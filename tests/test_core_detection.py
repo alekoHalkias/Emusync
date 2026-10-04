@@ -144,3 +144,23 @@ def test_every_console_def_declares_databases():
     databases — every seeded console must declare at least one."""
     for console_def in _IMPORT_CONSOLES:
         assert console_def.get("databases"), f"{console_def['key']} has no databases"
+
+
+def test_detect_retroarch_finds_bin_from_shared_paths(tmp_path, monkeypatch):
+    """Native bin list comes from shared/retroarch_paths.json (#489); the
+    home-relative entry must expand and be detected."""
+    import os
+    from cli.detect import _detect_retroarch
+    bin_path = tmp_path / ".local/bin/retroarch"
+    bin_path.parent.mkdir(parents=True)
+    bin_path.write_text("")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    real_exists = os.path.exists
+    # Hide any real system RetroArch so only the home-relative entry can match.
+    monkeypatch.setattr("cli.detect.os.path.exists",
+                        lambda p: real_exists(p) and not str(p).startswith("/usr/"))
+    monkeypatch.setattr("cli.detect.subprocess.run",
+                        lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
+    exec_paths = [i["exec_path"] for i in _detect_retroarch() if i["type"] == "native"]
+    assert exec_paths == [str(bin_path)]

@@ -1,0 +1,3 @@
+{
+  "native_bins": ["/usr/bin/retroarch", "/usr/local/bin/retroarch", "~/.local/bin/retroarch"]
+}

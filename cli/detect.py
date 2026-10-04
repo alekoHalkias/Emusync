@@ -7,12 +7,20 @@ from __future__ import annotations
 
 import configparser
 import glob
+import json
 import os
 import re
 import subprocess
 from pathlib import Path
 
 from cli.consoles_data import _IMPORT_SYSTEMS, _ROM_EXTENSIONS
+
+
+# Single source for RetroArch's native bin paths; gui/electron/emulator/detect.ts
+# imports the same file (#489).
+_RETROARCH_PATHS = json.loads(
+    (Path(__file__).resolve().parent.parent / "shared" / "retroarch_paths.json").read_text()
+)
 
 
 def _parse_retroarch_cfg(cfg_path: str) -> dict[str, str]:
@@ -47,8 +55,7 @@ def _detect_retroarch() -> list[dict]:
     infos: list[dict] = []
 
     # Native
-    native_bins = ["/usr/bin/retroarch", "/usr/local/bin/retroarch",
-                   os.path.join(home, ".local/bin/retroarch")]
+    native_bins = [os.path.expanduser(b) for b in _RETROARCH_PATHS["native_bins"]]
     native_cfg = os.path.join(home, ".config/retroarch/retroarch.cfg")
     for bin_path in native_bins:
         if os.path.exists(bin_path):
