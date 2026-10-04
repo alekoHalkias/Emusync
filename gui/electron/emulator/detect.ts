@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { execSync } from "child_process";
 import { join } from "path";
 import { rt } from "../runtime";
+import retroarchPaths from "../../../shared/retroarch_paths.json";
 import type { EmulatorInfo, DetectedEmulatorOption, StandaloneDef } from "./types";
 
 export function parseRetroArchCfg(cfgPath: string, home: string): Record<string, string> {
@@ -26,7 +27,7 @@ export function detectRetroArch(home: string): EmulatorInfo[] {
   const infos: EmulatorInfo[] = [];
 
   // ── native ──────────────────────────────────────────────────────────────────
-  const nativeBins = ["/usr/bin/retroarch", "/usr/local/bin/retroarch", join(home, ".local/bin/retroarch")];
+  const nativeBins = retroarchPaths.native_bins.map(b => b.startsWith("~/") ? join(home, b.slice(2)) : b);
   const nativeCfg  = join(home, ".config/retroarch/retroarch.cfg");
   for (const bin of nativeBins) {
     if (existsSync(bin)) {

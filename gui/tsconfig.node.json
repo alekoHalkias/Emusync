@@ -6,10 +6,11 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "strict": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "types": ["electron-vite/node"]
   },
-  "include": ["electron.vite.config.*", "electron/**/*"]
+  "include": ["electron.vite.config.*", "electron/**/*", "../shared/*.json"]
 }
