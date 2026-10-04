@@ -32,6 +32,7 @@ export interface EmusyncBridge {
   };
   display: {
     get: () => Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean }>;
+    onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void) => () => void;
     toggleBigPicture: () => Promise<boolean>;
     cycleScale: () => Promise<number>;
     toggleFullscreen: () => Promise<boolean>;

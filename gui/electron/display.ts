@@ -36,7 +36,22 @@ export function applyDisplay(win: BrowserWindow): void {
   const d = load();
   win.setFullScreen(d.fullscreen);
   // Zoom resets on each navigation, so re-apply after every load.
-  win.webContents.on("did-finish-load", () => win.webContents.setZoomFactor(d.scale));
+  let ready = false;
+  win.webContents.on("did-finish-load", () => {
+    win.webContents.setZoomFactor(d.scale);
+    ready = true;
+  });
+  // Entering/leaving fullscreen by any route (F11, Alt+Enter, button, OS)
+  // switches Big Picture/desktop mode with it (#509). Ignored until the page
+  // has loaded so restoring saved state at startup doesn't clobber a saved
+  // independent bigPicture value.
+  const sync = (fullscreen: boolean) => {
+    if (!ready) return;
+    save({ ...load(), fullscreen, bigPicture: fullscreen });
+    win.webContents.send("display:changed", { fullscreen, bigPicture: fullscreen });
+  };
+  win.on("enter-full-screen", () => sync(true));
+  win.on("leave-full-screen", () => sync(false));
 }
 
 export function toggleFullscreen(): boolean {
