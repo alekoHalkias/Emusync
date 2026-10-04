@@ -419,6 +419,35 @@ def test_seed_and_serve_standalones():
         assert viac[0]["dirs"]["flatpak"]["save"] == s["dirs"]["flatpak"]["save"]
 
 
+def test_reseed_updates_nested_rows_on_existing_ids():
+    """#488 regression: standalone/system/core rows are server-owned, so a
+    changed value for an already-seeded id must replace the stale one."""
+    def data(bins, save_dir, args, sys_name, exts, folder):
+        return [{
+            "key": "gba", "label": "Game Boy Advance", "abbr": "GBA",
+            "suggestions": [], "system_keys": ["gba"],
+            "systems": {"gba": {"name": sys_name, "save_exts": exts,
+                                "cores": [{"lib": "mgba", "folder": folder}]}},
+            "folder_names": [],
+            "standalones": [{
+                "id": "mgba", "label": "mGBA", "native_bins": bins,
+                "launch_args": args, "dirs": {"native": {"save": save_dir}},
+            }],
+        }]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.seed_console_defs(data(["old-bin"], "~/old", ["-a"], "GBA", ["srm"], "mGBA"))
+        store.seed_console_defs(data(["new-bin"], "~/new", ["-b"], "GBA2", ["sav"], "mGBA2"))
+        s = store.get_standalones_for_console("gba")[0]
+        assert s["native_bins"] == ["new-bin"]
+        assert s["launch_args"] == ["-b"]
+        assert s["dirs"]["native"]["save"] == "~/new"
+        assert s["save_dir_template"] == "~/new"
+        sysdef = store.get_system_defs()["gba"]
+        assert sysdef["name"] == "GBA2" and sysdef["save_exts"] == ["sav"]
+        assert sysdef["cores"] == [{"lib": "mgba", "folder": "mGBA2"}]
+
+
 def test_real_seed_data_includes_mgba_standalone():
     """The actual import seed data must now carry standalones (regression for the
     empty-standalones bug that made mGBA unselectable — issue #292)."""
