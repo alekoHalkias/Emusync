@@ -30,6 +30,11 @@ export interface EmusyncBridge {
     discover: () => Promise<Array<{ name: string; host: string; port: number }>>;
     localIp: () => Promise<string | null>;
   };
+  display: {
+    get: () => Promise<{ scale: number; fullscreen: boolean }>;
+    cycleScale: () => Promise<number>;
+    toggleFullscreen: () => Promise<boolean>;
+  };
   launcher: {
     path: () => Promise<string>;
   };

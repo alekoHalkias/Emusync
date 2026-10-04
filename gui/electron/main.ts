@@ -7,6 +7,7 @@ import { app, BrowserWindow } from "electron";
 import { rt } from "./runtime";
 import { createWindow } from "./window";
 import { registerConfigIpc } from "./config-store";
+import { registerDisplayIpc } from "./display";
 import { registerServerIpc, stopSyncDaemon, killServerByPid, killOrphanServers } from "./server";
 import { registerGameIpc } from "./game";
 import { registerFilesIpc } from "./files";
@@ -23,6 +24,7 @@ import { registerSwitchTitleDbIpc } from "./switchtitledb";
 // Register all IPC handlers up front (renderer can only call them once a window
 // has loaded, which happens after app.whenReady below).
 registerConfigIpc();
+registerDisplayIpc();
 registerServerIpc();
 registerGameIpc();
 registerFilesIpc();
