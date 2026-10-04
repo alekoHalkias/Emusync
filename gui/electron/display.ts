@@ -10,7 +10,7 @@ import { rt } from "./runtime";
 const DISPLAY_PATH = join(homedir(), ".emusync", "display.json");
 const SCALES = [1, 1.25, 1.5, 2];
 
-interface Display { scale: number; fullscreen: boolean }
+interface Display { scale: number; fullscreen: boolean; bigPicture: boolean }
 
 function load(): Display {
   let saved: Partial<Display> = {};
@@ -22,6 +22,8 @@ function load(): Display {
   return {
     scale: SCALES.includes(saved.scale as number) ? (saved.scale as number) : 1,
     fullscreen: process.argv.includes("--fullscreen") || (saved.fullscreen ?? autoFullscreen),
+    // Big Picture theme/wheel (#503): same first-run default as fullscreen, but toggled independently.
+    bigPicture: process.argv.includes("--fullscreen") || (saved.bigPicture ?? autoFullscreen),
   };
 }
 
@@ -47,7 +49,17 @@ export function toggleFullscreen(): boolean {
 }
 
 export function registerDisplayIpc(): void {
-  ipcMain.handle("display:get", () => ({ scale: load().scale, fullscreen: !!rt.mainWindow?.isFullScreen() }));
+  ipcMain.handle("display:get", () => ({
+    scale: load().scale,
+    fullscreen: !!rt.mainWindow?.isFullScreen(),
+    bigPicture: load().bigPicture,
+  }));
+
+  ipcMain.handle("display:toggleBigPicture", () => {
+    const d = load();
+    save({ ...d, bigPicture: !d.bigPicture });
+    return !d.bigPicture;
+  });
 
   ipcMain.handle("display:cycleScale", () => {
     const d = load();

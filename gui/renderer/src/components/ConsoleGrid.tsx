@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { GameRow } from "./game-list/types";
+import ConsoleWheel from "./ConsoleWheel";
 
 // Accent colour per console key (no more emoji — logo fetched from retroarch-assets)
 const CONSOLE_COLOR: Record<string, string> = {
@@ -66,9 +67,10 @@ function ConsoleIcon({ consoleKey, abbr }: { consoleKey: string; abbr: string })
 type Props = {
   games: GameRow[];
   onSelectConsole: (consoleKey: string, consoleLabel: string, consoleAbbr: string) => void;
+  bigPicture?: boolean;
 };
 
-export default function ConsoleGrid({ games, onSelectConsole }: Props): React.ReactElement {
+export default function ConsoleGrid({ games, onSelectConsole, bigPicture }: Props): React.ReactElement {
   const [consoleDefs, setConsoleDefs] = useState<ConsoleDef[]>([]);
 
   useEffect(() => {
@@ -109,6 +111,16 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
         <h3>No consoles yet</h3>
         <p style={{ marginBottom: 20 }}>Import a console to see your library here.</p>
       </div>
+    );
+  }
+
+  if (bigPicture) {
+    return (
+      <ConsoleWheel
+        items={cards.map((c) => ({ ...c, color: CONSOLE_COLOR[c.key] ?? DEFAULT_COLOR }))}
+        renderIcon={(c) => <ConsoleIcon consoleKey={c.key} abbr={c.abbr} />}
+        onSelect={(c) => onSelectConsole(c.key, c.label, c.abbr)}
+      />
     );
   }
 

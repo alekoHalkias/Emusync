@@ -793,3 +793,69 @@ html[data-input="controller"] .content { padding-bottom: 56px; }
   font: inherit;
   font-weight: 700;
 }
+
+/* ── Big Picture theme (#503) — html[data-bigpicture], toggled in App.tsx ───── */
+html[data-bigpicture] {
+  --bg: #05070d;
+  --surface: #0d1320;
+  --surface2: #162036;
+  --surface3: #101828;
+  --accent: #38e8ff;
+  --accent-hover: #7af0ff;
+  --text: #f2f7ff;
+  --text-muted: #7f8fb0;
+  --border: #1e2b47;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --font: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --shadow-card: 0 0 32px color-mix(in srgb, var(--bp-accent, #38e8ff) 35%, transparent);
+}
+html[data-bigpicture] .layout,
+html[data-bigpicture] .content { background: transparent; position: relative; z-index: 1; }
+html[data-bigpicture] .topbar {
+  background: rgba(5, 7, 13, 0.55);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+html[data-bigpicture] .topbar-title,
+html[data-bigpicture] .btn,
+html[data-bigpicture] .console-card-label { text-transform: uppercase; letter-spacing: 0.12em; }
+html[data-bigpicture] .topbar-title { background: none; -webkit-text-fill-color: var(--accent); color: var(--accent); }
+
+.bp-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 105%, color-mix(in srgb, var(--bp-accent, #38e8ff) 45%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 15% 0%, color-mix(in srgb, var(--bp-accent, #38e8ff) 18%, transparent), transparent 70%);
+  background-size: 140% 140%;
+  animation: bp-drift 24s ease-in-out infinite alternate;
+  transition: background-color 0.6s;
+}
+@keyframes bp-drift { from { background-position: 0% 0%, 0% 0%; } to { background-position: 40% 20%, 20% 40%; } }
+
+/* Console wheel */
+.console-wheel-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; gap: 28px; }
+.console-wheel { width: 100%; height: 280px; perspective: 1500px; overflow: hidden; }
+.console-wheel-ring { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+.wheel-item {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 190px; height: 220px;
+  margin: -110px 0 0 -95px;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.55s cubic-bezier(0.22, 0.8, 0.25, 1), opacity 0.55s;
+}
+.wheel-item-front { box-shadow: var(--shadow-card), 0 0 0 2px var(--console-accent); }
+.wheel-item .console-card-icon-wrap { width: 140px; height: 110px; }
+.wheel-item .console-card-logo { max-width: 140px; max-height: 110px; }
+.console-wheel-caption { text-align: center; }
+.console-wheel-label { font-size: 34px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: 0 0 24px var(--bp-accent, #38e8ff); }
+.console-wheel-count { margin-top: 6px; font-size: 16px; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) {
+  .bp-backdrop { animation: none; }
+  .wheel-item { transition: none; }
+}

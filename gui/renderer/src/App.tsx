@@ -34,8 +34,13 @@ export default function App(): React.ReactElement {
   useGamepadNav();
 
   // Big Picture controls (#499): current UI scale + fullscreen state.
-  const [display, setDisplay] = useState({ scale: 1, fullscreen: false });
+  const [display, setDisplay] = useState({ scale: 1, fullscreen: false, bigPicture: false });
   useEffect(() => { window.emusync.display.get().then(setDisplay); }, []);
+  // Big Picture theme (#503) is keyed off <html data-bigpicture> in styles.css.
+  useEffect(() => {
+    if (display.bigPicture) document.documentElement.dataset.bigpicture = "";
+    else delete document.documentElement.dataset.bigpicture;
+  }, [display.bigPicture]);
 
   // Shared game list — data source for both ConsoleGrid and GameGrid.
   // Only active after setup is complete; the hook starts polling on mount.
@@ -277,6 +282,7 @@ export default function App(): React.ReactElement {
   return (
     <DeviceProvider>
     <div className="layout">
+      {display.bigPicture && <div className="bp-backdrop" />}
       <header className="topbar">
         {/* Left: back breadcrumb or app title */}
         {screen.name === "console" ? (
@@ -325,6 +331,13 @@ export default function App(): React.ReactElement {
           )}
           <button
             className="btn btn-ghost"
+            title="Toggle Big Picture mode"
+            onClick={() => window.emusync.display.toggleBigPicture().then((bigPicture) => setDisplay((d) => ({ ...d, bigPicture })))}
+          >
+            {display.bigPicture ? "Desktop mode" : "Big Picture"}
+          </button>
+          <button
+            className="btn btn-ghost"
             title="Cycle UI size"
             onClick={() => window.emusync.display.cycleScale().then((scale) => setDisplay((d) => ({ ...d, scale })))}
           >
@@ -352,6 +365,7 @@ export default function App(): React.ReactElement {
           ) : (
             <ConsoleGrid
               games={games}
+              bigPicture={display.bigPicture}
               onSelectConsole={(key, label, abbr) =>
                 setScreen({ name: "console", key, label, abbr })
               }

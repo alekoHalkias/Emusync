@@ -5,6 +5,8 @@ import { useEffect, useSyncExternalStore } from "react";
 const BTN_A = 0;
 const BTN_B = 1;
 const BTN_X = 2;
+const BTN_LB = 4;
+const BTN_RB = 5;
 const BTN_START = 9;
 const BTN_DPAD_UP = 12;
 const BTN_DPAD_DOWN = 13;
@@ -104,6 +106,11 @@ function findNextFocusable(current: HTMLElement, dir: Direction): HTMLElement | 
   return best;
 }
 
+// No-op unless the Big Picture console wheel (ConsoleWheel.tsx) is mounted.
+function rotateWheel(step: 1 | -1): void {
+  window.dispatchEvent(new CustomEvent("wheel-rotate", { detail: step }));
+}
+
 // A CSS-attribute-selector identity for a console/game card, keyed by the
 // stable data-slug/data-console-key attribute rather than the DOM node
 // itself, so it survives the card being remounted under a new key.
@@ -152,6 +159,8 @@ export function useGamepadNav(): void {
     let prevB = false;
     let prevX = false;
     let prevStart = false;
+    let prevLB = false;
+    let prevRB = false;
     // A text field only blocks D-pad navigation once explicitly "entered"
     // with A — landing on one via D-pad nav (it's just another focusable
     // element) must not trap the stick/D-pad there with no way back out.
@@ -251,11 +260,22 @@ export function useGamepadNav(): void {
       const startPressed = !!gp.buttons[BTN_START]?.pressed;
       if ((xPressed && !prevX) || (startPressed && !prevStart)) launchFocusedGame(active);
       prevX = xPressed;
+      const lbPressed = !!gp.buttons[BTN_LB]?.pressed;
+      const rbPressed = !!gp.buttons[BTN_RB]?.pressed;
+      if (!inModal && lbPressed && !prevLB) rotateWheel(-1);
+      if (!inModal && rbPressed && !prevRB) rotateWheel(1);
+      prevLB = lbPressed;
+      prevRB = rbPressed;
       prevStart = startPressed;
     }
 
     function moveFocus(dir: Direction): void {
       const active = document.activeElement as HTMLElement | null;
+      // Big Picture console wheel (#503): left/right rotate it instead of moving focus.
+      if ((dir === "left" || dir === "right") && active?.closest(".console-wheel")) {
+        rotateWheel(dir === "right" ? 1 : -1);
+        return;
+      }
       const scope = focusScope();
       const inScope = active && active !== document.body && scope.contains(active);
       if (inScope) {
