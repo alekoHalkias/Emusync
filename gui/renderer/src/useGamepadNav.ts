@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 // Standard Gamepad API mapping ("standard" gamepad_mapping) — Xbox-style
 // layout, which is what Steam Input/SDL present Deck controls as too.
@@ -16,6 +16,37 @@ const REPEAT_INITIAL_DELAY_MS = 350;
 const REPEAT_INTERVAL_MS = 130;
 
 type Direction = "up" | "down" | "left" | "right";
+
+// Pointer-vs-controller input mode (#498). Mirrored onto <html data-input>
+// so CSS can restyle (hide cursor, bigger focus ring) without React context;
+// the footer legend subscribes via useInputMode().
+export type GlyphFamily = "xbox" | "playstation" | "deck" | "generic";
+interface InputState { mode: "pointer" | "controller"; family: GlyphFamily }
+
+let inputState: InputState = { mode: "pointer", family: "generic" };
+const inputListeners = new Set<() => void>();
+
+function setInputState(next: Partial<InputState>): void {
+  const merged = { ...inputState, ...next };
+  if (merged.mode === inputState.mode && merged.family === inputState.family) return;
+  inputState = merged;
+  document.documentElement.dataset.input = merged.mode;
+  inputListeners.forEach((fn) => fn());
+}
+
+function glyphFamily(id: string): GlyphFamily {
+  if (/playstation|dualshock|dualsense|054c/i.test(id)) return "playstation";
+  if (/steam|28de/i.test(id)) return "deck";
+  if (/xbox|045e/i.test(id)) return "xbox";
+  return "generic";
+}
+
+export function useInputMode(): InputState {
+  return useSyncExternalStore(
+    (fn) => { inputListeners.add(fn); return () => { inputListeners.delete(fn); }; },
+    () => inputState,
+  );
+}
 
 const FOCUSABLE_SELECTOR =
   'button:not(:disabled), [tabindex="0"], input:not(:disabled), select:not(:disabled), a[href]';
@@ -150,6 +181,10 @@ export function useGamepadNav(): void {
       const gp = Array.from(navigator.getGamepads()).find((p): p is Gamepad => p !== null && p.mapping === "standard");
       if (!gp) return;
 
+      if (gp.buttons.some((b) => b.pressed) || gp.axes.some((a) => Math.abs(a) >= STICK_DEADZONE)) {
+        setInputState({ mode: "controller", family: glyphFamily(gp.id) });
+      }
+
       const inModal = focusScope() !== document;
       if (inModal) {
         wasInModal = true;
@@ -247,7 +282,20 @@ export function useGamepadNav(): void {
       if (playBtn && !playBtn.disabled) playBtn.click();
     }
 
+    const onPointer = () => setInputState({ mode: "pointer" });
+    const onDisconnect = () => {
+      if (!Array.from(navigator.getGamepads()).some((p) => p?.mapping === "standard")) onPointer();
+    };
+    window.addEventListener("mousemove", onPointer);
+    window.addEventListener("mousedown", onPointer);
+    window.addEventListener("gamepaddisconnected", onDisconnect);
+
     rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("mousemove", onPointer);
+      window.removeEventListener("mousedown", onPointer);
+      window.removeEventListener("gamepaddisconnected", onDisconnect);
+    };
   }, []);
 }

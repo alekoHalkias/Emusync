@@ -12,6 +12,7 @@ import { useGameList } from "./components/game-list/useGameList";
 import { applySwitchTitleId } from "./components/console-import/postImport";
 import { setConsoleDefsForLayout } from "./components/console-import/helpers";
 import { useGamepadNav } from "./useGamepadNav";
+import ControllerHints from "./components/ControllerHints";
 
 type Screen =
   | { name: "loading" }
@@ -359,6 +360,7 @@ export default function App(): React.ReactElement {
           />
         )}
       </main>
+      <ControllerHints />
 
       {/* Console import modal — accessible from anywhere via topbar button */}
       {importOpen && (
