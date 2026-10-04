@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 
+EVENT_LIMIT = 1000  # newest rows kept; older ones are pruned on every write
+
+
 class EventMixin:
     """Operates on `self._conn`; mixed into Store."""
 
@@ -18,6 +21,8 @@ class EventMixin:
             "INSERT INTO events (type, game_slug, device_id, device_name, rom_path, occurred_at) VALUES (?, ?, ?, ?, ?, ?)",
             (event_type, game_slug, device_id, device_name, rom_path, now),
         )
+        # ids are autoincrement, so "newest EVENT_LIMIT" is a plain id cutoff
+        self._conn.execute("DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?", (EVENT_LIMIT,))
         self._conn.commit()
 
     def list_events(self, limit: int = 100) -> list[dict]:

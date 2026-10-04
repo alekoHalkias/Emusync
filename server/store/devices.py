@@ -103,5 +103,7 @@ class DeviceMixin:
             "DELETE FROM rom_pull_requests WHERE from_device_id = ? OR to_device_id = ?",
             (device_id, device_id),
         )
+        # `events` rows are intentionally kept: no FK, they carry their own device_name,
+        # and they're bounded by EVENT_LIMIT.
         c.execute("DELETE FROM devices WHERE id = ?", (device_id,))
         c.commit()
