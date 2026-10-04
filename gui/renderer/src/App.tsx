@@ -333,13 +333,6 @@ export default function App(): React.ReactElement {
           )}
           <button
             className="btn btn-ghost"
-            title="Toggle Big Picture mode"
-            onClick={() => window.emusync.display.toggleBigPicture().then((bigPicture) => setDisplay((d) => ({ ...d, bigPicture })))}
-          >
-            {display.bigPicture ? "Desktop mode" : "Big Picture"}
-          </button>
-          <button
-            className="btn btn-ghost"
             title="Cycle UI size"
             onClick={() => window.emusync.display.cycleScale().then((scale) => setDisplay((d) => ({ ...d, scale })))}
           >

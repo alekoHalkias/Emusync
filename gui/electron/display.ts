@@ -70,12 +70,6 @@ export function registerDisplayIpc(): void {
     bigPicture: load().bigPicture,
   }));
 
-  ipcMain.handle("display:toggleBigPicture", () => {
-    const d = load();
-    save({ ...d, bigPicture: !d.bigPicture });
-    return !d.bigPicture;
-  });
-
   ipcMain.handle("display:cycleScale", () => {
     const d = load();
     const scale = SCALES[(SCALES.indexOf(d.scale) + 1) % SCALES.length];
