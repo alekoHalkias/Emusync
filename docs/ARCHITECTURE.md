@@ -123,6 +123,7 @@ window.emusync.game.offExited(cb)          // unsubscribe
 
 window.emusync.art.get(slug, gameName, consoleKey) // fetch this console's configured artwork type; SteamGridDB then (grid only) libretro-thumbnails; caches to disk; file:// URL or null
 window.emusync.art.getConsoleIcon(consoleKey) // fetch the white monochrome system logo; caches; file:// URL or null
+window.emusync.art.getConsoleLogo(consoleKey) // full-colour wordmark SVG (es-theme-carbon) for the Big Picture wheel, #505; data: URL or null (3DS/Switch come from art-book-next-es-de; unmapped/offline → caller falls back to getConsoleIcon)
 
 window.emusync.daemon.start()              // spawn emusync sync-daemon (client devices only)
 window.emusync.daemon.stop()               // kill the sync daemon if running

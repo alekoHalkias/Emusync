@@ -859,3 +859,7 @@ html[data-bigpicture] .topbar-title { background: none; -webkit-text-fill-color:
   .bp-backdrop { animation: none; }
   .wheel-item { transition: none; }
 }
+
+/* Wheel logos (#505): colour wordmarks, unlike the monochrome grid icons */
+.wheel-item .wheel-logo { max-width: 160px; max-height: 110px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6)); }
+.wheel-item .console-card-icon-wrap { width: 160px; }

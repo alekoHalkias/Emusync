@@ -64,6 +64,21 @@ function ConsoleIcon({ consoleKey, abbr }: { consoleKey: string; abbr: string })
   return <div className="console-card-abbr-fallback">{abbr}</div>;
 }
 
+/** Big Picture wheel (#505): colour wordmark logo, falling back to the monochrome icon/text. */
+function ConsoleLogo({ consoleKey, abbr }: { consoleKey: string; abbr: string }): React.ReactElement | null {
+  const [state, setState] = useState<{ url: string | null; done: boolean }>({ url: null, done: false });
+
+  useEffect(() => {
+    window.emusync.art.getConsoleLogo(consoleKey)
+      .then((url) => setState({ url, done: true }))
+      .catch(() => setState({ url: null, done: true }));
+  }, [consoleKey]);
+
+  if (state.url) return <img src={state.url} alt={abbr} className="wheel-logo" />;
+  // Render nothing while loading so the fallback icon doesn't flash first.
+  return state.done ? <ConsoleIcon consoleKey={consoleKey} abbr={abbr} /> : null;
+}
+
 type Props = {
   games: GameRow[];
   onSelectConsole: (consoleKey: string, consoleLabel: string, consoleAbbr: string) => void;
@@ -118,7 +133,7 @@ export default function ConsoleGrid({ games, onSelectConsole, bigPicture }: Prop
     return (
       <ConsoleWheel
         items={cards.map((c) => ({ ...c, color: CONSOLE_COLOR[c.key] ?? DEFAULT_COLOR }))}
-        renderIcon={(c) => <ConsoleIcon consoleKey={c.key} abbr={c.abbr} />}
+        renderIcon={(c) => <ConsoleLogo consoleKey={c.key} abbr={c.abbr} />}
         onSelect={(c) => onSelectConsole(c.key, c.label, c.abbr)}
       />
     );
