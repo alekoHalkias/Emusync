@@ -35,4 +35,10 @@ Follows CLAUDE.md's "Execution approval policy" — runs straight through with n
    ```
    PR body must include `Closes #<issue-number>` so the issue auto-closes on merge, plus a short summary and a test-plan checklist. Do this automatically after the commit — don't ask whether to push or open the PR.
 
-8. Report back the PR URL and a one-line summary of what changed.
+8. Sync the server PC to this branch (standing instruction, no asking):
+   ```bash
+   ssh -o BatchMode=yes server@192.168.4.111 'cd ~/Github/Emusync && git fetch -q --prune && git checkout <branch> && git pull -q; systemctl --user restart emusync-server && sleep 4 && curl -s localhost:8765/health'
+   ```
+   The server repo may carry an uncommitted `emusync` change — leave it alone. If checkout fails over local changes, report it instead of discarding them.
+
+9. Report back the PR URL and a one-line summary of what changed.
