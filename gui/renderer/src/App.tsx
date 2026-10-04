@@ -33,6 +33,10 @@ export default function App(): React.ReactElement {
 
   useGamepadNav();
 
+  // Big Picture controls (#499): current UI scale + fullscreen state.
+  const [display, setDisplay] = useState({ scale: 1, fullscreen: false });
+  useEffect(() => { window.emusync.display.get().then(setDisplay); }, []);
+
   // Shared game list — data source for both ConsoleGrid and GameGrid.
   // Only active after setup is complete; the hook starts polling on mount.
   const { games, loading, reload } = useGameList();
@@ -319,6 +323,20 @@ export default function App(): React.ReactElement {
               + Import
             </button>
           )}
+          <button
+            className="btn btn-ghost"
+            title="Cycle UI size"
+            onClick={() => window.emusync.display.cycleScale().then((scale) => setDisplay((d) => ({ ...d, scale })))}
+          >
+            {Math.round(display.scale * 100)}%
+          </button>
+          <button
+            className="btn btn-ghost"
+            title="Toggle fullscreen (F11)"
+            onClick={() => window.emusync.display.toggleFullscreen().then((fullscreen) => setDisplay((d) => ({ ...d, fullscreen })))}
+          >
+            {display.fullscreen ? "Exit fullscreen" : "Fullscreen"}
+          </button>
           <ConflictsButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
         </div>

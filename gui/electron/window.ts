@@ -2,6 +2,7 @@
 import { BrowserWindow, shell } from "electron";
 import { join } from "path";
 import { rt } from "./runtime";
+import { applyDisplay, toggleFullscreen } from "./display";
 
 export function createWindow(): void {
   rt.mainWindow = new BrowserWindow({
@@ -24,6 +25,8 @@ export function createWindow(): void {
     rt.mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
 
+  applyDisplay(rt.mainWindow);
+
   rt.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
@@ -34,6 +37,7 @@ export function createWindow(): void {
   // isn't bound, unlike Ctrl+- (zoom out) and Ctrl+0 (reset). Add just that
   // missing case; Shift+= keeps working via the default menu as before.
   rt.mainWindow.webContents.on("before-input-event", (_event, input) => {
+    if (input.key === "F11" && input.type === "keyDown") toggleFullscreen();
     if (input.control && input.key === "=" && input.type === "keyDown") {
       const wc = rt.mainWindow?.webContents;
       if (wc) wc.setZoomLevel(wc.getZoomLevel() + 0.5);
