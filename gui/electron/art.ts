@@ -231,8 +231,8 @@ const CONSOLE_LOGO: Record<string, string> = {
 };
 
 // EmuSync console key → es-theme-carbon folder, whose art/system.svg is the
-// system's colour wordmark logo (#505). Carbon has no 3DS/Switch — those fall
-// back to the XMB icon above.
+// system's colour wordmark logo (#505). Carbon has no 3DS/Switch — those come
+// from art-book-next-es-de (below), then fall back to the XMB icon above.
 const CARBON_FOLDER: Record<string, string> = {
   nes: "nes", snes: "snes", n64: "n64", nds: "nds", gb: "gb", gbc: "gbc", gba: "gba",
   genesis: "genesis", sms: "mastersystem", pce: "pcengine", psx: "psx", ps2: "ps2", psp: "psp",
@@ -240,6 +240,9 @@ const CARBON_FOLDER: Record<string, string> = {
   atari2600: "atari2600", lynx: "atarilynx", ws: "wonderswan", wsc: "wonderswancolor",
 };
 const CARBON_BASE = "https://raw.githubusercontent.com/RetroPie/es-theme-carbon/master";
+// Second source for what carbon lacks: console key → file under _inc/systems/logos/.
+const ART_BOOK_LOGO: Record<string, string> = { "3ds": "n3ds", switch: "switch" };
+const ART_BOOK_BASE = "https://raw.githubusercontent.com/anthonycaccese/art-book-next-es-de/HEAD/_inc/systems/logos";
 
 const RETROARCH_ASSETS_BASE =
   "https://raw.githubusercontent.com/libretro/retroarch-assets/master/xmb/monochrome/png";
@@ -298,10 +301,13 @@ export function registerArtIpc(): void {
         const toUrl = () => `data:image/svg+xml;base64,${readFileSync(dest).toString("base64")}`;
         if (existsSync(dest)) return toUrl();
 
-        const folder = CARBON_FOLDER[consoleKey.toLowerCase()];
-        if (!folder) return null;
+        const key = consoleKey.toLowerCase();
+        const url = CARBON_FOLDER[key]
+          ? `${CARBON_BASE}/${CARBON_FOLDER[key]}/art/system.svg`
+          : ART_BOOK_LOGO[key] ? `${ART_BOOK_BASE}/${ART_BOOK_LOGO[key]}.svg` : null;
+        if (!url) return null;
 
-        await download(`${CARBON_BASE}/${folder}/art/system.svg`, dest);
+        await download(url, dest);
         return existsSync(dest) ? toUrl() : null;
       } catch {
         return null;
