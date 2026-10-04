@@ -31,7 +31,8 @@ export interface EmusyncBridge {
     localIp: () => Promise<string | null>;
   };
   display: {
-    get: () => Promise<{ scale: number; fullscreen: boolean }>;
+    get: () => Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean }>;
+    toggleBigPicture: () => Promise<boolean>;
     cycleScale: () => Promise<number>;
     toggleFullscreen: () => Promise<boolean>;
   };

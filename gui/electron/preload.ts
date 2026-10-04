@@ -29,7 +29,8 @@ contextBridge.exposeInMainWorld("emusync", {
     localIp: (): Promise<string | null> => ipcRenderer.invoke("server:local-ip"),
   },
   display: {
-    get: (): Promise<{ scale: number; fullscreen: boolean }> => ipcRenderer.invoke("display:get"),
+    get: (): Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean }> => ipcRenderer.invoke("display:get"),
+    toggleBigPicture: (): Promise<boolean> => ipcRenderer.invoke("display:toggleBigPicture"),
     cycleScale: (): Promise<number> => ipcRenderer.invoke("display:cycleScale"),
     toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke("display:toggleFullscreen"),
   },
