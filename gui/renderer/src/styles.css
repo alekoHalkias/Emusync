@@ -408,12 +408,14 @@ input.error { border-color: var(--red); }
   opacity: 0.12;
   transition: opacity 0.15s;
 }
-.console-card:hover {
+.console-card:hover,
+.console-card:focus-visible {
   transform: translateY(-3px);
   box-shadow: var(--shadow-card), 0 0 0 1px var(--console-accent, var(--border));
   border-color: var(--console-accent, var(--border));
 }
-.console-card:hover::before { opacity: 0.22; }
+.console-card:hover::before,
+.console-card:focus-visible::before { opacity: 0.22; }
 
 .console-card-icon-wrap {
   width: 72px;
@@ -431,7 +433,8 @@ input.error { border-color: var(--red); }
   opacity: 0.85;
   transition: opacity 0.15s, filter 0.15s;
 }
-.console-card:hover .console-card-logo {
+.console-card:hover .console-card-logo,
+.console-card:focus-visible .console-card-logo {
   opacity: 1;
   filter: brightness(0) invert(1) drop-shadow(0 0 6px var(--console-accent, #fff));
 }
@@ -591,7 +594,8 @@ input.error { border-color: var(--red); }
   transition: transform 0.15s, box-shadow 0.15s;
   position: relative;
 }
-.game-card:hover {
+.game-card:hover,
+.game-card:focus-visible {
   transform: translateY(-2px);
   box-shadow: var(--shadow-card);
 }
@@ -758,3 +762,34 @@ input.error { border-color: var(--red); }
   border-color: #6ee89a;
 }
 .game-card-btn-play:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Controller mode (#498): set on <html data-input> by useGamepadNav */
+html[data-input="controller"], html[data-input="controller"] * { cursor: none !important; }
+html[data-input="controller"] button:focus-visible,
+html[data-input="controller"] [role="button"]:focus-visible { outline-width: 3px; outline-offset: 2px; }
+html[data-input="controller"] .console-card:focus-visible,
+html[data-input="controller"] .game-card:focus-visible { transform: translateY(-4px) scale(1.03); }
+html[data-input="controller"] .content { padding-bottom: 56px; }
+.controller-hints {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  padding: 10px 16px;
+  background: var(--surface, #111827);
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.controller-hints kbd {
+  display: inline-block;
+  min-width: 24px;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  font: inherit;
+  font-weight: 700;
+}
