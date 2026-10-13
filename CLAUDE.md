@@ -339,6 +339,8 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **A game's launch command uses the `%ROM%` token, resolved at launch — don't bake the ROM path in (#518).** `emusync run` shlex-splits the stored `launch_command` and executes it (it is the launcher, not a side path); `cli/run.py`'s `_resolve_launch_command` substitutes `%ROM%` with the ROM actually in use (local path, or for network games the live master else the offline copy), so renames, moves and "Copy for offline play" never need the command rewritten. New imports (`scan.ts`, `cli/console.py`) emit `"%ROM%"`; `GameConfig.tsx` converts legacy commands with a literal path to the token when the settings form loads, and the literal-path rewrites (rename branch, `rom:localize`/`delocalize`, ROM-path edit on save) remain only for legacy commands. Launch command and ROM file are both required in the settings form.
 
+**PS3 (RPCS3) saves are learned per-title, and directory-style games aren't scannable (#422).** `cli/run_ps3.py` adopts whichever `savedata/<TITLE_ID>/` folder was written in a session (blank `save_path` at import, like Switch/Wii); a session touching several folders is ambiguous and skipped. The scanners only match files (`.iso`/`.pkg`), not `PS3_GAME/` folders. Save-folder layout was built from RPCS3's documented structure, not verified on a real install.
+
 **Orphaned server processes** — If Electron exits abnormally, uvicorn can keep running. "Port already in use": run `pkill -9 -f "emusync.py server start"`. `emusync server start` now detects a running server and exits gracefully instead of duplicating it.
 
 **SIGKILL skips Python finally blocks** — `.server_pid`/`.server_token` may survive a hard kill; the stop handler manually deletes them.

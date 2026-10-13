@@ -41,6 +41,24 @@ _PCSX2 = {
     },
 }
 
+# RPCS3 (PS3) — standalone only. `--no-gui` boots the game straight in without
+# the game-list window. Saves are per-title folders under
+# dev_hdd0/home/00000001/savedata/<TITLE_ID>…/ — the folder isn't knowable at
+# import, so it's learned after first play (cli/run_ps3.py, #422). EmuDeck
+# installs redirect the data dir to ~/Emulation/storage/rpcs3/ (run_ps3 checks it).
+_RPCS3 = {
+    "id": "rpcs3", "label": "RPCS3",
+    "native_bins": ["/usr/bin/rpcs3", "~/.local/bin/rpcs3",
+                    "~/Applications/RPCS3.AppImage", "~/.local/bin/rpcs3.AppImage"],
+    "flatpak_id": "net.rpcs3.RPCS3",
+    "flatpak_exec": "flatpak run net.rpcs3.RPCS3",
+    "launch_args": ["--no-gui"],
+    "dirs": {
+        "native":  {"save": "~/.config/rpcs3/dev_hdd0/home/00000001/savedata"},
+        "flatpak": {"save": "~/.var/app/net.rpcs3.RPCS3/config/rpcs3/dev_hdd0/home/00000001/savedata"},
+    },
+}
+
 # Dolphin (GameCube/Wii) standalone. `-b` runs headless/batch and requires the
 # ROM path, passed positionally like the other standalones (issue #415). Save
 # dir is the GC memory-card folder directly (no "User/GC" subpath — that's a
@@ -213,6 +231,15 @@ _IMPORT_CONSOLES = [
      "folder_names": ["wii"],
      "standalones": [_DOLPHIN],
      "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"]},
+    # PS3 is standalone-only (RPCS3). Per-game saves in a learned savedata
+    # folder, like Wii/Switch (#422). Directory-style games (PS3_GAME/) aren't
+    # scannable yet — only .iso/.pkg files.
+    {"key": "ps3",     "label": "PlayStation 3",              "abbr": "PS3",
+     "system_keys": [],
+     "rom_extensions": ["iso", "pkg"],
+     "databases": ["Sony - PlayStation 3"],
+     "folder_names": ["ps3", "playstation3", "playstation 3"],
+     "standalones": [_RPCS3], "suggestions": ["RPCS3 standalone"]},
     {"key": "psp",     "label": "PlayStation Portable",       "abbr": "PSP",
      "system_keys": [],
      "rom_extensions": ["iso", "cso", "pbp"],
@@ -376,6 +403,7 @@ _ROM_EXTENSIONS = {
     "gcm", "rvz", "wbfs",         # GameCube / Wii (#402)
     "cso",                        # PSP (#402)
     "3ds", "cci", "cxi",          # Nintendo 3DS (#418)
+    "pkg",                        # PS3 (#422)
     "nsp", "xci",                 # Nintendo Switch (#419) — .nca excluded: it's a
                                   # raw internal content container, never a
                                   # standalone ROM file users have loose
