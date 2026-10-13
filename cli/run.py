@@ -78,6 +78,9 @@ from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/
 )
 
 
+ROM_TOKEN = "%ROM%"
+
+
 def _resolve_launch_command(gd) -> Optional[str]:
     """Return *gd*'s launch command pointed at an available ROM copy, or None.
 
@@ -87,12 +90,19 @@ def _resolve_launch_command(gd) -> Optional[str]:
     available (mount down + no local copy) so the caller should refuse.
     """
     cmd = gd.launch_command
-    if getattr(gd, "rom_source", "local") != "network":
-        return cmd
-    effective = resolve_rom_path(gd.rom_source, gd.rom_path, gd.local_rom_path)
-    if not effective:
+    network = getattr(gd, "rom_source", "local") == "network"
+    effective = (
+        resolve_rom_path(gd.rom_source, gd.rom_path, gd.local_rom_path)
+        if network else gd.rom_path
+    )
+    if network and not effective:
         return None
-    if effective != gd.rom_path and gd.rom_path and cmd:
+    # `%ROM%` (#518) always follows the ROM actually in use, so renames, moves
+    # and offline copies never need the stored command rewritten.
+    if cmd and ROM_TOKEN in cmd:
+        return cmd.replace(ROM_TOKEN, effective) if effective else None
+    # Legacy commands with the literal path baked in.
+    if network and effective != gd.rom_path and gd.rom_path and cmd:
         cmd = cmd.replace(gd.rom_path, effective)
     return cmd
 
