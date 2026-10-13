@@ -128,6 +128,7 @@ export interface EmusyncBridge {
   };
   steam: {
     addGame: (slug: string, gameName: string, consoleName: string, consoleKey: string) => Promise<{ ok: boolean; updated?: boolean; warning?: string; error?: string }>;
+    removeGame: (slug: string) => Promise<{ ok: boolean; error?: string }>;
     isAdded: (slug: string) => Promise<boolean>;
     addedSlugs: () => Promise<string[]>;
     isRunning: () => Promise<boolean>;

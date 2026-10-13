@@ -285,7 +285,33 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     await doBulkAddToSteam(false);
   }
 
+  // Selection with any not-yet-added game adds just those; only a selection of
+  // purely imported games switches the button to removal.
+  const steamRemoveMode = selectedSlugs.size > 0 && Array.from(selectedSlugs).every((s) => steamSlugs?.has(s));
+
+  async function doBulkRemoveFromSteam(relaunching: boolean): Promise<void> {
+    setSteamBusy(true);
+    setBulkMsg(null);
+    let removed = 0;
+    let error: string | null = null;
+    for (const slug of Array.from(selectedSlugs)) {
+      const res = await window.emusync.steam.removeGame(slug).catch((e: unknown) => ({ ok: false, error: e instanceof Error ? e.message : "Failed to remove from Steam." }));
+      if (!res.ok) { error = res.error ?? "Failed to remove from Steam."; break; }
+      removed++;
+    }
+    const slugs = await window.emusync.steam.addedSlugs().catch(() => null);
+    if (slugs) setSteamSlugs(new Set(slugs));
+    if (error) {
+      setBulkMsg({ text: removed > 0 ? `Removed ${removed}, then failed: ${error}` : error, isError: true });
+    } else {
+      setBulkMsg({ text: `Removed ${removed} from Steam. ${relaunching ? "Steam is restarting." : "Restart Steam to see the change."}`, isError: false });
+      setSelectedSlugs(new Set());
+    }
+    setSteamBusy(false);
+  }
+
   async function doBulkAddToSteam(relaunching: boolean): Promise<void> {
+    if (steamRemoveMode) return doBulkRemoveFromSteam(relaunching);
     setSteamBusy(true);
     setBulkMsg(null);
     const consoles = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
@@ -436,9 +462,13 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           className="btn btn-ghost game-grid-header-btn"
           disabled={selectedSlugs.size === 0 || steamBusy}
           onClick={handleBulkAddToSteam}
-          title="Add the selected games to Steam (already-added games are skipped)"
+          title={steamRemoveMode
+            ? "Remove the selected games from Steam"
+            : "Add the selected games to Steam (already-added games are skipped)"}
         >
-          {steamBusy ? <><span className="spinner" /> Adding…</> : `🎮 Add to Steam${selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}`}
+          {steamBusy
+            ? <><span className="spinner" /> {steamRemoveMode ? "Removing…" : "Adding…"}</>
+            : `🎮 ${steamRemoveMode ? "Remove from Steam" : "Add to Steam"}${selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}`}
         </button>
         <button
           className="btn btn-danger game-grid-header-btn"
@@ -479,6 +509,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
                     consoleAccent={accent}
                     artType={artType}
                     selected={selectedSlugs.has(g.slug)}
+                    inSteam={steamSlugs?.has(g.slug)}
                     onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}
                     onSettings={() => openSettings(g)}
@@ -503,6 +534,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
                     consoleAccent={accent}
                     artType={artType}
                     selected={selectedSlugs.has(g.slug)}
+                    inSteam={steamSlugs?.has(g.slug)}
                     onToggleSelect={() => toggleSelect(g.slug)}
                     onPlay={() => handlePlay(g)}
                     onSettings={() => openSettings(g)}
@@ -534,6 +566,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
 
       {showSteamRestart && (
         <SteamRestartModal
+          remove={steamRemoveMode}
           count={selectedSlugs.size}
           busy={steamBusy}
           onYes={restartSteamAndBulkAdd}

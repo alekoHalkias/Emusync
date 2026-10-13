@@ -335,6 +335,8 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **Two console-image sources, on purpose (#505).** `art:getConsoleIcon` fetches RetroArch's XMB *monochrome* glyphs (hardware silhouettes — white-tinted by CSS, used by the desktop `ConsoleGrid`); `art:getConsoleLogo` fetches full-colour wordmark SVGs from RetroPie's es-theme-carbon (`<folder>/art/system.svg`, key→folder map `CARBON_FOLDER` in `art.ts`, cached as `art/consoles/<key>-logo.svg`) for the Big Picture `ConsoleWheel`. Carbon has no 3DS/Switch, so those two come from anthonycaccese/art-book-next-es-de (`ART_BOOK_LOGO`, white wordmarks, no license file in that repo — fetched at runtime, never bundled); anything with no entry in either map falls back to the monochrome icon, then abbr text. Adding a console to the wheel's logo set = one `CARBON_FOLDER` entry (check the folder exists in that repo first).
 
+**The bulk Steam button is add-or-remove by selection (#516).** If any selected game isn't in Steam yet it only adds those; only an all-already-imported selection flips it to "Remove from Steam" (`steam:removeGame`, deletes the shortcut only — cached grid art and collection entries are left behind, inert).
+
 **Orphaned server processes** — If Electron exits abnormally, uvicorn can keep running. "Port already in use": run `pkill -9 -f "emusync.py server start"`. `emusync server start` now detects a running server and exits gracefully instead of duplicating it.
 
 **SIGKILL skips Python finally blocks** — `.server_pid`/`.server_token` may survive a hard kill; the stop handler manually deletes them.
