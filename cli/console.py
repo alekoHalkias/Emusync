@@ -361,9 +361,9 @@ def console_import() -> None:
                         state_match = root_sm
 
         if emu.get("core_path"):
-            launch_cmd = f'{emu["exec_path"]} -L "{emu["core_path"]}" "{rom_path}"'
+            launch_cmd = f'{emu["exec_path"]} -L "{emu["core_path"]}" "%ROM%"'
         else:
-            launch_cmd = f'{emu["exec_path"]} "{rom_path}"'
+            launch_cmd = f'{emu["exec_path"]} "%ROM%"'
 
         # Switch dumps carry bracketed title-ID/version tags in the filename
         # (e.g. "Pokemon Brilliant Diamond [0100000011D90000][v0].nsp") — every
