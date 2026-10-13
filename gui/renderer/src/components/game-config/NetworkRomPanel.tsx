@@ -118,6 +118,11 @@ export function NetworkRomPanel({
             )}
           </>
         )}
+        {localRomPath && (
+          <span style={{ fontSize: 13, color: "var(--text-muted)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={localRomPath}>
+            Offline copy: {localRomPath}
+          </span>
+        )}
         {romBusy && !mine?.hidden && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>Working…</span>}
         {!romBusy && romMsg && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>{romMsg}</span>}
       </div>
