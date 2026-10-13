@@ -7,6 +7,7 @@ import GameFilterButton, { EMPTY_FILTERS, matchesFilters, type GameFilters } fro
 import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
 import SteamRestartModal from "./SteamRestartModal";
+import { createSpeedMeter } from "./speedMeter";
 import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
 import { useEscapeToCloseTopmost } from "../useEscapeToClose";
 
@@ -197,7 +198,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     let completedBytes = 0;
     let currentBase = 0;
     let currentSlug = "";
-    const speed = { lastT: Date.now(), lastBytes: 0, bps: 0 };
+    const meter = createSpeedMeter();
     const listener = window.emusync.rom.onLocalizeProgress(({ slug, copied, total }) => {
       if (slug !== currentSlug) return; // stale event from a finished game
       if ((sizes[slug] ?? 0) !== total) {
@@ -207,15 +208,8 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         sizes[slug] = total;
       }
       const doneBytes = currentBase + copied;
-      const now = Date.now();
-      const dt = now - speed.lastT;
-      if (dt >= 500) {
-        const inst = ((doneBytes - speed.lastBytes) / dt) * 1000;
-        speed.bps = speed.bps > 0 ? speed.bps * 0.7 + inst * 0.3 : inst;
-        speed.lastT = now;
-        speed.lastBytes = doneBytes;
-      }
-      setDlModal((prev) => (prev ? { ...prev, doneBytes, totalBytes, speedBps: speed.bps } : prev));
+      const speedBps = meter.update(doneBytes);
+      setDlModal((prev) => (prev ? { ...prev, doneBytes, totalBytes, speedBps } : prev));
     });
 
     let done = 0;
@@ -227,9 +221,8 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         const g = targets[i];
         currentBase = completedBytes;
         currentSlug = g.slug;
-        speed.lastT = Date.now();
-        speed.lastBytes = completedBytes;
-        setDlModal({ index: i + 1, count: targets.length, gameName: g.name, doneBytes: completedBytes, totalBytes, speedBps: speed.bps });
+        meter.reset(completedBytes);
+        setDlModal({ index: i + 1, count: targets.length, gameName: g.name, doneBytes: completedBytes, totalBytes, speedBps: meter.update(completedBytes) });
         try {
           let res = await window.emusync.rom.localize(g.slug, pickedFolder);
           if (!res.ok && !res.cancelled && res.error?.includes("No local destination")) {

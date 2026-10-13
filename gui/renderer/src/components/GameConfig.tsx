@@ -230,6 +230,11 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     return Object.keys(e).length === 0;
   }
 
+  // With an offline copy the ROM line shows (and edits) the copy in use; the
+  // network master stays in romPath untouched (#520).
+  const shownRomPath = romSource === "network" && localRomPath ? localRomPath : romPath;
+  const setShownRomPath = romSource === "network" && localRomPath ? setLocalRomPath : setRomPath;
+
   async function handleSave(): Promise<void> {
     if (!validate()) return;
     setSaving(true);
@@ -377,18 +382,19 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           <div className="input-row">
             <input
               type="text"
-              value={romPath}
-              onChange={(e) => setRomPath(e.target.value)}
+              value={shownRomPath}
+              onChange={(e) => setShownRomPath(e.target.value)}
               className={errors.romPath ? "error" : ""}
               placeholder="/path/to/game.rom"
             />
-            <button className="btn btn-icon" title="Browse" onClick={() => pickFile(setRomPath, "Select ROM file")}>
+            <button className="btn btn-icon" title="Browse" onClick={() => pickFile(setShownRomPath, "Select ROM file")}>
               📁
             </button>
           </div>
           {errors.romPath && <span className="error-msg">{errors.romPath}</span>}
           <NetworkRomPanel
             slug={slug}
+            gameName={name}
             romSource={romSource}
             localRomPath={localRomPath}
             onLocalRomPathChange={(p, cmd) => {
