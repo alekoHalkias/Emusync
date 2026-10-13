@@ -31,7 +31,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
 }): React.ReactElement {
   const { slug, name, gameConsole, consoleKey, gameIsLocal, savePath, statePath, canPlay } = target;
   const isSwitch = consoleKey === "switch";
-  const [tab, setTab] = useState<Tab>("settings");
+  const [tab, setTab] = useState<Tab>(canPlay ? "run" : "settings");
 
   useEscapeToClose(onClose);
 
@@ -43,6 +43,18 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
     ...(isSwitch ? [{ key: "mods" as Tab, label: "Mods" }] : []),
     { key: "run", label: "Run", disabled: !canPlay },
   ];
+
+  // LB/RB from useGamepadNav step through the enabled tabs.
+  useEffect(() => {
+    function onTab(e: Event): void {
+      const enabled = tabs.filter((t) => !t.disabled);
+      const i = enabled.findIndex((t) => t.key === tab);
+      const step = (e as CustomEvent<number>).detail;
+      setTab(enabled[(i + step + enabled.length) % enabled.length].key);
+    }
+    window.addEventListener("modal-tab", onTab);
+    return () => window.removeEventListener("modal-tab", onTab);
+  });
 
   return (
     <div className="modal-overlay" onClick={onClose}>

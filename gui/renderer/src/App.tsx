@@ -14,6 +14,7 @@ import { setConsoleDefsForLayout } from "./components/console-import/helpers";
 import { useLocalizeJob } from "./localizeJob";
 import { useGamepadNav } from "./useGamepadNav";
 import ControllerHints from "./components/ControllerHints";
+import SelectPicker from "./components/SelectPicker";
 
 type Screen =
   | { name: "loading" }
@@ -400,6 +401,7 @@ export default function App(): React.ReactElement {
         )}
       </main>
       <ControllerHints />
+      <SelectPicker />
 
       {/* Console import modal — accessible from anywhere via topbar button */}
       {importOpen && (
