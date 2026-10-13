@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getDeviceConsoles, getGame, whoami } from "../../api";
+import { createSpeedMeter } from "../speedMeter";
 import DownloadProgressModal, { type DownloadModalState } from "../DownloadProgressModal";
 
 // Network-ROM (issue #255) localize/delocalize UI — copy a network-sourced
@@ -52,23 +53,15 @@ export function NetworkRomPanel({
       folder = picked;
       setLocalDestFolder(picked);   // remember it locally; the copy teaches the console
     }
-    // Progress modal (#520): size known upfront, speed is an EMA over >=500ms
-    // windows (same approach as the bulk download in GameGrid).
+    // Progress modal (#520): size known upfront.
     const total = (await window.emusync.rom.localizeSizes([slug]).catch(() => ({} as Record<string, number>)))[slug] ?? 0;
-    const speed = { lastT: Date.now(), lastBytes: 0, bps: 0 };
+    const meter = createSpeedMeter();
     setCancelling(false);
     setDlModal({ index: 1, count: 1, gameName, doneBytes: 0, totalBytes: total, speedBps: 0 });
     const listener = window.emusync.rom.onLocalizeProgress((p) => {
       if (p.slug !== slug) return;
-      const now = Date.now();
-      const dt = now - speed.lastT;
-      if (dt >= 500) {
-        const inst = ((p.copied - speed.lastBytes) / dt) * 1000;
-        speed.bps = speed.bps > 0 ? speed.bps * 0.7 + inst * 0.3 : inst;
-        speed.lastT = now;
-        speed.lastBytes = p.copied;
-      }
-      setDlModal((prev) => (prev ? { ...prev, doneBytes: p.copied, totalBytes: p.total, speedBps: speed.bps } : prev));
+      const speedBps = meter.update(p.copied);
+      setDlModal((prev) => (prev ? { ...prev, doneBytes: p.copied, totalBytes: p.total, speedBps } : prev));
     });
     try {
       const r = await window.emusync.rom.localize(slug, folder);
