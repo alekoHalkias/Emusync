@@ -221,6 +221,19 @@ def _do_start_server() -> None:
 
     cfg = cfg_module.load()
 
+    # A client paired to another machine must not be silently flipped into a
+    # server below: that leaves is_server=true alongside an external
+    # server_host, so the GUI claims "this machine is the server" while talking
+    # to the other host (and starts a stray local server on every launch).
+    if not cfg.is_server and cfg.server_host not in ("", "localhost", "127.0.0.1"):
+        click.echo(
+            f"This device is paired to {cfg.server_host} as a client — refusing to start a "
+            "local server. To make this device the server instead, clear server_host "
+            "in ~/.emusync/emusync.toml first.",
+            err=True,
+        )
+        sys.exit(1)
+
     # Timestamp every line the server writes to stdout (idempotent), and mirror
     # stdout to a rotating log file at ~/.emusync/server.log (issue #268).
     log_writer = _install_timestamped_stdout(Path(cfg.data_dir) / "server.log")

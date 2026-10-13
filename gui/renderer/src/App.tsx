@@ -33,6 +33,17 @@ export default function App(): React.ReactElement {
 
   useGamepadNav();
 
+  // Big Picture controls (#499): current UI scale + fullscreen state.
+  const [display, setDisplay] = useState({ scale: 1, fullscreen: false, bigPicture: false });
+  useEffect(() => { window.emusync.display.get().then(setDisplay); }, []);
+  // Main pushes this when fullscreen changes (F11/Alt+Enter/OS) — Big Picture follows it.
+  useEffect(() => window.emusync.display.onChange((d) => setDisplay((prev) => ({ ...prev, ...d }))), []);
+  // Big Picture theme (#503) is keyed off <html data-bigpicture> in styles.css.
+  useEffect(() => {
+    if (display.bigPicture) document.documentElement.dataset.bigpicture = "";
+    else delete document.documentElement.dataset.bigpicture;
+  }, [display.bigPicture]);
+
   // Shared game list — data source for both ConsoleGrid and GameGrid.
   // Only active after setup is complete; the hook starts polling on mount.
   const { games, loading, reload } = useGameList();
@@ -273,6 +284,7 @@ export default function App(): React.ReactElement {
   return (
     <DeviceProvider>
     <div className="layout">
+      {display.bigPicture && <div className="bp-backdrop" />}
       <header className="topbar">
         {/* Left: back breadcrumb or app title */}
         {screen.name === "console" ? (
@@ -319,6 +331,20 @@ export default function App(): React.ReactElement {
               + Import
             </button>
           )}
+          <button
+            className="btn btn-ghost"
+            title="Cycle UI size"
+            onClick={() => window.emusync.display.cycleScale().then((scale) => setDisplay((d) => ({ ...d, scale })))}
+          >
+            {Math.round(display.scale * 100)}%
+          </button>
+          <button
+            className="btn btn-ghost"
+            title="Toggle fullscreen (F11)"
+            onClick={() => window.emusync.display.toggleFullscreen().then((fullscreen) => setDisplay((d) => ({ ...d, fullscreen })))}
+          >
+            {display.fullscreen ? "Exit fullscreen" : "Fullscreen"}
+          </button>
           <ConflictsButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
         </div>
@@ -334,6 +360,7 @@ export default function App(): React.ReactElement {
           ) : (
             <ConsoleGrid
               games={games}
+              bigPicture={display.bigPicture}
               onSelectConsole={(key, label, abbr) =>
                 setScreen({ name: "console", key, label, abbr })
               }

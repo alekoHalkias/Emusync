@@ -30,6 +30,12 @@ export interface EmusyncBridge {
     discover: () => Promise<Array<{ name: string; host: string; port: number }>>;
     localIp: () => Promise<string | null>;
   };
+  display: {
+    get: () => Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean }>;
+    onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void) => () => void;
+    cycleScale: () => Promise<number>;
+    toggleFullscreen: () => Promise<boolean>;
+  };
   launcher: {
     path: () => Promise<string>;
   };
@@ -98,6 +104,7 @@ export interface EmusyncBridge {
   };
   art: {
     get: (slug: string, gameName: string, consoleKey: string) => Promise<string | null>;
+    getConsoleLogo: (consoleKey: string) => Promise<string | null>;
     getConsoleIcon: (consoleKey: string) => Promise<string | null>;
   };
   artwork: {
