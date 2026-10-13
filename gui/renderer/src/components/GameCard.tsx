@@ -12,13 +12,14 @@ type Props = {
   consoleAccent: string;
   artType: ArtType;
   selected: boolean;
+  inSteam?: boolean;
   onToggleSelect: () => void;
   onPlay: (slug: string, name: string) => void;
   onSettings: (game: GameRow) => void;
   onArtStatus?: (slug: string, hasArt: boolean) => void;
 };
 
-export default function GameCard({ game, consoleKey, consoleAccent, artType, selected, onToggleSelect, onPlay, onSettings, onArtStatus }: Props): React.ReactElement {
+export default function GameCard({ game, consoleKey, consoleAccent, artType, selected, inSteam, onToggleSelect, onPlay, onSettings, onArtStatus }: Props): React.ReactElement {
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [artFailed, setArtFailed] = useState(false);
   const fetchedRef = useRef(false);
@@ -74,6 +75,11 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
 
         {/* Overlay badges */}
         <div className="game-card-badges">
+          {inSteam && (
+            <span className="game-card-badge game-card-badge-net" title="Added to Steam">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-label="Steam"><path d="M12 2a10 10 0 0 0-10 9.3l5.4 2.2a2.8 2.8 0 0 1 1.6-.5l2.4-3.5v-.1a3.8 3.8 0 1 1 3.8 3.8h-.1l-3.4 2.5a2.8 2.8 0 0 1-5.5.6L2.2 14.7A10 10 0 1 0 12 2zm-4.6 15.3 1.2.5a2.1 2.1 0 1 0 1.1-2.8l1.3.5a1.5 1.5 0 1 1-1.1 2.8l-1.2-.5zm9.4-6.6a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0zm-4.4 0a1.9 1.9 0 1 1 3.8 0 1.9 1.9 0 0 1-3.8 0z"/></svg>
+            </span>
+          )}
           {game.locked && (
             <span className="game-card-badge game-card-badge-locked" title="Currently running on another device">
               🔒

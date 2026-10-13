@@ -375,6 +375,25 @@ export function registerSteamIpc(): void {
     }
   });
 
+  // Removes the game's EmuSync shortcut. Leaves cached grid art and any
+  // collection entry behind (ponytail: both are inert without a shortcut).
+  ipcMain.handle("steam:removeGame", async (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {
+    const steamDir = findSteamDir();
+    const userdataDir = steamDir && findActiveUserdataDir(steamDir);
+    if (!userdataDir) return { ok: false, error: "Steam installation not found on this device." };
+    if (steamIsRunning()) return { ok: false, error: "Steam appears to be running. Close Steam first, then try again." };
+    const path = join(userdataDir, "config", "shortcuts.vdf");
+    try {
+      const parsed = await parseShortcutsFile(path);
+      const launcherExe = join(dirname(SCRIPT), "emusync");
+      const kept = parsed.shortcuts.filter((s) => !isOurShortcut(s, launcherExe, `run ${slug}`));
+      if (kept.length !== parsed.shortcuts.length) await writeShortcutsFile(path, { shortcuts: kept });
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: `Failed to update shortcuts.vdf: ${e.message || e}` };
+    }
+  });
+
   ipcMain.handle(
     "steam:addGame",
     async (_event, slug: string, gameName: string, consoleName: string, consoleKey: string):
