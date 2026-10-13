@@ -13,7 +13,7 @@ export type DownloadModalState = {
   speedBps: number;     // bytes/second, 0 until the first measurement
 };
 
-function fmtBytes(n: number): string {
+export function fmtBytes(n: number): string {
   if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(2)} GB`;
   if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`;
   if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
@@ -24,9 +24,10 @@ type Props = {
   state: DownloadModalState;
   cancelling: boolean;
   onCancel: () => void;
+  onHide?: () => void;   // single-game copy only: minimise to an inline bar (#520)
 };
 
-export default function DownloadProgressModal({ state, cancelling, onCancel }: Props): React.ReactElement {
+export default function DownloadProgressModal({ state, cancelling, onCancel, onHide }: Props): React.ReactElement {
   const pct = state.totalBytes > 0 ? Math.min(100, (state.doneBytes / state.totalBytes) * 100) : 0;
   return (
     <div className="modal-overlay">
@@ -41,6 +42,7 @@ export default function DownloadProgressModal({ state, cancelling, onCancel }: P
           {state.speedBps > 0 && <> • {fmtBytes(state.speedBps)}/s</>}
         </p>
         <div className="modal-actions">
+          {onHide && <button className="btn btn-ghost" onClick={onHide}>Hide</button>}
           <button className="btn btn-ghost" onClick={onCancel} disabled={cancelling}>
             {cancelling ? <><span className="spinner" /> Cancelling…</> : "Cancel"}
           </button>

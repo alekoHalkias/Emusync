@@ -11,6 +11,7 @@ import ImportWizard from "./components/ImportWizard";
 import { useGameList } from "./components/game-list/useGameList";
 import { applySwitchTitleId } from "./components/console-import/postImport";
 import { setConsoleDefsForLayout } from "./components/console-import/helpers";
+import { useLocalizeJob } from "./localizeJob";
 import { useGamepadNav } from "./useGamepadNav";
 import ControllerHints from "./components/ControllerHints";
 
@@ -26,6 +27,7 @@ export default function App(): React.ReactElement {
   const [isServer, setIsServer] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [gameRunning, setGameRunning] = useState(false);
+  const localizeJob = useLocalizeJob();
   const [gameIsExternal, setGameIsExternal] = useState(false);
   const [runningGameName, setRunningGameName] = useState<string | null>(null);
   const [runningGameSlug, setRunningGameSlug] = useState<string | null>(null);
@@ -321,6 +323,16 @@ export default function App(): React.ReactElement {
             {!gameIsExternal && (
               <button className="btn btn-danger" onClick={handleStop}>■ Stop</button>
             )}
+          </div>
+        )}
+
+        {/* Centre: background "Copy for offline play" (#520) — same slot as the running-game line */}
+        {!gameRunning && localizeJob?.hidden && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
+            <span className="topbar-game-running" title={localizeJob.gameName}>
+              ⬇ Downloading 1 game
+              {localizeJob.totalBytes > 0 && ` • ${Math.min(100, Math.round((localizeJob.doneBytes / localizeJob.totalBytes) * 100))}%`}
+            </span>
           </div>
         )}
 

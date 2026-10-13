@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getDeviceConsoles, getGame, whoami } from "../../api";
-import { createSpeedMeter } from "../speedMeter";
-import DownloadProgressModal, { type DownloadModalState } from "../DownloadProgressModal";
+import DownloadProgressModal, { fmtBytes } from "../DownloadProgressModal";
+import { useLocalizeJob, startLocalizeJob, cancelLocalizeJob, hideLocalizeJob } from "../../localizeJob";
 
 // Network-ROM (issue #255) localize/delocalize UI — copy a network-sourced
 // ROM onto local disk for offline play, or remove the local copy. The NAS
@@ -20,8 +20,8 @@ export function NetworkRomPanel({
   const [localDestFolder, setLocalDestFolder] = useState("");  // console's configured local-copy folder
   const [romBusy, setRomBusy] = useState(false);
   const [romMsg, setRomMsg] = useState("");
-  const [dlModal, setDlModal] = useState<DownloadModalState | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const job = useLocalizeJob();
+  const mine = job && job.slug === slug ? job : null;
 
   // Resolve the console's configured local-copy destination for a network ROM,
   // so we can show it and localize without re-prompting (issue #255).
@@ -53,23 +53,11 @@ export function NetworkRomPanel({
       folder = picked;
       setLocalDestFolder(picked);   // remember it locally; the copy teaches the console
     }
-    // Progress modal (#520): size known upfront.
-    const total = (await window.emusync.rom.localizeSizes([slug]).catch(() => ({} as Record<string, number>)))[slug] ?? 0;
-    const meter = createSpeedMeter();
-    setCancelling(false);
-    setDlModal({ index: 1, count: 1, gameName, doneBytes: 0, totalBytes: total, speedBps: 0 });
-    const listener = window.emusync.rom.onLocalizeProgress((p) => {
-      if (p.slug !== slug) return;
-      const speedBps = meter.update(p.copied);
-      setDlModal((prev) => (prev ? { ...prev, doneBytes: p.copied, totalBytes: p.total, speedBps } : prev));
-    });
     try {
-      const r = await window.emusync.rom.localize(slug, folder);
+      const r = await startLocalizeJob(slug, gameName, folder);
       if (r.ok) { onLocalRomPathChange(r.localPath ?? "", r.launchCommand); setRomMsg("✓ Localized for offline play."); }
       else setRomMsg(r.cancelled ? "Copy cancelled." : r.error ?? "Localize failed.");
     } finally {
-      window.emusync.rom.offLocalizeProgress(listener);
-      setDlModal(null);
       setRomBusy(false);
     }
   }
@@ -90,11 +78,12 @@ export function NetworkRomPanel({
 
   return (
     <>
-    {dlModal && (
+    {mine && !mine.hidden && (
       <DownloadProgressModal
-        state={dlModal}
-        cancelling={cancelling}
-        onCancel={() => { setCancelling(true); window.emusync.rom.cancelLocalize().catch(() => {}); }}
+        state={{ index: 1, count: 1, gameName: mine.gameName, doneBytes: mine.doneBytes, totalBytes: mine.totalBytes, speedBps: mine.speedBps }}
+        cancelling={mine.cancelling}
+        onCancel={cancelLocalizeJob}
+        onHide={() => hideLocalizeJob(true)}
       />
     )}
     <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
@@ -104,7 +93,20 @@ export function NetworkRomPanel({
           <button className="btn" disabled={romBusy} onClick={handleDelocalize} style={{ flexShrink: 0 }}>Remove offline copy</button>
         ) : (
           <>
-            <button className="btn" disabled={romBusy} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
+            <button className="btn" disabled={romBusy || !!job} onClick={handleLocalize} style={{ flexShrink: 0 }}>Copy for offline play</button>
+            {mine?.hidden ? (
+              <>
+                <div className="download-progress-track" style={{ flex: 1, minWidth: 60 }}>
+                  <div className="download-progress-fill" style={{ width: `${mine.totalBytes > 0 ? Math.min(100, (mine.doneBytes / mine.totalBytes) * 100) : 0}%` }} />
+                </div>
+                <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>
+                  {mine.totalBytes > 0 ? `${Math.min(100, Math.round((mine.doneBytes / mine.totalBytes) * 100))}% • ` : ""}
+                  {fmtBytes(mine.doneBytes)} / {fmtBytes(mine.totalBytes)}
+                  {mine.speedBps > 0 && <> • {fmtBytes(mine.speedBps)}/s</>}
+                </span>
+                <button className="btn btn-ghost" style={{ flexShrink: 0 }} onClick={() => hideLocalizeJob(false)}>Show</button>
+              </>
+            ) : !mine && (
             <button
               className="btn btn-ghost"
               style={{ flexShrink: 0 }}
@@ -113,9 +115,10 @@ export function NetworkRomPanel({
             >
               {localDestFolder ? "Change folder…" : "Choose folder…"}
             </button>
+            )}
           </>
         )}
-        {romBusy && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>Working…</span>}
+        {romBusy && !mine?.hidden && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>Working…</span>}
         {!romBusy && romMsg && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>{romMsg}</span>}
       </div>
     </div>
