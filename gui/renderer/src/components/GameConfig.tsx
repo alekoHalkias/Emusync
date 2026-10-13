@@ -55,6 +55,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [savePath, setSavePath] = useState("");
   const [statePath, setStatePath] = useState("");
   const [launchCommand, setLaunchCommand] = useState("");
+  // ROM path as last loaded/saved, so a manual edit can be carried into the launch command (#518).
+  const loadedRomRef = useRef("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -94,6 +96,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     getGameDevice(slug)
       .then((cfg) => {
         setRomPath(cfg.rom_path);
+        loadedRomRef.current = cfg.rom_path;
         setSavePath(cfg.save_path);
         setStatePath(cfg.state_path ?? "");
         setLaunchCommand(cfg.launch_command);
@@ -117,6 +120,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         const cfg = cached.config;
         setGameConsole(cached.console);
         setRomPath(cfg.rom_path);
+        loadedRomRef.current = cfg.rom_path;
         setSavePath(cfg.save_path);
         setStatePath(cfg.state_path ?? "");
         setLaunchCommand(cfg.launch_command);
@@ -210,6 +214,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     // Switch's real save path is unknowable until learned after first play
     // (cli/run_switch.py, #441) — never require it up front like every other
     // console's save path.
+    if (!launchCommand.trim()) e.launchCommand = "Launch command is required.";
     if (!savePath.trim() && gameConsole !== "Switch") e.savePath = "Save file path is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -228,6 +233,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
       let finalLaunch = launchCommand.trim();
       let finalLocalRom = localRomPath;
       let finalRel = netExtraRef.current.rom_rel_path;
+
+      // ROM path edited by hand (e.g. network drive -> local): carry it into the
+      // launch command, which embeds the ROM path (#518).
+      const loadedRom = loadedRomRef.current;
+      if (loadedRom && finalRom && finalRom !== loadedRom && finalLaunch.includes(loadedRom)) {
+        finalLaunch = finalLaunch.split(loadedRom).join(finalRom);
+        setLaunchCommand(finalLaunch);
+      }
+      loadedRomRef.current = finalRom;
 
       if (isNew) {
         const game = await addGame(name.trim());
@@ -365,7 +379,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             slug={slug}
             romSource={romSource}
             localRomPath={localRomPath}
-            onLocalRomPathChange={setLocalRomPath}
+            onLocalRomPathChange={(p, cmd) => {
+              setLocalRomPath(p);
+              if (cmd !== undefined) setLaunchCommand(cmd);
+            }}
           />
         </div>
 
@@ -485,13 +502,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         )}
 
         <div className="input-group">
-          <label>Launch command <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+          <label>Launch command</label>
           <input
             type="text"
             value={launchCommand}
             onChange={(e) => setLaunchCommand(e.target.value)}
             placeholder="retroarch -L snes.so %ROM%"
+            className={errors.launchCommand ? "error" : ""}
           />
+          {errors.launchCommand && <span className="error-msg">{errors.launchCommand}</span>}
         </div>
 
         {!isNew && (

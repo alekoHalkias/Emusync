@@ -76,8 +76,8 @@ export interface EmusyncBridge {
   };
   rom: {
     push: (slug: string, toDeviceId: string, consoleName: string) => Promise<{ ok: boolean; targetOnline?: boolean; error?: string }>;
-    localize: (slug: string, destFolder?: string) => Promise<{ ok: boolean; localPath?: string; cancelled?: boolean; error?: string }>;
-    delocalize: (slug: string) => Promise<{ ok: boolean; error?: string }>;
+    localize: (slug: string, destFolder?: string) => Promise<{ ok: boolean; localPath?: string; launchCommand?: string; cancelled?: boolean; error?: string }>;
+    delocalize: (slug: string) => Promise<{ ok: boolean; launchCommand?: string; error?: string }>;
     uploadMaster: (localPath: string, networkPath: string) => Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }>;
     setupNetworkPlay: (slug: string, mountRoot: string) => Promise<{ ok: boolean; romPath?: string; error?: string }>;
     deleteFile: (absolutePath: string) => Promise<{ ok: boolean; error?: string }>;

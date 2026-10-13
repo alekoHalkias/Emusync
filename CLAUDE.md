@@ -337,6 +337,8 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **The bulk Steam button is add-or-remove by selection (#516).** If any selected game isn't in Steam yet it only adds those; only an all-already-imported selection flips it to "Remove from Steam" (`steam:removeGame`, deletes the shortcut only — cached grid art and collection entries are left behind, inert).
 
+**A game's launch command embeds its ROM path, so every ROM-path change has to rewrite it (#518).** `GameConfig.tsx`'s `handleSave` swaps the previously-loaded ROM path for the edited one inside the command (same as the rename branch), and `rom:localize`/`rom:delocalize` (`gui/electron/sync/rom.ts`) swap master ↔ local-copy path and return the new `launchCommand` so the open form doesn't save a stale one back. Launch command is required (`cli/run.py` refuses without one), unlike the ROM field.
+
 **Orphaned server processes** — If Electron exits abnormally, uvicorn can keep running. "Port already in use": run `pkill -9 -f "emusync.py server start"`. `emusync server start` now detects a running server and exits gracefully instead of duplicating it.
 
 **SIGKILL skips Python finally blocks** — `.server_pid`/`.server_token` may survive a hard kill; the stop handler manually deletes them.
