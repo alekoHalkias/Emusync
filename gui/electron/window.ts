@@ -37,7 +37,11 @@ export function createWindow(): void {
   // isn't bound, unlike Ctrl+- (zoom out) and Ctrl+0 (reset). Add just that
   // missing case; Shift+= keeps working via the default menu as before.
   rt.mainWindow.webContents.on("before-input-event", (_event, input) => {
-    if (input.key === "F11" && input.type === "keyDown") toggleFullscreen();
+    const isToggle = input.key === "F11" || (input.alt && input.key === "Enter");
+    if (isToggle && input.type === "keyDown") {
+      _event.preventDefault(); // keep Alt+Enter from also clicking the focused element
+      toggleFullscreen();
+    }
     if (input.control && input.key === "=" && input.type === "keyDown") {
       const wc = rt.mainWindow?.webContents;
       if (wc) wc.setZoomLevel(wc.getZoomLevel() + 0.5);

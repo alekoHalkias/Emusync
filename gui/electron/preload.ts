@@ -29,7 +29,12 @@ contextBridge.exposeInMainWorld("emusync", {
     localIp: (): Promise<string | null> => ipcRenderer.invoke("server:local-ip"),
   },
   display: {
-    get: (): Promise<{ scale: number; fullscreen: boolean }> => ipcRenderer.invoke("display:get"),
+    get: (): Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean }> => ipcRenderer.invoke("display:get"),
+    onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void): (() => void) => {
+      const handler = (_e: unknown, d: { fullscreen: boolean; bigPicture: boolean }) => cb(d);
+      ipcRenderer.on("display:changed", handler);
+      return () => { ipcRenderer.removeListener("display:changed", handler); };
+    },
     cycleScale: (): Promise<number> => ipcRenderer.invoke("display:cycleScale"),
     toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke("display:toggleFullscreen"),
   },
@@ -152,6 +157,8 @@ contextBridge.exposeInMainWorld("emusync", {
   art: {
     get: (slug: string, gameName: string, consoleKey: string): Promise<string | null> =>
       ipcRenderer.invoke("art:get", slug, gameName, consoleKey),
+    getConsoleLogo: (consoleKey: string): Promise<string | null> =>
+      ipcRenderer.invoke("art:getConsoleLogo", consoleKey),
     getConsoleIcon: (consoleKey: string): Promise<string | null> =>
       ipcRenderer.invoke("art:getConsoleIcon", consoleKey),
   },
