@@ -12,7 +12,7 @@ export function NetworkRomPanel({
   slug: string | null;
   romSource: string;
   localRomPath: string;
-  onLocalRomPathChange: (path: string) => void;
+  onLocalRomPathChange: (path: string, launchCommand?: string) => void;
 }): React.ReactElement | null {
   const [localDestFolder, setLocalDestFolder] = useState("");  // console's configured local-copy folder
   const [romBusy, setRomBusy] = useState(false);
@@ -49,7 +49,7 @@ export function NetworkRomPanel({
       setLocalDestFolder(picked);   // remember it locally; the copy teaches the console
     }
     const r = await window.emusync.rom.localize(slug, folder);
-    if (r.ok) { onLocalRomPathChange(r.localPath ?? ""); setRomMsg("✓ Localized for offline play."); }
+    if (r.ok) { onLocalRomPathChange(r.localPath ?? "", r.launchCommand); setRomMsg("✓ Localized for offline play."); }
     else setRomMsg(r.error ?? "Localize failed.");
     setRomBusy(false);
   }
@@ -63,7 +63,7 @@ export function NetworkRomPanel({
     if (!slug) return;
     setRomBusy(true); setRomMsg("");
     const r = await window.emusync.rom.delocalize(slug);
-    if (r.ok) { onLocalRomPathChange(""); setRomMsg("✓ Local copy removed."); }
+    if (r.ok) { onLocalRomPathChange("", r.launchCommand); setRomMsg("✓ Local copy removed."); }
     else setRomMsg(r.error ?? "Failed to remove local copy.");
     setRomBusy(false);
   }

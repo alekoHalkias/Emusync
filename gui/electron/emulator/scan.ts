@@ -268,8 +268,8 @@ export function runEmulatorScan(params: {
 
         const standaloneArgs = (emulatorOption.launchArgs ?? []).join(" ");
         const launchCommand = emulatorOption.corePath
-          ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "${romPath}"`
-          : `${emulatorOption.execPath}${standaloneArgs ? ` ${standaloneArgs}` : ""} "${romPath}"`;
+          ? `${emulatorOption.execPath} -L "${emulatorOption.corePath}" "%ROM%"`
+          : `${emulatorOption.execPath}${standaloneArgs ? ` ${standaloneArgs}` : ""} "%ROM%"`;
         return {
           name: consoleKey === "switch" ? switchDisplayName(base) : base, romPath,
           savePath: m.path, saveExists: m.exists,

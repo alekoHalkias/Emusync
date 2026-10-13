@@ -32,6 +32,15 @@ type Props = {
   onRemoved?: () => void;        // game deleted from the Settings tab
 };
 
+const ROM_TOKEN = "%ROM%";
+
+/** Legacy launch commands embed the literal ROM path; show/save them with the
+ * `%ROM%` token instead (resolved at launch by cli/run.py) so the command
+ * always follows the ROM — rename, move, or offline copy (#518). */
+function withRomToken(cmd: string, ...paths: (string | undefined)[]): string {
+  return paths.reduce<string>((c, p) => (p ? c.split(p).join(ROM_TOKEN) : c), cmd);
+}
+
 export default function GameConfig({ slug, name: initialName, onBack, onSaved, onPlay, embedded, onRemoved }: Props): React.ReactElement {
   const isNew = slug === null;
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -55,6 +64,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [savePath, setSavePath] = useState("");
   const [statePath, setStatePath] = useState("");
   const [launchCommand, setLaunchCommand] = useState("");
+  // ROM path as last loaded/saved, so a manual edit can be carried into the launch command (#518).
+  const loadedRomRef = useRef("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -94,9 +105,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     getGameDevice(slug)
       .then((cfg) => {
         setRomPath(cfg.rom_path);
+        loadedRomRef.current = cfg.rom_path;
         setSavePath(cfg.save_path);
         setStatePath(cfg.state_path ?? "");
-        setLaunchCommand(cfg.launch_command);
+        setLaunchCommand(withRomToken(cfg.launch_command, cfg.rom_path, cfg.local_rom_path));
         setRomSource(cfg.rom_source ?? "local");
         setLocalRomPath(cfg.local_rom_path ?? "");
         netExtraRef.current = {
@@ -117,9 +129,10 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         const cfg = cached.config;
         setGameConsole(cached.console);
         setRomPath(cfg.rom_path);
+        loadedRomRef.current = cfg.rom_path;
         setSavePath(cfg.save_path);
         setStatePath(cfg.state_path ?? "");
-        setLaunchCommand(cfg.launch_command);
+        setLaunchCommand(withRomToken(cfg.launch_command, cfg.rom_path, cfg.local_rom_path));
         setRomSource(cfg.rom_source ?? "local");
         setLocalRomPath(cfg.local_rom_path ?? "");
         netExtraRef.current = {
@@ -210,6 +223,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     // Switch's real save path is unknowable until learned after first play
     // (cli/run_switch.py, #441) — never require it up front like every other
     // console's save path.
+    if (!romPath.trim()) e.romPath = "ROM file is required.";
+    if (!launchCommand.trim()) e.launchCommand = "Launch command is required.";
     if (!savePath.trim() && gameConsole !== "Switch") e.savePath = "Save file path is required.";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -228,6 +243,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
       let finalLaunch = launchCommand.trim();
       let finalLocalRom = localRomPath;
       let finalRel = netExtraRef.current.rom_rel_path;
+
+      // ROM path edited by hand (e.g. network drive -> local): carry it into the
+      // launch command, which embeds the ROM path (#518).
+      const loadedRom = loadedRomRef.current;
+      if (loadedRom && finalRom && finalRom !== loadedRom && finalLaunch.includes(loadedRom)) {
+        finalLaunch = finalLaunch.split(loadedRom).join(finalRom);
+        setLaunchCommand(finalLaunch);
+      }
+      loadedRomRef.current = finalRom;
 
       if (isNew) {
         const game = await addGame(name.trim());
@@ -349,23 +373,28 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
 
         <div className="input-group">
-          <label>ROM file <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+          <label>ROM file</label>
           <div className="input-row">
             <input
               type="text"
               value={romPath}
               onChange={(e) => setRomPath(e.target.value)}
+              className={errors.romPath ? "error" : ""}
               placeholder="/path/to/game.rom"
             />
             <button className="btn btn-icon" title="Browse" onClick={() => pickFile(setRomPath, "Select ROM file")}>
               📁
             </button>
           </div>
+          {errors.romPath && <span className="error-msg">{errors.romPath}</span>}
           <NetworkRomPanel
             slug={slug}
             romSource={romSource}
             localRomPath={localRomPath}
-            onLocalRomPathChange={setLocalRomPath}
+            onLocalRomPathChange={(p, cmd) => {
+              setLocalRomPath(p);
+              if (cmd !== undefined) setLaunchCommand(cmd);
+            }}
           />
         </div>
 
@@ -485,13 +514,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         )}
 
         <div className="input-group">
-          <label>Launch command <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+          <label>Launch command</label>
           <input
             type="text"
             value={launchCommand}
             onChange={(e) => setLaunchCommand(e.target.value)}
             placeholder="retroarch -L snes.so %ROM%"
+            className={errors.launchCommand ? "error" : ""}
           />
+          {errors.launchCommand && <span className="error-msg">{errors.launchCommand}</span>}
         </div>
 
         {!isNew && (

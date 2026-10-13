@@ -172,7 +172,7 @@ export function registerRomIpc(): void {
 
   ipcMain.handle(
     "rom:localize",
-    async (event, slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; cancelled?: boolean; error?: string }> => {
+    async (event, slug: string, destFolder?: string): Promise<{ ok: boolean; localPath?: string; launchCommand?: string; cancelled?: boolean; error?: string }> => {
       localizeCancelled = false;
       try {
         const { host, port, authHeaders } = loadServerCfg();
@@ -221,7 +221,11 @@ export function registerRomIpc(): void {
           renameSync(tmp, localPath);
           // Remember a manually-picked folder on the console so the next game of
           // this console localizes without re-prompting (issue #255).
-          const updated = { ...gd, local_rom_path: localPath, rom_sha256: hash,
+          // The launch command embeds the ROM path — point it at the local copy (#518).
+          const launchCommand = gd.launch_command && networkPath
+            ? (gd.launch_command as string).split(networkPath).join(localPath)
+            : gd.launch_command;
+          const updated = { ...gd, local_rom_path: localPath, rom_sha256: hash, launch_command: launchCommand,
             ...(learnedFolder ? { device_local_folder: learnedFolder } : {}) };
           const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
             method: "PUT",
@@ -229,7 +233,7 @@ export function registerRomIpc(): void {
             body: JSON.stringify(updated),
           });
           if (!putRes.ok) return { ok: false, error: "Copied, but failed to update server config" };
-          return { ok: true, localPath };
+          return { ok: true, localPath, launchCommand };
         } finally {
           if (existsSync(tmp)) { try { unlinkSync(tmp); } catch { /* best effort */ } }
         }
@@ -241,7 +245,7 @@ export function registerRomIpc(): void {
 
   ipcMain.handle(
     "rom:delocalize",
-    async (_event, slug: string): Promise<{ ok: boolean; error?: string }> => {
+    async (_event, slug: string): Promise<{ ok: boolean; launchCommand?: string; error?: string }> => {
       try {
         const { host, port, authHeaders } = loadServerCfg();
         const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
@@ -269,14 +273,18 @@ export function registerRomIpc(): void {
             dir = dirname(dir);
           }
         } catch { /* hit a non-empty dir or the root — nothing more to clean */ }
-        const updated = { ...gd, local_rom_path: "", rom_sha256: "" };
+        // Point the launch command back at the network master (#518).
+        const launchCommand = gd.launch_command && gd.rom_path
+          ? (gd.launch_command as string).split(localPath).join(gd.rom_path)
+          : gd.launch_command;
+        const updated = { ...gd, local_rom_path: "", rom_sha256: "", launch_command: launchCommand };
         const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
           method: "PUT",
           headers: { ...authHeaders, "Content-Type": "application/json" },
           body: JSON.stringify(updated),
         });
         if (!putRes.ok) return { ok: false, error: "Removed copy, but failed to update server config" };
-        return { ok: true };
+        return { ok: true, launchCommand };
       } catch (e: any) {
         return { ok: false, error: e.message || "Delocalize failed" };
       }
