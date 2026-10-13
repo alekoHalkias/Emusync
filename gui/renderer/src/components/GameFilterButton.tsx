@@ -48,8 +48,20 @@ export default function GameFilterButton({ filters, onChange }: Props): React.Re
     function onClickOutside(e: MouseEvent): void {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    // Capture + stopImmediatePropagation so B/Escape closes only the popover.
+    function onKey(e: KeyboardEvent): void {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      setOpen(false);
+      ref.current?.querySelector<HTMLElement>(".game-grid-filter-btn")?.focus();
+    }
+    ref.current?.querySelector<HTMLElement>("[data-pad-trap] input")?.focus();
     document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      window.removeEventListener("keydown", onKey, true);
+    };
   }, [open]);
 
   return (
@@ -62,6 +74,7 @@ export default function GameFilterButton({ filters, onChange }: Props): React.Re
       </button>
       {open && (
         <div
+          data-pad-trap
           style={{
             position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 20,
             background: "var(--surface, var(--bg))", border: "2px solid var(--border)",

@@ -67,6 +67,7 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
         <input
           type="checkbox"
           className="game-card-checkbox"
+          tabIndex={-1}
           checked={selected}
           onChange={onToggleSelect}
           onClick={(e) => e.stopPropagation()}

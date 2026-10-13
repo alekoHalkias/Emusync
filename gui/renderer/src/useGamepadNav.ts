@@ -5,6 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 const BTN_A = 0;
 const BTN_B = 1;
 const BTN_X = 2;
+const BTN_Y = 3;
 const BTN_LB = 4;
 const BTN_RB = 5;
 const BTN_START = 9;
@@ -51,7 +52,7 @@ export function useInputMode(): InputState {
 }
 
 const FOCUSABLE_SELECTOR =
-  'button:not(:disabled), [tabindex="0"], input:not(:disabled), select:not(:disabled), a[href]';
+  'button:not(:disabled), [tabindex="0"], input:not(:disabled):not([tabindex="-1"]), select:not(:disabled), a[href]';
 
 function isVisible(el: Element): boolean {
   return (el as HTMLElement).offsetParent !== null;
@@ -60,8 +61,9 @@ function isVisible(el: Element): boolean {
 // Background screens stay mounted behind an open modal (e.g. GameGrid's
 // {gameModal && <GameModal/>}), so navigation must be scoped to the topmost
 // modal when one is open — otherwise D-pad could focus a hidden card behind it.
+// An open popover marked data-pad-trap (e.g. the game filter) traps the same way.
 function focusScope(): ParentNode {
-  const overlays = document.querySelectorAll(".modal-overlay");
+  const overlays = document.querySelectorAll(".modal-overlay, [data-pad-trap]");
   return overlays.length ? overlays[overlays.length - 1] : document;
 }
 
@@ -111,6 +113,11 @@ function rotateWheel(step: 1 | -1): void {
   window.dispatchEvent(new CustomEvent("wheel-rotate", { detail: step }));
 }
 
+// Cycles the open GameModal's tabs; no-op unless one is listening.
+function cycleModalTab(step: 1 | -1): void {
+  window.dispatchEvent(new CustomEvent("modal-tab", { detail: step }));
+}
+
 // A CSS-attribute-selector identity for a console/game card, keyed by the
 // stable data-slug/data-console-key attribute rather than the DOM node
 // itself, so it survives the card being remounted under a new key.
@@ -158,6 +165,7 @@ export function useGamepadNav(): void {
     let prevA = false;
     let prevB = false;
     let prevX = false;
+    let prevY = false;
     let prevStart = false;
     let prevLB = false;
     let prevRB = false;
@@ -236,7 +244,10 @@ export function useGamepadNav(): void {
       const aPressed = !!gp.buttons[BTN_A]?.pressed;
       if (aPressed && !prevA) {
         if (isTextField && !editing) editingInput = active; // enter edit mode, same as clicking into it
-        else active?.click();
+        else if (active?.tagName === "SELECT") {
+          // The native popup can't be driven by this loop — SelectPicker takes over.
+          window.dispatchEvent(new CustomEvent("pad-select", { detail: active }));
+        } else active?.click();
       }
       prevA = aPressed;
 
@@ -260,10 +271,13 @@ export function useGamepadNav(): void {
       const startPressed = !!gp.buttons[BTN_START]?.pressed;
       if ((xPressed && !prevX) || (startPressed && !prevStart)) launchFocusedGame(active);
       prevX = xPressed;
+      const yPressed = !!gp.buttons[BTN_Y]?.pressed;
+      if (yPressed && !prevY) active?.closest<HTMLElement>(".game-card")?.querySelector<HTMLInputElement>(".game-card-checkbox")?.click();
+      prevY = yPressed;
       const lbPressed = !!gp.buttons[BTN_LB]?.pressed;
       const rbPressed = !!gp.buttons[BTN_RB]?.pressed;
-      if (!inModal && lbPressed && !prevLB) rotateWheel(-1);
-      if (!inModal && rbPressed && !prevRB) rotateWheel(1);
+      if (lbPressed && !prevLB) (inModal ? cycleModalTab : rotateWheel)(-1);
+      if (rbPressed && !prevRB) (inModal ? cycleModalTab : rotateWheel)(1);
       prevLB = lbPressed;
       prevRB = rbPressed;
       prevStart = startPressed;
