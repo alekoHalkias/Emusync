@@ -377,6 +377,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </div>
           <NetworkRomPanel
             slug={slug}
+            gameName={name}
             romSource={romSource}
             localRomPath={localRomPath}
             onLocalRomPathChange={(p, cmd) => {

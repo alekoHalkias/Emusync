@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getDeviceConsoles, getGame, whoami } from "../../api";
+import DownloadProgressModal, { type DownloadModalState } from "../DownloadProgressModal";
 
 // Network-ROM (issue #255) localize/delocalize UI — copy a network-sourced
 // ROM onto local disk for offline play, or remove the local copy. The NAS
@@ -7,9 +8,10 @@ import { getDeviceConsoles, getGame, whoami } from "../../api";
 // GameConfig's save flow needs the current local copy path for its rename
 // logic; everything else here is self-contained.
 export function NetworkRomPanel({
-  slug, romSource, localRomPath, onLocalRomPathChange,
+  slug, gameName, romSource, localRomPath, onLocalRomPathChange,
 }: {
   slug: string | null;
+  gameName: string;
   romSource: string;
   localRomPath: string;
   onLocalRomPathChange: (path: string, launchCommand?: string) => void;
@@ -17,6 +19,8 @@ export function NetworkRomPanel({
   const [localDestFolder, setLocalDestFolder] = useState("");  // console's configured local-copy folder
   const [romBusy, setRomBusy] = useState(false);
   const [romMsg, setRomMsg] = useState("");
+  const [dlModal, setDlModal] = useState<DownloadModalState | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Resolve the console's configured local-copy destination for a network ROM,
   // so we can show it and localize without re-prompting (issue #255).
@@ -48,10 +52,33 @@ export function NetworkRomPanel({
       folder = picked;
       setLocalDestFolder(picked);   // remember it locally; the copy teaches the console
     }
-    const r = await window.emusync.rom.localize(slug, folder);
-    if (r.ok) { onLocalRomPathChange(r.localPath ?? "", r.launchCommand); setRomMsg("✓ Localized for offline play."); }
-    else setRomMsg(r.error ?? "Localize failed.");
-    setRomBusy(false);
+    // Progress modal (#520): size known upfront, speed is an EMA over >=500ms
+    // windows (same approach as the bulk download in GameGrid).
+    const total = (await window.emusync.rom.localizeSizes([slug]).catch(() => ({} as Record<string, number>)))[slug] ?? 0;
+    const speed = { lastT: Date.now(), lastBytes: 0, bps: 0 };
+    setCancelling(false);
+    setDlModal({ index: 1, count: 1, gameName, doneBytes: 0, totalBytes: total, speedBps: 0 });
+    const listener = window.emusync.rom.onLocalizeProgress((p) => {
+      if (p.slug !== slug) return;
+      const now = Date.now();
+      const dt = now - speed.lastT;
+      if (dt >= 500) {
+        const inst = ((p.copied - speed.lastBytes) / dt) * 1000;
+        speed.bps = speed.bps > 0 ? speed.bps * 0.7 + inst * 0.3 : inst;
+        speed.lastT = now;
+        speed.lastBytes = p.copied;
+      }
+      setDlModal((prev) => (prev ? { ...prev, doneBytes: p.copied, totalBytes: p.total, speedBps: speed.bps } : prev));
+    });
+    try {
+      const r = await window.emusync.rom.localize(slug, folder);
+      if (r.ok) { onLocalRomPathChange(r.localPath ?? "", r.launchCommand); setRomMsg("✓ Localized for offline play."); }
+      else setRomMsg(r.cancelled ? "Copy cancelled." : r.error ?? "Localize failed.");
+    } finally {
+      window.emusync.rom.offLocalizeProgress(listener);
+      setDlModal(null);
+      setRomBusy(false);
+    }
   }
 
   async function handlePickDestFolder(): Promise<void> {
@@ -69,6 +96,14 @@ export function NetworkRomPanel({
   }
 
   return (
+    <>
+    {dlModal && (
+      <DownloadProgressModal
+        state={dlModal}
+        cancelling={cancelling}
+        onCancel={() => { setCancelling(true); window.emusync.rom.cancelLocalize().catch(() => {}); }}
+      />
+    )}
     <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 13, minWidth: 0 }}>🌐 Network ROM</span>
@@ -91,5 +126,6 @@ export function NetworkRomPanel({
         {!romBusy && romMsg && <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>{romMsg}</span>}
       </div>
     </div>
+    </>
   );
 }

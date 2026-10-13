@@ -31,13 +31,13 @@ export default function DownloadProgressModal({ state, cancelling, onCancel }: P
   return (
     <div className="modal-overlay">
       <div className="modal">
-        <h3>Downloading game {state.index} of {state.count}</h3>
-        <p style={{ marginBottom: 12 }}>Downloading {state.gameName}</p>
+        <h3>{state.count > 1 ? `Downloading game ${state.index} of ${state.count}` : "Copying for offline play"}</h3>
+        <p style={{ marginBottom: 12 }}>{state.count > 1 ? "Downloading" : "Copying"} {state.gameName}</p>
         <div className="download-progress-track">
           <div className="download-progress-fill" style={{ width: `${pct}%` }} />
         </div>
         <p style={{ fontSize: 13, marginTop: 8, marginBottom: 20 }}>
-          {fmtBytes(state.doneBytes)} / {fmtBytes(state.totalBytes)}
+          {pct.toFixed(0)}% • {fmtBytes(state.doneBytes)} / {fmtBytes(state.totalBytes)}
           {state.speedBps > 0 && <> • {fmtBytes(state.speedBps)}/s</>}
         </p>
         <div className="modal-actions">
