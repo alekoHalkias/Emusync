@@ -411,14 +411,16 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
       {showFolders && <ConsoleFoldersModal consoleKey={consoleKey} onClose={() => setShowFolders(false)} />}
       {/* Header */}
       <div className="game-grid-header" style={{ "--grid-accent": accent } as React.CSSProperties}>
-        <input
-          className="game-grid-search"
-          type="text"
-          placeholder="Search…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <GameFilterButton filters={filters} onChange={setFilters} />
+        <div className="game-grid-search-wrap">
+          <input
+            className="game-grid-search"
+            type="text"
+            placeholder="Search…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <GameFilterButton filters={filters} onChange={setFilters} />
+        </div>
         <div className="game-grid-select-wrap">
           <select
             className="game-grid-art-type"

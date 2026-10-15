@@ -24,6 +24,14 @@ export function PlayIcon({ size = 12, className }: IconProps): React.ReactElemen
   );
 }
 
+export function FilterIcon({ size = 14, className }: IconProps): React.ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
+      <path d="M2 3h12l-4.5 5.5V13l-3-1.5V8.5L2 3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function ChevronDownIcon({ size = 10, className }: IconProps): React.ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 12 8" fill="none" className={className} aria-hidden="true">
