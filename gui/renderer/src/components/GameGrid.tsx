@@ -486,6 +486,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         <div
           style={{ fontSize: 12, padding: "4px 16px", color: bulkMsg.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)", cursor: "pointer" }}
           onClick={() => setBulkMsg(null)}
+          role={bulkMsg.isError ? "alert" : "status"}
           title="Dismiss"
         >
           {bulkMsg.text}

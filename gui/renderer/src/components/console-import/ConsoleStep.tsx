@@ -4,8 +4,8 @@ export function ConsoleStep({ vm }: { vm: ConsoleImportVM }) {
   return (
     <>
       <div className="input-group" style={{ marginBottom: 24 }}>
-        <label>Select a console</label>
-        <select
+        <label htmlFor="ci-console">Select a console</label>
+        <select id="ci-console"
           value={vm.consoleSel}
           onChange={e => vm.setConsoleSel(e.target.value)}
           style={{ width: "100%" }}

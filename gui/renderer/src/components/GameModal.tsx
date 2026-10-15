@@ -61,7 +61,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
       <div className="modal" style={{ width: 760, maxWidth: "92vw" }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>{name}</h3>
-          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
+          <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><CloseIcon /></button>
         </div>
 
         <div style={{ display: "flex", gap: 4, borderBottom: "2px solid var(--border)", marginBottom: 16 }}>

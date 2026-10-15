@@ -51,7 +51,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
 
   return (
     <>
-      {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <p role="alert" className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
 
       {/* ROM source: local folder vs network share (issue #255) */}
       <div style={{ marginBottom: 12, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
@@ -110,6 +110,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                 style={{ fontSize: 11, padding: "1px 6px" }}
                 onClick={() => extraPaths.includes(p) ? vm.removeExtraPath(p) : vm.removeRomDir(p)}
                 title={extraPaths.includes(p) ? "Remove folder" : "Ignore this folder"}
+                aria-label={extraPaths.includes(p) ? "Remove folder" : "Ignore this folder"}
               ><CloseIcon /></button>
             )}
           </div>

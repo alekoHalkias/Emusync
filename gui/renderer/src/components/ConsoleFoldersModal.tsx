@@ -77,9 +77,9 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
               )}
               {FIELDS.map((f) => (
                 <div key={f.key} className="input-group">
-                  <label>{f.label}</label>
+                  <label htmlFor={`${row.id}-${f.key}`}>{f.label}</label>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <input
+                    <input id={`${row.id}-${f.key}`}
                       type="text"
                       value={(row[f.key] as string | undefined) ?? ""}
                       onChange={(e) => edit(row.id, f.key, e.target.value)}

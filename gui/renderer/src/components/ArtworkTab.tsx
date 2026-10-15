@@ -135,9 +135,9 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
     <div>
       {/* Search row */}
       <div className="input-group" style={{ marginBottom: 12 }}>
-        <label>Search SteamGridDB</label>
+        <label htmlFor="sgdb-search">Search SteamGridDB</label>
         <div style={{ display: "flex", gap: 8 }}>
-          <input
+          <input id="sgdb-search"
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -181,7 +181,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
         </div>
       )}
 
-      {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <p role="alert" className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
 
       {/* Current artwork tiles */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -224,7 +224,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
           <div className="modal" style={{ width: 640, maxWidth: "90vw" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 style={{ margin: 0 }}>{ART_TYPE_LABELS[pickerType]} artwork</h3>
-              <button className="btn btn-ghost" onClick={() => setPickerType(null)}><CloseIcon /></button>
+              <button className="btn btn-ghost" aria-label="Close" onClick={() => setPickerType(null)}><CloseIcon /></button>
             </div>
 
             {current[pickerType] && (
@@ -239,6 +239,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                   <button
                     onClick={clearCurrent}
                     title="Remove saved artwork"
+                    aria-label="Remove saved artwork"
                     style={{
                       position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%",
                       background: "#dc2626", color: "#fff", border: "none", cursor: "pointer",

@@ -1,6 +1,6 @@
 // Labelled text input with its own Save button and Saved/error feedback.
 // `onSave` resolves to an error message, or nothing on success.
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 
 type Props = {
   label: React.ReactNode;
@@ -11,6 +11,7 @@ type Props = {
 };
 
 export default function SaveField({ label, value, onChange, onSave, placeholder }: Props): React.ReactElement {
+  const inputId = useId();
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -28,8 +29,9 @@ export default function SaveField({ label, value, onChange, onSave, placeholder 
     <div>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
         <div className="input-group" style={{ flex: 1 }}>
-          <label>{label}</label>
+          <label htmlFor={inputId}>{label}</label>
           <input
+            id={inputId}
             type="text"
             value={value}
             onChange={(e) => { onChange(e.target.value); setSaved(false); setError(""); }}
@@ -41,7 +43,7 @@ export default function SaveField({ label, value, onChange, onSave, placeholder 
           {saved ? "Saved" : busy ? <span className="spinner" /> : "Save"}
         </button>
       </div>
-      {error && <span className="error-msg" style={{ display: "block", marginTop: 4 }}>{error}</span>}
+      {error && <span role="alert" className="error-msg" style={{ display: "block", marginTop: 4 }}>{error}</span>}
     </div>
   );
 }

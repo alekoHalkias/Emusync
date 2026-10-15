@@ -27,7 +27,7 @@ export default function ConsoleImport({ onClose, onImported, initialConsole, ini
       >
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>{title ?? "Add console"}</h3>
-          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
+          <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><CloseIcon /></button>
         </div>
 
         {vm.showStepper && <Stepper currentStep={vm.currentStep} />}
