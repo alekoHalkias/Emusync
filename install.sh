@@ -5,6 +5,17 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$SCRIPT_DIR/.venv"
 
+echo "==> Checking prerequisites..."
+if ! command -v python3 &>/dev/null; then
+    echo "ERROR: python3 not found. Install Python 3.10 or newer." >&2; exit 1
+fi
+if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))'; then
+    echo "ERROR: Python 3.10+ required, found $(python3 -V 2>&1)." >&2; exit 1
+fi
+if ! python3 -c 'import venv, ensurepip' &>/dev/null; then
+    echo "ERROR: python3 venv support is missing. On Debian/Ubuntu: sudo apt install python3-venv" >&2; exit 1
+fi
+
 echo "==> Setting up Python virtual environment..."
 python3 -m venv "$VENV"
 "$VENV/bin/pip" install --upgrade pip -q
@@ -19,7 +30,11 @@ EOF
 chmod +x "$SCRIPT_DIR/emusync"
 echo "    Launcher: $SCRIPT_DIR/emusync"
 
-if command -v npm &>/dev/null; then
+if command -v npm &>/dev/null && ! command -v node &>/dev/null; then
+    echo "    [skip] node not found — GUI dependencies not installed."
+elif command -v npm &>/dev/null && [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 18 ]; then
+    echo "    [skip] Node $(node -v) is too old (need 18+) — GUI dependencies not installed."
+elif command -v npm &>/dev/null; then
     echo "==> Installing Node dependencies for GUI..."
     cd "$SCRIPT_DIR/gui" && npm install -q
     echo "    Node dependencies installed."
@@ -28,9 +43,11 @@ else
     echo "           Install Node.js, then run: cd gui && npm install"
 fi
 
-echo "==> Installing git hooks..."
-git -C "$SCRIPT_DIR" config core.hooksPath .githooks
-echo "    Git hooks installed (pre-commit will warn on CLAUDE.md drift)."
+if [ -d "$SCRIPT_DIR/.git" ]; then
+    echo "==> Installing git hooks..."
+    git -C "$SCRIPT_DIR" config core.hooksPath .githooks
+    echo "    Git hooks installed (pre-commit will warn on CLAUDE.md drift)."
+fi
 
 echo ""
 echo "Done! To use the CLI:"

@@ -35,8 +35,10 @@ export default function Setup({ onDone }: Props): React.ReactElement {
   // Stable across the verify probes and the final connect so the server
   // registers this device exactly once.
   const [deviceId, setDeviceId] = useState("");
+  const [preflightError, setPreflightError] = useState("");
 
   useEffect(() => {
+    window.emusync.server.preflight().then((r) => { if (!r.ok) setPreflightError(r.error ?? "Python install looks broken."); });
     window.emusync.config.load().then((cfg) => {
       if (cfg?.device_name) setDeviceName(cfg.device_name as string);
       setDeviceId((cfg?.device_id as string) ?? crypto.randomUUID());
@@ -190,6 +192,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
           <>
             <h1>Welcome to EmuSync</h1>
             <p>Keep game saves in sync across your devices on your home network.</p>
+            {preflightError && <p className="error-msg" style={{ margin: "12px 0", whiteSpace: "pre-wrap" }}>{preflightError}</p>}
 
             <div className="input-group" style={{ margin: "20px 0" }}>
               <label>What should we call this device?</label>

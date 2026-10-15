@@ -345,6 +345,8 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **Config reads distinguish missing from corrupt, and every write is atomic + 0600 (#535).** Both `server/config.py` `load()` and Electron's `config:load` used to treat a TOML parse error like a missing file, so Setup re-ran and its first save overwrote the only copy of `device_id`/PIN. A corrupt file is now renamed to `emusync.toml.corrupt-<ms>` (Electron also shows an error dialog) before falling back to defaults/Setup. All writers (`config.save`, `config-store.ts`'s `writeConfig`, used by `config:save`, `addRecentFolder` and `server:change-pin`) write a `.tmp` with mode 0600 and rename — don't add a bare `writeFileSync(CONFIG_PATH, …)`.
 
+**Install and first-run preflight (#536).** `install.sh` fails early with a fix hint if Python is <3.10 or `venv`/`ensurepip` is missing (Debian needs `python3-venv`), skips the GUI deps with a message for Node <18, and only sets `core.hooksPath` when run inside a git checkout. `runtime.ts`'s `PYTHON` picks `.venv/Scripts/python.exe` on Windows. `server:preflight` IPC (`server.ts`) tries importing the server's dependencies with `PYTHON`; `Setup.tsx` shows its error on the welcome screen so a broken venv is explained before the first failed server start.
+
 **Orphaned server processes** — If Electron exits abnormally, uvicorn can keep running. "Port already in use": run `pkill -9 -f "emusync.py server start"`. `emusync server start` now detects a running server and exits gracefully instead of duplicating it.
 
 **SIGKILL skips Python finally blocks** — `.server_pid`/`.server_token` may survive a hard kill; the stop handler manually deletes them.
