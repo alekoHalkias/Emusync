@@ -637,7 +637,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </details>
         )}
 
-        <div className={embedded ? "modal-actions" : undefined} style={embedded ? { alignItems: "center" } : { display: "flex", justifyContent: "flex-end" }}>
+        <div className={embedded ? "config-save-bar" : undefined} style={embedded ? undefined : { display: "flex", justifyContent: "flex-end" }}>
           {justSaved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? <><span className="spinner" /> Saving…</> : "✓ Save"}
