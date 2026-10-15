@@ -6,6 +6,7 @@ import {
 } from "../api";
 import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
+import Modal from "./Modal";
 
 type Kind = "save" | "state";
 
@@ -291,14 +292,12 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
 
   if (embedded) return body;
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 540 }} onClick={(e) => e.stopPropagation()}>
+    <Modal size="md" onClose={onClose}>
         <h3>Save &amp; state recovery — {name}</h3>
         {body}
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }

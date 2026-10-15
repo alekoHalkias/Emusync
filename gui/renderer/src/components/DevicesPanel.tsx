@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { listEvents, removeDevice, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
-import { useEscapeToClose } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 export default function DevicesPanel(): React.ReactElement {
   const { devices, currentDeviceId, refresh } = useDevices();
@@ -15,7 +15,6 @@ export default function DevicesPanel(): React.ReactElement {
   const [removing, setRemoving] = useState(false);
   // ponytail: doesn't take priority over the host "Paired devices" popup's own
   // escape handler, so Escape may close both at once — fine for a rare nested case.
-  useEscapeToClose(() => !removing && setConfirmRemove(null));
 
   const loadEvents = useCallback(async () => {
     setEventsLoading(true);
@@ -106,8 +105,7 @@ export default function DevicesPanel(): React.ReactElement {
       )}
 
       {confirmRemove && (
-        <div className="modal-overlay" onClick={() => setConfirmRemove(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal busy={removing} onClose={() => setConfirmRemove(null)}>
             <h3>Remove device?</h3>
             <p>This device will be removed from your paired devices. It can re-pair anytime.</p>
             <div className="modal-actions">
@@ -118,8 +116,7 @@ export default function DevicesPanel(): React.ReactElement {
                 {removing ? <><span className="spinner" /> Removing…</> : "Remove"}
               </button>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
     </div>
   );

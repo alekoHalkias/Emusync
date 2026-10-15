@@ -2,7 +2,7 @@
 // GameConfig's single add and GameGrid's bulk add. Purely presentational;
 // the caller owns the shutdown → add → relaunch orchestration.
 import React from "react";
-import { useEscapeToClose } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 type Props = {
   remove?: boolean;      // true when the pending op removes shortcuts instead of adding
@@ -13,10 +13,8 @@ type Props = {
 };
 
 export default function SteamRestartModal({ remove, count, busy, onYes, onNo }: Props): React.ReactElement {
-  useEscapeToClose(() => !busy && onNo());
   return (
-    <div className="modal-overlay" onClick={() => !busy && onNo()}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onNo} busy={busy}>
         <h3>Steam is open</h3>
         <p>
           Steam must be closed while shortcuts are {remove ? "removed" : "added"}. Restart it to {remove ? "remove" : "add"}
@@ -29,7 +27,6 @@ export default function SteamRestartModal({ remove, count, busy, onYes, onNo }: 
             {busy ? <><span className="spinner" /> Restarting Steam…</> : "Yes, restart Steam"}
           </button>
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }

@@ -8,6 +8,7 @@ import {
 } from "../../api";
 import { useDevices } from "../../DeviceContext";
 import type { DeviceModalTarget, TransferState } from "./types";
+import Modal from "../Modal";
 
 type Props = DeviceModalTarget & { onClose: () => void; embedded?: boolean };
 
@@ -220,14 +221,12 @@ export default function GameDeviceModal({ slug, name, gameConsole, gameIsLocal, 
 
   if (embedded) return body;
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+    <Modal size="md" onClose={onClose}>
         <h3>Devices — {name}</h3>
         {body}
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }

@@ -10,7 +10,7 @@ import ConsoleFoldersModal from "./ConsoleFoldersModal";
 import SteamRestartModal from "./SteamRestartModal";
 import { createSpeedMeter } from "./speedMeter";
 import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
-import { useEscapeToCloseTopmost } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -63,10 +63,6 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
   // and needs its own strong confirmation before it actually runs.
   const [bulkDeleteNetworkRom, setBulkDeleteNetworkRom] = useState(false);
   const [confirmBulkNetworkDelete, setConfirmBulkNetworkDelete] = useState(false);
-  useEscapeToCloseTopmost(
-    [confirmBulkNetworkDelete && !deleting, () => setConfirmBulkNetworkDelete(false)],
-    [confirmDelete && !deleting, () => setConfirmDelete(false)],
-  );
   const [showFolders, setShowFolders] = useState(false);
   const [artType, setArtType] = useState<ArtType>("grid");
   // Bumped per-slug when the settings modal closes, so that game's GameCard
@@ -589,8 +585,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
       )}
 
       {confirmDelete && confirmBulkNetworkDelete && (
-        <div className="modal-overlay" onClick={() => !deleting && setConfirmBulkNetworkDelete(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal busy={deleting} onClose={() => setConfirmBulkNetworkDelete(false)}>
             <h3 style={{ color: "var(--color-danger, #e5484d)" }}>⚠ Delete network ROM files?</h3>
             <p>
               This will permanently delete the network-drive ROM file for {selectedSlugs.size} selected
@@ -608,13 +603,11 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
                 {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete the network ROM"}
               </button>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
 
       {confirmDelete && !confirmBulkNetworkDelete && (
-        <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal busy={deleting} onClose={() => setConfirmDelete(false)}>
             <h3>Remove {selectedSlugs.size} game{selectedSlugs.size !== 1 ? "s" : ""} from this device?</h3>
             <p>This unlinks the selected games from this device. Save files and other devices' configs are <strong>not</strong> touched unless selected below.</p>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 8 }}>
@@ -648,8 +641,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
                 {deleting ? <><span className="spinner" /> Deleting…</> : "Yes, delete"}
               </button>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
     </>
   );

@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { getGame, setGameSgdbId } from "../api";
 import { CloseIcon } from "./icons";
+import Modal from "./Modal";
 
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
 const ART_TYPES: ArtType[] = ["grid", "wide_grid", "hero", "logo", "icon"];
@@ -220,8 +221,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
 
       {/* Picker modal */}
       {pickerType && (
-        <div className="modal-overlay" onClick={() => setPickerType(null)}>
-          <div className="modal" style={{ width: 640, maxWidth: "90vw" }} onClick={(e) => e.stopPropagation()}>
+        <Modal size="lg" onClose={() => setPickerType(null)}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 style={{ margin: 0 }}>{ART_TYPE_LABELS[pickerType]} artwork</h3>
               <button className="btn btn-ghost" aria-label="Close" onClick={() => setPickerType(null)}><CloseIcon /></button>
@@ -269,8 +269,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
     </div>
   );

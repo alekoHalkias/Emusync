@@ -7,8 +7,8 @@ import GameDeviceModal from "./game-list/GameDeviceModal";
 import SaveHistory from "./SaveHistory";
 import SwitchModsTab from "./SwitchModsTab";
 import { CloseIcon, PlayIcon } from "./icons";
-import { useEscapeToClose } from "../useEscapeToClose";
 import { usesSharedSaveLayout } from "./console-import/helpers";
+import Modal from "./Modal";
 
 export type GameModalTarget = {
   slug: string;
@@ -33,7 +33,6 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   const isSwitch = consoleKey === "switch";
   const [tab, setTab] = useState<Tab>(canPlay ? "run" : "settings");
 
-  useEscapeToClose(onClose);
 
   const tabs: { key: Tab; label: string; disabled?: boolean }[] = [
     { key: "settings", label: "Settings" },
@@ -57,8 +56,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
   });
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 760, maxWidth: "92vw" }} onClick={(e) => e.stopPropagation()}>
+    <Modal size="xl" onClose={onClose}>
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>{name}</h3>
           <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><CloseIcon /></button>
@@ -114,8 +112,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
             <RunTab slug={slug} name={name} canPlay={canPlay} onLaunch={onLaunch} onClose={onClose} />
           )}
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }
 

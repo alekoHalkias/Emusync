@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { getDeviceConsoles, updateDeviceConsole, type DeviceConsole } from "../api";
 import { useDevices } from "../DeviceContext";
-import { useEscapeToClose } from "../useEscapeToClose";
 import { usesSharedSaveLayout } from "./console-import/helpers";
+import Modal from "./Modal";
 
 type Folders = Omit<DeviceConsole, "id" | "console_name">;
 const FIELDS: Array<{ key: keyof Folders; label: string; picker: boolean }> = [
@@ -24,7 +24,6 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
   const [abbr, setAbbr] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
-  useEscapeToClose(onClose);
 
   useEffect(() => {
     if (!currentDeviceId) return;
@@ -62,8 +61,7 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 560 }} onClick={(e) => e.stopPropagation()}>
+    <Modal size="md" onClose={onClose}>
         <h3>{abbr || consoleKey} folders on this device</h3>
         {rows === null ? (
           <span className="spinner" />
@@ -104,7 +102,6 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }
