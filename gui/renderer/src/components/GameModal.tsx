@@ -88,7 +88,7 @@ export default function GameModal({ target, onClose, onChanged, onLaunch }: {
               slug={slug}
               name={name}
               onBack={onClose}
-              onSaved={() => { onChanged(); onClose(); }}
+              onSaved={onChanged}
               onRemoved={() => { onChanged(); onClose(); }}
             />
           )}
@@ -147,7 +147,7 @@ function RunTab({ slug, name, canPlay, onLaunch, onClose }: {
         <PlayIcon /> Launch now
       </button>
 
-      <p style={{ marginBottom: 6, fontWeight: 500 }}>Add to Steam</p>
+      <p style={{ marginBottom: 6, fontWeight: 500 }}>Steam launch option</p>
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>
         Paste this into Steam → game properties → launch options. Keep the
         <code> %command%</code> — Steam replaces it with the emulator command so EmuSync can wrap it.

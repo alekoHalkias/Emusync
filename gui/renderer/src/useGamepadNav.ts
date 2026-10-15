@@ -52,7 +52,7 @@ export function useInputMode(): InputState {
 }
 
 const FOCUSABLE_SELECTOR =
-  'button:not(:disabled), [tabindex="0"], input:not(:disabled):not([tabindex="-1"]), select:not(:disabled), a[href]';
+  'button:not(:disabled), [tabindex="0"], input:not(:disabled):not([tabindex="-1"]), select:not(:disabled), a[href], summary';
 
 function isVisible(el: Element): boolean {
   return (el as HTMLElement).offsetParent !== null;
