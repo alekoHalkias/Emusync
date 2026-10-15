@@ -9,6 +9,7 @@ import {
 import { useDevices } from "../../DeviceContext";
 import type { DeviceModalTarget, TransferState } from "./types";
 import Modal from "../Modal";
+import { DotIcon, MonitorIcon } from "../icons";
 
 type Props = DeviceModalTarget & { onClose: () => void; embedded?: boolean };
 
@@ -46,9 +47,9 @@ function DeviceRow({ d, dim, displayIp }: { d: Device; dim: boolean; displayIp?:
   const ip = displayIp ?? d.last_ip;
   return (
     <li style={{ padding: "6px 0", borderBottom: "2px solid var(--border)", display: "flex", alignItems: "center", gap: 8, opacity: dim ? 0.6 : 1 }}>
-      <span>🖥</span>
+      <span><MonitorIcon /></span>
       <span>{d.name}</span>
-      <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}>●</span>
+      <span style={{ color: FRESHNESS_COLOR[freshness], fontSize: 14 }} title={FRESHNESS_TITLE[freshness]}><DotIcon /></span>
       <span style={{ color: "var(--text-muted)", fontSize: 11 }}>{ip ?? "—"}</span>
     </li>
   );

@@ -15,6 +15,7 @@ import { useLocalizeJob } from "./localizeJob";
 import { useGamepadNav } from "./useGamepadNav";
 import ControllerHints from "./components/ControllerHints";
 import SelectPicker from "./components/SelectPicker";
+import { DotIcon, DownloadIcon, StopIcon } from "./components/icons";
 
 type Screen =
   | { name: "loading" }
@@ -318,11 +319,11 @@ export default function App(): React.ReactElement {
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
             <span className="topbar-game-running">
               {gameIsExternal
-                ? `● Playing ${runningGameName ?? "game"} on Steam`
-                : `● ${runningGameName ?? "Game"} running`}
+                ? <><DotIcon /> Playing {runningGameName ?? "game"} on Steam</>
+                : <><DotIcon /> {runningGameName ?? "Game"} running</>}
             </span>
             {!gameIsExternal && (
-              <button className="btn btn-danger" onClick={handleStop}>■ Stop</button>
+              <button className="btn btn-danger" onClick={handleStop}><StopIcon /> Stop</button>
             )}
           </div>
         )}
@@ -331,7 +332,7 @@ export default function App(): React.ReactElement {
         {!gameRunning && localizeJob?.hidden && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, justifyContent: "center" }}>
             <span className="topbar-game-running" title={localizeJob.gameName}>
-              ⬇ Downloading 1 game
+              <DownloadIcon /> Downloading 1 game
               {localizeJob.totalBytes > 0 && ` • ${Math.min(100, Math.round((localizeJob.doneBytes / localizeJob.totalBytes) * 100))}%`}
             </span>
           </div>

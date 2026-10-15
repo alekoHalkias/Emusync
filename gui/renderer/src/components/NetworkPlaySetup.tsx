@@ -12,6 +12,7 @@ import {
 } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import Modal from "./Modal";
+import { GlobeIcon, SaveIcon } from "./icons";
 
 type Props = {
   slug: string;
@@ -211,7 +212,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
 
             {/* Option A — network drive */}
             <div style={{ border: "2px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>🌐 Set up this console & play</div>
+              <div style={{ fontWeight: 500, fontSize: 14 }}><GlobeIcon /> Set up this console & play</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
                 {networkMount
                   ? <>Search for this game on <code>{networkMount}</code> and play it.</>
@@ -230,7 +231,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
 
             {/* Option B — pull to this device */}
             <div style={{ border: "2px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>💾 Pull the ROM to this device</div>
+              <div style={{ fontWeight: 500, fontSize: 14 }}><SaveIcon /> Pull the ROM to this device</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
                 {sources.length
                   ? <>Copy the ROM from <b>{sources[0].name}</b> onto this device for offline play.</>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { RelTime } from "../../time";
+import { CheckIcon, CloseIcon, CloudIcon, SaveIcon } from "../icons";
 
 export type SyncOp = { status: "idle" | "busy" | "ok" | "error"; action: "push" | "pull" | null; msg: string };
 export const IDLE_OP: SyncOp = { status: "idle", action: null, msg: "" };
@@ -41,7 +42,7 @@ export function SyncLine({
         onClick={onClick}
         title={op.action === action && op.status === "error" ? op.msg : undefined}
       >
-        {showSpinner ? <span className="spinner" style={{ width: 10, height: 10 }} /> : f ? (f.ok ? "✓" : "✗") : label}
+        {showSpinner ? <span className="spinner" style={{ width: 10, height: 10 }} /> : f ? (f.ok ? <CheckIcon /> : <CloseIcon />) : label}
       </button>
     );
   }
@@ -49,9 +50,9 @@ export function SyncLine({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, fontSize: 13, flexWrap: "wrap" }}>
       <span style={{ color: "var(--text-muted)", fontSize: 12 }}>Sync:</span>
-      <span title="On this device"><span style={{ opacity: 0.7 }}>💾</span> <RelTime iso={localTime} /></span>
+      <span title="On this device"><span style={{ opacity: 0.7 }}><SaveIcon /></span> <RelTime iso={localTime} /></span>
       <span style={{ color: "var(--text-muted)" }}>·</span>
-      <span title="On the server"><span style={{ opacity: 0.7 }}>☁️</span> <RelTime iso={serverTime} /></span>
+      <span title="On the server"><span style={{ opacity: 0.7 }}><CloudIcon /></span> <RelTime iso={serverTime} /></span>
       <span style={{ flex: 1 }} />
       <Btn action="push" onClick={onPush} disabled={pushDisabled} label="↑ Push" />
       <Btn action="pull" onClick={onPull} disabled={pullDisabled} label="↓ Pull" />

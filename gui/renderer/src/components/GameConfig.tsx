@@ -6,7 +6,7 @@ import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
 import { useGameSync } from "./game-config/useGameSync";
 import SteamRestartModal from "./SteamRestartModal";
-import { PlayIcon } from "./icons";
+import { CheckIcon, FolderIcon, GamepadIcon, PlayIcon, PlusIcon, TrashIcon, WarningIcon } from "./icons";
 
 /**
  * Swap the basename of a portable ROM rel-path to a new base, keeping the
@@ -361,7 +361,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
       {offlineData && (
         <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-          ⚠ Showing cached data from this device's last sync — server unreachable.
+          <WarningIcon /> Showing cached data from this device's last sync — server unreachable.
         </p>
       )}
       {loadError && <p role="alert" className="error-msg" style={{ marginBottom: 16 }}>{loadError}</p>}
@@ -406,7 +406,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               placeholder="/path/to/game.rom"
             />
             <button className="btn btn-icon" title="Browse" onClick={() => pickFile(setShownRomPath, "Select ROM file")}>
-              📁
+              <FolderIcon />
             </button>
           </div>
           {errors.romPath && <span role="alert" className="error-msg">{errors.romPath}</span>}
@@ -434,7 +434,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               placeholder="/path/to/save.sav"
             />
             <button className="btn btn-icon" title="Browse" onClick={() => pickFile(setSavePath, "Select save file")}>
-              📁
+              <FolderIcon />
             </button>
           </div>
           {errors.savePath && <span role="alert" className="error-msg">{errors.savePath}</span>}
@@ -485,7 +485,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                   const result = await window.emusync.gameFolder.reveal(slug!);
                   if (!result.ok) setGameFolderError(result.error || "Failed to open folder");
                 }}>
-                📁
+                <FolderIcon />
               </button>
               <button className="btn btn-icon" title="Add file to folder (e.g. an update or DLC)" disabled={!gameFolder || isNew}
                 onClick={async () => {
@@ -498,7 +498,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                   const result = await window.emusync.gameFolder.addFile(slug!, picked);
                   if (!result.ok) setGameFolderError(result.error || "Failed to add file");
                 }}>
-                ➕
+                <PlusIcon />
               </button>
             </div>
             {gameFolderError && <span role="alert" className="error-msg">{gameFolderError}</span>}
@@ -525,7 +525,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                 const folder = await window.emusync.dialog.openFolder();
                 if (folder) setStatePath(folder);
               }}>
-                📁
+                <FolderIcon />
               </button>
             </div>
             {!isNew && statePath && !sharedStateLayout && (
@@ -557,7 +557,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                 disabled={steamBusy || steamAdded}
                 title={steamAdded ? "This game already has a Steam shortcut" : undefined}
               >
-                {steamBusy ? <><span className="spinner" /> Adding…</> : steamAdded ? "✓ In Steam" : "🎮 Add to Steam"}
+                {steamBusy ? <><span className="spinner" /> Adding…</> : steamAdded ? <><CheckIcon /> In Steam</> : <><GamepadIcon /> Add to Steam</>}
               </button>
               {steamMessage && (
                 <span style={{ fontSize: 12, color: steamMessage.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)" }}>
@@ -582,7 +582,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               confirmNetworkDelete ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, alignItems: "flex-start", maxWidth: 320 }}>
                   <span style={{ color: "var(--color-danger, #e5484d)", fontWeight: 600 }}>
-                    ⚠ This will permanently delete "{romPath.split(/[\\/]/).pop()}" from the network drive. This cannot be undone.
+                    <WarningIcon /> This will permanently delete "{romPath.split(/[\\/]/).pop()}" from the network drive. This cannot be undone.
                   </span>
                   <span style={{ display: "flex", gap: 8 }}>
                     <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
@@ -635,13 +635,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                 </div>
               )
             ) : (
-              <button className="btn btn-danger" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
+              <button className="btn btn-danger" onClick={() => setDeleteConfirm(true)}><TrashIcon /> Delete</button>
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {justSaved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+            {justSaved && <span style={{ fontSize: 12, color: "var(--green)" }}><CheckIcon /> Saved</span>}
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? <><span className="spinner" /> Saving…</> : "✓ Save"}
+              {saving ? <><span className="spinner" /> Saving…</> : <><CheckIcon /> Save</>}
             </button>
           </div>
         </div>

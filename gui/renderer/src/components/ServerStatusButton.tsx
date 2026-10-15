@@ -5,7 +5,7 @@ import DevicesPanel from "./DevicesPanel";
 import SaveField from "./settings/SaveField";
 import PinInput from "./settings/PinInput";
 import { useDevices } from "../DeviceContext";
-import { CloseIcon } from "./icons";
+import { CloseIcon, DotIcon, PlayIcon, StopIcon, UploadIcon, WarningIcon } from "./icons";
 import Modal from "./Modal";
 
 type ServerState = "checking" | "online" | "offline";
@@ -300,7 +300,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                   <div style={{ marginBottom: 12 }}>
                     {existingServers.length > 0 && !startWarningConfirmed && (
                       <div style={{ marginBottom: 10, padding: "10px 12px", background: "var(--bg)", border: "1px solid var(--red, #f87171)", borderRadius: "var(--radius)", fontSize: 12 }}>
-                        <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}>⚠ Another EmuSync server was found on your LAN:</p>
+                        <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}><WarningIcon /> Another EmuSync server was found on your LAN:</p>
                         {existingServers.map((s) => (
                           <p key={s.host} style={{ color: "var(--text-muted)" }}>{s.name || "Unknown"} — {s.host}:{s.port}</p>
                         ))}
@@ -355,7 +355,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                   </div>
                   {pinConfirming && (
                     <p style={{ fontSize: 12, color: "var(--red, #f87171)", marginTop: 8 }}>
-                      ⚠ This will restart the server. Other devices will need to update their PIN to reconnect.
+                      <WarningIcon /> This will restart the server. Other devices will need to update their PIN to reconnect.
                     </p>
                   )}
                   {pinError && <span role="alert" className="error-msg" style={{ marginTop: 4, display: "block" }}>{pinError}</span>}
@@ -372,7 +372,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
 
                 {pairServerWarning && (
                   <div style={{ marginBottom: 12, padding: "10px 12px", background: "var(--bg)", border: "1px solid var(--red, #f87171)", borderRadius: "var(--radius)", fontSize: 12 }}>
-                    <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}>⚠ This machine is currently running as a server</p>
+                    <p style={{ color: "var(--red, #f87171)", marginBottom: 6, fontWeight: 500 }}><WarningIcon /> This machine is currently running as a server</p>
                     <p style={{ color: "var(--text-muted)" }}>Connecting to an external host will stop this server. Continue?</p>
                     <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
                       <button className="btn btn-danger" onClick={doConnect}>Stop server & connect</button>
@@ -500,11 +500,11 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
             ) : (
               <div style={{ display: "flex", flexDirection: "column", maxHeight: 400, overflowY: "auto" }}>
                 {events.map((e, i) => {
-                  const icons: Record<string, string> = {
-                    server_started: "🟢",
-                    game_started: "▶",
-                    game_stopped: "■",
-                    save_synced: "↑",
+                  const icons: Record<string, React.ReactNode> = {
+                    server_started: <span style={{ color: "var(--green, #4caf50)" }}><DotIcon /></span>,
+                    game_started: <PlayIcon />,
+                    game_stopped: <StopIcon />,
+                    save_synced: <UploadIcon />,
                   };
                   const descriptions: Record<string, (ev: ActivityEvent) => string> = {
                     server_started: () => "Server started",

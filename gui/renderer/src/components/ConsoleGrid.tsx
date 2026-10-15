@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { GameRow } from "./game-list/types";
 import ConsoleWheel from "./ConsoleWheel";
+import { GamepadIcon } from "./icons";
 
 // Accent colour per console key (no more emoji — logo fetched from retroarch-assets)
 const CONSOLE_COLOR: Record<string, string> = {
@@ -122,7 +123,7 @@ export default function ConsoleGrid({ games, onSelectConsole, bigPicture }: Prop
   if (cards.length === 0) {
     return (
       <div className="empty-state">
-        <div style={{ fontSize: 48, marginBottom: 16 }}>🎮</div>
+        <div style={{ fontSize: 48, marginBottom: 16 }}><GamepadIcon /></div>
         <h3>No consoles yet</h3>
         <p style={{ marginBottom: 20 }}>Import a console to see your library here.</p>
       </div>

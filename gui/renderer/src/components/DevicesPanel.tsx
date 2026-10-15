@@ -6,6 +6,7 @@ import { listEvents, removeDevice, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
 import Modal from "./Modal";
+import { TrashIcon } from "./icons";
 
 export default function DevicesPanel(): React.ReactElement {
   const { devices, currentDeviceId, refresh } = useDevices();
@@ -112,7 +113,7 @@ export default function DevicesPanel(): React.ReactElement {
                   disabled={d.id === currentDeviceId}
                   onClick={() => setConfirmRemove(d.id)}
                 >
-                  🗑
+                  <TrashIcon />
                 </button>
               </div>
             </div>

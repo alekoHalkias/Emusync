@@ -11,6 +11,7 @@ import SteamRestartModal from "./SteamRestartModal";
 import { createSpeedMeter } from "./speedMeter";
 import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
 import Modal from "./Modal";
+import { CheckSquareIcon, DownloadIcon, GamepadIcon, GearIcon, SquareIcon, TrashIcon, WarningIcon } from "./icons";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -438,7 +439,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           onClick={() => setShowFolders(true)}
           title="Console folders for this device"
         >
-          ⚙
+          <GearIcon />
         </button>
         <div style={{ flex: 1 }} />
         <button
@@ -448,7 +449,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           onClick={toggleSelectAll}
           title={allFilteredSelected ? "Deselect all visible games" : "Select all visible games"}
         >
-          {allFilteredSelected ? "☑" : "☐"} <span className="btn-label">{allFilteredSelected ? "Deselect All" : "Select All"}</span>
+          {allFilteredSelected ? <CheckSquareIcon /> : <SquareIcon />} <span className="btn-label">{allFilteredSelected ? "Deselect All" : "Select All"}</span>
         </button>
         <button
           className="btn btn-ghost game-grid-header-btn"
@@ -459,7 +460,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         >
           {dlBusy
             ? <><span className="spinner" /> <span className="btn-label">Downloading…</span></>
-            : <>⬇ <span className="btn-label">Download</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}</>}
+            : <><DownloadIcon /> <span className="btn-label">Download</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}</>}
         </button>
         <button
           className="btn btn-ghost game-grid-header-btn"
@@ -472,7 +473,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         >
           {steamBusy
             ? <><span className="spinner" /> <span className="btn-label">{steamRemoveMode ? "Removing…" : "Adding…"}</span></>
-            : <>🎮 <span className="btn-label">{steamRemoveMode ? "Remove from Steam" : "Add to Steam"}</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}</>}
+            : <><GamepadIcon /> <span className="btn-label">{steamRemoveMode ? "Remove from Steam" : "Add to Steam"}</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}</>}
         </button>
         <button
           className="btn btn-danger game-grid-header-btn"
@@ -480,7 +481,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           aria-label="Delete selected"
           onClick={() => setConfirmDelete(true)}
         >
-          🗑 <span className="btn-label">Delete</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
+          <TrashIcon /> <span className="btn-label">Delete</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
         </button>
       </div>
 
@@ -592,7 +593,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
 
       {confirmDelete && confirmBulkNetworkDelete && (
         <Modal busy={deleting} onClose={() => setConfirmBulkNetworkDelete(false)}>
-            <h3 style={{ color: "var(--color-danger, #e5484d)" }}>⚠ Delete network ROM files?</h3>
+            <h3 style={{ color: "var(--color-danger, #e5484d)" }}><WarningIcon /> Delete network ROM files?</h3>
             <p>
               This will permanently delete the network-drive ROM file for {selectedSlugs.size} selected
               game{selectedSlugs.size !== 1 ? "s" : ""} (any that are network-sourced). <strong>This cannot be undone.</strong>

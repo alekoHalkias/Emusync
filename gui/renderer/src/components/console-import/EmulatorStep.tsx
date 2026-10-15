@@ -1,4 +1,5 @@
 import type { ConsoleImportVM } from "./useConsoleImport";
+import { GamepadIcon } from "../icons";
 
 export function EmulatorStep({ vm }: { vm: ConsoleImportVM }) {
   const { emulators, consoleLabel, emuSel } = vm;
@@ -9,7 +10,7 @@ export function EmulatorStep({ vm }: { vm: ConsoleImportVM }) {
     <>
       {emulators.length === 0 ? (
         <div style={{ padding: "24px 0", textAlign: "center" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🎮</div>
+          <div style={{ fontSize: 36, marginBottom: 12 }}><GamepadIcon /></div>
           <p style={{ fontWeight: 600, marginBottom: 8 }}>
             No compatible emulator found
           </p>

@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from "react";
 import { getGame, listSwitchMods, SwitchModPoolEntry } from "../api";
 import { applySwitchTitleId } from "./console-import/postImport";
+import { CheckIcon } from "./icons";
 
 function fmtSize(n: number): string {
   if (!n) return "?";
@@ -137,8 +138,8 @@ export default function SwitchModsTab({ slug }: { slug: string }): React.ReactEl
               return (
                 <tr key={name} style={{ borderTop: "2px solid var(--border)" }}>
                   <td style={{ padding: "6px" }}>{name}</td>
-                  <td style={{ padding: "6px" }}>{inLocal ? "✓" : ""}</td>
-                  <td style={{ padding: "6px" }}>{poolEntry ? "✓" : ""}</td>
+                  <td style={{ padding: "6px" }}>{inLocal ? <CheckIcon /> : ""}</td>
+                  <td style={{ padding: "6px" }}>{poolEntry ? <CheckIcon /> : ""}</td>
                   <td style={{ padding: "6px" }}>{poolEntry ? fmtSize(poolEntry.size) : "?"}</td>
                 </tr>
               );

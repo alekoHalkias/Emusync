@@ -117,6 +117,7 @@ input.error { border-color: var(--red); }
   max-height: 90vh;
   overflow-y: auto;
 }
+.icon { display: inline-block; vertical-align: -0.15em; flex-shrink: 0; }
 .modal:focus { outline: none; }
 .modal-md { width: 520px; }
 .modal-lg { width: 640px; }

@@ -7,6 +7,7 @@ import {
 import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
 import Modal from "./Modal";
+import { WarningIcon } from "./icons";
 
 type Kind = "save" | "state";
 
@@ -185,7 +186,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
     try {
       const res = await window.emusync.recovery.restoreLocalBackup(e.bakPath, e.targetPath);
       if (!res.ok) throw new Error(res.error || "Restore failed");
-      setStatus("Local backup restored to disk. Use ▶ or push to put it on the server.");
+      setStatus("Local backup restored to disk. Use the play button or push to put it on the server.");
       onRestored();
       await load();
     } catch (err: any) {
@@ -212,7 +213,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
             {e.isCurrent && !e.damaged && <span style={{ color: "var(--green)", marginLeft: 8, fontSize: 11 }}>current</span>}
             {e.damaged && (
               <span style={{ color: "var(--red)", marginLeft: 8, fontSize: 11 }} title={`This save looks damaged: ${reasonsText(e.damaged.reasons)}.`}>
-                ⚠ damaged
+                <WarningIcon /> damaged
               </span>
             )}
             {e.source === "local-bak" && <span style={{ color: "var(--text-muted)", marginLeft: 8, fontSize: 11 }}>local backup (not on server)</span>}
@@ -270,7 +271,7 @@ export default function SaveHistory({ slug, name, savePath, statePath, onClose, 
     <>
       {anyDamaged && (
         <p style={{ fontSize: 12, color: "var(--red)", margin: "4px 0 8px" }}>
-          ⚠ This game's current {integrity!.save.status === "damaged" ? "save" : "state"} looks damaged. Restore the last good copy below.
+          <WarningIcon /> This game's current {integrity!.save.status === "damaged" ? "save" : "state"} looks damaged. Restore the last good copy below.
         </p>
       )}
       {entries === null ? (
