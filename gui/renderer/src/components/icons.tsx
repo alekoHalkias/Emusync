@@ -45,11 +45,11 @@ export function ChevronDownIcon({ size = 10, className }: IconProps): React.Reac
 // default to 1em, so they occupy the same space as the glyph they replaced.
 type SizedProps = { size?: number | string; className?: string };
 
-function glyph(children: React.ReactNode, filled = false) {
+function glyph(children: React.ReactNode, filled = false, viewBox = "0 0 16 16") {
   return function Icon({ size = "1em", className }: SizedProps): React.ReactElement {
     return (
       <svg
-        width={size} height={size} viewBox="0 0 16 16" aria-hidden="true"
+        width={size} height={size} viewBox={viewBox} aria-hidden="true"
         className={className ? `icon ${className}` : "icon"}
         fill={filled ? "currentColor" : "none"} stroke={filled ? "none" : "currentColor"}
         strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
@@ -74,7 +74,7 @@ export const UploadIcon = glyph(<path d="M8 11V3M4.5 6.5L8 3l3.5 3.5M3 13h10" />
 export const DownloadIcon = glyph(<path d="M8 3v8M4.5 7.5L8 11l3.5-3.5M3 13h10" />);
 export const WarningIcon = glyph(<path d="M8 2.5L14.5 13.5h-13zM8 6.5v3.5M8 12v.01" />);
 export const CheckIcon = glyph(<path d="M3 8.5l3.5 3.5L13 4.5" />);
-export const GearIcon = glyph(<><circle cx="8" cy="8" r="2.5" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></>);
+export const GearIcon = glyph(<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" /></>, false, "0 0 24 24");
 export const RefreshIcon = glyph(<path d="M13 8a5 5 0 1 1-1.5-3.5M13 2.5v3h-3" />);
 export const SquareIcon = glyph(<path d="M3 3h10v10H3z" />);
 export const CheckSquareIcon = glyph(<path d="M3 3h10v10H3zM5.5 8.2l1.8 1.8 3.2-3.6" />);
