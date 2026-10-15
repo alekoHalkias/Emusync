@@ -572,7 +572,12 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                   {netExtraRef.current.rom_sha256 && <><span>ROM SHA-256</span><span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{netExtraRef.current.rom_sha256}</span></>}
                 </div>
               )}
-              <div>
+            </div>
+          </details>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+          <div>
             {!isNew && (deleteConfirm ? (
               confirmNetworkDelete ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, alignItems: "flex-start", maxWidth: 320 }}>
@@ -632,16 +637,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             ) : (
               <button className="btn btn-danger" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
             ))}
-              </div>
-            </div>
-          </details>
-        )}
-
-        <div className={embedded ? "config-save-bar" : undefined} style={embedded ? undefined : { display: "flex", justifyContent: "flex-end" }}>
-          {justSaved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <><span className="spinner" /> Saving…</> : "✓ Save"}
-          </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {justSaved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? <><span className="spinner" /> Saving…</> : "✓ Save"}
+            </button>
+          </div>
         </div>
       </div>
 
