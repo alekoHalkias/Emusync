@@ -49,7 +49,7 @@ export default function App(): React.ReactElement {
 
   // Shared game list — data source for both ConsoleGrid and GameGrid.
   // Only active after setup is complete; the hook starts polling on mount.
-  const { games, loading, reload } = useGameList();
+  const { games, loading, unreachable, reload } = useGameList();
 
   useEffect(() => {
     window.emusync.config.load().then((cfg) => {
@@ -354,7 +354,14 @@ export default function App(): React.ReactElement {
         {screen.name === "games" && (
           loading ? (
             <div style={{ textAlign: "center", padding: 60 }}>
-              <span className="spinner" style={{ width: 28, height: 28 }} />
+              {unreachable ? (
+                <>
+                  <p role="alert" style={{ marginBottom: 12 }}>Can't reach the EmuSync server, and no games are cached on this device. Retrying…</p>
+                  <button className="btn btn-ghost" onClick={() => reload()}>Retry now</button>
+                </>
+              ) : (
+                <span className="spinner" style={{ width: 28, height: 28 }} />
+              )}
             </div>
           ) : (
             <ConsoleGrid

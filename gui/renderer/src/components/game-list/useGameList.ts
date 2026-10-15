@@ -6,6 +6,8 @@ import type { GameRow } from "./types";
 export type UseGameList = {
   games: GameRow[];
   loading: boolean;
+  /** True while the server is unreachable and nothing is cached, so the UI can say so instead of spinning forever. */
+  unreachable: boolean;
   /** Reload the list. Pass `silent` to refresh without toggling the loading spinner. */
   reload: (silent?: boolean) => Promise<void>;
 };
@@ -47,6 +49,7 @@ export function useGameList(): UseGameList {
   const [cached] = useState<GameRow[] | null>(readCache);
   const [games, setGames] = useState<GameRow[]>(cached ?? []);
   const [loading, setLoading] = useState(cached === null);
+  const [unreachable, setUnreachable] = useState(false);
   const loadIdRef = useRef(0);
   // Flips to true after the first successful fetch; drives the poll cadence.
   // Seeded true when a warm cache exists, so the initial fetch runs silently
@@ -90,6 +93,7 @@ export function useGameList(): UseGameList {
       );
       if (loadIdRef.current !== thisId) return;
       everLoadedRef.current = true;
+      setUnreachable(false);
       setGames(enriched);
       writeCache(enriched);
       if (!silent) setLoading(false);
@@ -122,6 +126,7 @@ export function useGameList(): UseGameList {
         }
         // Nothing cached either. Stay in loading=true; the self-scheduling poll
         // below retries in 1 s.
+        setUnreachable(true);
         setLoading(true);
         return;
       }
@@ -150,5 +155,5 @@ export function useGameList(): UseGameList {
     return () => clearTimeout(timer);
   }, [reload]);
 
-  return { games, loading, reload };
+  return { games, loading, unreachable, reload };
 }

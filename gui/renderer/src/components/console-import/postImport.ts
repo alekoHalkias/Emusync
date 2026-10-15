@@ -25,9 +25,10 @@ export function _serverIsNewer(localTime: string | null, serverMeta: SaveMeta): 
 
 export async function prefetchArt(
   entries: ImportedEntry[], consoleKey: string,
-  setArtProgress: (v: { done: number; total: number }) => void,
+  setArtProgress: (v: { done: number; total: number; failed: number }) => void,
 ): Promise<void> {
-  setArtProgress({ done: 0, total: entries.length });
+  let failed = 0;
+  setArtProgress({ done: 0, total: entries.length, failed });
   for (let i = 0; i < entries.length; i++) {
     // All 5 types, not just the console's configured one (#411) — reuses the
     // Artwork tab's per-type SGDB dispatch (#325) instead of art:get's single
@@ -38,8 +39,8 @@ export async function prefetchArt(
     // Sequential across games and, internally, across types — never more than
     // one SGDB request in flight — and each type's failure is isolated inside
     // refreshAll, so a rate-limited/missing type doesn't stop the rest.
-    try { await emusync.artwork.refreshAll(entries[i].slug, entries[i].name, consoleKey, null); } catch { /* best-effort */ }
-    setArtProgress({ done: i + 1, total: entries.length });
+    try { await emusync.artwork.refreshAll(entries[i].slug, entries[i].name, consoleKey, null); } catch { failed++; }
+    setArtProgress({ done: i + 1, total: entries.length, failed });
   }
 }
 

@@ -47,7 +47,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [savedFolders, setSavedFolders] = useState<string[]>([]);
   const [pushResults, setPushResults]   = useState<PushResult[]>([]);
-  const [artProgress, setArtProgress]   = useState({ done: 0, total: 0 });
+  const [artProgress, setArtProgress]   = useState({ done: 0, total: 0, failed: 0 });
   const [pushSaves, setPushSaves]       = useState(true);
   const [pushStates, setPushStates]     = useState(true);
   // ROM source (issue #255): import from a local folder or a network share, and

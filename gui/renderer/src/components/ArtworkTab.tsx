@@ -45,8 +45,8 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
       window.emusync.artwork.getMatchedGame(g.sgdb_game_id).then((match) => {
         if (match) setMatchedName(match.name);
       }).catch(() => {});
-    }).catch(() => {});
-    window.emusync.artwork.getCurrent(slug, consoleKey).then(setCurrent).catch(() => {});
+    }).catch(() => setError("Couldn't load this game's artwork settings from the server."));
+    window.emusync.artwork.getCurrent(slug, consoleKey).then(setCurrent).catch(() => setError("Couldn't load current artwork."));
   }, [slug, consoleKey]);
 
   async function search(): Promise<void> {
@@ -74,7 +74,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
   async function pickGame(game: SgdbGameResult): Promise<void> {
     setSelectedId(game.id);
     setMatchedName(game.name);
-    try { await setGameSgdbId(slug, game.id); } catch { /* best-effort — local selection still works this session */ }
+    try { await setGameSgdbId(slug, game.id); } catch { setError("Couldn't save the SteamGridDB match to the server — it will be lost after this session."); }
     // Pull the id directly rather than through selectedId's state — a
     // just-clicked setSelectedId hasn't re-rendered yet, so reading the
     // state var here would still see the previous selection.
