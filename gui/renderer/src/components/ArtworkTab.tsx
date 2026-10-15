@@ -193,7 +193,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
           {refreshing ? <><span className="spinner" /> Refreshing…</> : "↻ Refresh all"}
         </button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 10 }}>
         {ART_TYPES.map((type) => (
           <button type="button" key={type} onClick={() => openPicker(type)} style={{ cursor: "pointer", textAlign: "center", background: "none", border: 0, padding: 0, color: "inherit", font: "inherit" }}>
             <div
