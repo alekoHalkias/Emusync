@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld("emusync", {
     stop: (): Promise<boolean> => ipcRenderer.invoke("server:stop"),
     changePin: (pin: string | null): Promise<{ ok: boolean; token: string | null }> =>
       ipcRenderer.invoke("server:change-pin", pin),
+    preflight: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke("server:preflight"),
     discover: (): Promise<Array<{ name: string; host: string; port: number }>> =>
       ipcRenderer.invoke("server:discover"),
     localIp: (): Promise<string | null> => ipcRenderer.invoke("server:local-ip"),

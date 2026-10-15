@@ -14,8 +14,9 @@ import { homedir } from "os";
 export const CONFIG_PATH = join(homedir(), ".emusync", "emusync.toml");
 export const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../../../emusync.py");
 export const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
-  const venv = join(dirname(SCRIPT), ".venv", "bin", "python");
-  return existsSync(venv) ? venv : "python3";
+  const win = process.platform === "win32";
+  const venv = join(dirname(SCRIPT), ".venv", win ? "Scripts" : "bin", win ? "python.exe" : "python");
+  return existsSync(venv) ? venv : win ? "python" : "python3";
 })();
 
 export const rt = {

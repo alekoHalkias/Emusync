@@ -149,6 +149,20 @@ export function registerServerIpc(): void {
     return true;
   });
 
+  // Can PYTHON import the server's dependencies? Lets Setup explain a broken install up front.
+  ipcMain.handle("server:preflight", () => {
+    return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      const proc = spawn(PYTHON, ["-c", "import fastapi, uvicorn, click, tomlkit, zeroconf, httpx"], { stdio: ["ignore", "ignore", "pipe"] });
+      let err = "";
+      proc.stderr?.on("data", (c: Buffer) => { err += c.toString(); });
+      proc.on("exit", (code) => resolve(code === 0 ? { ok: true } : {
+        ok: false,
+        error: `Python dependencies are missing for ${PYTHON}. Run install.sh from the EmuSync folder.\n${err.trim().split("\n").pop() ?? ""}`,
+      }));
+      proc.on("error", () => resolve({ ok: false, error: `Python was not found (${PYTHON}). Install Python 3.10+ and run install.sh.` }));
+    });
+  });
+
   ipcMain.handle("server:discover", () => {
     return new Promise<Array<{ name: string; host: string; port: number }>>((resolve) => {
       const proc = spawn(PYTHON, [SCRIPT, "server", "discover-json"], {
