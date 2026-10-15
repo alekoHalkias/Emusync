@@ -133,20 +133,20 @@ export default function Setup({ onDone }: Props): React.ReactElement {
 
             {error && <p className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
             <div className="setup-choices">
-              <div className="setup-choice" onClick={startServer}>
+              <button type="button" className="setup-choice" onClick={startServer}>
                 <span className="setup-choice-icon">🖥️</span>
                 <div className="setup-choice-text">
                   <h3>Set up this as the server</h3>
                   <p>This is your gaming PC. Saves are stored here. Run this on your main machine first.</p>
                 </div>
-              </div>
-              <div className="setup-choice" onClick={scanServers}>
+              </button>
+              <button type="button" className="setup-choice" onClick={scanServers}>
                 <span className="setup-choice-icon">🎮</span>
                 <div className="setup-choice-text">
                   <h3>Join an existing server</h3>
                   <p>This is your Steam Deck or second device. Connect to the server running on your gaming PC.</p>
                 </div>
-              </div>
+              </button>
             </div>
           </>
         )}
