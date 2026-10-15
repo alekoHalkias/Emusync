@@ -13,6 +13,7 @@ export default function DevicesPanel(): React.ReactElement {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [confirmAll, setConfirmAll] = useState(false);
   // ponytail: doesn't take priority over the host "Paired devices" popup's own
   // escape handler, so Escape may close both at once — fine for a rare nested case.
 
@@ -47,6 +48,21 @@ export default function DevicesPanel(): React.ReactElement {
       /* error — keep UI responsive */
     } finally {
       setRemoving(false);
+    }
+  }
+
+  const others = devices.filter((d) => d.id !== currentDeviceId);
+
+  async function handleRemoveOthers(): Promise<void> {
+    setRemoving(true);
+    try {
+      await Promise.all(others.map((d) => removeDevice(d.id)));
+    } catch {
+      /* partial failure — refresh below shows what's left */
+    } finally {
+      setRemoving(false);
+      setConfirmAll(false);
+      await refresh();
     }
   }
 
@@ -101,6 +117,23 @@ export default function DevicesPanel(): React.ReactElement {
               </div>
             </div>
           ))}
+          {others.length > 0 && (
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              {!confirmAll ? (
+                <button className="btn btn-ghost" onClick={() => setConfirmAll(true)}>Remove all other devices</button>
+              ) : (
+                <>
+                  <span style={{ fontSize: 12, color: "var(--red, #f87171)", alignSelf: "center" }}>
+                    Remove {others.length} device{others.length === 1 ? "" : "s"}? They can re-pair.
+                  </span>
+                  <button className="btn btn-danger" onClick={handleRemoveOthers} disabled={removing}>
+                    {removing ? <><span className="spinner" /> Removing…</> : "Confirm"}
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => setConfirmAll(false)} disabled={removing}>Cancel</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 

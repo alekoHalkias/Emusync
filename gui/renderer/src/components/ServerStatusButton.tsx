@@ -32,6 +32,11 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
 
   // Device name
   const [deviceName, setDeviceName] = useState("");
+  const [watchSaves, setWatchSaves] = useState(false);
+  const [deviceId, setDeviceId] = useState("");
+  const [dataDir, setDataDir] = useState("");
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Activity log
   const [showActivity, setShowActivity] = useState(false);
@@ -84,6 +89,9 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
       setPairPin((cfg.server_pin as string) || "");
       setDeviceName((cfg.device_name as string) || "");
       setPinInput((cfg.server_pin as string) || "");
+      setWatchSaves(!!cfg.watch_saves);
+      setDeviceId((cfg.device_id as string) || "");
+      setDataDir((cfg.data_dir as string) || "");
     });
     window.emusync.steamgriddb.getKey().then((key) => {
       setArtKeyInput(key || "");
@@ -121,6 +129,21 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
   async function saveDeviceName(): Promise<void> {
     const cfg = (await window.emusync.config.load()) ?? {};
     await window.emusync.config.save({ ...cfg, device_name: deviceName });
+  }
+
+  async function toggleWatchSaves(on: boolean): Promise<void> {
+    setWatchSaves(on);
+    const cfg = (await window.emusync.config.load()) ?? {};
+    await window.emusync.config.save({ ...cfg, watch_saves: on });
+    // sync-daemon reads watch_saves at startup, so it needs a restart to apply.
+    await window.emusync.daemon.stop();
+    await window.emusync.daemon.start();
+  }
+
+  async function clearRememberedFolders(): Promise<void> {
+    const cfg = (await window.emusync.config.load()) ?? {};
+    await window.emusync.config.save({ ...cfg, recent_import_folders: {}, import_rom_source: {}, import_local_folder: {} });
+    setClearConfirm(false);
   }
 
   async function saveArtKey(): Promise<string | void> {
@@ -391,6 +414,10 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
 
             <div className="settings-heading">This device</div>
             <SaveField label="Device name" value={deviceName} onChange={setDeviceName} onSave={saveDeviceName} placeholder="My Gaming PC" />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, cursor: "pointer" }}>
+              <input type="checkbox" checked={watchSaves} onChange={(e) => toggleWatchSaves(e.target.checked)} />
+              Watch for save changes in the background
+            </label>
 
             <div className="settings-heading">Game art</div>
             <SaveField
@@ -421,6 +448,36 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                 Fullscreen: {display.fullscreen ? "on" : "off"}
               </button>
             </div>
+
+            <details className="settings-collapse">
+              <summary className="settings-heading">Details</summary>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", marginBottom: 10 }}>
+                <span>Device ID</span>
+                <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{deviceId}</span>
+                <span>Data folder</span>
+                <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{dataDir}</span>
+                <span>Server port</span>
+                <span style={{ fontFamily: "monospace" }}>{pairPort}</span>
+                <span>Config file</span>
+                <span style={{ fontFamily: "monospace" }}>~/.emusync/emusync.toml</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => navigator.clipboard.writeText(deviceId).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); })}
+                >
+                  {copied ? "Copied" : "Copy device ID"}
+                </button>
+                {!clearConfirm ? (
+                  <button className="btn btn-ghost" onClick={() => setClearConfirm(true)}>Clear remembered import folders</button>
+                ) : (
+                  <>
+                    <button className="btn btn-danger" onClick={clearRememberedFolders}>Confirm clear</button>
+                    <button className="btn btn-ghost" onClick={() => setClearConfirm(false)}>Cancel</button>
+                  </>
+                )}
+              </div>
+            </details>
 
             <details className="settings-collapse">
               <summary className="settings-heading">Paired devices ({devices.length})</summary>
