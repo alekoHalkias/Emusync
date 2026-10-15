@@ -23,7 +23,7 @@ export default function ImportWizard({ onClose, onImported }: Props): ReactEleme
       <div className="modal" style={{ width: "clamp(480px, 60vw, 640px)" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h3 style={{ margin: 0 }}>Add games</h3>
-          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
+          <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><CloseIcon /></button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

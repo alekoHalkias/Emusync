@@ -700,6 +700,7 @@ input.error { border-color: var(--red); }
   -webkit-app-region: no-drag;
 }
 .game-card:hover .game-card-checkbox,
+.game-card:focus-visible .game-card-checkbox,
 .game-card-checkbox:checked { opacity: 1; }
 
 /* Selected card: accent border + subtle tint */

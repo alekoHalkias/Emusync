@@ -195,8 +195,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
             {preflightError && <p className="error-msg" style={{ margin: "12px 0", whiteSpace: "pre-wrap" }}>{preflightError}</p>}
 
             <div className="input-group" style={{ margin: "20px 0" }}>
-              <label>What should we call this device?</label>
-              <input
+              <label htmlFor="setup-device-name">What should we call this device?</label>
+              <input id="setup-device-name"
                 type="text"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
@@ -205,7 +205,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               />
             </div>
 
-            {error && <p className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
+            {error && <p role="alert" className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
             <div className="setup-choices">
               <button type="button" className="setup-choice" onClick={startServer}>
                 <span className="setup-choice-icon">🖥️</span>
@@ -282,8 +282,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               API key from the "API" tab and paste it below.
             </p>
             <div className="input-group" style={{ marginBottom: 16 }}>
-              <label>API key</label>
-              <input
+              <label htmlFor="setup-api-key">API key</label>
+              <input id="setup-api-key"
                 type="text"
                 value={artKey}
                 onChange={(e) => { setArtKey(e.target.value); setArtKeyError(""); }}
@@ -291,7 +291,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                 className={artKeyError ? "error" : ""}
                 autoFocus
               />
-              {artKeyError && <span className="error-msg">{artKeyError}</span>}
+              {artKeyError && <span role="alert" className="error-msg">{artKeyError}</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-ghost" onClick={onDone} disabled={artKeyBusy}>
@@ -333,8 +333,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               <>
                 <p>No servers found automatically. Enter the server details manually.</p>
                 <div className="input-group" style={{ marginTop: 16 }}>
-                  <label>Server host</label>
-                  <input
+                  <label htmlFor="setup-host">Server host</label>
+                  <input id="setup-host"
                     type="text"
                     placeholder="192.168.1.50"
                     value={manualHost}
@@ -342,8 +342,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                   />
                 </div>
                 <div className="input-group" style={{ marginTop: 12 }}>
-                  <label>Port</label>
-                  <input
+                  <label htmlFor="setup-port">Port</label>
+                  <input id="setup-port"
                     type="number"
                     value={manualPort}
                     onChange={(e) => setManualPort(e.target.value)}
@@ -371,7 +371,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                 </div>
               </>
             )}
-            {error && <p className="error-msg" style={{ marginTop: 12 }}>{error}</p>}
+            {error && <p role="alert" className="error-msg" style={{ marginTop: 12 }}>{error}</p>}
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button className="btn btn-ghost" onClick={scanServers} disabled={busy}>
                 Rescan
@@ -393,15 +393,16 @@ export default function Setup({ onDone }: Props): React.ReactElement {
             <h1>Enter PIN</h1>
             <p>This server requires a PIN. It is shown in the server's settings on the gaming PC.</p>
             <div className="input-group" style={{ margin: "16px 0" }}>
-              <label>PIN</label>
+              <label htmlFor="setup-pin">PIN</label>
               <PinInput
+                id="setup-pin"
                 value={inputPin}
                 onChange={(v) => { setInputPin(v); setError(""); }}
                 onKeyDown={(e) => { if (e.key === "Enter" && inputPin) verifyServer(inputPin, true); }}
                 className={error ? "error" : ""}
                 autoFocus
               />
-              {error && <span className="error-msg">{error}</span>}
+              {error && <span role="alert" className="error-msg">{error}</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-ghost" onClick={() => { setError(""); setStep("join-select"); }} disabled={busy}>
@@ -419,8 +420,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
             <h1>Device Name</h1>
             <p>What would you like to name this device on the server?</p>
             <div className="input-group" style={{ margin: "16px 0" }}>
-              <label>Device name <span style={{ color: "var(--error)" }}>*</span></label>
-              <input
+              <label htmlFor="setup-device-name2">Device name <span style={{ color: "var(--error)" }}>*</span></label>
+              <input id="setup-device-name2"
                 type="text"
                 placeholder="My Device"
                 value={deviceName}
@@ -429,8 +430,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                 className={error ? "error" : ""}
                 autoFocus
               />
-              {!deviceName.trim() && <span className="error-msg">Device name is required</span>}
-              {error && <span className="error-msg">{error}</span>}
+              {!deviceName.trim() && <span role="alert" className="error-msg">Device name is required</span>}
+              {error && <span role="alert" className="error-msg">{error}</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-ghost" onClick={() => { setError(""); setStep(inputPin ? "join-pin" : "join-select"); }} disabled={busy}>

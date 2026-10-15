@@ -250,7 +250,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
           <div className="modal" style={{ width: 560 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Settings</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setOpen(false)}><CloseIcon /></button>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} aria-label="Close" onClick={() => setOpen(false)}><CloseIcon /></button>
             </div>
 
             <div className="settings-heading first">Connection</div>
@@ -340,7 +340,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                       ⚠ This will restart the server. Other devices will need to update their PIN to reconnect.
                     </p>
                   )}
-                  {pinError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{pinError}</span>}
+                  {pinError && <span role="alert" className="error-msg" style={{ marginTop: 4, display: "block" }}>{pinError}</span>}
                 </div>
               </div>
             )}
@@ -367,22 +367,23 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <div style={{ display: "flex", gap: 8 }}>
                       <div className="input-group" style={{ flex: 2 }}>
-                        <label>Server host</label>
-                        <input type="text" value={pairHost} onChange={(e) => setPairHost(e.target.value)} placeholder="192.168.1.50" />
+                        <label htmlFor="pair-host">Server host</label>
+                        <input id="pair-host" type="text" value={pairHost} onChange={(e) => setPairHost(e.target.value)} placeholder="192.168.1.50" />
                       </div>
                       <div className="input-group" style={{ flex: 1 }}>
-                        <label>Port</label>
-                        <input type="number" value={pairPort} onChange={(e) => setPairPort(e.target.value)} />
+                        <label htmlFor="pair-port">Port</label>
+                        <input id="pair-port" type="number" value={pairPort} onChange={(e) => setPairPort(e.target.value)} />
                       </div>
                     </div>
                     <div className="input-group">
-                      <label>PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
+                      <label htmlFor="pair-pin">PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
                       <PinInput
+                        id="pair-pin"
                         value={pairPin}
                         onChange={setPairPin}
                         className={pairError ? "error" : ""}
                       />
-                      {pairError && <span className="error-msg">{pairError}</span>}
+                      {pairError && <span role="alert" className="error-msg">{pairError}</span>}
                       {pairSuccess && <span style={{ fontSize: 12, color: "var(--green)" }}>Connected successfully.</span>}
                     </div>
                     <button className="btn btn-primary" onClick={doConnect} disabled={pairBusy || !pairHost.trim()}>
@@ -440,7 +441,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
           <div className="modal" style={{ width: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Server activity</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowActivity(false)}><CloseIcon /></button>
+              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} aria-label="Close" onClick={() => setShowActivity(false)}><CloseIcon /></button>
             </div>
             {eventsLoading ? (
               <div style={{ textAlign: "center", padding: 40 }}><span className="spinner" style={{ width: 22, height: 22 }} /></div>

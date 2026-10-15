@@ -43,7 +43,10 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
       data-slug={game.slug}
       style={{ "--card-accent": consoleAccent, cursor: "pointer" } as React.CSSProperties}
       onClick={() => onSettings(game)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSettings(game); } }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSettings(game); }
+        else if (e.key === "s" && e.target === e.currentTarget) { e.preventDefault(); onToggleSelect(); }
+      }}
       role="button"
       tabIndex={0}
       title="Settings, history & devices"
@@ -72,6 +75,7 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
           onChange={onToggleSelect}
           onClick={(e) => e.stopPropagation()}
           title={selected ? "Deselect" : "Select for deletion"}
+          aria-label={selected ? `Deselect ${game.name}` : `Select ${game.name}`}
         />
 
         {/* Overlay badges */}

@@ -122,10 +122,10 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
       >
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>Import library</h3>
-          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
+          <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><CloseIcon /></button>
         </div>
 
-        {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+        {error && <p role="alert" className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
 
         {phase === "source" && (
           <>
