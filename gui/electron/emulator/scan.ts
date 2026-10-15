@@ -218,6 +218,9 @@ export function runEmulatorScan(params: {
           // Shared-save console: every game's savePath is the same card (#295/#402).
           const cardPath = resolveSharedCard(consoleKey, emulatorOption.saveDir, saveRoot, emulatorOption.systemDir);
           m = { path: cardPath, exists: existsSync(cardPath) };
+        } else if (consoleKey === "ps3") {
+          // RPCS3 save folder is <TITLE_ID>-named; learned after first play (cli/run_ps3.py, #422).
+          m = { path: "", exists: false };
         } else if (consoleKey === "switch") {
           // Eden's real save folder is a NAND path keyed by profile-ID +
           // title-ID, nothing like the ROM's own name or location — a

@@ -331,7 +331,7 @@ def console_import() -> None:
 
         if shared_layout:
             save_match = shared_save_match
-        elif console_def["key"] == "switch":
+        elif console_def["key"] in ("switch", "ps3"):
             save_match = _switch_save_match()
         else:
             system = _IMPORT_SYSTEMS.get(ext, {})

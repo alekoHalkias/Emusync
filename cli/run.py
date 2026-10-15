@@ -68,6 +68,7 @@ from cli.run_reconcile import (  # noqa: F401 — re-exported for existing calle
     _SAVE_EXTS,
     _STATE_RE,
 )
+from cli.run_ps3 import _resolve_written_ps3_save  # noqa: F401
 from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
 from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
     _find_local_switch_save,
@@ -437,6 +438,9 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             actual_state_path = None
         elif console_abbr == "Wii":
             actual_save_path = _resolve_written_wii_save(launch_start)
+            actual_state_path = None
+        elif console_abbr == "PS3":
+            actual_save_path = _resolve_written_ps3_save(launch_start)
             actual_state_path = None
         elif console_abbr == "Switch":
             actual_save_path = _resolve_written_switch_save(launch_start)
