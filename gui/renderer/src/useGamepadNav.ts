@@ -252,8 +252,8 @@ export function useGamepadNav(): void {
       prevA = aPressed;
 
       // B backs out of an entered text field first, then mirrors Escape —
-      // every modal already closes on Escape via useEscapeToClose/
-      // useEscapeToCloseTopmost's own window keydown listeners (#474), so
+      // every modal already closes on Escape via <Modal> (components/Modal.tsx) or
+      // useEscapeToClose's own window keydown listeners (#474/#530), so
       // dispatching a synthetic Escape keydown reuses that wiring for free
       // instead of duplicating close logic per modal.
       const bPressed = !!gp.buttons[BTN_B]?.pressed;

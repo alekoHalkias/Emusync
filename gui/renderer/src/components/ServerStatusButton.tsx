@@ -6,7 +6,7 @@ import SaveField from "./settings/SaveField";
 import PinInput from "./settings/PinInput";
 import { useDevices } from "../DeviceContext";
 import { CloseIcon } from "./icons";
-import { useEscapeToCloseTopmost } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
@@ -44,10 +44,6 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
 
   // SteamGridDB art key (issue #322)
   const [artKeyInput, setArtKeyInput] = useState("");
-  useEscapeToCloseTopmost(
-    [showActivity, () => setShowActivity(false)],
-    [open, () => setOpen(false)],
-  );
 
   // Connect-to-server form
   const [pairHost, setPairHost] = useState("");
@@ -246,8 +242,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
       </button>
 
       {open && (
-        <div className="modal-overlay" onClick={() => setOpen(false)}>
-          <div className="modal" style={{ width: 560 }} onClick={(e) => e.stopPropagation()}>
+        <Modal size="md" style={{ width: 560 }} onClose={() => setOpen(false)}>
             <div className="modal-header">
               <h3>Settings</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} aria-label="Close" onClick={() => setOpen(false)}><CloseIcon /></button>
@@ -431,14 +426,12 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
               <summary className="settings-heading">Paired devices ({devices.length})</summary>
               <DevicesPanel />
             </details>
-          </div>
-        </div>
+          </Modal>
       )}
 
       {/* Activity popup */}
       {showActivity && (
-        <div className="modal-overlay" onClick={() => setShowActivity(false)}>
-          <div className="modal" style={{ width: 480 }} onClick={(e) => e.stopPropagation()}>
+        <Modal size="md" onClose={() => setShowActivity(false)}>
             <div className="modal-header">
               <h3>Server activity</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} aria-label="Close" onClick={() => setShowActivity(false)}><CloseIcon /></button>
@@ -472,8 +465,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                 })}
               </div>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
     </>
   );

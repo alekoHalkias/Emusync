@@ -5,7 +5,7 @@ import {
   type SaveConflict,
 } from "../api";
 import { RelTime } from "../time";
-import { useEscapeToClose } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 /**
  * Top-bar "Conflicts" panel (issue #243). EmuSync auto-resolves a true save
@@ -27,7 +27,6 @@ export default function ConflictsButton(): React.ReactElement | null {
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [status, setStatus] = useState<Record<string, string>>({});
-  useEscapeToClose(() => setOpen(false));
 
   const load = useCallback(async () => {
     try {
@@ -133,8 +132,7 @@ export default function ConflictsButton(): React.ReactElement | null {
       </button>
 
       {open && (
-        <div className="modal-overlay" onClick={() => setOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
+        <Modal size="md" onClose={() => setOpen(false)}>
             <h3 style={{ marginBottom: 4 }}>Save conflicts</h3>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0 }}>
               Both copies of a save changed since the last sync. EmuSync kept the newer one;
@@ -190,8 +188,7 @@ export default function ConflictsButton(): React.ReactElement | null {
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setOpen(false)}>Close</button>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
     </>
   );

@@ -11,7 +11,7 @@ import {
   type GameNetworkSource,
 } from "../api";
 import ConsoleImport from "./ConsoleImport";
-import { useEscapeToClose } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 type Props = {
   slug: string;
@@ -46,7 +46,6 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   const [networkMount, setNetworkMount] = useState<string | null>(null);
   const [gameNetworkSource, setGameNetworkSource] = useState<GameNetworkSource | null>(null);
   const autoAttempted = useRef(false);
-  useEscapeToClose(onClose);
 
   useEffect(() => {
     (async () => {
@@ -192,8 +191,8 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 520 }} onClick={(e) => e.stopPropagation()}>
+    <>
+      <Modal size="md" onClose={onClose}>
         <h3>Play "{name}" on this device</h3>
 
         {mode === "auto" ? (
@@ -256,7 +255,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
         </div>
-      </div>
+      </Modal>
 
       {showConsoleImport && consoleKey && (
         <ConsoleImport
@@ -270,6 +269,6 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
           }}
         />
       )}
-    </div>
+    </>
   );
 }
