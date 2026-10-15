@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import ConsoleImport from "./ConsoleImport";
 import { Spinner } from "./console-import/Spinner";
-import { CloseIcon } from "./icons";
+import { CloseIcon, WarningIcon } from "./icons";
 import type { ConsoleOption } from "./console-import/types";
 import Modal from "./Modal";
 
@@ -187,7 +187,7 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "2px solid var(--border)" }}
                 >
                   <span className="truncate" style={{ flex: 1, fontSize: 13 }}>{e.folderName}</span>
-                  {!e.consoleKey && <span title="No console match found" style={{ color: "var(--text-muted)" }}>⚠</span>}
+                  {!e.consoleKey && <span title="No console match found" style={{ color: "var(--text-muted)" }}><WarningIcon /></span>}
                   <select
                     value={e.consoleKey ?? ""}
                     onChange={ev => setEntryConsole(e.path, ev.target.value)}

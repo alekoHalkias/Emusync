@@ -6,7 +6,7 @@ import GameConfig from "./GameConfig";
 import GameDeviceModal from "./game-list/GameDeviceModal";
 import SaveHistory from "./SaveHistory";
 import SwitchModsTab from "./SwitchModsTab";
-import { CloseIcon, PlayIcon } from "./icons";
+import { CheckIcon, CloseIcon, PlayIcon } from "./icons";
 import { usesSharedSaveLayout } from "./console-import/helpers";
 import Modal from "./Modal";
 
@@ -163,7 +163,7 @@ function RunTab({ slug, name, canPlay, onLaunch, onClose }: {
           className="btn btn-ghost"
           onClick={() => { navigator.clipboard.writeText(steamCommand); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
         >
-          {copied ? "✓ Copied" : "Copy"}
+          {copied ? <><CheckIcon /> Copied</> : "Copy"}
         </button>
       </div>
     </div>

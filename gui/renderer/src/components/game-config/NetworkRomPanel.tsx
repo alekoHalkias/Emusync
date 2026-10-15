@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { getDeviceConsoles, getGame, whoami } from "../../api";
 import DownloadProgressModal, { fmtBytes } from "../DownloadProgressModal";
 import { useLocalizeJob, startLocalizeJob, cancelLocalizeJob, hideLocalizeJob } from "../../localizeJob";
+import { GlobeIcon } from "../icons";
 
 // Network-ROM (issue #255) localize/delocalize UI — copy a network-sourced
 // ROM onto local disk for offline play, or remove the local copy. The NAS
@@ -55,7 +56,7 @@ export function NetworkRomPanel({
     }
     try {
       const r = await startLocalizeJob(slug, gameName, folder);
-      if (r.ok) { onLocalRomPathChange(r.localPath ?? "", r.launchCommand); setRomMsg("✓ Localized for offline play."); }
+      if (r.ok) { onLocalRomPathChange(r.localPath ?? "", r.launchCommand); setRomMsg("Localized for offline play."); }
       else setRomMsg(r.cancelled ? "Copy cancelled." : r.error ?? "Localize failed.");
     } finally {
       setRomBusy(false);
@@ -71,7 +72,7 @@ export function NetworkRomPanel({
     if (!slug) return;
     setRomBusy(true); setRomMsg("");
     const r = await window.emusync.rom.delocalize(slug);
-    if (r.ok) { onLocalRomPathChange("", r.launchCommand); setRomMsg("✓ Local copy removed."); }
+    if (r.ok) { onLocalRomPathChange("", r.launchCommand); setRomMsg("Local copy removed."); }
     else setRomMsg(r.error ?? "Failed to remove local copy.");
     setRomBusy(false);
   }
@@ -88,7 +89,7 @@ export function NetworkRomPanel({
     )}
     <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--bg-subtle, rgba(127,127,127,0.08))", borderRadius: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 13, minWidth: 0 }}>🌐 Network ROM</span>
+        <span style={{ fontSize: 13, minWidth: 0 }}><GlobeIcon /> Network ROM</span>
         {localRomPath ? (
           <button className="btn" disabled={romBusy} onClick={handleDelocalize} style={{ flexShrink: 0 }}>Remove offline copy</button>
         ) : (

@@ -6,6 +6,7 @@ import {
 } from "../api";
 import { RelTime } from "../time";
 import Modal from "./Modal";
+import { WarningIcon } from "./icons";
 
 /**
  * Top-bar "Conflicts" panel (issue #243). EmuSync auto-resolves a true save
@@ -128,7 +129,7 @@ export default function ConflictsButton(): React.ReactElement | null {
         style={{ fontSize: 13, color: conflicts.length ? "var(--red)" : undefined }}
         title="Save conflicts to review"
       >
-        ⚠ Conflicts {conflicts.length}
+        <WarningIcon /> Conflicts {conflicts.length}
       </button>
 
       {open && (
@@ -140,7 +141,7 @@ export default function ConflictsButton(): React.ReactElement | null {
             </p>
 
             {conflicts.length === 0 ? (
-              <p style={{ color: "var(--text-muted)", padding: "12px 0" }}>No conflicts to review. 🎉</p>
+              <p style={{ color: "var(--text-muted)", padding: "12px 0" }}>No conflicts to review.</p>
             ) : (
               <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0" }}>
                 {conflicts.map(c => (

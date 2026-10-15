@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { GameRow } from "./game-list/types";
 import { RelTime } from "../time";
-import { PlayIcon } from "./icons";
+import { BoltIcon, GlobeIcon, LockIcon, PlayIcon, SaveIcon } from "./icons";
 
 // Mirrors the ArtType union in gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -87,12 +87,12 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
           )}
           {game.locked && (
             <span className="game-card-badge game-card-badge-locked" title="Currently running on another device">
-              🔒
+              <LockIcon />
             </span>
           )}
           {game.offline && (
             <span className="game-card-badge game-card-badge-offline" title="Server unreachable — showing cached data; save will sync once reconnected">
-              ⚡ offline
+              <BoltIcon /> offline
             </span>
           )}
           {!game.isLocal && (
@@ -105,7 +105,7 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
               className="game-card-badge game-card-badge-net"
               title={game.hasLocalCopy ? "Network ROM — local copy available" : "Network ROM"}
             >
-              {game.hasLocalCopy ? "💾" : "🌐"}
+              {game.hasLocalCopy ? <SaveIcon /> : <GlobeIcon />}
             </span>
           )}
         </div>

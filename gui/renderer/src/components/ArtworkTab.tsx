@@ -3,7 +3,7 @@
 // Complements the automatic per-console fetch in art.ts/GameCard.
 import React, { useEffect, useState } from "react";
 import { getGame, setGameSgdbId } from "../api";
-import { CloseIcon } from "./icons";
+import { CheckIcon, CloseIcon, RefreshIcon } from "./icons";
 import Modal from "./Modal";
 
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -152,7 +152,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
         </div>
         {matchedName && (
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
-            ✓ Matched: {matchedName}
+            <CheckIcon /> Matched: {matchedName}
           </p>
         )}
       </div>
@@ -171,7 +171,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                 display: "flex", justifyContent: "space-between", alignItems: "center",
               }}
             >
-              <span>{r.name}{selectedId === r.id ? " ✓" : ""}</span>
+              <span>{r.name}{selectedId === r.id ? <> <CheckIcon /></> : ""}</span>
               {r.release_date > 0 && (
                 <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
                   {new Date(r.release_date * 1000).getFullYear()}
@@ -190,7 +190,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
           Current artwork
         </label>
         <button className="btn btn-ghost" onClick={() => doRefreshAll(selectedId)} disabled={refreshing} style={{ fontSize: 12 }}>
-          {refreshing ? <><span className="spinner" /> Refreshing…</> : "↻ Refresh all"}
+          {refreshing ? <><span className="spinner" /> Refreshing…</> : <><RefreshIcon /> Refresh all</>}
         </button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: 10 }}>

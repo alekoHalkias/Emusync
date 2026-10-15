@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { findReplace, groupByDir, replaceUnderscores } from "./helpers";
 import type { RomEntry } from "./types";
 import type { ConsoleImportVM } from "./useConsoleImport";
-import { CloseIcon } from "../icons";
+import { CheckIcon, CloseIcon, GlobeIcon, SaveIcon, UploadIcon } from "../icons";
 
 type StatusFilter = "all" | "new" | "linked" | "save" | "state";
 
@@ -234,13 +234,13 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                     />
                     <div style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", gap: 8, alignItems: "center" }}>
                       {rom.presence === "network" && (
-                        <span title="On the network share" style={{ flexShrink: 0 }}>🌐</span>
+                        <span title="On the network share" style={{ flexShrink: 0 }}><GlobeIcon /></span>
                       )}
                       {rom.presence === "both" && (
-                        <span title="On the share with a local copy already present" style={{ flexShrink: 0 }}>💾</span>
+                        <span title="On the share with a local copy already present" style={{ flexShrink: 0 }}><SaveIcon /></span>
                       )}
                       {rom.presence === "local" && (
-                        <span title="Only on local disk — will be copied to the share and kept as a local copy" style={{ flexShrink: 0 }}>⬆</span>
+                        <span title="Only on local disk — will be copied to the share and kept as a local copy" style={{ flexShrink: 0 }}><UploadIcon /></span>
                       )}
                       <span className="truncate" style={{ flex: 1, minWidth: 0 }}>
                         {rom.romPath}
@@ -249,10 +249,10 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                         <span title="Already imported here as a local game — will be copied to the share and switched to network play" style={{ color: "var(--accent, #7c8cf8)", flexShrink: 0 }}>↥ Upload to share</span>
                       )}
                       {rom.saveExists && (
-                        <span className="ci-ok" style={{ flexShrink: 0 }}>✓ Save</span>
+                        <span className="ci-ok" style={{ flexShrink: 0 }}><CheckIcon /> Save</span>
                       )}
                       {rom.statePath && rom.stateExists && (
-                        <span className="ci-ok" style={{ flexShrink: 0 }}>✓ State</span>
+                        <span className="ci-ok" style={{ flexShrink: 0 }}><CheckIcon /> State</span>
                       )}
                       {!!rom.switchSiblingCount && (
                         <span className="ci-ok" style={{ flexShrink: 0 }} title="Synced as part of this game's folder">
@@ -272,7 +272,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
 
       {romSource === "network" ? (
         <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-          🌐 Network ROMs aren't copied to other devices — every device reads them from the share.
+          <GlobeIcon /> Network ROMs aren't copied to other devices — every device reads them from the share.
         </div>
       ) : (
         <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13 }}>

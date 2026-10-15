@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { STEP_LABELS } from "./helpers";
+import { CheckIcon } from "../icons";
 
 export function Stepper({ currentStep }: { currentStep: number }) {
   return (
@@ -14,7 +15,7 @@ export function Stepper({ currentStep }: { currentStep: number }) {
               color: active ? "var(--accent, #7c8cf8)" : done ? "var(--green, #4caf50)" : "var(--text-muted)",
               fontWeight: active ? 600 : 400,
             }}>
-              {done ? `✓ ${label}` : label}
+              {done ? <><CheckIcon /> {label}</> : label}
             </span>
           </Fragment>
         );

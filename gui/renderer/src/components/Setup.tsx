@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { configure, configureDevice, health, whoami } from "../api";
 import PinInput from "./settings/PinInput";
+import { CheckIcon, GamepadIcon, MonitorIcon } from "./icons";
 
 type Step =
   | "choose"
@@ -208,14 +209,14 @@ export default function Setup({ onDone }: Props): React.ReactElement {
             {error && <p role="alert" className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
             <div className="setup-choices">
               <button type="button" className="setup-choice" onClick={startServer}>
-                <span className="setup-choice-icon">🖥️</span>
+                <span className="setup-choice-icon"><MonitorIcon size={28} /></span>
                 <div className="setup-choice-text">
                   <h3>Set up this as the server</h3>
                   <p>This is your gaming PC. Saves are stored here. Run this on your main machine first.</p>
                 </div>
               </button>
               <button type="button" className="setup-choice" onClick={scanServers}>
-                <span className="setup-choice-icon">🎮</span>
+                <span className="setup-choice-icon"><GamepadIcon size={28} /></span>
                 <div className="setup-choice-text">
                   <h3>Join an existing server</h3>
                   <p>This is your Steam Deck or second device. Connect to the server running on your gaming PC.</p>
@@ -365,7 +366,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                         <div style={{ fontWeight: 500 }}>{s.name || "EmuSync Server"}</div>
                         <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.host}:{s.port}</div>
                       </div>
-                      {selectedServer?.host === s.host && <span>✓</span>}
+                      {selectedServer?.host === s.host && <span><CheckIcon /></span>}
                     </div>
                   ))}
                 </div>
