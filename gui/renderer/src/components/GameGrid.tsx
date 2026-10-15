@@ -6,6 +6,7 @@ import GameCard from "./GameCard";
 import GameFilterButton, { EMPTY_FILTERS, matchesFilters, type GameFilters } from "./GameFilterButton";
 import GameModal from "./GameModal";
 import NetworkPlaySetup from "./NetworkPlaySetup";
+import ConsoleFoldersModal from "./ConsoleFoldersModal";
 import SteamRestartModal from "./SteamRestartModal";
 import { createSpeedMeter } from "./speedMeter";
 import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
@@ -66,6 +67,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     [confirmBulkNetworkDelete && !deleting, () => setConfirmBulkNetworkDelete(false)],
     [confirmDelete && !deleting, () => setConfirmDelete(false)],
   );
+  const [showFolders, setShowFolders] = useState(false);
   const [artType, setArtType] = useState<ArtType>("grid");
   // Bumped per-slug when the settings modal closes, so that game's GameCard
   // remounts and re-fetches art (it may have just been edited in the
@@ -410,6 +412,7 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
 
   return (
     <>
+      {showFolders && <ConsoleFoldersModal consoleKey={consoleKey} onClose={() => setShowFolders(false)} />}
       {/* Header */}
       <div className="game-grid-header" style={{ "--grid-accent": accent } as React.CSSProperties}>
         <input
@@ -432,6 +435,13 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
             ))}
           </select>
         </div>
+        <button
+          className="btn btn-ghost game-grid-header-btn"
+          onClick={() => setShowFolders(true)}
+          title="Console folders for this device"
+        >
+          ⚙
+        </button>
         <div style={{ flex: 1 }} />
         <button
           className="btn btn-ghost game-grid-header-btn"

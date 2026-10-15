@@ -105,9 +105,11 @@ def upsert_console_for_game(
     )
 
     if existing:
-        existing.device_save_folder = save_folder
-        existing.device_state_folder = state_folder
-        existing.device_emulator = emulator
+        # Fill-only-blank: a folder already on the row (learned earlier or hand-edited
+        # via PUT /devices/.../consoles/{id}, #539) is never rewritten from one game's paths.
+        existing.device_save_folder = existing.device_save_folder or save_folder
+        existing.device_state_folder = existing.device_state_folder or state_folder
+        existing.device_emulator = existing.device_emulator or emulator
         # Only overwrite the network/local folders when new values are supplied,
         # so a later plain save/state update doesn't blank them (issue #255).
         if network_folder:
