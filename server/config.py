@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 import platform
+import sys
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,11 +38,25 @@ class Config:
     art_type_by_console: dict = field(default_factory=dict)
 
 
+def _int(value, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def load() -> Config:
     if not CONFIG_PATH.exists():
         return Config()
-    with open(CONFIG_PATH) as f:
-        data = tomlkit.load(f)
+    try:
+        with open(CONFIG_PATH) as f:
+            data = tomlkit.load(f)
+    except tomlkit.exceptions.TOMLKitError as e:
+        # Corrupt, not missing: keep the bad file instead of letting the next save() clobber it.
+        backup = CONFIG_PATH.with_name(f"{CONFIG_PATH.name}.corrupt-{int(time.time() * 1000)}")
+        os.replace(CONFIG_PATH, backup)
+        print(f"EmuSync: config unreadable ({e}); saved as {backup}, using defaults.", file=sys.stderr)
+        return Config()
     recent_folders = {}
     if "recent_import_folders" in data:
         recent_folders_data = data.get("recent_import_folders", {})
@@ -47,7 +64,7 @@ def load() -> Config:
             recent_folders[console_key] = list(folders) if isinstance(folders, list) else []
     return Config(
         server_host=str(data.get("server_host", "")),
-        server_port=int(data.get("server_port", 8765)),
+        server_port=_int(data.get("server_port"), 8765),
         data_dir=str(data.get("data_dir", str(Path.home() / ".emusync"))),
         device_id=str(data.get("device_id", str(uuid.uuid4()))),
         device_name=str(data.get("device_name", _hostname())),
@@ -82,5 +99,9 @@ def save(cfg: Config) -> None:
         doc.add("import_local_folder", cfg.import_local_folder)
     if cfg.art_type_by_console:
         doc.add("art_type_by_console", cfg.art_type_by_console)
-    with open(CONFIG_PATH, "w") as f:
+    # Atomic + owner-only (server_pin is stored in plaintext).
+    tmp = CONFIG_PATH.with_name(CONFIG_PATH.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         tomlkit.dump(doc, f)
+    os.replace(tmp, CONFIG_PATH)

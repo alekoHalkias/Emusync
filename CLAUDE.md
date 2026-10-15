@@ -343,6 +343,8 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **`server:start` can fail with a reason now (#534).** `startServerProcess` keeps the last ~1.5KB of the server's stdout/stderr and resolves `{ok:false, error}` if the process exits non-zero before printing its ready line (exit 0 = an already-running server, still `ok`). `Setup.tsx` shows that error, and also fails if `/health` never answers after start, reverting `is_server` so a broken start doesn't leave a config that skips Setup and silently retries on every relaunch. The 5s "assume ready" fallback in `server.ts` remains, so the renderer's health poll is the real readiness check.
 
+**Config reads distinguish missing from corrupt, and every write is atomic + 0600 (#535).** Both `server/config.py` `load()` and Electron's `config:load` used to treat a TOML parse error like a missing file, so Setup re-ran and its first save overwrote the only copy of `device_id`/PIN. A corrupt file is now renamed to `emusync.toml.corrupt-<ms>` (Electron also shows an error dialog) before falling back to defaults/Setup. All writers (`config.save`, `config-store.ts`'s `writeConfig`, used by `config:save`, `addRecentFolder` and `server:change-pin`) write a `.tmp` with mode 0600 and rename — don't add a bare `writeFileSync(CONFIG_PATH, …)`.
+
 **Orphaned server processes** — If Electron exits abnormally, uvicorn can keep running. "Port already in use": run `pkill -9 -f "emusync.py server start"`. `emusync server start` now detects a running server and exits gracefully instead of duplicating it.
 
 **SIGKILL skips Python finally blocks** — `.server_pid`/`.server_token` may survive a hard kill; the stop handler manually deletes them.

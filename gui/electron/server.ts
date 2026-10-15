@@ -1,11 +1,12 @@
 // Python server + sync-daemon process lifecycle, and the server:* / daemon:* IPC.
 import { ipcMain } from "electron";
 import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir, networkInterfaces } from "os";
-import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
+import { parse as parseTOML } from "smol-toml";
 import { CONFIG_PATH, SCRIPT, PYTHON, rt } from "./runtime";
+import { writeConfig } from "./config-store";
 
 // ── sync daemon ─────────────────────────────────────────────────────────────
 
@@ -187,7 +188,7 @@ export function registerServerIpc(): void {
     } else {
       delete raw.server_pin;
     }
-    writeFileSync(CONFIG_PATH, stringifyTOML(raw as any));
+    writeConfig(raw);
 
     return startServerProcess();
   });

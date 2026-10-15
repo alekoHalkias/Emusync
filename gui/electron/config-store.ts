@@ -1,8 +1,8 @@
 // Config file (~/.emusync/emusync.toml) reading/writing.
 //   - config:* IPC handlers used by the renderer
 //   - loadServerCfg(): the {host, port, authHeaders} every networked handler needs
-import { ipcMain } from "electron";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { ipcMain, dialog } from "electron";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from "fs";
 import { dirname } from "path";
 import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
 import { CONFIG_PATH } from "./runtime";
@@ -25,19 +25,35 @@ export function loadServerCfg(): { host: string; port: number; authHeaders: Reco
   return { host, port, authHeaders };
 }
 
+// Atomic (temp file + rename) and owner-only: the file holds server_pin in plaintext,
+// and a crash mid-write must not truncate the config.
+export function writeConfig(data: Record<string, unknown>): void {
+  mkdirSync(dirname(CONFIG_PATH), { recursive: true });
+  const tmp = `${CONFIG_PATH}.tmp`;
+  writeFileSync(tmp, stringifyTOML(data as any), { mode: 0o600 });
+  renameSync(tmp, CONFIG_PATH);
+}
+
 export function registerConfigIpc(): void {
   ipcMain.handle("config:load", () => {
     if (!existsSync(CONFIG_PATH)) return null;
     try {
       return parseTOML(readFileSync(CONFIG_PATH, "utf-8"));
-    } catch {
+    } catch (e) {
+      // Corrupt (not missing): move it aside so Setup's save doesn't silently
+      // overwrite the only copy of device_id/PIN/etc., and tell the user.
+      const backup = `${CONFIG_PATH}.corrupt-${Date.now()}`;
+      try { renameSync(CONFIG_PATH, backup); } catch { /* best effort */ }
+      dialog.showErrorBox(
+        "EmuSync config could not be read",
+        `${(e as Error).message}\n\nThe file was saved as:\n${backup}\n\nEmuSync will start setup again.`,
+      );
       return null;
     }
   });
 
   ipcMain.handle("config:save", (_event, data: Record<string, unknown>) => {
-    mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-    writeFileSync(CONFIG_PATH, stringifyTOML(data as any));
+    writeConfig(data);
     return true;
   });
 
@@ -74,7 +90,7 @@ export function registerConfigIpc(): void {
       // Add to front and limit to 10 recent folders
       folders.unshift(folderPath);
       folders.splice(10);
-      writeFileSync(CONFIG_PATH, stringifyTOML(data as any));
+      writeConfig(data);
     } catch {
       // ignore
     }
