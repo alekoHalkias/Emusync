@@ -60,11 +60,13 @@ export function stopSyncDaemon(): void {
 
 // ── server process ──────────────────────────────────────────────────────────
 
-export function startServerProcess(): Promise<{ ok: boolean }> {
+export function startServerProcess(): Promise<{ ok: boolean; error?: string }> {
   if (rt.serverProcess) return Promise.resolve({ ok: true });
 
-  return new Promise<{ ok: boolean }>((resolve) => {
+  return new Promise<{ ok: boolean; error?: string }>((resolve) => {
     let resolved = false;
+    let tail = ""; // last output, surfaced if the server dies before it is ready
+    const keepTail = (chunk: Buffer) => { tail = (tail + chunk.toString()).slice(-1500); };
     const proc = spawn(PYTHON, [SCRIPT, "server", "start"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PYTHONUNBUFFERED: "1" },
@@ -72,7 +74,9 @@ export function startServerProcess(): Promise<{ ok: boolean }> {
     rt.serverProcess = proc;
 
     // Resolve as soon as the server prints its startup line (before uvicorn binds)
+    proc.stderr?.on("data", keepTail);
     proc.stdout?.on("data", (chunk: Buffer) => {
+      keepTail(chunk);
       const line = chunk.toString();
       if (!resolved && line.includes("EmuSync server ready")) {
         resolved = true;
@@ -83,12 +87,17 @@ export function startServerProcess(): Promise<{ ok: boolean }> {
 
     proc.on("error", (err) => {
       rt.serverProcess = null;
-      if (!resolved) { resolved = true; resolve({ ok: false }); }
+      if (!resolved) { resolved = true; resolve({ ok: false, error: `Could not launch Python (${PYTHON}): ${err.message}` }); }
       console.error("Server process error:", err);
     });
 
-    proc.on("exit", () => {
+    proc.on("exit", (code) => {
       rt.serverProcess = null;
+      // Exit 0 = another server was already running (graceful no-op); anything else is a real failure.
+      if (!resolved) {
+        resolved = true;
+        resolve(code === 0 ? { ok: true } : { ok: false, error: tail.trim() || `Server exited with code ${code}.` });
+      }
     });
 
     // Fallback: resolve after 5 s if we never see the startup line

@@ -57,19 +57,31 @@ export default function Setup({ onDone }: Props): React.ReactElement {
       device_id: deviceId,
     });
 
+    const fail = async (msg: string): Promise<void> => {
+      // Don't leave is_server=true behind, or every relaunch skips Setup and silently retries.
+      await window.emusync.config.save({ ...existing, is_server: existing.is_server ?? false });
+      await window.emusync.server.stop();
+      setError(msg);
+      setStep("choose");
+    };
+
     const result = await window.emusync.server.start();
     if (!result.ok) {
-      setError("Failed to start server. Make sure Python and emusync.py are available.");
-      setStep("choose");
+      await fail(result.error || "Failed to start server. Make sure Python and emusync.py are available.");
       return;
     }
 
     // Wait for server to be ready before proceeding
     configure("localhost", port, pin);
     configureDevice(deviceId, devName);
-    for (let i = 0; i < 100; i++) {
-      if (await health()) break;
-      await new Promise<void>((r) => setTimeout(r, 100));
+    let up = false;
+    for (let i = 0; i < 100 && !up; i++) {
+      up = await health();
+      if (!up) await new Promise<void>((r) => setTimeout(r, 100));
+    }
+    if (!up) {
+      await fail(`The server did not respond on port ${port}. Is the port already in use?`);
+      return;
     }
 
     setStep("server-ready");
