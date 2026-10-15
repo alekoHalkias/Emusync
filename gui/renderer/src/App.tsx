@@ -344,22 +344,8 @@ export default function App(): React.ReactElement {
               + Import
             </button>
           )}
-          <button
-            className="btn btn-ghost"
-            title="Cycle UI size"
-            onClick={() => window.emusync.display.cycleScale().then((scale) => setDisplay((d) => ({ ...d, scale })))}
-          >
-            {Math.round(display.scale * 100)}%
-          </button>
-          <button
-            className="btn btn-ghost"
-            title="Toggle fullscreen (F11)"
-            onClick={() => window.emusync.display.toggleFullscreen().then((fullscreen) => setDisplay((d) => ({ ...d, fullscreen })))}
-          >
-            {display.fullscreen ? "Exit fullscreen" : "Fullscreen"}
-          </button>
           <ConflictsButton />
-          <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} />
+          <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} display={display} onDisplay={(d) => setDisplay((prev) => ({ ...prev, ...d }))} />
         </div>
       </header>
 
