@@ -361,26 +361,26 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           ⚠ Showing cached data from this device's last sync — server unreachable.
         </p>
       )}
-      {loadError && <p className="error-msg" style={{ marginBottom: 16 }}>{loadError}</p>}
-      {errors._global && <p className="error-msg" style={{ marginBottom: 16 }}>{errors._global}</p>}
+      {loadError && <p role="alert" className="error-msg" style={{ marginBottom: 16 }}>{loadError}</p>}
+      {errors._global && <p role="alert" className="error-msg" style={{ marginBottom: 16 }}>{errors._global}</p>}
 
       <div className="card config-form">
         <div className="input-group">
-          <label>Game name</label>
-          <input
+          <label htmlFor="gc-name">Game name</label>
+          <input id="gc-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className={errors.name ? "error" : ""}
             placeholder="The Legend of Zelda: BOTW"
           />
-          {errors.name && <span className="error-msg">{errors.name}</span>}
+          {errors.name && <span role="alert" className="error-msg">{errors.name}</span>}
         </div>
 
         <div className="input-group">
-          <label>ROM file</label>
+          <label htmlFor="gc-rom">ROM file</label>
           <div className="input-row">
-            <input
+            <input id="gc-rom"
               type="text"
               value={shownRomPath}
               onChange={(e) => setShownRomPath(e.target.value)}
@@ -391,7 +391,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
-          {errors.romPath && <span className="error-msg">{errors.romPath}</span>}
+          {errors.romPath && <span role="alert" className="error-msg">{errors.romPath}</span>}
           <NetworkRomPanel
             slug={slug}
             gameName={name}
@@ -405,9 +405,9 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
 
         <div className="input-group">
-          <label>Save file location</label>
+          <label htmlFor="gc-save">Save file location</label>
           <div className="input-row">
-            <input
+            <input id="gc-save"
               type="text"
               value={savePath}
               onChange={(e) => setSavePath(e.target.value)}
@@ -418,7 +418,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               📁
             </button>
           </div>
-          {errors.savePath && <span className="error-msg">{errors.savePath}</span>}
+          {errors.savePath && <span role="alert" className="error-msg">{errors.savePath}</span>}
           {showSyncPanel && (
             <SyncLine
               localTime={sync.localSaveTime}
@@ -456,9 +456,9 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
 
         {gameConsole === "Switch" ? (
           <div className="input-group">
-            <label>Game folder</label>
+            <label htmlFor="gc-folder">Game folder</label>
             <div className="input-row">
-              <input type="text" value={gameFolder} readOnly placeholder="Set a ROM file above first" />
+              <input id="gc-folder" type="text" value={gameFolder} readOnly placeholder="Set a ROM file above first" />
               <button className="btn btn-icon" title="Open folder" disabled={!gameFolder || isNew}
                 onClick={async () => {
                   const result = await window.emusync.gameFolder.reveal(slug!);
@@ -480,7 +480,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
                 ➕
               </button>
             </div>
-            {gameFolderError && <span className="error-msg">{gameFolderError}</span>}
+            {gameFolderError && <span role="alert" className="error-msg">{gameFolderError}</span>}
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
               This whole folder syncs together when you push/pull this game — any
               update or DLC file placed here rides along automatically. Eden has no
@@ -490,9 +490,9 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </div>
         ) : (
           <div className="input-group">
-            <label>States folder <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
+            <label htmlFor="gc-states">States folder <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
             <div className="input-row">
-              <input
+              <input id="gc-states"
                 type="text"
                 value={statePath}
                 onChange={(e) => setStatePath(e.target.value)}
@@ -520,15 +520,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         )}
 
         <div className="input-group">
-          <label>Launch command</label>
-          <input
+          <label htmlFor="gc-launch">Launch command</label>
+          <input id="gc-launch"
             type="text"
             value={launchCommand}
             onChange={(e) => setLaunchCommand(e.target.value)}
             placeholder="retroarch -L snes.so %ROM%"
             className={errors.launchCommand ? "error" : ""}
           />
-          {errors.launchCommand && <span className="error-msg">{errors.launchCommand}</span>}
+          {errors.launchCommand && <span role="alert" className="error-msg">{errors.launchCommand}</span>}
         </div>
 
         {!isNew && (

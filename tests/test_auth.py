@@ -67,3 +67,13 @@ async def test_blank_pin_server_ignores_wrong_pin(make_client):
     c = await make_client(pin="")
     r = await c.get("/games", headers={"Authorization": "Bearer wrong-pin", "X-Device-ID": "d1", "X-Device-Name": "D1"})
     assert r.status_code == 200
+
+
+# ── Setup "Join" probe contract (#533) ────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_whoami_probe_pin_contract(client):
+    """The GUI Join flow probes /whoami: bad PIN → 401, right PIN → 200."""
+    bad = _device_auth(DEVICE_ID, DEVICE_NAME, pin="wrong")
+    assert (await client.get("/whoami", headers=bad)).status_code == 401
+    assert (await client.get("/whoami", headers=AUTH)).status_code == 200

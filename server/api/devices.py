@@ -1,7 +1,8 @@
 """Device listing, presence, removal, and per-device console/game-device views."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from ._core import (
     _auth,
@@ -51,6 +52,7 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
     consoles = _get_store().list_consoles(target_device_id)
     return [
         {
+            "id": c.id,
             "console_name": c.console_name,
             "device_game_folder": c.device_game_folder,
             "device_save_folder": c.device_save_folder,
@@ -61,6 +63,33 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
         }
         for c in consoles
     ]
+
+
+class ConsoleFoldersRequest(BaseModel):
+    device_game_folder: str = ""
+    device_save_folder: str = ""
+    device_state_folder: str = ""
+    device_emulator: str = ""
+    device_network_folder: str = ""
+    device_local_folder: str = ""
+
+
+@router.put("/devices/{target_device_id}/consoles/{console_id}")
+def update_device_console(
+    target_device_id: str, console_id: str, req: ConsoleFoldersRequest,
+    device_id: str = Depends(_auth),
+) -> dict:
+    """Edit one of the caller's own console rows (#539). Replaces all six folder fields."""
+    if target_device_id != device_id:
+        raise HTTPException(status_code=403, detail="Can only edit this device's consoles")
+    store = _get_store()
+    console = next((c for c in store.list_consoles(device_id) if c.id == console_id), None)
+    if not console:
+        raise HTTPException(status_code=404, detail="Console not found")
+    for field, value in req.model_dump().items():
+        setattr(console, field, value)
+    store.set_console(console)
+    return {"ok": True}
 
 
 # ── device game-devices (any device) ─────────────────────────────────────────

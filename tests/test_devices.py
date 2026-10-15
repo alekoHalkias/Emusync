@@ -279,3 +279,61 @@ async def test_delete_device_endpoint_with_configured_game(make_client, tmp_path
     )
     r = await c.delete("/devices/dev-x", headers=auth)
     assert r.status_code == 200
+
+
+# ── editable console folders (#539) ───────────────────────────────────────────
+
+async def _seed_console(client) -> dict:
+    await client.post("/games", json={"name": "Chrono", "console": "SNES"}, headers=AUTH)
+    r = await client.put(
+        "/games/chrono/device",
+        json={"rom_path": "/roms/snes/chrono.sfc", "save_path": "/saves/snes/chrono.srm"},
+        headers=AUTH,
+    )
+    assert r.status_code == 200
+    consoles = (await client.get(f"/devices/{DEVICE_ID}/consoles", headers=AUTH)).json()
+    assert len(consoles) == 1
+    return consoles[0]
+
+
+@pytest.mark.asyncio
+async def test_update_device_console_edits_folders(client):
+    c = await _seed_console(client)
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name")}
+    body["device_save_folder"] = "/new/saves"
+    body["device_emulator"] = "retroarch"
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    assert r.status_code == 200
+    got = (await client.get(f"/devices/{DEVICE_ID}/consoles", headers=AUTH)).json()[0]
+    assert got["device_save_folder"] == "/new/saves"
+    assert got["device_emulator"] == "retroarch"
+
+
+@pytest.mark.asyncio
+async def test_update_device_console_errors(client):
+    c = await _seed_console(client)
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/nope", json={}, headers=AUTH)
+    assert r.status_code == 404
+    other = _device_auth("d2", "Deck")
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json={}, headers=other)
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_game_config_save_does_not_overwrite_edited_console_folders(client):
+    """Regression: set_game_device used to rewrite save/state/emulator on every call."""
+    c = await _seed_console(client)
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name")}
+    body["device_save_folder"] = "/new/saves"
+    body["device_state_folder"] = "/new/states"
+    body["device_emulator"] = "custom"
+    await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    await client.put(
+        "/games/chrono/device",
+        json={"rom_path": "/roms/snes/chrono.sfc", "save_path": "/saves/snes/chrono.srm"},
+        headers=AUTH,
+    )
+    got = (await client.get(f"/devices/{DEVICE_ID}/consoles", headers=AUTH)).json()[0]
+    assert got["device_save_folder"] == "/new/saves"
+    assert got["device_state_folder"] == "/new/states"
+    assert got["device_emulator"] == "custom"

@@ -117,6 +117,11 @@ input.error { border-color: var(--red); }
   max-height: 90vh;
   overflow-y: auto;
 }
+.modal:focus { outline: none; }
+.modal-md { width: 520px; }
+.modal-lg { width: 640px; }
+.modal-xl { width: 760px; }
+.modal-wizard { width: clamp(520px, 70vw, 960px); }
 .modal h3 { margin-bottom: 12px; }
 .modal p { color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
 .modal-header {
@@ -128,6 +133,12 @@ input.error { border-color: var(--red); }
   z-index: 1;
 }
 .modal-header h3 { margin-bottom: 0; }
+.settings-heading {
+  font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 18px 0 8px; padding-top: 12px; border-top: 2px solid var(--border);
+}
+.settings-heading.first { margin-top: 0; padding-top: 0; border-top: none; }
+.settings-collapse > summary { cursor: pointer; margin-bottom: 8px; }
 .modal-actions {
   display: flex; gap: 10px; justify-content: flex-end;
   position: sticky; bottom: -28px;
@@ -174,6 +185,7 @@ input.error { border-color: var(--red); }
   padding: 18px; border: 2px solid var(--border); border-radius: var(--radius);
   background: var(--bg); cursor: pointer; transition: border-color 0.15s;
   -webkit-app-region: no-drag;
+  width: 100%; text-align: left; font: inherit; color: inherit;
 }
 .setup-choice:hover { border-color: var(--accent); }
 .setup-choice-icon { font-size: 28px; line-height: 1; }
@@ -693,6 +705,7 @@ input.error { border-color: var(--red); }
   -webkit-app-region: no-drag;
 }
 .game-card:hover .game-card-checkbox,
+.game-card:focus-visible .game-card-checkbox,
 .game-card-checkbox:checked { opacity: 1; }
 
 /* Selected card: accent border + subtle tint */

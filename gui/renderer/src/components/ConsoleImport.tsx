@@ -12,22 +12,16 @@ import { EmulatorStep } from "./console-import/EmulatorStep";
 import { ResultsStep } from "./console-import/ResultsStep";
 import { DoneStep } from "./console-import/DoneStep";
 import { CloseIcon } from "./icons";
-import { useEscapeToClose } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 export default function ConsoleImport({ onClose, onImported, initialConsole, initialRomDirs, title }: Props): ReactElement {
   const vm = useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs });
-  useEscapeToClose(onClose);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal"
-        style={{ width: "clamp(640px, 70vw, 960px)", maxHeight: "85vh", display: "flex", flexDirection: "column" }}
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal size="wizard" onClose={onClose} busy={vm.phase === "importing"} style={{ maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>{title ?? "Add console"}</h3>
-          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
+          <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><CloseIcon /></button>
         </div>
 
         {vm.showStepper && <Stepper currentStep={vm.currentStep} />}
@@ -41,7 +35,6 @@ export default function ConsoleImport({ onClose, onImported, initialConsole, ini
           <Spinner muted={false} message={`Importing ${vm.progress.done} / ${vm.progress.total}…`} />
         )}
         {vm.phase === "done"      && <DoneStep vm={vm} />}
-      </div>
-    </div>
+      </Modal>
   );
 }

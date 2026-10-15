@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { listEvents, removeDevice, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
 import { useDevices } from "../DeviceContext";
-import { useEscapeToClose } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 export default function DevicesPanel(): React.ReactElement {
   const { devices, currentDeviceId, refresh } = useDevices();
@@ -13,9 +13,9 @@ export default function DevicesPanel(): React.ReactElement {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [confirmAll, setConfirmAll] = useState(false);
   // ponytail: doesn't take priority over the host "Paired devices" popup's own
   // escape handler, so Escape may close both at once — fine for a rare nested case.
-  useEscapeToClose(() => !removing && setConfirmRemove(null));
 
   const loadEvents = useCallback(async () => {
     setEventsLoading(true);
@@ -48,6 +48,21 @@ export default function DevicesPanel(): React.ReactElement {
       /* error — keep UI responsive */
     } finally {
       setRemoving(false);
+    }
+  }
+
+  const others = devices.filter((d) => d.id !== currentDeviceId);
+
+  async function handleRemoveOthers(): Promise<void> {
+    setRemoving(true);
+    try {
+      await Promise.all(others.map((d) => removeDevice(d.id)));
+    } catch {
+      /* partial failure — refresh below shows what's left */
+    } finally {
+      setRemoving(false);
+      setConfirmAll(false);
+      await refresh();
     }
   }
 
@@ -102,12 +117,28 @@ export default function DevicesPanel(): React.ReactElement {
               </div>
             </div>
           ))}
+          {others.length > 0 && (
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              {!confirmAll ? (
+                <button className="btn btn-ghost" onClick={() => setConfirmAll(true)}>Remove all other devices</button>
+              ) : (
+                <>
+                  <span style={{ fontSize: 12, color: "var(--red, #f87171)", alignSelf: "center" }}>
+                    Remove {others.length} device{others.length === 1 ? "" : "s"}? They can re-pair.
+                  </span>
+                  <button className="btn btn-danger" onClick={handleRemoveOthers} disabled={removing}>
+                    {removing ? <><span className="spinner" /> Removing…</> : "Confirm"}
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => setConfirmAll(false)} disabled={removing}>Cancel</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {confirmRemove && (
-        <div className="modal-overlay" onClick={() => setConfirmRemove(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <Modal busy={removing} onClose={() => setConfirmRemove(null)}>
             <h3>Remove device?</h3>
             <p>This device will be removed from your paired devices. It can re-pair anytime.</p>
             <div className="modal-actions">
@@ -118,8 +149,7 @@ export default function DevicesPanel(): React.ReactElement {
                 {removing ? <><span className="spinner" /> Removing…</> : "Remove"}
               </button>
             </div>
-          </div>
-        </div>
+          </Modal>
       )}
     </div>
   );

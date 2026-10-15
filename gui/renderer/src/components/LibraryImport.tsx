@@ -10,7 +10,7 @@ import ConsoleImport from "./ConsoleImport";
 import { Spinner } from "./console-import/Spinner";
 import { CloseIcon } from "./icons";
 import type { ConsoleOption } from "./console-import/types";
-import { useEscapeToClose } from "../useEscapeToClose";
+import Modal from "./Modal";
 
 const emusync = window.emusync;
 
@@ -31,7 +31,6 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
 
-  useEscapeToClose(onClose);
   useEffect(() => { emusync.emulator.consoles().then(setConsoles); }, []);
 
   async function pickLibraryRoot(): Promise<void> {
@@ -114,18 +113,13 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal"
-        style={{ width: "clamp(640px, 70vw, 960px)", maxHeight: "85vh", display: "flex", flexDirection: "column" }}
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal size="wizard" onClose={onClose} style={{ maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
         <div className="modal-header">
           <h3 style={{ margin: 0 }}>Import library</h3>
-          <button className="btn btn-ghost" onClick={onClose}><CloseIcon /></button>
+          <button className="btn btn-ghost" aria-label="Close" onClick={onClose}><CloseIcon /></button>
         </div>
 
-        {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+        {error && <p role="alert" className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
 
         {phase === "source" && (
           <>
@@ -213,7 +207,6 @@ export default function LibraryImport({ onClose, onImported }: Props): ReactElem
             </div>
           </>
         )}
-      </div>
-    </div>
+      </Modal>
   );
 }

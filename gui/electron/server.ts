@@ -1,11 +1,12 @@
 // Python server + sync-daemon process lifecycle, and the server:* / daemon:* IPC.
 import { ipcMain } from "electron";
 import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir, networkInterfaces } from "os";
-import { parse as parseTOML, stringify as stringifyTOML } from "smol-toml";
+import { parse as parseTOML } from "smol-toml";
 import { CONFIG_PATH, SCRIPT, PYTHON, rt } from "./runtime";
+import { writeConfig } from "./config-store";
 
 // ── sync daemon ─────────────────────────────────────────────────────────────
 
@@ -60,11 +61,13 @@ export function stopSyncDaemon(): void {
 
 // ── server process ──────────────────────────────────────────────────────────
 
-export function startServerProcess(): Promise<{ ok: boolean }> {
+export function startServerProcess(): Promise<{ ok: boolean; error?: string }> {
   if (rt.serverProcess) return Promise.resolve({ ok: true });
 
-  return new Promise<{ ok: boolean }>((resolve) => {
+  return new Promise<{ ok: boolean; error?: string }>((resolve) => {
     let resolved = false;
+    let tail = ""; // last output, surfaced if the server dies before it is ready
+    const keepTail = (chunk: Buffer) => { tail = (tail + chunk.toString()).slice(-1500); };
     const proc = spawn(PYTHON, [SCRIPT, "server", "start"], {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PYTHONUNBUFFERED: "1" },
@@ -72,7 +75,9 @@ export function startServerProcess(): Promise<{ ok: boolean }> {
     rt.serverProcess = proc;
 
     // Resolve as soon as the server prints its startup line (before uvicorn binds)
+    proc.stderr?.on("data", keepTail);
     proc.stdout?.on("data", (chunk: Buffer) => {
+      keepTail(chunk);
       const line = chunk.toString();
       if (!resolved && line.includes("EmuSync server ready")) {
         resolved = true;
@@ -83,12 +88,17 @@ export function startServerProcess(): Promise<{ ok: boolean }> {
 
     proc.on("error", (err) => {
       rt.serverProcess = null;
-      if (!resolved) { resolved = true; resolve({ ok: false }); }
+      if (!resolved) { resolved = true; resolve({ ok: false, error: `Could not launch Python (${PYTHON}): ${err.message}` }); }
       console.error("Server process error:", err);
     });
 
-    proc.on("exit", () => {
+    proc.on("exit", (code) => {
       rt.serverProcess = null;
+      // Exit 0 = another server was already running (graceful no-op); anything else is a real failure.
+      if (!resolved) {
+        resolved = true;
+        resolve(code === 0 ? { ok: true } : { ok: false, error: tail.trim() || `Server exited with code ${code}.` });
+      }
     });
 
     // Fallback: resolve after 5 s if we never see the startup line
@@ -139,6 +149,20 @@ export function registerServerIpc(): void {
     return true;
   });
 
+  // Can PYTHON import the server's dependencies? Lets Setup explain a broken install up front.
+  ipcMain.handle("server:preflight", () => {
+    return new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      const proc = spawn(PYTHON, ["-c", "import fastapi, uvicorn, click, tomlkit, zeroconf, httpx"], { stdio: ["ignore", "ignore", "pipe"] });
+      let err = "";
+      proc.stderr?.on("data", (c: Buffer) => { err += c.toString(); });
+      proc.on("exit", (code) => resolve(code === 0 ? { ok: true } : {
+        ok: false,
+        error: `Python dependencies are missing for ${PYTHON}. Run install.sh from the EmuSync folder.\n${err.trim().split("\n").pop() ?? ""}`,
+      }));
+      proc.on("error", () => resolve({ ok: false, error: `Python was not found (${PYTHON}). Install Python 3.10+ and run install.sh.` }));
+    });
+  });
+
   ipcMain.handle("server:discover", () => {
     return new Promise<Array<{ name: string; host: string; port: number }>>((resolve) => {
       const proc = spawn(PYTHON, [SCRIPT, "server", "discover-json"], {
@@ -178,7 +202,7 @@ export function registerServerIpc(): void {
     } else {
       delete raw.server_pin;
     }
-    writeFileSync(CONFIG_PATH, stringifyTOML(raw as any));
+    writeConfig(raw);
 
     return startServerProcess();
   });

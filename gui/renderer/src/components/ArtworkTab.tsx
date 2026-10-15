@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { getGame, setGameSgdbId } from "../api";
 import { CloseIcon } from "./icons";
+import Modal from "./Modal";
 
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
 const ART_TYPES: ArtType[] = ["grid", "wide_grid", "hero", "logo", "icon"];
@@ -135,9 +136,9 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
     <div>
       {/* Search row */}
       <div className="input-group" style={{ marginBottom: 12 }}>
-        <label>Search SteamGridDB</label>
+        <label htmlFor="sgdb-search">Search SteamGridDB</label>
         <div style={{ display: "flex", gap: 8 }}>
-          <input
+          <input id="sgdb-search"
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -181,7 +182,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
         </div>
       )}
 
-      {error && <p className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
+      {error && <p role="alert" className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
 
       {/* Current artwork tiles */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -194,7 +195,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
         {ART_TYPES.map((type) => (
-          <div key={type} onClick={() => openPicker(type)} style={{ cursor: "pointer", textAlign: "center" }}>
+          <button type="button" key={type} onClick={() => openPicker(type)} style={{ cursor: "pointer", textAlign: "center", background: "none", border: 0, padding: 0, color: "inherit", font: "inherit" }}>
             <div
               style={{
                 aspectRatio: type === "hero" ? "16 / 6" : type === "wide_grid" ? "460 / 215" : type === "grid" ? "3 / 4" : "1 / 1",
@@ -214,17 +215,16 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
               )}
             </div>
             <div style={{ fontSize: 12, marginTop: 4 }}>{ART_TYPE_LABELS[type]}</div>
-          </div>
+          </button>
         ))}
       </div>
 
       {/* Picker modal */}
       {pickerType && (
-        <div className="modal-overlay" onClick={() => setPickerType(null)}>
-          <div className="modal" style={{ width: 640, maxWidth: "90vw" }} onClick={(e) => e.stopPropagation()}>
+        <Modal size="lg" onClose={() => setPickerType(null)}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 style={{ margin: 0 }}>{ART_TYPE_LABELS[pickerType]} artwork</h3>
-              <button className="btn btn-ghost" onClick={() => setPickerType(null)}><CloseIcon /></button>
+              <button className="btn btn-ghost" aria-label="Close" onClick={() => setPickerType(null)}><CloseIcon /></button>
             </div>
 
             {current[pickerType] && (
@@ -239,6 +239,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                   <button
                     onClick={clearCurrent}
                     title="Remove saved artwork"
+                    aria-label="Remove saved artwork"
                     style={{
                       position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%",
                       background: "#dc2626", color: "#fff", border: "none", cursor: "pointer",
@@ -268,8 +269,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
                 ))}
               </div>
             )}
-          </div>
-        </div>
+          </Modal>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { configure, configureDevice, health } from "../api";
+import { configure, configureDevice, health, whoami } from "../api";
+import PinInput from "./settings/PinInput";
 
 type Step =
   | "choose"
@@ -29,10 +30,18 @@ export default function Setup({ onDone }: Props): React.ReactElement {
   const [artKey, setArtKey] = useState("");
   const [artKeyError, setArtKeyError] = useState("");
   const [artKeyBusy, setArtKeyBusy] = useState(false);
+  const [manualHost, setManualHost] = useState("");
+  const [manualPort, setManualPort] = useState("8765");
+  // Stable across the verify probes and the final connect so the server
+  // registers this device exactly once.
+  const [deviceId, setDeviceId] = useState("");
+  const [preflightError, setPreflightError] = useState("");
 
   useEffect(() => {
+    window.emusync.server.preflight().then((r) => { if (!r.ok) setPreflightError(r.error ?? "Python install looks broken."); });
     window.emusync.config.load().then((cfg) => {
       if (cfg?.device_name) setDeviceName(cfg.device_name as string);
+      setDeviceId((cfg?.device_id as string) ?? crypto.randomUUID());
     });
   }, []);
 
@@ -51,19 +60,31 @@ export default function Setup({ onDone }: Props): React.ReactElement {
       device_id: deviceId,
     });
 
+    const fail = async (msg: string): Promise<void> => {
+      // Don't leave is_server=true behind, or every relaunch skips Setup and silently retries.
+      await window.emusync.config.save({ ...existing, is_server: existing.is_server ?? false });
+      await window.emusync.server.stop();
+      setError(msg);
+      setStep("choose");
+    };
+
     const result = await window.emusync.server.start();
     if (!result.ok) {
-      setError("Failed to start server. Make sure Python and emusync.py are available.");
-      setStep("choose");
+      await fail(result.error || "Failed to start server. Make sure Python and emusync.py are available.");
       return;
     }
 
     // Wait for server to be ready before proceeding
     configure("localhost", port, pin);
     configureDevice(deviceId, devName);
-    for (let i = 0; i < 100; i++) {
-      if (await health()) break;
-      await new Promise<void>((r) => setTimeout(r, 100));
+    let up = false;
+    for (let i = 0; i < 100 && !up; i++) {
+      up = await health();
+      if (!up) await new Promise<void>((r) => setTimeout(r, 100));
+    }
+    if (!up) {
+      await fail(`The server did not respond on port ${port}. Is the port already in use?`);
+      return;
     }
 
     setStep("server-ready");
@@ -71,8 +92,61 @@ export default function Setup({ onDone }: Props): React.ReactElement {
 
   async function scanServers(): Promise<void> {
     setStep("join-scanning");
-    setServers([]);
+    setSelectedServer(null);
+    setError("");
+    let found: DiscoveredServer[] = [];
+    try {
+      found = await window.emusync.server.discover();
+    } catch {
+      // fall through to manual entry
+    }
+    setServers(found);
+    if (found.length === 1) setSelectedServer(found[0]);
     setStep("join-select");
+  }
+
+  function joinTarget(): DiscoveredServer | null {
+    if (servers.length > 0) return selectedServer;
+    const host = manualHost.trim();
+    const port = parseInt(manualPort);
+    if (!host || !(port >= 1 && port <= 65535)) return null;
+    return { name: "", host, port };
+  }
+
+  // Probe the chosen server: reachable? open or PIN-protected? Skips the PIN
+  // screen for open servers; a wrong PIN stays on the PIN screen.
+  async function verifyServer(pin: string, fromPinStep: boolean): Promise<void> {
+    const target = joinTarget();
+    if (!target) {
+      setError("Enter a valid host and port.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      setSelectedServer(target);
+      configure(target.host, target.port, pin);
+      configureDevice(deviceId, deviceName || "unknown");
+      if (!(await health())) {
+        throw new Error("Could not reach the server. Check the address and make sure it is running.");
+      }
+      try {
+        await whoami();
+      } catch (e: unknown) {
+        // Blank-PIN probe failing on auth just means "ask for the PIN".
+        if (!fromPinStep && pin === "") {
+          setStep("join-pin");
+          return;
+        }
+        throw e;
+      }
+      setInputPin(pin);
+      setStep("join-name");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Connection failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function doConnect(): Promise<void> {
@@ -84,7 +158,6 @@ export default function Setup({ onDone }: Props): React.ReactElement {
     setError("");
     try {
       const cfg      = (await window.emusync.config.load()) ?? {};
-      const deviceId = (cfg.device_id as string) ?? crypto.randomUUID();
       const devName  = deviceName || (cfg.device_name as string) || "unknown";
       const pin      = inputPin.trim();
 
@@ -119,10 +192,11 @@ export default function Setup({ onDone }: Props): React.ReactElement {
           <>
             <h1>Welcome to EmuSync</h1>
             <p>Keep game saves in sync across your devices on your home network.</p>
+            {preflightError && <p className="error-msg" style={{ margin: "12px 0", whiteSpace: "pre-wrap" }}>{preflightError}</p>}
 
             <div className="input-group" style={{ margin: "20px 0" }}>
-              <label>What should we call this device?</label>
-              <input
+              <label htmlFor="setup-device-name">What should we call this device?</label>
+              <input id="setup-device-name"
                 type="text"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
@@ -131,22 +205,22 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               />
             </div>
 
-            {error && <p className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
+            {error && <p role="alert" className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
             <div className="setup-choices">
-              <div className="setup-choice" onClick={startServer}>
+              <button type="button" className="setup-choice" onClick={startServer}>
                 <span className="setup-choice-icon">🖥️</span>
                 <div className="setup-choice-text">
                   <h3>Set up this as the server</h3>
                   <p>This is your gaming PC. Saves are stored here. Run this on your main machine first.</p>
                 </div>
-              </div>
-              <div className="setup-choice" onClick={scanServers}>
+              </button>
+              <button type="button" className="setup-choice" onClick={scanServers}>
                 <span className="setup-choice-icon">🎮</span>
                 <div className="setup-choice-text">
                   <h3>Join an existing server</h3>
                   <p>This is your Steam Deck or second device. Connect to the server running on your gaming PC.</p>
                 </div>
-              </div>
+              </button>
             </div>
           </>
         )}
@@ -208,8 +282,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               API key from the "API" tab and paste it below.
             </p>
             <div className="input-group" style={{ marginBottom: 16 }}>
-              <label>API key</label>
-              <input
+              <label htmlFor="setup-api-key">API key</label>
+              <input id="setup-api-key"
                 type="text"
                 value={artKey}
                 onChange={(e) => { setArtKey(e.target.value); setArtKeyError(""); }}
@@ -217,7 +291,7 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                 className={artKeyError ? "error" : ""}
                 autoFocus
               />
-              {artKeyError && <span className="error-msg">{artKeyError}</span>}
+              {artKeyError && <span role="alert" className="error-msg">{artKeyError}</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn btn-ghost" onClick={onDone} disabled={artKeyBusy}>
@@ -259,26 +333,20 @@ export default function Setup({ onDone }: Props): React.ReactElement {
               <>
                 <p>No servers found automatically. Enter the server details manually.</p>
                 <div className="input-group" style={{ marginTop: 16 }}>
-                  <label>Server host</label>
-                  <input
+                  <label htmlFor="setup-host">Server host</label>
+                  <input id="setup-host"
                     type="text"
                     placeholder="192.168.1.50"
-                    onChange={(e) =>
-                      setSelectedServer((s) => ({ ...(s ?? { name: "", port: 8765 }), host: e.target.value }))
-                    }
+                    value={manualHost}
+                    onChange={(e) => setManualHost(e.target.value)}
                   />
                 </div>
                 <div className="input-group" style={{ marginTop: 12 }}>
-                  <label>Port</label>
-                  <input
+                  <label htmlFor="setup-port">Port</label>
+                  <input id="setup-port"
                     type="number"
-                    defaultValue={8765}
-                    onChange={(e) =>
-                      setSelectedServer((s) => ({
-                        ...(s ?? { name: "", host: "" }),
-                        port: parseInt(e.target.value) || 8765,
-                      }))
-                    }
+                    value={manualPort}
+                    onChange={(e) => setManualPort(e.target.value)}
                   />
                 </div>
               </>
@@ -303,41 +371,45 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                 </div>
               </>
             )}
-            <button
-              className="btn btn-primary"
-              style={{ marginTop: 20, width: "100%" }}
-              disabled={!selectedServer?.host}
-              onClick={() => setStep("join-pin")}
-            >
-              Next
-            </button>
+            {error && <p role="alert" className="error-msg" style={{ marginTop: 12 }}>{error}</p>}
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              <button className="btn btn-ghost" onClick={scanServers} disabled={busy}>
+                Rescan
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                disabled={busy || !joinTarget()}
+                onClick={() => verifyServer("", false)}
+              >
+                {busy ? <><span className="spinner" /> Checking…</> : "Next"}
+              </button>
+            </div>
           </>
         )}
 
         {step === "join-pin" && (
           <>
             <h1>Enter PIN</h1>
-            <p>If the server has a PIN set, enter it below. Otherwise leave it blank.</p>
+            <p>This server requires a PIN. It is shown in the server's settings on the gaming PC.</p>
             <div className="input-group" style={{ margin: "16px 0" }}>
-              <label>PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={4}
-                placeholder="1234"
+              <label htmlFor="setup-pin">PIN</label>
+              <PinInput
+                id="setup-pin"
                 value={inputPin}
-                onChange={(e) => setInputPin(e.target.value.replace(/\D/g, ""))}
+                onChange={(v) => { setInputPin(v); setError(""); }}
+                onKeyDown={(e) => { if (e.key === "Enter" && inputPin) verifyServer(inputPin, true); }}
                 className={error ? "error" : ""}
                 autoFocus
               />
-              {error && <span className="error-msg">{error}</span>}
+              {error && <span role="alert" className="error-msg">{error}</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn btn-ghost" onClick={() => setStep("join-select")} disabled={busy}>
+              <button className="btn btn-ghost" onClick={() => { setError(""); setStep("join-select"); }} disabled={busy}>
                 Back
               </button>
-              <button className="btn btn-primary" onClick={() => setStep("join-name")} disabled={busy} style={{ flex: 1 }}>
-                Next
+              <button className="btn btn-primary" onClick={() => verifyServer(inputPin, true)} disabled={busy || !inputPin} style={{ flex: 1 }}>
+                {busy ? <><span className="spinner" /> Checking…</> : "Next"}
               </button>
             </div>
           </>
@@ -348,8 +420,8 @@ export default function Setup({ onDone }: Props): React.ReactElement {
             <h1>Device Name</h1>
             <p>What would you like to name this device on the server?</p>
             <div className="input-group" style={{ margin: "16px 0" }}>
-              <label>Device name <span style={{ color: "var(--error)" }}>*</span></label>
-              <input
+              <label htmlFor="setup-device-name2">Device name <span style={{ color: "var(--error)" }}>*</span></label>
+              <input id="setup-device-name2"
                 type="text"
                 placeholder="My Device"
                 value={deviceName}
@@ -358,11 +430,11 @@ export default function Setup({ onDone }: Props): React.ReactElement {
                 className={error ? "error" : ""}
                 autoFocus
               />
-              {!deviceName.trim() && <span className="error-msg">Device name is required</span>}
-              {error && <span className="error-msg">{error}</span>}
+              {!deviceName.trim() && <span role="alert" className="error-msg">Device name is required</span>}
+              {error && <span role="alert" className="error-msg">{error}</span>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn btn-ghost" onClick={() => setStep("join-pin")} disabled={busy}>
+              <button className="btn btn-ghost" onClick={() => { setError(""); setStep(inputPin ? "join-pin" : "join-select"); }} disabled={busy}>
                 Back
               </button>
               <button className="btn btn-primary" onClick={doConnect} disabled={busy || !deviceName.trim()} style={{ flex: 1 }}>
