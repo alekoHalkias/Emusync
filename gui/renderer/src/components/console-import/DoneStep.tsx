@@ -15,6 +15,11 @@ export function DoneStep({ vm }: { vm: ConsoleImportVM }) {
             Failed: {importErrors.join(", ")}
           </p>
         )}
+        {!fetchingArt && artProgress.failed > 0 && (
+          <p role="alert" style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+            Artwork couldn't be fetched for {artProgress.failed} of {artProgress.total} games — retry from each game's Artwork tab.
+          </p>
+        )}
         {fetchingArt && (
           <p style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6 }}>
             <span className="spinner" style={{ width: 12, height: 12, flexShrink: 0 }} />
