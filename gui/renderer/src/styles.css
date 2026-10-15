@@ -174,6 +174,7 @@ input.error { border-color: var(--red); }
   padding: 18px; border: 2px solid var(--border); border-radius: var(--radius);
   background: var(--bg); cursor: pointer; transition: border-color 0.15s;
   -webkit-app-region: no-drag;
+  width: 100%; text-align: left; font: inherit; color: inherit;
 }
 .setup-choice:hover { border-color: var(--accent); }
 .setup-choice-icon { font-size: 28px; line-height: 1; }
