@@ -341,6 +341,8 @@ The `emulator:scan` IPC handler emits `[scan]` lines to stderr in dev mode — v
 
 **`consoles` rows are user-editable now, so `upsert_console_for_game` only fills blank save/state/emulator folders (#539).** It used to rewrite them from whichever game's paths were saved last, which would silently undo a hand edit made in `ConsoleFoldersModal` (⚙ in `GameGrid`'s header, `PUT /devices/{id}/consoles/{console_id}`). Side effect: a stale folder no longer self-corrects from game saves — fix it in that editor. A row's identity for upsert matching is still `(console_name, device_game_folder)`, so editing the ROM folder makes the next import from the old folder create a second row.
 
+**`server:start` can fail with a reason now (#534).** `startServerProcess` keeps the last ~1.5KB of the server's stdout/stderr and resolves `{ok:false, error}` if the process exits non-zero before printing its ready line (exit 0 = an already-running server, still `ok`). `Setup.tsx` shows that error, and also fails if `/health` never answers after start, reverting `is_server` so a broken start doesn't leave a config that skips Setup and silently retries on every relaunch. The 5s "assume ready" fallback in `server.ts` remains, so the renderer's health poll is the real readiness check.
+
 **Orphaned server processes** — If Electron exits abnormally, uvicorn can keep running. "Port already in use": run `pkill -9 -f "emusync.py server start"`. `emusync server start` now detects a running server and exits gracefully instead of duplicating it.
 
 **SIGKILL skips Python finally blocks** — `.server_pid`/`.server_token` may survive a hard kill; the stop handler manually deletes them.

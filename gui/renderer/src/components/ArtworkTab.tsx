@@ -194,7 +194,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
         {ART_TYPES.map((type) => (
-          <div key={type} onClick={() => openPicker(type)} style={{ cursor: "pointer", textAlign: "center" }}>
+          <button type="button" key={type} onClick={() => openPicker(type)} style={{ cursor: "pointer", textAlign: "center", background: "none", border: 0, padding: 0, color: "inherit", font: "inherit" }}>
             <div
               style={{
                 aspectRatio: type === "hero" ? "16 / 6" : type === "wide_grid" ? "460 / 215" : type === "grid" ? "3 / 4" : "1 / 1",
@@ -214,7 +214,7 @@ export default function ArtworkTab({ slug, name, consoleKey }: Props): React.Rea
               )}
             </div>
             <div style={{ fontSize: 12, marginTop: 4 }}>{ART_TYPE_LABELS[type]}</div>
-          </div>
+          </button>
         ))}
       </div>
 

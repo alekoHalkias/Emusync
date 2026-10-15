@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld("emusync", {
     addRecentFolder: (consoleKey: string, folderPath: string): Promise<void> => ipcRenderer.invoke("config:addRecentFolder", consoleKey, folderPath),
   },
   server: {
-    start: (): Promise<{ ok: boolean; token: string | null }> =>
+    start: (): Promise<{ ok: boolean; token: string | null; error?: string }> =>
       ipcRenderer.invoke("server:start"),
     stop: (): Promise<boolean> => ipcRenderer.invoke("server:stop"),
     changePin: (pin: string | null): Promise<{ ok: boolean; token: string | null }> =>

@@ -24,7 +24,7 @@ export interface EmusyncBridge {
     addRecentFolder: (consoleKey: string, folderPath: string) => Promise<void>;
   };
   server: {
-    start: () => Promise<{ ok: boolean; token: string | null }>;
+    start: () => Promise<{ ok: boolean; token: string | null; error?: string }>;
     stop: () => Promise<boolean>;
     changePin: (pin: string | null) => Promise<{ ok: boolean; token: string | null }>;
     discover: () => Promise<Array<{ name: string; host: string; port: number }>>;
