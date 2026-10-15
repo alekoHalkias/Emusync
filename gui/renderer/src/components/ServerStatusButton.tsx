@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { configure, configureDevice, health, listEvents, whoami, type ActivityEvent } from "../api";
 import { RelTime } from "../time";
 import DevicesPanel from "./DevicesPanel";
+import SaveField from "./settings/SaveField";
+import PinInput from "./settings/PinInput";
 import { useDevices } from "../DeviceContext";
 import { CloseIcon } from "./icons";
 import { useEscapeToCloseTopmost } from "../useEscapeToClose";
@@ -9,13 +11,18 @@ import { useEscapeToCloseTopmost } from "../useEscapeToClose";
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
 
-export default function ServerStatusButton({ isServer, onRepaired }: { isServer: boolean; onRepaired: () => void }): React.ReactElement {
+type DisplayState = { scale: number; fullscreen: boolean };
+
+export default function ServerStatusButton({ isServer, onRepaired, display, onDisplay }: {
+  isServer: boolean;
+  onRepaired: () => void;
+  display: DisplayState;
+  onDisplay: (d: Partial<DisplayState>) => void;
+}): React.ReactElement {
   const { devices } = useDevices();
   const [serverState, setServerState] = useState<ServerState>("checking");
   const [open, setOpen] = useState(false);
   const [startState, setStartState] = useState<StartState>("idle");
-  const [showDevices, setShowDevices] = useState(false);
-  const [showArtKey, setShowArtKey] = useState(false);
 
   // PIN management
   const [pinInput, setPinInput] = useState("");
@@ -25,7 +32,6 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
 
   // Device name
   const [deviceName, setDeviceName] = useState("");
-  const [deviceNameSaved, setDeviceNameSaved] = useState(false);
 
   // Activity log
   const [showActivity, setShowActivity] = useState(false);
@@ -38,15 +44,10 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
 
   // SteamGridDB art key (issue #322)
   const [artKeyInput, setArtKeyInput] = useState("");
-  const [artKeyBusy, setArtKeyBusy] = useState(false);
   useEscapeToCloseTopmost(
     [showActivity, () => setShowActivity(false)],
-    [showArtKey, () => setShowArtKey(false)],
-    [showDevices, () => setShowDevices(false)],
     [open, () => setOpen(false)],
   );
-  const [artKeySaved, setArtKeySaved] = useState(false);
-  const [artKeyError, setArtKeyError] = useState("");
 
   // Connect-to-server form
   const [pairHost, setPairHost] = useState("");
@@ -124,20 +125,11 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
   async function saveDeviceName(): Promise<void> {
     const cfg = (await window.emusync.config.load()) ?? {};
     await window.emusync.config.save({ ...cfg, device_name: deviceName });
-    setDeviceNameSaved(true);
-    setTimeout(() => setDeviceNameSaved(false), 2000);
   }
 
-  async function saveArtKey(): Promise<void> {
-    setArtKeyBusy(true);
+  async function saveArtKey(): Promise<string | void> {
     const result = await window.emusync.steamgriddb.setKey(artKeyInput.trim());
-    setArtKeyBusy(false);
-    if (result.ok) {
-      setArtKeySaved(true);
-      setTimeout(() => setArtKeySaved(false), 2000);
-    } else {
-      setArtKeyError(result.error || "Failed to save key.");
-    }
+    if (!result.ok) return result.error || "Failed to save key.";
   }
 
   async function applyPin(): Promise<void> {
@@ -255,12 +247,13 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
 
       {open && (
         <div className="modal-overlay" onClick={() => setOpen(false)}>
-          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ width: 560 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Server connection</h3>
+              <h3>Settings</h3>
               <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setOpen(false)}><CloseIcon /></button>
             </div>
 
+            <div className="settings-heading first">Connection</div>
             {/* Status row — click to open activity popup */}
             <button
               onClick={() => setShowActivity(true)}
@@ -278,24 +271,6 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
               </div>
               <span style={{ fontSize: 11, color: "var(--text-muted)" }}>click to see server activity →</span>
             </button>
-
-            {/* Device name editor */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
-                  <label>Device name</label>
-                  <input
-                    type="text"
-                    value={deviceName}
-                    onChange={(e) => { setDeviceName(e.target.value); setDeviceNameSaved(false); }}
-                    placeholder="My Gaming PC"
-                  />
-                </div>
-                <button className="btn btn-ghost" onClick={saveDeviceName} style={{ flexShrink: 0 }}>
-                  {deviceNameSaved ? "Saved" : "Save"}
-                </button>
-              </div>
-            </div>
 
             {/* Server machine controls */}
             {isServer && (
@@ -342,13 +317,9 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                     PIN <span style={{ opacity: 0.6 }}>(optional — if no PIN, any device can connect)</span>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={4}
+                    <PinInput
                       value={pinInput}
-                      onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, "")); setPinError(""); setPinConfirming(false); }}
-                      placeholder="1234"
+                      onChange={(v) => { setPinInput(v); setPinError(""); setPinConfirming(false); }}
                       style={{ width: 110, fontFamily: "monospace", letterSpacing: "0.1em", textAlign: "center" }}
                     />
                     {!pinConfirming ? (
@@ -406,13 +377,9 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
                     </div>
                     <div className="input-group">
                       <label>PIN <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional)</span></label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={4}
+                      <PinInput
                         value={pairPin}
-                        onChange={(e) => setPairPin(e.target.value.replace(/\D/g, ""))}
-                        placeholder="1234"
+                        onChange={setPairPin}
                         className={pairError ? "error" : ""}
                       />
                       {pairError && <span className="error-msg">{pairError}</span>}
@@ -426,60 +393,43 @@ export default function ServerStatusButton({ isServer, onRepaired }: { isServer:
               </div>
             )}
 
-            {/* Secondary settings — folded out into their own popups to keep this modal short */}
-            <div style={{ display: "flex", gap: 8, marginTop: 14, borderTop: "2px solid var(--border)", paddingTop: 14 }}>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowDevices(true)}>
-                Paired devices ({devices.length}) →
-              </button>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowArtKey(true)}>
-                SteamGridDB art →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            <div className="settings-heading">This device</div>
+            <SaveField label="Device name" value={deviceName} onChange={setDeviceName} onSave={saveDeviceName} placeholder="My Gaming PC" />
 
-      {/* Paired devices popup — folded in from the old standalone modal (#262) */}
-      {showDevices && (
-        <div className="modal-overlay" onClick={() => setShowDevices(false)}>
-          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Paired devices</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowDevices(false)}><CloseIcon /></button>
-            </div>
-            <DevicesPanel />
-          </div>
-        </div>
-      )}
-
-      {/* SteamGridDB art key popup (issues #322/#398) — stored on the server,
-          shared to every device; editable from ANY device so a headless
-          server can still be configured. */}
-      {showArtKey && (
-        <div className="modal-overlay" onClick={() => setShowArtKey(false)}>
-          <div className="modal" style={{ width: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>SteamGridDB art</h3>
-              <button className="btn btn-ghost" style={{ padding: "3px 8px" }} onClick={() => setShowArtKey(false)}><CloseIcon /></button>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
-              <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
-                <label>API key <span style={{ opacity: 0.6, fontWeight: 400 }}>(optional — shared with all devices via the server)</span></label>
-                <input
-                  type="text"
-                  value={artKeyInput}
-                  onChange={(e) => { setArtKeyInput(e.target.value); setArtKeyError(""); }}
-                  placeholder="Paste your SteamGridDB API key"
-                />
-              </div>
-              <button className="btn btn-ghost" onClick={saveArtKey} disabled={artKeyBusy} style={{ flexShrink: 0 }}>
-                {artKeySaved ? "Saved" : artKeyBusy ? <span className="spinner" /> : "Save"}
-              </button>
-            </div>
-            {artKeyError && <span className="error-msg" style={{ marginTop: 4, display: "block" }}>{artKeyError}</span>}
-            <button className="btn btn-ghost" onClick={() => window.emusync.steamgriddb.openKeyPage()} style={{ fontSize: 12 }}>
+            <div className="settings-heading">Game art</div>
+            <SaveField
+              label={<>SteamGridDB API key <span style={{ opacity: 0.6, fontWeight: 400, textTransform: "none" }}>(optional — shared with all devices)</span></>}
+              value={artKeyInput}
+              onChange={setArtKeyInput}
+              onSave={saveArtKey}
+              placeholder="Paste your SteamGridDB API key"
+            />
+            <button className="btn btn-ghost" onClick={() => window.emusync.steamgriddb.openKeyPage()} style={{ fontSize: 12, marginTop: 6 }}>
               Get a key from SteamGridDB →
             </button>
+
+            <div className="settings-heading">Display</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn btn-ghost"
+                title="Cycle UI size (100 / 125 / 150 / 200%)"
+                onClick={() => window.emusync.display.cycleScale().then((scale) => onDisplay({ scale }))}
+              >
+                UI size: {Math.round(display.scale * 100)}%
+              </button>
+              <button
+                className="btn btn-ghost"
+                title="Toggle fullscreen (F11 / Alt+Enter)"
+                onClick={() => window.emusync.display.toggleFullscreen().then((fullscreen) => onDisplay({ fullscreen }))}
+              >
+                Fullscreen: {display.fullscreen ? "on" : "off"}
+              </button>
+            </div>
+
+            <details className="settings-collapse">
+              <summary className="settings-heading">Paired devices ({devices.length})</summary>
+              <DevicesPanel />
+            </details>
           </div>
         </div>
       )}

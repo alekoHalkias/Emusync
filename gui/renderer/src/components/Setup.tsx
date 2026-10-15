@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { configure, configureDevice, health, whoami } from "../api";
+import PinInput from "./settings/PinInput";
 
 type Step =
   | "choose"
@@ -390,13 +391,9 @@ export default function Setup({ onDone }: Props): React.ReactElement {
             <p>This server requires a PIN. It is shown in the server's settings on the gaming PC.</p>
             <div className="input-group" style={{ margin: "16px 0" }}>
               <label>PIN</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={4}
-                placeholder="1234"
+              <PinInput
                 value={inputPin}
-                onChange={(e) => { setInputPin(e.target.value.replace(/\D/g, "")); setError(""); }}
+                onChange={(v) => { setInputPin(v); setError(""); }}
                 onKeyDown={(e) => { if (e.key === "Enter" && inputPin) verifyServer(inputPin, true); }}
                 className={error ? "error" : ""}
                 autoFocus
