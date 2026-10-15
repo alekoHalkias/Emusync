@@ -477,6 +477,8 @@ input.error { border-color: var(--red); }
 /* ── Game grid (per-console view) ───────────────────────────────────────────── */
 .game-grid-header {
   display: flex;
+  flex-wrap: wrap;
+  container-type: inline-size;
   align-items: center;
   gap: 12px;
   /* Pulls up into .content's 24px top padding (shared by every screen, so
@@ -577,6 +579,10 @@ input.error { border-color: var(--red); }
    padding and no border, and an emoji glyph's line-box is taller than the
    13px text, which grows a button's inline-flex height past its siblings
    even once padding matches (issue #347). */
+/* Narrow windows: bulk-action buttons drop their text and keep glyph + count (#557). */
+@container (max-width: 1000px) {
+  .game-grid-header .btn-label { display: none; }
+}
 .game-grid-header-btn {
   padding: 7px 12px;
   border: 2px solid var(--border);

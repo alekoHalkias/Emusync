@@ -442,39 +442,43 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
         <button
           className="btn btn-ghost game-grid-header-btn"
           disabled={filtered.length === 0}
+          aria-label={allFilteredSelected ? "Deselect all" : "Select all"}
           onClick={toggleSelectAll}
           title={allFilteredSelected ? "Deselect all visible games" : "Select all visible games"}
         >
-          {allFilteredSelected ? "☑ Deselect All" : "☐ Select All"}
+          {allFilteredSelected ? "☑" : "☐"} <span className="btn-label">{allFilteredSelected ? "Deselect All" : "Select All"}</span>
         </button>
         <button
           className="btn btn-ghost game-grid-header-btn"
           disabled={selectedSlugs.size === 0 || dlBusy}
+          aria-label="Download selected"
           onClick={handleBulkDownload}
           title="Download the selected games' ROMs to this device (already-local games are skipped)"
         >
           {dlBusy
-            ? <><span className="spinner" /> Downloading…</>
-            : `⬇ Download${selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}`}
+            ? <><span className="spinner" /> <span className="btn-label">Downloading…</span></>
+            : <>⬇ <span className="btn-label">Download</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}</>}
         </button>
         <button
           className="btn btn-ghost game-grid-header-btn"
           disabled={selectedSlugs.size === 0 || steamBusy}
+          aria-label={steamRemoveMode ? "Remove selected from Steam" : "Add selected to Steam"}
           onClick={handleBulkAddToSteam}
           title={steamRemoveMode
             ? "Remove the selected games from Steam"
             : "Add the selected games to Steam (already-added games are skipped)"}
         >
           {steamBusy
-            ? <><span className="spinner" /> {steamRemoveMode ? "Removing…" : "Adding…"}</>
-            : `🎮 ${steamRemoveMode ? "Remove from Steam" : "Add to Steam"}${selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}`}
+            ? <><span className="spinner" /> <span className="btn-label">{steamRemoveMode ? "Removing…" : "Adding…"}</span></>
+            : <>🎮 <span className="btn-label">{steamRemoveMode ? "Remove from Steam" : "Add to Steam"}</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}</>}
         </button>
         <button
           className="btn btn-danger game-grid-header-btn"
           disabled={selectedSlugs.size === 0}
+          aria-label="Delete selected"
           onClick={() => setConfirmDelete(true)}
         >
-          🗑 Delete{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
+          🗑 <span className="btn-label">Delete</span>{selectedSlugs.size > 0 ? ` ${selectedSlugs.size}` : ""}
         </button>
       </div>
 
