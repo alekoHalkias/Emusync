@@ -68,6 +68,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const loadedRomRef = useRef("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [loadError, setLoadError] = useState("");
   // True when the form was populated from this device's local offline cache
   // (~/.emusync/game_cache/) instead of a live server fetch (#464).
@@ -325,6 +326,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         rom_folder_path: netExtraRef.current.rom_folder_path,
       };
       await setGameDevice(finalSlug!, cfg);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000);
       onSaved();
     } catch (e: unknown) {
       setErrors({ _global: e instanceof Error ? e.message : "Failed to save. Check server connection." });
@@ -365,6 +368,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
       {errors._global && <p role="alert" className="error-msg" style={{ marginBottom: 16 }}>{errors._global}</p>}
 
       <div className="card config-form">
+        <div className="config-row">
         <div className="input-group">
           <label htmlFor="gc-name">Game name</label>
           <input id="gc-name"
@@ -375,6 +379,20 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             placeholder="The Legend of Zelda: BOTW"
           />
           {errors.name && <span role="alert" className="error-msg">{errors.name}</span>}
+        </div>
+
+        <div className="input-group">
+          <label htmlFor="gc-launch">Launch command</label>
+          <input id="gc-launch"
+            type="text"
+            value={launchCommand}
+            onChange={(e) => setLaunchCommand(e.target.value)}
+            placeholder="retroarch -L snes.so %ROM%"
+            className={errors.launchCommand ? "error" : ""}
+          />
+          {errors.launchCommand && <span role="alert" className="error-msg">{errors.launchCommand}</span>}
+        </div>
+
         </div>
 
         <div className="input-group">
@@ -404,6 +422,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           />
         </div>
 
+        <div className="config-row">
         <div className="input-group">
           <label htmlFor="gc-save">Save file location</label>
           <div className="input-row">
@@ -436,11 +455,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           )}
           {!isNew && sharedLayout && (
             <>
+              <details className="help-details"><summary>How this works</summary>
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
                 This is a shared {gameConsole} memory card — it syncs automatically for
                 the whole console when you play. Use these if you need to sync it
                 on demand, e.g. after editing the card outside EmuSync.
               </p>
+              </details>
               <SyncLine
                 localTime={sync.localSaveTime}
                 serverTime={sync.serverMemcardMeta?.pushed_at ?? null}
@@ -481,12 +502,14 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               </button>
             </div>
             {gameFolderError && <span role="alert" className="error-msg">{gameFolderError}</span>}
+            <details className="help-details"><summary>How this works</summary>
             <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
               This whole folder syncs together when you push/pull this game — any
               update or DLC file placed here rides along automatically. Eden has no
               automatic install for them, so install via Eden's own
               <strong> File &gt; Install Files to NAND...</strong> after they arrive.
             </p>
+            </details>
           </div>
         ) : (
           <div className="input-group">
@@ -519,19 +542,12 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           </div>
         )}
 
-        <div className="input-group">
-          <label htmlFor="gc-launch">Launch command</label>
-          <input id="gc-launch"
-            type="text"
-            value={launchCommand}
-            onChange={(e) => setLaunchCommand(e.target.value)}
-            placeholder="retroarch -L snes.so %ROM%"
-            className={errors.launchCommand ? "error" : ""}
-          />
-          {errors.launchCommand && <span role="alert" className="error-msg">{errors.launchCommand}</span>}
         </div>
 
         {!isNew && (
+          <details className="settings-collapse help-details">
+            <summary>Advanced</summary>
+            <div className="config-form" style={{ marginTop: 12 }}>
           <div className="input-group">
             <label>Steam</label>
             <div className="input-row" style={{ alignItems: "center", gap: 10 }}>
@@ -550,6 +566,14 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               )}
             </div>
           </div>
+              {(netExtraRef.current.rom_sha256 || netExtraRef.current.rom_rel_path) && (
+                <div style={{ fontSize: 12, color: "var(--text-muted)", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
+                  {netExtraRef.current.rom_rel_path && <><span>ROM path (relative)</span><span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{netExtraRef.current.rom_rel_path}</span></>}
+                  {netExtraRef.current.rom_sha256 && <><span>ROM SHA-256</span><span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{netExtraRef.current.rom_sha256}</span></>}
+                </div>
+              )}
+            </div>
+          </details>
         )}
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -614,9 +638,12 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               <button className="btn btn-danger" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
             ))}
           </div>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <><span className="spinner" /> Saving…</> : "✓ Save"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {justSaved && <span style={{ fontSize: 12, color: "var(--green)" }}>✓ Saved</span>}
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? <><span className="spinner" /> Saving…</> : "✓ Save"}
+            </button>
+          </div>
         </div>
       </div>
 
