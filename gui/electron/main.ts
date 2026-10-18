@@ -3,6 +3,7 @@
 // This file only wires things together: it registers every domain's IPC
 // handlers and owns the app lifecycle. The actual logic lives in the
 // per-domain modules imported below (see runtime.ts for the shared state).
+import "./migrate"; // must run first: moves a legacy ~/.emusync before any module reads paths (#564)
 import { app, BrowserWindow } from "electron";
 import { rt } from "./runtime";
 import { createWindow } from "./window";

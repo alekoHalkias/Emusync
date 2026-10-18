@@ -247,7 +247,7 @@ Shows the current lock and save status for every managed game. Useful for checki
 
 **WSL2 display issues** — the GUI requires a display server. Make sure `DISPLAY=:0` is set in your environment. The dev script handles this automatically.
 
-**Stale database after an update** — if you see a database error after pulling a new version, delete the old DB and restart: `rm ~/.emusync/emusync.db`. Your game list will need to be re-added but your ROM and save files are untouched.
+**Stale database after an update** — if you see a database error after pulling a new version, delete the old DB and restart: `rm ~/.local/share/emusync/emusync.db`. Your game list will need to be re-added but your ROM and save files are untouched.
 
 ---
 
@@ -258,9 +258,10 @@ Shows the current lock and save status for every managed game. Useful for checki
    ```bash
    rm -rf /path/to/Emusync
    ```
-3. Delete EmuSync's data folder (saves the server has stored, config, database):
+3. Delete EmuSync's folders (saves the server has stored, config, database, caches). On Linux:
    ```bash
-   rm -rf ~/.emusync
+   rm -rf ~/.config/emusync ~/.local/share/emusync ~/.cache/emusync
    ```
+   (Older versions used `~/.emusync`; it's migrated automatically on first run, but remove it too if it's still there.)
 
-That's everything. No system files are written outside the repo and `~/.emusync`.
+That's everything. No system files are written outside the repo and those folders.

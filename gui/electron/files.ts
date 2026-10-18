@@ -3,6 +3,7 @@
 import { ipcMain, dialog } from "electron";
 import { existsSync, writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, renameSync } from "fs";
 import { homedir } from "os";
+import { dataDir } from "./paths";
 import { join, dirname, basename, extname } from "path";
 import { rt } from "./runtime";
 
@@ -62,14 +63,14 @@ export function registerFilesIpc(): void {
   );
 
   // PS2 per-game last-played from PCSX2's playtime.dat (issue #301). `emusync run`
-  // learns each game's disc serial into ~/.emusync/ps2_serials.json; here we join
+  // learns each game's disc serial into <data dir>/ps2_serials.json; here we join
   // that with the live playtime.dat (serial → last-played) so the game list can
   // show a real per-game date despite the shared memory card. Returns {slug: ISO}.
   ipcMain.handle("files:get-ps2-last-played", (): Record<string, string> => {
     const out: Record<string, string> = {};
     try {
       const home = homedir();
-      const mapPath = join(home, ".emusync", "ps2_serials.json");
+      const mapPath = join(dataDir(), "ps2_serials.json");
       if (!existsSync(mapPath)) return out;
       const map = JSON.parse(readFileSync(mapPath, "utf-8")) as Record<string, string>;
 

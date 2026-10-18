@@ -87,7 +87,7 @@ def _load_cached_game_device(cfg, game_slug: str) -> Optional[GameDeviceConfig]:
 
 
 def _log_offline_play(cfg, game_slug: str, started_at: str, ended_at: str, save_path: str) -> None:
-    """Append a record of an offline play to ~/.emusync/offline_plays.json so a
+    """Append a record of an offline play to <data_dir>/offline_plays.json so a
     later online sync has a timestamped trail for conflict resolution (issue #5)."""
     entry = {"slug": game_slug, "started_at": started_at, "ended_at": ended_at, "offline": True}
     try:

@@ -39,7 +39,7 @@ class _RotatingLogWriter:
     When the file would exceed *max_bytes*, it is rotated: ``server.log`` →
     ``server.log.1`` → ``server.log.2`` … keeping at most *backups* old files.
     Used by :class:`_TimestampedStream` to mirror already-stamped stdout lines to
-    ``~/.emusync/server.log``. Not thread-safe on its own — the caller
+    ``<data_dir>/server.log``. Not thread-safe on its own — the caller
     (``_TimestampedStream``) serializes writes under its own lock.
     """
 
@@ -229,13 +229,13 @@ def _do_start_server() -> None:
         click.echo(
             f"This device is paired to {cfg.server_host} as a client — refusing to start a "
             "local server. To make this device the server instead, clear server_host "
-            "in ~/.emusync/emusync.toml first.",
+            f"in {cfg_module.CONFIG_PATH} first.",
             err=True,
         )
         sys.exit(1)
 
     # Timestamp every line the server writes to stdout (idempotent), and mirror
-    # stdout to a rotating log file at ~/.emusync/server.log (issue #268).
+    # stdout to a rotating log file at <data_dir>/server.log (issue #268).
     log_writer = _install_timestamped_stdout(Path(cfg.data_dir) / "server.log")
 
     # Auto-initialize with preset defaults on first start — no interactive prompt.
@@ -414,3 +414,14 @@ def server_discover_json() -> None:
     from server import mdns as mdns_module
     results = mdns_module.discover(timeout=2.0)
     click.echo(json.dumps([{"name": r.name, "host": r.host, "port": r.port} for r in results]))
+
+
+@cli.command("migrate")
+def migrate() -> None:
+    """Move an old ~/.emusync folder into the config/data/cache dirs (#564).
+    Runs automatically on first config load; the GUI calls it before reading anything."""
+    from server import paths
+    moved = paths.migrate_legacy()
+    click.echo(f"config: {paths.config_dir()}\ndata:   {paths.data_dir()}\ncache:  {paths.cache_dir()}")
+    if moved:
+        click.echo("Migrated from ~/.emusync.")

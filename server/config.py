@@ -6,11 +6,12 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import tomlkit
 
-CONFIG_PATH = Path.home() / ".emusync" / "emusync.toml"
+from server import paths
+
+CONFIG_PATH = paths.config_dir() / "emusync.toml"
 
 
 def _hostname() -> str:
@@ -23,7 +24,7 @@ def _hostname() -> str:
 class Config:
     server_host: str = ""
     server_port: int = 8765
-    data_dir: str = field(default_factory=lambda: str(Path.home() / ".emusync"))
+    data_dir: str = field(default_factory=lambda: str(paths.data_dir()))
     device_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     device_name: str = field(default_factory=_hostname)
     is_server: bool = False
@@ -46,6 +47,7 @@ def _int(value, default: int) -> int:
 
 
 def load() -> Config:
+    paths.migrate_legacy()  # #564: first run after upgrading from ~/.emusync
     if not CONFIG_PATH.exists():
         return Config()
     try:
@@ -65,7 +67,7 @@ def load() -> Config:
     return Config(
         server_host=str(data.get("server_host", "")),
         server_port=_int(data.get("server_port"), 8765),
-        data_dir=str(data.get("data_dir", str(Path.home() / ".emusync"))),
+        data_dir=str(data.get("data_dir", str(paths.data_dir()))),
         device_id=str(data.get("device_id", str(uuid.uuid4()))),
         device_name=str(data.get("device_name", _hostname())),
         is_server=bool(data.get("is_server", False)),

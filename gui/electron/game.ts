@@ -3,7 +3,7 @@ import { ipcMain } from "electron";
 import { spawn } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
-import { homedir } from "os";
+import { dataDir } from "./paths";
 import { SCRIPT, PYTHON, rt } from "./runtime";
 
 export function registerGameIpc(): void {
@@ -40,7 +40,7 @@ export function registerGameIpc(): void {
   ipcMain.handle("game:isRunning", () => rt.gameProcess !== null);
 
   ipcMain.handle("game:stop-external", () => {
-    const gamePidFile = join(homedir(), ".emusync", ".game_pid");
+    const gamePidFile = join(dataDir(), ".game_pid");
     try {
       if (existsSync(gamePidFile)) {
         const lines = readFileSync(gamePidFile, "utf-8").trim().split("\n");
@@ -56,9 +56,9 @@ export function registerGameIpc(): void {
   // Offline fallback game list (issue #383): when the server can't be reached at
   // all, the renderer has nothing to show from GET /games/overview. Build a list
   // from what cli/run.py cached on this device's last online launch of each game
-  // (~/.emusync/game_cache/) so the user can still find and press Play.
+  // (<data dir>/game_cache/) so the user can still find and press Play.
   ipcMain.handle("game:offlineList", () => {
-    const cacheDir = join(homedir(), ".emusync", "game_cache");
+    const cacheDir = join(dataDir(), "game_cache");
     const indexPath = join(cacheDir, "_offline_index.json");
     if (!existsSync(indexPath)) return [];
     let index: Record<string, { name?: string; console?: string }>;
@@ -90,7 +90,7 @@ export function registerGameIpc(): void {
   // renders blank when the server's never been reached — even though the same
   // data is already cached here (same cacheDir game:offlineList reads).
   ipcMain.handle("game:offlineDeviceConfig", (_event, slug: string) => {
-    const cacheDir = join(homedir(), ".emusync", "game_cache");
+    const cacheDir = join(dataDir(), "game_cache");
     const indexPath = join(cacheDir, "_offline_index.json");
     const gdPath = join(cacheDir, `${slug}.json`);
     if (!existsSync(gdPath)) return null;
@@ -110,7 +110,7 @@ export function registerGameIpc(): void {
   });
 
   ipcMain.handle("game:hasPidFile", () => {
-    const gamePidFile = join(homedir(), ".emusync", ".game_pid");
+    const gamePidFile = join(dataDir(), ".game_pid");
     if (!existsSync(gamePidFile)) return false;
     try {
       const pid = parseInt(readFileSync(gamePidFile, "utf-8").trim().split("\n")[0], 10);

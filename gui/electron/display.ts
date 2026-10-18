@@ -1,13 +1,13 @@
 // Big Picture display settings (#499): UI zoom + fullscreen, persisted to
-// ~/.emusync/display.json. Deliberately NOT in emusync.toml — server/config.py's
+// <config dir>/display.json. Deliberately NOT in emusync.toml — server/config.py's
 // save() rebuilds that file from its dataclass and would drop unknown keys.
 import { BrowserWindow, ipcMain } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname, join } from "path";
-import { homedir } from "os";
+import { configDir } from "./paths";
 import { rt } from "./runtime";
 
-const DISPLAY_PATH = join(homedir(), ".emusync", "display.json");
+const DISPLAY_PATH = join(configDir(), "display.json");
 const SCALES = [1, 1.25, 1.5, 2];
 
 interface Display { scale: number; fullscreen: boolean; bigPicture: boolean }

@@ -4,7 +4,7 @@
 import { ipcMain } from "electron";
 import { createWriteStream, existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { dataDir, cacheDir } from "./paths";
 import https from "https";
 import { parse as parseTOML } from "smol-toml";
 import type SGDBImport from "steamgriddb";
@@ -23,8 +23,10 @@ async function loadSGDB(): Promise<typeof SGDBImport> {
   return SGDBCtor;
 }
 
-export const ART_DIR = join(homedir(), ".emusync", "art");
-const CONSOLE_DIR    = join(homedir(), ".emusync", "art", "consoles");
+// Per-game art can be user-picked, so it lives in data; console icons/logos are
+// re-downloadable, so they live in cache.
+export const ART_DIR = join(dataDir(), "art");
+const CONSOLE_DIR    = join(cacheDir(), "consoles");
 
 // EmuSync console key → libretro-thumbnails system folder name (used for boxart)
 const LIBRETRO_SYSTEM: Record<string, string> = {
@@ -259,7 +261,7 @@ export function registerArtIpc(): void {
       try {
         // One folder per console, one subfolder per game (issue #304 follow-up),
         // one file per artwork type within it (issue #324) — e.g.
-        // ~/.emusync/art/gba/pokemon-emerald/grid.png. Each type is cached
+        // <data dir>/art/gba/pokemon-emerald/grid.png. Each type is cached
         // independently and permanently once fetched; switching a console's
         // configured type never deletes another type's cached file, it just
         // changes which one this device looks for/fetches next.

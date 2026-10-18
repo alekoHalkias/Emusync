@@ -71,7 +71,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const [justSaved, setJustSaved] = useState(false);
   const [loadError, setLoadError] = useState("");
   // True when the form was populated from this device's local offline cache
-  // (~/.emusync/game_cache/) instead of a live server fetch (#464).
+  // (<data dir>/game_cache/) instead of a live server fetch (#464).
   const [offlineData, setOfflineData] = useState(false);
   // Switch games sync their whole containing folder, not a states folder —
   // Eden has no save-state feature at all (#441). Derived from romPath, not
