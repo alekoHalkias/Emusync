@@ -6,6 +6,7 @@ Run:  .venv/bin/python -m pytest tests/ -v
 """
 from __future__ import annotations
 
+import os
 import socket
 import tempfile
 import threading
@@ -19,6 +20,13 @@ from httpx import ASGITransport, AsyncClient
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Isolate every test run from the developer's real config/data (and from the
+# ~/.emusync migration, which is skipped whenever an override is set) — must
+# happen before server.config computes CONFIG_PATH at import (#564).
+_ISOLATED = tempfile.mkdtemp(prefix="emusync-tests-")
+for _k in ("CONFIG", "DATA", "CACHE"):
+    os.environ.setdefault(f"EMUSYNC_{_k}_DIR", os.path.join(_ISOLATED, _k.lower()))
 
 from server import api as api_module
 from server.store import Store

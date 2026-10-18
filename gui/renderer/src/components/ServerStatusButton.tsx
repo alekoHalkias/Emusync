@@ -459,7 +459,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                 <span>Server port</span>
                 <span style={{ fontFamily: "monospace" }}>{pairPort}</span>
                 <span>Config file</span>
-                <span style={{ fontFamily: "monospace" }}>~/.emusync/emusync.toml</span>
+                <span style={{ fontFamily: "monospace" }}>emusync.toml (in the config folder)</span>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button

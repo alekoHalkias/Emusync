@@ -10,7 +10,7 @@
 import { ipcMain } from "electron";
 import { existsSync, readFileSync, writeFileSync, statSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { cacheDir } from "./paths";
 import { spawn } from "child_process";
 import { SCRIPT, PYTHON } from "./runtime";
 
@@ -21,7 +21,7 @@ const TITLEDB_URL = "https://raw.githubusercontent.com/blawar/titledb/master/US.
 // slug->titleId map before being written to disk. Only the very first lookup
 // ever pays the big download; every later one (any device, any run) reads the
 // small cached file below until it's 30 days old.
-const CACHE_PATH = join(homedir(), ".emusync", "switch_titledb.json");
+const CACHE_PATH = join(cacheDir(), "switch_titledb.json");
 const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Local since electron/ doesn't share code with gui/renderer/src's helpers.ts.

@@ -1,4 +1,4 @@
-// Config file (~/.emusync/emusync.toml) reading/writing.
+// Config file (<config dir>/emusync.toml) reading/writing.
 //   - config:* IPC handlers used by the renderer
 //   - loadServerCfg(): the {host, port, authHeaders} every networked handler needs
 import { ipcMain, dialog } from "electron";

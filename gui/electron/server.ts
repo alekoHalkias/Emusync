@@ -3,7 +3,8 @@ import { ipcMain } from "electron";
 import { spawn } from "child_process";
 import { existsSync, readFileSync, unlinkSync } from "fs";
 import { join } from "path";
-import { homedir, networkInterfaces } from "os";
+import { networkInterfaces } from "os";
+import { dataDir } from "./paths";
 import { parse as parseTOML } from "smol-toml";
 import { CONFIG_PATH, SCRIPT, PYTHON, rt } from "./runtime";
 import { writeConfig } from "./config-store";
@@ -109,7 +110,7 @@ export function startServerProcess(): Promise<{ ok: boolean; error?: string }> {
 }
 
 export function killServerByPid(): void {
-  const pidFile = join(homedir(), ".emusync", ".server_pid");
+  const pidFile = join(dataDir(), ".server_pid");
   try {
     if (existsSync(pidFile)) {
       const pid = parseInt(readFileSync(pidFile, "utf-8").trim(), 10);
@@ -117,7 +118,7 @@ export function killServerByPid(): void {
       unlinkSync(pidFile);
     }
   } catch {}
-  try { unlinkSync(join(homedir(), ".emusync", ".server_token")); } catch {}
+  try { unlinkSync(join(dataDir(), ".server_token")); } catch {}
 }
 
 export function killOrphanServers(): Promise<void> {

@@ -9,9 +9,9 @@ import type { ChildProcess } from "child_process";
 import type { BrowserWindow } from "electron";
 import { existsSync } from "fs";
 import { join, dirname } from "path";
-import { homedir } from "os";
+import { CONFIG_PATH } from "./paths";
 
-export const CONFIG_PATH = join(homedir(), ".emusync", "emusync.toml");
+export { CONFIG_PATH };
 export const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../../../emusync.py");
 export const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
   const win = process.platform === "win32";

@@ -59,7 +59,7 @@ def device_connect(host: str | None, port: int | None, pin: str) -> None:
     cfg.server_port = port
     cfg.server_pin = pin
     cfg_module.save(cfg)
-    click.echo("Connected. Settings saved to ~/.emusync/emusync.toml")
+    click.echo(f"Connected. Settings saved to {cfg_module.CONFIG_PATH}")
 
 
 @device.command("list")

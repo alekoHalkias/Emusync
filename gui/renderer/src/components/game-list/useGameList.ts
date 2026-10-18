@@ -13,7 +13,7 @@ export type UseGameList = {
 };
 
 // Instant warm-start cache (issue #410) — a plain localStorage entry, not one of
-// the ~/.emusync/ files: this is a pure GUI paint-speed concern (skip the
+// the data-dir files: this is a pure GUI paint-speed concern (skip the
 // loading spinner while the poll below silently reconciles), not cross-process
 // state the CLI needs to see. Bump the version suffix if GameRow's shape
 // changes incompatibly.
