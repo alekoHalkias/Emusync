@@ -427,7 +427,10 @@ export function registerSteamIpc(): void {
         return { ok: false, error: `Failed to read shortcuts.vdf: ${e.message || e}` };
       }
 
-      const appid = shortcutAppId(launcherExe, gameName);
+      // Hash the slug, not the launcher path: the path differs per device, and a
+      // shared appid is what lets Steam offer "Stream" from the other machine's
+      // shortcut of the same game as one library entry (#568).
+      const appid = shortcutAppId(`emusync:${slug}`, gameName);
       // shortcuts.vdf stores the same 32 bits as a signed int32.
       const signedAppid = appid > 0x7fffffff ? appid - 0x100000000 : appid;
       const artSrcDir = join(ART_DIR, consoleKey, slug);
