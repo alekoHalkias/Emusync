@@ -28,7 +28,7 @@ from server.store.models import SaveMeta
 
 # How many generations to retain per game, per blob table. Older rows (and their
 # on-disk files) are pruned on every push.
-HISTORY_LIMIT = 20
+HISTORY_LIMIT = 5
 
 # A current blob that shrank below this fraction of the generation before it is
 # treated as truncated (a crashed/SIGKILLed emulator signal). Mirrors
