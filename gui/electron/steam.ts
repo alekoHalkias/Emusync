@@ -20,7 +20,7 @@
 import { ipcMain } from "electron";
 import { spawn } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync, copyFileSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, basename } from "path";
 import { homedir, platform } from "os";
 import shortcutEditor from "steam-shortcut-editor";
 import { SCRIPT } from "./runtime";
@@ -137,7 +137,10 @@ const stripQuotes = (v: unknown): string => (typeof v === "string" ? v.replace(/
  * steam:addGame's upsert/dedup, steam:isAdded, and steam:addedSlugs so they
  * can never disagree about what counts as ours. */
 function ourSlug(s: SteamShortcut, launcherExe: string): string | null {
-  if (stripQuotes(propCI(s, "exe")) !== launcherExe) return null;
+  // Compare the launcher's file name, not its full path: the checkout/AppImage
+  // mount dir differs per device and per run, so a full-path match reports
+  // games as "not in Steam" whenever the shortcut was added from elsewhere.
+  if (basename(stripQuotes(propCI(s, "exe"))) !== basename(launcherExe)) return null;
   const m = stripQuotes(propCI(s, "LaunchOptions")).match(/^run (.+)$/);
   return m ? m[1] : null;
 }
