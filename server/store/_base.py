@@ -27,13 +27,6 @@ class StoreBase:
         self._chunk_dir = self._blob_dir / "chunks"
         self._chunk_dir.mkdir(parents=True, exist_ok=True)
 
-    def _chunk_status_path(self) -> Path:
-        """SQLite file path for chunk progress tracking."""
-        return self._conn.path  # Return the actual DB path for chunk_progress table
-        # Chunked uploads for issue #576
-        self._chunk_dir = self._blob_dir / "chunks"
-        self._chunk_dir.mkdir(parents=True, exist_ok=True)
-
         is_fresh = not db_path.exists()
         # Per-thread connections; PRAGMAs (WAL, synchronous, foreign_keys) are
         # applied to each connection as it is created (see connection.py).
@@ -53,3 +46,7 @@ class StoreBase:
         if db_version < _SCHEMA_VERSION:
             _migrate(self._conn, db_version, self._blob_dir)
         self._conn.commit()
+
+    def _chunk_status_path(self) -> Path:
+        """SQLite file path for chunk progress tracking."""
+        return self._conn.path
