@@ -350,9 +350,64 @@ class SaveStateMixin:
     # unchanged), while every push also records a retained copy in history,
     # mirroring saves/states' per-game HISTORY_LIMIT-generation model.
 
+    # ── console memcard helpers ─────────────────────────────────────────────────
+    # Detect file vs folder uploads (issue #241) — Dolphin uses tar archives for
+    # folder-based memcards ("GCIFolder" format), while files are used for other
+    # card formats. We handle both by storing folders as tar.zst archives and
+    # rehydrating them on pull via _write_memcard (#239).
+
+    # ── console memcard helpers ─────────────────────────────────────────────────
+    _CONSOLE_MEMCARD_ARCH_EXT = ".memcard.tar.zst"
+
+    def _is_folder_upload(self, src: Path) -> bool:
+        """Detect folder-based memcards (tar archives from Dolphin's GCIFolder format)."""
+        return src.suffix.lower() in (".tar", ".tar.gz", ".tgz", ".tar.zst")
+
+    def _archive_memcard_folder(self, folder: Path) -> tuple[Path, str, int]:
+        """Tar and compress a memcard folder to a single archive.
+
+        Returns (path, hash, size). The tar is created in memory then written
+        to a temp file for hashing; this ensures we hash the actual archived
+        bytes, not the uncompressed folder.
+        """
+        import tarfile
+        from io import BytesIO
+
+        buf = BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+            for item in sorted(folder.iterdir()):
+                arcname = (item.relative_to(folder)).as_posix()
+                tf.add(item, arcname=arcname)
+        buf.seek(0)
+
+        tmp = self.new_upload_path()
+        with open(tmp, "wb") as f:
+            f.write(buf.getvalue())
+        return tmp, hashlib.sha256(buf.getvalue()).hexdigest(), len(buf.getvalue())
+
+    def _extract_memcard_archive(self, archive: Path, dest: Path) -> None:
+        """Extract a memcard tar archive to the destination folder."""
+        import tarfile
+        with tarfile.open(archive, "r:gz") as tf:
+            # Extract to a temp location first
+            tmp = dest.with_suffix(".tmp")
+            tmp.mkdir(parents=True, exist_ok=True)
+            tf.extractall(tmp)
+            # Move contents to destination
+            for item in tmp.iterdir():
+                if item.name != ".":
+                    shutil.move(item, dest / item.name)
+            tmp.rmdir()
+
+    # ── console memcard push (file or folder) ───────────────────────────────────
+
     def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int,
                                 card_format: str = "") -> dict:
         """Store a console's shared memory card, overwriting the previous copy.
+
+        Supports both file uploads (MemoryCard format) and folder uploads
+        (GCIFolder format from Dolphin). Folder uploads are archived to tar.zst
+        before storage (#241).
 
         `card_format` is the pushing device's configured memory-card storage
         format (e.g. Dolphin's "MemoryCard"/"GCIFolder" — issue #428), recorded
@@ -360,17 +415,26 @@ class SaveStateMixin:
         card layouts together. Empty for consoles without multiple formats.
         """
         now = datetime.now(timezone.utc).isoformat()
+
+        # Archive folder-based uploads
+        is_folder = self._is_folder_upload(src)
+        if is_folder:
+            src, h, size = self._archive_memcard_folder(src)
+
         row = self._conn.execute(
             "SELECT device_id, hash, pushed_at, size, card_format FROM console_saves WHERE console_key = ?",
             (console_key,),
         ).fetchone()
         if row and row["hash"] == h:
-            Path(src).unlink(missing_ok=True)  # identical content — keep what's there
-            return dict(row)
+            return dict(row)  # identical content — return existing metadata
+
+        # Record in history before moving into live slot
         self._push_console_history_row(console_key, device_id, h, size, now, card_format, src)
+
         dest = self._blob_path("console_saves", console_key)
         dest.parent.mkdir(parents=True, exist_ok=True)
         os.replace(src, dest)
+
         self._conn.execute(
             "INSERT INTO console_saves (console_key, device_id, hash, pushed_at, size, card_format) "
             "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(console_key) DO UPDATE SET "
@@ -382,14 +446,39 @@ class SaveStateMixin:
         return {"device_id": device_id, "hash": h, "pushed_at": now, "size": size, "card_format": card_format}
 
     def pull_console_save_path(self, console_key: str) -> tuple[Optional[Path], Optional[dict]]:
-        """The console's shared-card on-disk path + meta, or (None, None)."""
+        """Pull the console's shared-card.
+
+        Returns (path, meta). For folder uploads (GCIFolder format), the path
+        points to a temporary directory with extracted contents; callers should
+        delete it on error. For file uploads, returns the single file path.
+        """
         meta = self.get_console_save_meta(console_key)
         if meta is None:
             return None, None
-        path = self._blob_path("console_saves", console_key)
-        if not path.exists():
-            return None, None
-        return path, meta
+        dest = self._blob_path("console_saves", console_key)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        # Check for folder-based uploads (stored as tar archives)
+        if dest.suffix in (".tar.gz", ".tgz"):
+            archive_ext = "gz" if dest.suffix == ".tar.gz" else "gz"
+            try:
+                import tarfile
+                tmp = dest.with_suffix(".tmp")
+                with tarfile.open(dest, f"r:{archive_ext}") as tf:
+                    # Extract to temp location first
+                    tmp.mkdir(parents=True, exist_ok=True)
+                    tf.extractall(tmp)
+                    # Move contents to destination
+                    for item in tmp.iterdir():
+                        if item.name != ".":
+                            shutil.move(item, dest / item.name)
+                    tmp.rmdir()
+                return dest, meta
+            except tarfile.TarError:
+                # Not a valid tar archive — treat as single file
+                pass
+
+        return dest, meta
 
     def get_console_save_meta(self, console_key: str) -> Optional[dict]:
         row = self._conn.execute(
