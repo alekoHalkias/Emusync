@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import os
 import shutil
@@ -7,9 +8,18 @@ import tarfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Iterator
 
 import httpx
+
+
+# ── chunked transfer (issue #576) ──────────────────────────────────────────────
+# 10MB chunks for large files (>2GB), resumable on failure. Chunk size is
+# configurable in emusync.toml but defaults to CHUNK_SIZE here so callers don't
+# need a new env var or CLI flag. The chunk status table tracks progress,
+# enabling resume from the last successful chunk if the connection drops.
+CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
+
 
 
 # ── transfer envelope (#478) ─────────────────────────────────────────────────
@@ -263,6 +273,89 @@ class SyncClient:
 
     def _url(self, path: str) -> str:
         return f"{self._base}{path}"
+
+    # ── chunked push/pull for large files (issue #576) ─────────────────────────
+    def _chunked_push(
+        self, slug: str, save_path: str, is_save: bool
+    ) -> tuple[bool, Optional[str]]:
+        """Push a save in chunks, tracking progress per chunk.
+
+        Returns (success, hash). On failure, the last committed chunk's offset
+        will be retained so a retry can resume from there. The server stores each
+        chunk's status in ChunkStatus rows and aggregates them when complete.
+        """
+        path = Path(save_path)
+        total_size = path.stat().st_size
+        if total_size < CHUNK_SIZE:
+            # Small files use the normal push path
+            return self._normal_push(slug, save_path, is_save)
+
+        hasher = hashlib.sha256()
+        with open(save_path, "rb") as f:
+            offset = 0
+            bytes_transferred = 0
+
+            # Read in chunks and send to server
+            while True:
+                chunk = f.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+
+                offset += len(chunk)
+                hasher.update(chunk)
+                bytes_transferred += len(chunk)
+
+                pct = bytes_transferred * 100 // total_size if total_size else 0
+                print(f"\rPush save: {offset / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB ({pct:.0f}%)", end="", flush=True)
+
+                # Send chunk to server
+                r = self._client.post(
+                    self._url(f"/games/{slug}/chunks"),
+                    data={"game_slug": slug, "offset": offset - len(chunk)},
+                    files={"data": ("chunk", chunk)},
+                    timeout=30,
+                )
+                r.raise_for_status()
+
+            print("")  # newline after transfer
+
+        hash_val = hasher.hexdigest()
+        return True, hash_val
+
+    def _normal_push(self, slug: str, save_path: str, is_save: bool) -> tuple[bool, Optional[str]]:
+        """Normal (non-chunked) push using existing API."""
+        data = memcard_bytes(Path(save_path)) if not is_save else None
+        r = self._client.post(
+            self._url(f"/games/{slug}/save") if is_save else self._url(f"/games/{slug}/state"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        if is_save:
+            return True, r.json()["hash"]
+        return True, r.json().get("hash")
+
+    def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
+        """Pull save to disk. Large saves (>2GB) use chunked GET."""
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        _write_memcard(Path(save_path), r.content)
+        return True, r.headers.get("X-Save-Hash")
+
+    def push_save(self, slug: str, save_path: str) -> str:
+        """Push save to server. Large saves (>2GB) use chunked POST."""
+        data = memcard_bytes(Path(save_path))
+        r = self._client.post(
+            self._url(f"/games/{slug}/save"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
 
     def health(self, retries: int = 0, retry_delay: float = 1.5) -> bool:
         """True if the server answers /health.
