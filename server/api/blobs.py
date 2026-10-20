@@ -365,7 +365,7 @@ def restore_console_memcard(console_key: str, req: RestoreRequest, device_id: st
 # in SQLite. Server reassembles committed chunks into the final blob on GET
 # /games/{slug}/save when no current version exists.
 
-_CHUNK_SIZE = int(_get_store().get_setting("chunk_size", 10 * 1024 ** 2))
+_CHUNK_SIZE: int = 10 * 1024 ** 2  # default; will be set by store init if configured
 
 
 class ChunkUploadRequest(BaseModel):
