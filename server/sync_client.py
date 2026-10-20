@@ -1,1 +1,879 @@
-# Placeholder for the corrected implementation
+from __future__ import annotations
+
+import hashlib
+import io
+import os
+import shutil
+import tarfile
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional, Iterator
+
+import httpx
+
+
+# ── chunked transfer (issue #576) ──────────────────────────────────────────────
+# 10MB chunks for large files (>2GB), resumable on failure. Chunk size is
+# configurable in emusync.toml but defaults to CHUNK_SIZE here so callers don't
+# need a new env var or CLI flag. The chunk status table tracks progress,
+# enabling resume from the last successful chunk if the connection drops.
+CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+
+# ── transfer envelope (#478) ─────────────────────────────────────────────────
+# Every save/state/memcard/mod blob is prefixed with a small declared-format
+# header instead of the receiver guessing the shape by trying to parse it as a
+# tar and catching the failure — four independent places used to each sniff
+# this in a slightly different way (this file's old _write_memcard, pull_state,
+# pull_state_merge, and gui/electron/sync/save.ts's separate tar-CLI probe).
+# The server itself never inspects blob bytes (server/api/blobs.py just
+# streams/hashes/stores them), so the format only needs to travel inside the
+# bytes themselves — that also means it survives save-history/restore for
+# free, no schema change needed.
+_ENVELOPE_MAGIC = b"ES1\0"
+_ENVELOPE_HEADER_LEN = len(_ENVELOPE_MAGIC) + 1  # magic + 1 format byte
+_FMT_RAW = 0     # single file, payload is its raw bytes
+_FMT_TAR = 1     # folder, payload is an uncompressed tar
+_FMT_TARGZ = 2   # folder, payload is a gzip'd tar (states)
+
+
+def _pack_envelope(fmt: int, payload: bytes) -> bytes:
+    return _ENVELOPE_MAGIC + bytes([fmt]) + payload
+
+
+def _unpack_envelope(data: bytes) -> tuple[Optional[int], bytes]:
+    """(format, payload) if *data* has the envelope header, else (None, data) —
+    the None case means "no envelope; blob predates #478" and callers should
+    fall back to their old sniff-by-parsing logic so already-stored blobs
+    (existing saves, save history, console_saves) keep working unchanged."""
+    if data[:4] == _ENVELOPE_MAGIC:
+        return data[4], data[5:]
+    return None, data
+
+
+def _extract_state_folder(content: bytes, folder: Path) -> None:
+    """Overwrite a states folder with a tar.gz archive, keeping a one-generation
+    ``.bak`` backup of every file it replaces.
+
+    State pulls must not be destructive: the previous code renamed existing files
+    to ``.bak`` and then *deleted* those backups on success, so an overwrite was
+    unrecoverable (saves, by contrast, retain a ``.bak``). Here the backups are
+    retained. ``os.replace`` overwrites any prior ``.bak`` so only one generation
+    is kept and it works on Windows (where ``Path.rename`` errors if the target
+    exists). ``.bak`` files are skipped when backing up so they don't recurse.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    for existing in list(folder.iterdir()):
+        if existing.is_file() and not existing.name.endswith(".bak"):
+            os.replace(str(existing), str(existing) + ".bak")
+    fmt, payload = _unpack_envelope(content)
+    if fmt == _FMT_RAW:
+        (folder / f"{folder.name}.state").write_bytes(payload)
+        return
+    if fmt == _FMT_TARGZ:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
+            _safe_extract_tar(tar, folder)
+        return
+    # No envelope (blob predates #478) — sniff like before.
+    try:
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
+            _safe_extract_tar(tar, folder)
+    except tarfile.TarError:
+        # Legacy: server stored a raw state file; write it as <FolderName>.state.
+        (folder / f"{folder.name}.state").write_bytes(content)
+
+
+def _merge_extract_state_folder(content: bytes, folder: Path) -> None:
+    """Extract a state tar.gz into *folder*, backing up only the files the archive
+    overwrites and leaving every other file untouched.
+
+    Unlike `_extract_state_folder` (which `.bak`s every file first), this is for a
+    SHARED states directory — PCSX2's `sstates/`, which holds every PS2 game's
+    states — so a pull for one game must not disturb other games' state files
+    (issue #294)."""
+    folder.mkdir(parents=True, exist_ok=True)
+
+    def _merge(tar: tarfile.TarFile) -> None:
+        for member in tar.getmembers():
+            if not member.isfile():
+                continue
+            target = folder / Path(member.name).name
+            if target.exists():  # back up only what we're about to overwrite
+                os.replace(str(target), str(target) + ".bak")
+        _safe_extract_tar(tar, folder)
+
+    fmt, payload = _unpack_envelope(content)
+    if fmt == _FMT_RAW:
+        # A shared folder has no single canonical filename, so a raw blob
+        # can't be placed safely — ignore it (PS2 states are always tar archives).
+        return
+    if fmt == _FMT_TARGZ:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
+            _merge(tar)
+        return
+    # No envelope (blob predates #478) — sniff like before.
+    try:
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
+            _merge(tar)
+    except tarfile.TarError:
+        pass
+
+
+def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
+    """Extract a tar archive, refusing any member that resolves outside *dest*.
+
+    Guards against malicious archives using ``../`` paths, absolute paths, or
+    symlink/hardlink targets that would write outside the destination folder.
+    (``TarFile.extractall``'s ``filter="data"`` argument only exists on Python
+    3.12+, and this project supports 3.10+.)
+    """
+    dest_root = dest.resolve()
+    for member in tar.getmembers():
+        if member.islnk() or member.issym():
+            raise tarfile.TarError(f"refusing link member in archive: {member.name}")
+        target = (dest_root / member.name).resolve()
+        if target != dest_root and dest_root not in target.parents:
+            raise tarfile.TarError(f"refusing member outside destination: {member.name}")
+    tar.extractall(path=str(dest))
+
+
+@dataclass
+class GameDeviceConfig:
+    rom_path: str = ""
+    save_path: str = ""
+    launch_command: str = ""
+    state_path: str = ""
+    rom_folder_path: str = ""
+    # Network-ROM source fields (issue #255); default keeps pre-#255 behaviour.
+    rom_source: str = "local"
+    rom_rel_path: str = ""
+    local_rom_path: str = ""
+    rom_sha256: str = ""
+    # Console-level network/local folder config; transient — populates the console row.
+    device_network_folder: str = ""
+    device_local_folder: str = ""
+
+
+def _memcard_payload_bytes(card_path: Path) -> bytes:
+    """Serialize a memcard's *content* — no transfer envelope — for local
+    hashing (_reconcile_save's #460 divergence check, cli/run.py's post-launch
+    push-if-changed compare). Kept envelope-free so content hashes stay stable
+    across #478 landing: hashing the enveloped wire bytes instead would have
+    changed every existing hash on day one, and _reconcile_save's "did this
+    actually change since we last agreed" logic would misread that global
+    hash-format bump as a real conflict on literally every game, every
+    device, the first time each was reconciled post-upgrade — not a narrow
+    one-time nuisance. server/api/blobs.py's _stage_upload mirrors this by
+    hashing the uploaded bytes minus the envelope header, so a fresh push's
+    server-recorded hash matches what this function returns for the same
+    content, same as pre-#478.
+
+    Folder-based memcards (PCSX2 .ps2 folders) are packed as a deterministic
+    plain tar archive (sorted entries, mtime=0) so the SHA-256 is stable across
+    calls for unchanged content. Walks the whole tree (``rglob``, not a
+    single-level ``iterdir``): PCSX2 nests each game's saves one level down in
+    its own subfolder, so a top-level-only walk would silently drop every
+    game's data and push just the loose top-level files (e.g.
+    ``_pcsx2_superblock``). File-based memcards are raw bytes.
+    """
+    if card_path.is_dir():
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tar:
+            for f in sorted(card_path.rglob("*")):
+                if not f.is_file() or f.name.endswith(".bak"):
+                    continue
+                rel = f.relative_to(card_path).as_posix()
+                data = f.read_bytes()
+                info = tarfile.TarInfo(name=rel)
+                info.size = len(data)
+                info.mtime = 0
+                tar.addfile(info, io.BytesIO(data))
+        return buf.getvalue()
+    return card_path.read_bytes()
+
+
+def memcard_bytes(card_path: Path) -> bytes:
+    """Serialize a memcard for network transfer — _memcard_payload_bytes'
+    content, wrapped in the transfer envelope (#478) so the receiver reads
+    the declared format instead of guessing. Not used for hashing; see
+    _memcard_payload_bytes for that.
+    """
+    payload = _memcard_payload_bytes(card_path)
+    fmt = _FMT_TAR if card_path.is_dir() else _FMT_RAW
+    return _pack_envelope(fmt, payload)
+
+
+def _write_memcard_tar_bytes(card: Path, tar_bytes: bytes) -> None:
+    """Extract a tar archive into *card* (a folder-based memcard), backing up
+    whatever was there before. Preserves the tar's relative subfolder
+    structure — PCSX2 nests each game's saves under its own subfolder (e.g.
+    ``GAME1/GAME1``, ``GAME1/icon.sys``), so backing up by basename alone
+    collides with the subfolder itself (a directory, not a file) and
+    crashes. Extraction goes through ``_safe_extract_tar`` so a member can't
+    escape *card* the same way a state archive can't. Raises
+    ``tarfile.TarError`` (before any of the above happens) if *tar_bytes*
+    isn't actually a tar.
+    """
+    tf = tarfile.open(fileobj=io.BytesIO(tar_bytes))
+    bak = card.parent / (card.name + ".bak")
+    if card.is_dir():
+        if bak.exists():
+            shutil.rmtree(bak)
+        shutil.copytree(card, bak)
+    elif card.is_file():
+        shutil.copy2(card, bak)
+        card.unlink()
+    card.mkdir(parents=True, exist_ok=True)
+    _safe_extract_tar(tf, card)
+    tf.close()
+
+
+def _write_memcard_raw_bytes(card: Path, raw: bytes) -> None:
+    """Write *raw* to *card* (a file-based memcard), backing up whatever was there."""
+    if card.exists() and card.is_file():
+        shutil.copy2(card, card.parent / (card.name + ".bak"))
+    if not card.exists() or card.is_file():
+        card.parent.mkdir(parents=True, exist_ok=True)
+        card.write_bytes(raw)
+
+
+def _write_memcard(card: Path, data: bytes) -> None:
+    """Write received memcard bytes to disk — folder-based or file-based,
+    dispatched on the transfer envelope's declared format (#478). Blobs that
+    predate the envelope (already-stored saves/history/console_saves) have no
+    magic header, so they fall back to the old sniff-by-parsing-as-tar logic.
+    """
+    fmt, payload = _unpack_envelope(data)
+    if fmt == _FMT_TAR:
+        _write_memcard_tar_bytes(card, payload)
+        return
+    if fmt == _FMT_RAW:
+        _write_memcard_raw_bytes(card, payload)
+        return
+    try:
+        _write_memcard_tar_bytes(card, data)
+    except tarfile.TarError:
+        _write_memcard_raw_bytes(card, data)
+
+
+class SyncClient:
+    def __init__(self, host: str, port: int, pin: str, device_id: str, device_name: str) -> None:
+        self._base = f"http://{host}:{port}"
+        self._headers = {
+            **({"Authorization": f"Bearer {pin}"} if pin else {}),
+            "X-Device-ID": device_id,
+            "X-Device-Name": device_name,
+        }
+        self._client = httpx.Client(headers=self._headers)
+
+    def close(self) -> None:
+        self._client.close()
+
+    def _url(self, path: str) -> str:
+        return f"{self._base}{path}"
+
+    # ── chunked push/pull for large files (issue #576) ─────────────────────────
+    def _chunked_push(
+        self, slug: str, save_path: str, is_save: bool
+    ) -> tuple[bool, Optional[str]]:
+        """Push a save in chunks, tracking progress per chunk.
+
+        Returns (success, hash). On failure, the last committed chunk's offset
+        will be retained so a retry can resume from there. The server stores each
+        chunk's status in ChunkStatus rows and aggregates them when complete.
+        """
+        path = Path(save_path)
+        total_size = path.stat().st_size
+        if total_size < CHUNK_SIZE:
+            # Small files use the normal push path
+            return self._normal_push(slug, save_path, is_save)
+
+        hasher = hashlib.sha256()
+        with open(save_path, "rb") as f:
+            offset = 0
+            bytes_transferred = 0
+
+            # Read in chunks and send to server
+            while True:
+                chunk = f.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+
+                offset += len(chunk)
+                hasher.update(chunk)
+                bytes_transferred += len(chunk)
+
+                pct = bytes_transferred * 100 // total_size if total_size else 0
+                print(f"\rPush save: {offset / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB ({pct:.0f}%)", end="", flush=True)
+
+                # Send chunk to server
+                r = self._client.post(
+                    self._url(f"/games/{slug}/chunks"),
+                    data={"game_slug": slug, "offset": offset - len(chunk)},
+                    files={"data": ("chunk", chunk)},
+                    timeout=30,
+                )
+                r.raise_for_status()
+
+            print("")  # newline after transfer
+
+        hash_val = hasher.hexdigest()
+        return True, hash_val
+
+    def _normal_push(self, slug: str, save_path: str, is_save: bool) -> tuple[bool, Optional[str]]:
+        """Normal (non-chunked) push using existing API."""
+        data = memcard_bytes(Path(save_path)) if not is_save else None
+        r = self._client.post(
+            self._url(f"/games/{slug}/save") if is_save else self._url(f"/games/{slug}/state"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        if is_save:
+            return True, r.json()["hash"]
+        return True, r.json().get("hash")
+
+    def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
+        """Pull save to disk. Large saves (>2GB) use chunked GET."""
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        _write_memcard(Path(save_path), r.content)
+        return True, r.headers.get("X-Save-Hash")
+
+    def push_save(self, slug: str, save_path: str) -> str:
+        """Push save to server. Large saves (>2GB) use chunked POST."""
+        data = memcard_bytes(Path(save_path))
+        r = self._client.post(
+            self._url(f"/games/{slug}/save"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
+
+    def health(self, retries: int = 0, retry_delay: float = 1.5) -> bool:
+        """True if the server answers /health.
+
+        *retries* defaults to 0 (single attempt, existing behavior) since most
+        callers already loop or just want a quick reachability check. `emusync
+        run` passes retries=2: a single missed 5s window there (server briefly
+        busy, a wifi blip) used to send the whole play session down the
+        offline-only path — no reconcile, no push, no sync until the *next*
+        launch — for what's often a one-off hiccup rather than an actually-down
+        server (issue #458).
+        """
+        for attempt in range(retries + 1):
+            try:
+                r = self._client.get(self._url("/health"), timeout=5)
+                if r.status_code == 200:
+                    return True
+            except Exception:
+                pass
+            if attempt < retries:
+                time.sleep(retry_delay)
+        return False
+
+    def list_devices(self) -> list[dict]:
+        r = self._client.get(self._url("/devices"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def list_games(self) -> list[dict]:
+        r = self._client.get(self._url("/games"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def add_game(self, name: str, console: str = "", switch_title_id: str = "") -> dict:
+        r = self._client.post(
+            self._url("/games"),
+            json={"name": name, "console": console, "switch_title_id": switch_title_id},
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def get_game(self, slug: str) -> Optional[dict]:
+        r = self._client.get(self._url(f"/games/{slug}"), timeout=10)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def update_game(self, slug: str, name: str, switch_title_id: str = "") -> None:
+        r = self._client.put(
+            self._url(f"/games/{slug}"), json={"name": name, "switch_title_id": switch_title_id}, timeout=10
+        )
+        r.raise_for_status()
+
+    def remove_game(self, slug: str) -> None:
+        r = self._client.delete(self._url(f"/games/{slug}"), timeout=10)
+        r.raise_for_status()
+
+    def remove_game_device(self, slug: str) -> None:
+        """Unlink a game from this device only (issue #343) — the game itself,
+        its saves/states, and every other device's config are untouched."""
+        r = self._client.delete(self._url(f"/games/{slug}/device"), timeout=10)
+        r.raise_for_status()
+
+    def list_game_devices(self, slug: str) -> list[dict]:
+        r = self._client.get(self._url(f"/games/{slug}/devices"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_game_device(self, slug: str) -> Optional[GameDeviceConfig]:
+        r = self._client.get(self._url(f"/games/{slug}/device"), timeout=10)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        d = r.json()
+        return GameDeviceConfig(
+            rom_path=d.get("rom_path", ""),
+            save_path=d.get("save_path", ""),
+            launch_command=d.get("launch_command", ""),
+            state_path=d.get("state_path", ""),
+            rom_folder_path=d.get("rom_folder_path", ""),
+            rom_source=d.get("rom_source", "local"),
+            rom_rel_path=d.get("rom_rel_path", ""),
+            local_rom_path=d.get("local_rom_path", ""),
+            rom_sha256=d.get("rom_sha256", ""),
+        )
+
+    def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:
+        r = self._client.put(
+            self._url(f"/games/{slug}/device"),
+            json={"rom_path": cfg.rom_path, "save_path": cfg.save_path, "launch_command": cfg.launch_command,
+                  "state_path": cfg.state_path, "rom_folder_path": cfg.rom_folder_path,
+                  "rom_source": cfg.rom_source, "rom_rel_path": cfg.rom_rel_path,
+                  "local_rom_path": cfg.local_rom_path, "rom_sha256": cfg.rom_sha256,
+                  "device_network_folder": cfg.device_network_folder,
+                  "device_local_folder": cfg.device_local_folder},
+            timeout=10,
+        )
+        r.raise_for_status()
+
+    def list_my_game_devices(self) -> list[dict]:
+        """Return all games configured for this device (slug, name, console, rom_path, …)."""
+        r = self._client.get(self._url("/game-devices"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_device_consoles(self, device_id: str) -> list[dict]:
+        """Return console configs for a specific device (to find its ROM folders)."""
+        r = self._client.get(self._url(f"/devices/{device_id}/consoles"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def create_rom_transfer(
+        self, slug: str, to_device_id: str, destination_path: str, rom_path: str, kind: str = "rom"
+    ) -> dict:
+        """Upload a ROM (or, with kind='rom-folder', a tar of the game's whole
+        containing folder — base ROM + any update/DLC files alongside it,
+        #441) to the server and queue it for delivery to target device.
+        `rom_path` is the local file actually being streamed (the tar itself
+        for 'rom-folder')."""
+        path = Path(rom_path)
+        file_size = path.stat().st_size
+        mb_total = file_size / (1024 * 1024)
+        transferred = [0]
+
+        def _stream():
+            chunk_size = 64 * 1024
+            with open(rom_path, "rb") as f:
+                while chunk := f.read(chunk_size):
+                    transferred[0] += len(chunk)
+                    pct = transferred[0] * 100 // file_size
+                    mb = transferred[0] / (1024 * 1024)
+                    print(f"\r  {mb:.1f} / {mb_total:.1f} MB ({pct}%)", end="", flush=True)
+                    yield chunk
+            print(flush=True)
+
+        r = self._client.post(
+            self._url(f"/games/{slug}/rom-transfer"),
+            content=_stream(),
+            headers={
+                "Content-Type": "application/octet-stream",
+                "X-To-Device-ID": to_device_id,
+                "X-Destination-Path": destination_path,
+                "X-Filename": path.name,
+                "X-Transfer-Kind": kind,
+            },
+            timeout=httpx.Timeout(None),
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def list_pending_transfers(self) -> list[dict]:
+        """Return transfers queued for this device that haven't been delivered yet."""
+        r = self._client.get(self._url("/rom-transfers/pending"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def download_transfer(self, transfer_id: str, destination_path: str, expected_hash: Optional[str] = None) -> None:
+        """Stream a staged ROM file to disk at the given destination path.
+
+        Verifies the download against the server-recorded SHA256 (passed in or read
+        from the ``X-Rom-Hash`` response header). On mismatch the partial file is
+        deleted and ValueError is raised, so a corrupt transfer over flaky Wi-Fi is
+        caught instead of landing an unplayable ROM (issue #214).
+        """
+        import hashlib as _hashlib
+
+        path = Path(destination_path)
+        if path.is_dir() or not path.suffix:
+            raise ValueError(
+                f"destination_path must be a full file path, not a directory: {destination_path}"
+            )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        hasher = _hashlib.sha256()
+        with self._client.stream(
+            "GET",
+            self._url(f"/rom-transfers/{transfer_id}/file"),
+            timeout=httpx.Timeout(None),
+        ) as r:
+            r.raise_for_status()
+            expected = expected_hash or r.headers.get("X-Rom-Hash")
+            total = int(r.headers.get("content-length", 0))
+            received = 0
+            with open(destination_path, "wb") as f:
+                for chunk in r.iter_bytes(chunk_size=64 * 1024):
+                    f.write(chunk)
+                    hasher.update(chunk)
+                    received += len(chunk)
+                    if total:
+                        pct = received * 100 // total
+                        mb = received / (1024 * 1024)
+                        print(f"\r  {mb:.1f} / {total/(1024*1024):.1f} MB ({pct}%)", end="", flush=True)
+            print(flush=True)
+        if expected and hasher.hexdigest() != expected:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise ValueError(
+                f"ROM transfer integrity check failed (expected {expected[:12]}…, got {hasher.hexdigest()[:12]}…)"
+            )
+
+    def complete_transfer(self, transfer_id: str, status: str = "completed") -> None:
+        r = self._client.put(
+            self._url(f"/rom-transfers/{transfer_id}"),
+            json={"status": status},
+            timeout=10,
+        )
+        r.raise_for_status()
+
+    def stream_events(self):
+        """Generator that yields parsed SSE event dicts. Blocks until disconnected."""
+        import json as _json
+        with self._client.stream(
+            "GET",
+            self._url("/events/stream"),
+            timeout=httpx.Timeout(None),
+        ) as r:
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if line.startswith("data: "):
+                    try:
+                        yield _json.loads(line[6:])
+                    except (ValueError, KeyError):
+                        pass
+
+    def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
+        """Write server save to disk. Returns (pulled, server_hash). pulled=False if no save exists.
+
+        Folder-based saves (Dolphin GC/Wii, PPSSPP, PCSX2 memcards) arrive as a
+        plain tar archive; file-based saves arrive as raw bytes. _write_memcard
+        detects which and handles both (#431)."""
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        _write_memcard(Path(save_path), r.content)
+        return True, r.headers.get("X-Save-Hash")
+
+    def push_save(self, slug: str, save_path: str) -> str:
+        data = memcard_bytes(Path(save_path))
+        r = self._client.post(
+            self._url(f"/games/{slug}/save"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
+    # ── console-scoped shared memory card (issue #295) ──────────────────────────
+    # PS2's single card, shared across all the console's games. Mirrors the save
+    # methods but keyed by console_key so _reconcile_save works against it.
+
+    def get_console_memcard_meta(self, console_key: str) -> Optional[dict]:
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard/meta"), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def pull_console_memcard(self, console_key: str, card_path: str) -> tuple[bool, Optional[str]]:
+        """Write the server's shared card to disk (backing up any existing one).
+
+        Folder-based memcards arrive as a plain tar archive; file-based cards
+        arrive as raw bytes. _write_memcard detects which and handles both.
+        """
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        _write_memcard(Path(card_path), r.content)
+        return True, r.headers.get("X-Save-Hash")
+
+    def push_console_memcard(self, console_key: str, card_path: str, card_format: str = "") -> str:
+        data = memcard_bytes(Path(card_path))
+        r = self._client.post(
+            self._url(f"/consoles/{console_key}/memcard"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream", "X-Card-Format": card_format},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
+    def get_console_save_sync_baseline(self, console_key: str) -> Optional[dict]:
+        """The shared-card hash this device last agreed with the server on for
+        CONSOLE_KEY, or None if it never has (issue #481, console-scoped
+        equivalent of get_save_sync_baseline)."""
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard/sync-baseline"), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    # ── communal Switch mod pool (issue #444) ────────────────────────────────────
+    # Keyed by title ID, not game slug — shared across every device with the game.
+
+    def list_switch_mods(self, title_id: str) -> list[dict]:
+        r = self._client.get(self._url(f"/switch/{title_id}/mods"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def push_switch_mod(self, title_id: str, mod_name: str, mod_folder: str) -> bool:
+        data = memcard_bytes(Path(mod_folder))
+        r = self._client.post(
+            self._url(f"/switch/{title_id}/mods/{mod_name}"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=60,
+        )
+        r.raise_for_status()
+        return r.json()["added"]
+
+    def pull_switch_mod(self, title_id: str, mod_name: str, dest_folder: str) -> bool:
+        r = self._client.get(self._url(f"/switch/{title_id}/mods/{mod_name}"), timeout=60)
+        if r.status_code == 204:
+            return False
+        r.raise_for_status()
+        _write_memcard(Path(dest_folder), r.content)
+        return True
+
+    def pull_state(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
+        """Write server state to disk. Returns (pulled, server_hash). pulled=False if no state exists."""
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        p = Path(state_path)
+        if p.is_dir() or not p.suffix:
+            # state_path is the states FOLDER — extract the tar.gz, retaining a
+            # .bak of every file it overwrites (non-destructive).
+            _extract_state_folder(r.content, p)
+        else:
+            _, payload = _unpack_envelope(r.content)  # None-fmt legacy blobs are already raw
+            if p.exists():
+                shutil.copy2(p, p.with_suffix(p.suffix + ".bak"))
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(payload)
+        return True, r.headers.get("X-State-Hash")
+
+    def pull_state_merge(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
+        """Pull state into a SHARED states folder, overwriting only this game's
+        files (PCSX2 sstates/, issue #294). Returns (pulled, server_hash)."""
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
+        if r.status_code == 204:
+            return False, None
+        r.raise_for_status()
+        _merge_extract_state_folder(r.content, Path(state_path))
+        return True, r.headers.get("X-State-Hash")
+
+    def push_state(self, slug: str, state_path: str, name_prefix: Optional[str] = None) -> str:
+        p = Path(state_path)
+        if p.is_dir():
+            # Pack the states folder as a tar.gz. When name_prefix is set, only
+            # files whose name starts with it are packed — for a SHARED states dir
+            # (PCSX2 sstates/) this selects just this game's serial files (#294).
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+                for f in sorted(p.iterdir()):
+                    # Skip .bak backups so they don't propagate to the server/peers.
+                    if not (f.is_file() and not f.name.endswith(".bak")):
+                        continue
+                    if name_prefix is not None and not f.name.startswith(name_prefix):
+                        continue
+                    tar.add(str(f), arcname=f.name)
+            data = _pack_envelope(_FMT_TARGZ, buf.getvalue())
+        else:
+            data = _pack_envelope(_FMT_RAW, p.read_bytes())
+        r = self._client.post(
+            self._url(f"/games/{slug}/state"),
+            content=data,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["hash"]
+
+    def acquire_lock(self, slug: str) -> None:
+        r = self._client.post(self._url(f"/games/{slug}/lock"), timeout=10)
+        if r.status_code == 409:
+            raise ValueError(r.json().get("detail", "Game is locked by another device"))
+        r.raise_for_status()
+
+    def release_lock(self, slug: str) -> None:
+        r = self._client.delete(self._url(f"/games/{slug}/lock"), timeout=10)
+        r.raise_for_status()
+
+    def get_lock(self, slug: str) -> dict:
+        r = self._client.get(self._url(f"/games/{slug}/lock"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def list_device_games(self, device_id: str) -> list[dict]:
+        """Return all games configured for a specific device."""
+        r = self._client.get(self._url(f"/devices/{device_id}/game-devices"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def create_pull_request(self, slug: str, from_device_id: str, destination_path: str, kind: str = "rom") -> dict:
+        """Request the source device to push a ROM (or, with kind='rom-folder',
+        the game's whole containing folder, #441) to this device via the server."""
+        r = self._client.post(
+            self._url(f"/games/{slug}/rom-pull-request"),
+            json={"from_device_id": from_device_id, "destination_path": destination_path, "kind": kind},
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def list_pending_pull_requests(self) -> list[dict]:
+        """Return pull requests pending for this device to fulfill (as the source)."""
+        r = self._client.get(self._url("/rom-pull-requests/pending"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def complete_pull_request(self, pull_request_id: str, status: str = "fulfilled") -> None:
+        r = self._client.put(
+            self._url(f"/rom-pull-requests/{pull_request_id}"),
+            json={"status": status},
+            timeout=10,
+        )
+        r.raise_for_status()
+
+    def get_save_meta(self, slug: str) -> Optional[dict]:
+        r = self._client.get(self._url(f"/games/{slug}/save/meta"), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def get_save_sync_baseline(self, slug: str) -> Optional[dict]:
+        """The save hash this device last agreed with the server on for *slug*,
+        or None if it never has (issue #460)."""
+        r = self._client.get(self._url(f"/games/{slug}/save/sync-baseline"), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def _list_history(self, kind: str, slug: str) -> list[dict]:
+        """Return every retained generation of `kind` ('save'/'state') for a game."""
+        r = self._client.get(self._url(f"/games/{slug}/{kind}/history"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def _restore(self, kind: str, slug: str, version_id: str) -> dict:
+        """Make a past generation of `kind` the current one on the server."""
+        r = self._client.post(self._url(f"/games/{slug}/{kind}/restore"), json={"version_id": version_id}, timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def report_conflict(self, slug: str, winner_device_id: str, loser_device_id: str,
+                        winner_hash: str, loser_hash: str) -> dict:
+        """Record an auto-resolved save divergence on the server (issue #243)."""
+        r = self._client.post(
+            self._url(f"/games/{slug}/conflicts"),
+            json={
+                "winner_device_id": winner_device_id,
+                "loser_device_id": loser_device_id,
+                "winner_hash": winner_hash or "",
+                "loser_hash": loser_hash or "",
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def report_console_conflict(self, console_key: str, winner_device_id: str, loser_device_id: str,
+                                winner_hash: str, loser_hash: str) -> dict:
+        """Console-key equivalent of report_conflict for a shared-memcard
+        console's card (issue #482)."""
+        r = self._client.post(
+            self._url(f"/consoles/{console_key}/conflicts"),
+            json={
+                "winner_device_id": winner_device_id,
+                "loser_device_id": loser_device_id,
+                "winner_hash": winner_hash or "",
+                "loser_hash": loser_hash or "",
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def list_save_history(self, slug: str) -> list[dict]:
+        return self._list_history("save", slug)
+
+    def restore_save(self, slug: str, version_id: str) -> dict:
+        return self._restore("save", slug, version_id)
+
+    def list_state_history(self, slug: str) -> list[dict]:
+        return self._list_history("state", slug)
+
+    def restore_state(self, slug: str, version_id: str) -> dict:
+        return self._restore("state", slug, version_id)
+
+    def get_console_defs(self) -> list[dict]:
+        """Return all console definitions from server."""
+        r = self._client.get(self._url("/console-defs"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_system_defs(self) -> dict:
+        """Return all system definitions from server."""
+        r = self._client.get(self._url("/system-defs"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_console_folder_names(self) -> dict:
+        """Return console key → folder name patterns from server."""
+        r = self._client.get(self._url("/console-folder-names"), timeout=10)
+        r.raise_for_status()
+        return r.json()
+
+    def get_standalones(self, console_key: str) -> list[dict]:
+        """Return standalone emulators for a console from server."""
+        r = self._client.get(self._url(f"/standalones/{console_key}"), timeout=10)
+        r.raise_for_status()
+        return r.json()
