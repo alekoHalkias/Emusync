@@ -18,8 +18,8 @@ class Game:
     slug: str
     name: str
     console: str = ""
-    switch_title_id: str = ""
     sgdb_game_id: Optional[int] = None
+    switch_title_id: str = ""
 
 
 @dataclass
@@ -51,7 +51,6 @@ class GameDevice:
     rom_rel_path: str = ""          # path relative to the console's network root
     local_rom_path: str = ""        # on-demand local copy; empty until localized
     rom_sha256: str = ""            # master hash captured at localize time
-    update_paths: str = ""          # ';'-joined Switch update/DLC files found next to rom_path (#441)
 
 
 @dataclass
@@ -95,3 +94,4 @@ class RomPullRequest:
     status: str
     requested_at: str
     fulfilled_at: Optional[str] = None
+    kind: str = "rom"  # 'rom' or 'rom-folder' — mirrors RomTransfer.kind (#441)
