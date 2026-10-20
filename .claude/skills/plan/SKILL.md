@@ -1,6 +1,8 @@
 ---
 name: plan
 description: Use when the user runs /plan, or automatically at the end of /issue, on a feature/<issue-number>-* branch whose issue needs an implementation plan before any code is written.
+
+DO NOT MAKE CHANGES TO CODE BEFORE SHOWING PLAN.
 ---
 
 # /plan — plan the current branch's issue
