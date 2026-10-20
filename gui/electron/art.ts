@@ -43,6 +43,7 @@ const LIBRETRO_SYSTEM: Record<string, string> = {
   pce:     "NEC_-_PC_Engine_-_TurboGrafx_16",
   psx:     "Sony_-_PlayStation",
   ps2:     "Sony_-_PlayStation_2",
+  ps3:     "Sony_-_PlayStation_3",
   psp:     "Sony_-_PlayStation_Portable",
   dc:      "Sega_-_Dreamcast",
   gamecube: "Nintendo_-_GameCube",
@@ -218,6 +219,7 @@ const CONSOLE_LOGO: Record<string, string> = {
   pce:       "NEC - PC Engine - TurboGrafx 16",
   psx:       "Sony - PlayStation",
   ps2:       "Sony - PlayStation 2",
+  ps3:       "Sony - PlayStation 3",
   psp:       "Sony - PlayStation Portable",
   dc:        "Sega - Dreamcast",
   gamecube:  "Nintendo - GameCube",
@@ -233,7 +235,7 @@ const CONSOLE_LOGO: Record<string, string> = {
 };
 
 // EmuSync console key → es-theme-carbon folder, whose art/system.svg is the
-// system's colour wordmark logo (#505). Carbon has no 3DS/Switch — those come
+// system's colour wordmark logo (#505). Carbon has no 3DS/Switch/PS3 — those come
 // from art-book-next-es-de (below), then fall back to the XMB icon above.
 const CARBON_FOLDER: Record<string, string> = {
   nes: "nes", snes: "snes", n64: "n64", nds: "nds", gb: "gb", gbc: "gbc", gba: "gba",
@@ -243,7 +245,7 @@ const CARBON_FOLDER: Record<string, string> = {
 };
 const CARBON_BASE = "https://raw.githubusercontent.com/RetroPie/es-theme-carbon/master";
 // Second source for what carbon lacks: console key → file under _inc/systems/logos/.
-const ART_BOOK_LOGO: Record<string, string> = { "3ds": "n3ds", switch: "switch" };
+const ART_BOOK_LOGO: Record<string, string> = { "3ds": "n3ds", switch: "switch", ps3: "ps3" };
 const ART_BOOK_BASE = "https://raw.githubusercontent.com/anthonycaccese/art-book-next-es-de/HEAD/_inc/systems/logos";
 
 const RETROARCH_ASSETS_BASE =
