@@ -63,6 +63,19 @@ class SaveMeta:
 
 
 @dataclass
+class ChunkStatus:
+    """Track chunk progress for resumable transfers (issue #576)."""
+    slug: str
+    to_device_id: str
+    destination_path: str
+    chunk_index: int          # 0-based, total chunks in upload request
+    offset: int               # bytes transferred before this chunk
+    status: str               # 'pending' | 'in_progress' | 'committed' | 'failed'
+    attempted_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+@dataclass
 class Lock:
     game_slug: str
     device_id: str
@@ -95,16 +108,3 @@ class RomPullRequest:
     requested_at: str
     fulfilled_at: Optional[str] = None
     kind: str = "rom"  # 'rom' or 'rom-folder' — mirrors RomTransfer.kind (#441)
-
-
-@dataclass
-class ChunkStatus:
-    """Track chunk progress for resumable transfers (issue #576)."""
-    slug: str
-    to_device_id: str
-    destination_path: str
-    chunk_index: int          # 0-based, total chunks in upload request
-    offset: int               # bytes transferred before this chunk
-    status: str               # 'pending' | 'in_progress' | 'committed' | 'failed'
-    attempted_at: Optional[str] = None
-    completed_at: Optional[str] = None
