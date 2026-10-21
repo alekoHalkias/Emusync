@@ -22,7 +22,7 @@ Users drop a folder (`theme.json`, `theme.css`, assets) in `<configDir>/themes/`
 - [x] 4. Move the `html[data-bigpicture]` colour/typography block (styles.css lines ~836-862) into `gui/renderer/src/themes/default.css`, imported by styles.css/App so it is the reference example (header comment documents the variables, selector scope, `emusync-theme://` asset URLs, `logos/<consoleKey>.svg`). It stays scoped `html[data-bigpicture]` (lower specificity than `[data-theme="<id>"]`) so partial user themes layer over it. Backdrop, wheel and gamepad focus rules stay in the base styles.css (#500: themes cannot break navigation).
   - Files: gui/renderer/src/styles.css, gui/renderer/src/themes/default.css (new)
   - New: default.css - issue asks the default to be a standalone reference file
-- [ ] 5. Renderer apply: in App.tsx, when `display.theme !== "default"`, `theme.get(id)` -> inject into `<style id="theme">`, set `documentElement.dataset.theme`; switching removes/replaces both. Applies only while Big Picture is on.
+- [x] 5. Renderer apply: in App.tsx, when `display.theme !== "default"`, `theme.get(id)` -> inject into `<style id="theme">`, set `documentElement.dataset.theme`; switching removes/replaces both. Applies only while Big Picture is on.
   - Files: gui/renderer/src/App.tsx
   - Reuses: existing data-bigpicture effect at App.tsx:45
 - [ ] 6. Theme picker in settings Display section (select fed by `theme.list`, calls `display.setTheme`, `onDisplay({theme})`); empty-list hint shows folder location via the existing data-folder row pattern.
