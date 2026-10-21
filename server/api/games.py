@@ -113,19 +113,19 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     gd = _get_store().get_game_device(slug, device_id)
     if not gd:
         raise HTTPException(status_code=404, detail="No device config for this game")
-    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command,
-            "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path,
-            "rom_source": gd.rom_source, "rom_rel_path": gd.rom_rel_path,
-            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256,
-            "layout": gd.layout, "shared_id": gd.shared_id}:
-    gd = _get_store().get_game_device(slug, device_id)
-    if not gd:
-        raise HTTPException(status_code=404, detail="No device config for this game")
-    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command,
-            "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path,
-            "rom_source": gd.rom_source, "rom_rel_path": gd.rom_rel_path,
-            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256,
-            "layout": gd.layout, "shared_id": gd.shared_id}
+    return {
+        "rom_path": gd.rom_path,
+        "save_path": gd.save_path,
+        "launch_command": gd.launch_command,
+        "state_path": gd.state_path,
+        "rom_folder_path": gd.rom_folder_path,
+        "rom_source": gd.rom_source,
+        "rom_rel_path": gd.rom_rel_path,
+        "local_rom_path": gd.local_rom_path,
+        "rom_sha256": gd.rom_sha256,
+        "layout": gd.layout,
+        "shared_id": gd.shared_id
+    }
 
 
 @router.delete("/games/{slug}/device")
