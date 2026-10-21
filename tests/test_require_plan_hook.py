@@ -1,7 +1,6 @@
 """The .claude/hooks/require_plan.py edit gate (#586)."""
 import importlib.util
 import pathlib
-import subprocess
 
 _HOOK = pathlib.Path(__file__).resolve().parent.parent / ".claude" / "hooks" / "require_plan.py"
 _spec = importlib.util.spec_from_file_location("require_plan", _HOOK)
@@ -10,7 +9,8 @@ _spec.loader.exec_module(require_plan)
 
 
 def _repo(tmp_path, branch):
-    subprocess.run(["git", "init", "-q", "-b", branch, str(tmp_path)], check=True)
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    require_plan.git(str(tmp_path), "init", "-q", "-b", branch)  # env-clean: pre-push sets GIT_DIR
     return tmp_path
 
 
