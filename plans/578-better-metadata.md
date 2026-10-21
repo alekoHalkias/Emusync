@@ -10,25 +10,25 @@ Fix attempts: 0
 Implement automated metadata retrieval via IGDB, with caching, fallback, toggle auto-fetch, and manual override support.
 
 ## Steps
-- [ ] 1. Add `auto_fetch_metadata: bool` to `server/config.py` (default: True). Update `load` and `save` accordingly. Add documentation in config.
+- [x] 1. Add `auto_fetch_metadata: bool` to `server/config.py` (default: True). Update `load` and `save` accordingly. Add documentation in config.
   - Files: server/config.py
   - Reuses existing Config dataclass.
-- [ ] 2. Update `server/api/games.py::get_game_metadata` to:
+- [x] 2. Update `server/api/games.py::get_game_metadata` to:
     - Check `store.get_game_metadata`.
     - If None and `auto_fetch_metadata` is True, call `get_igdb_metadata` and store via `store.set_game_metadata`.
     - Return meta (or 404 if still missing).
   - Files: server/api/games.py
-- [ ] 3. Improve `server/api/igdb.py::fetch_igdb_metadata`:
+- [x] 3. Improve `server/api/igdb.py::fetch_igdb_metadata`:
     - Correct query handling: send `variables` dict directly.
     - After default query, if no result, perform title-based fallback using `_TITLE_QUERY`.
     - Log errors, return None on failure.
   - Files: server/api/igdb.py
-- [ ] 4. Add tests in `tests/test_metadata.py`:
+- [x] 4. Add tests in `tests/test_metadata/test_metadata.py`:
     - Test cache retrieval when metadata already present.
     - Test auto-fetch enabled: metadata fetched and stored.
     - Test auto-fetch disabled: metadata not fetched.
     - Test fallback to title search.
-  - Files: tests/test_metadata.py
+  - Files: tests/test_metadata/test_metadata.py
 - [ ] 5. Update documentation:
     - docs/GOTCHAS.md: note new metadata endpoint, toggle, manual override.
     - docs/ARCHITECTURE.md: mention IGDB service and caching.
