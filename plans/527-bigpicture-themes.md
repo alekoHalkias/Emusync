@@ -14,7 +14,7 @@ Users drop a folder (`theme.json`, `theme.css`, assets) in `<configDir>/themes/`
   - Files: gui/electron/themes.ts (new), gui/electron/main.ts
   - Reuses: gui/electron/paths.ts:configDir, gui/electron/display.ts registerDisplayIpc pattern
   - New: themes.ts - no existing theme/protocol code; kept separate from display.ts (file size rule, ~300 lines)
-- [ ] 2. Persist selection: add `theme: string` (default `"default"`) to `Display` in display.json; `display:get` returns it, new `display:setTheme(id)` saves it. Not in emusync.toml (#499).
+- [x] 2. Persist selection: add `theme: string` (default `"default"`) to `Display` in display.json; `display:get` returns it, new `display:setTheme(id)` saves it. Not in emusync.toml (#499).
   - Files: gui/electron/display.ts
   - Reuses: display.ts load()/save()
 - [ ] 3. Preload + types: `theme.list/get`, `display.setTheme`, theme in `display.get` result type.

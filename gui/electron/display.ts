@@ -10,7 +10,7 @@ import { rt } from "./runtime";
 const DISPLAY_PATH = join(configDir(), "display.json");
 const SCALES = [1, 1.25, 1.5, 2];
 
-interface Display { scale: number; fullscreen: boolean; bigPicture: boolean }
+interface Display { scale: number; fullscreen: boolean; bigPicture: boolean; theme: string }
 
 function load(): Display {
   let saved: Partial<Display> = {};
@@ -24,6 +24,8 @@ function load(): Display {
     fullscreen: process.argv.includes("--fullscreen") || (saved.fullscreen ?? autoFullscreen),
     // Big Picture theme/wheel (#503): same first-run default as fullscreen, but toggled independently.
     bigPicture: process.argv.includes("--fullscreen") || (saved.bigPicture ?? autoFullscreen),
+    // Big Picture user theme id (#527); "default" = bundled look only.
+    theme: typeof saved.theme === "string" && saved.theme ? saved.theme : "default",
   };
 }
 
@@ -68,7 +70,13 @@ export function registerDisplayIpc(): void {
     scale: load().scale,
     fullscreen: !!rt.mainWindow?.isFullScreen(),
     bigPicture: load().bigPicture,
+    theme: load().theme,
   }));
+
+  ipcMain.handle("display:setTheme", (_e, theme: string) => {
+    save({ ...load(), theme });
+    return theme;
+  });
 
   ipcMain.handle("display:cycleScale", () => {
     const d = load();
