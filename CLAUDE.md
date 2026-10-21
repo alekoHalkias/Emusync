@@ -81,3 +81,10 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version
 ## Keeping docs updated
 
 Update this file when policy, workflow, or a rule changes (put long explanations in docs/GOTCHAS.md). Update docs/ARCHITECTURE.md when CLI subcommands/IPC/components, config fields/data files, or server lifecycle/auth/ROM protocol change.
+
+## Output limits
+- Always write code to files using the Write/Edit tools. Never paste full files into the chat.
+- When changing a file, use Edit on the specific section. Do not rewrite the whole file.
+- One task per turn. Finish it, summarize in a few lines, and stop.
+- Keep files under ~300 lines; split larger ones into modules.
+- Don't repeat code or plans that are already written.

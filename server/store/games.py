@@ -104,7 +104,9 @@ class GameDeviceMixin:
 
     def list_devices_for_game(self, game_slug: str) -> list[dict]:
         rows = self._conn.execute(
-            """SELECT d.id, d.name, gd.rom_path, gd.save_path, gd.state_path, gd.rom_folder_path
+            """SELECT d.id, d.name, gd.rom_path, gd.save_path, gd.state_path, gd.rom_folder_path,
+                   gd.rom_source, gd.rom_rel_path, gd.local_rom_path, gd.rom_sha256,
+                   gd.layout, gd.shared_id
                FROM game_devices gd
                JOIN devices d ON d.id = gd.device_id
                WHERE gd.game_slug = ?
@@ -119,6 +121,12 @@ class GameDeviceMixin:
                 "save_path": row["save_path"],
                 "state_path": row["state_path"],
                 "rom_folder_path": row["rom_folder_path"],
+                "rom_source": row["rom_source"],
+                "rom_rel_path": row["rom_rel_path"],
+                "local_rom_path": row["local_rom_path"],
+                "rom_sha256": row["rom_sha256"],
+                "layout": row["layout"],
+                "shared_id": row["shared_id"],
             }
             for row in rows
         ]
@@ -197,6 +205,27 @@ class GameDeviceMixin:
         return result
 
     def list_game_devices_for_device(self, device_id: str) -> list[dict]:
+        rows = self._conn.execute(
+            """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
+                      gd.launch_command, gd.state_path, gd.rom_folder_path,
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
+                      gd.rom_sha256, gd.layout, gd.shared_id
+               FROM game_devices gd
+               JOIN games g ON g.slug = gd.game_slug
+               WHERE gd.device_id = ?
+               ORDER BY g.name""",
+            (device_id,),
+        ).fetchall()
+        return [dict(r) for r in rows], gd.state_path, gd.rom_folder_path,
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
+                      gd.rom_sha256, gd.layout, gd.shared_id
+               FROM game_devices gd
+               JOIN games g ON g.slug = gd.game_slug
+               WHERE gd.device_id = ?
+               ORDER BY g.name""",
+            (device_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]dict]:
         rows = self._conn.execute(
             """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
                       gd.launch_command, gd.state_path, gd.rom_folder_path,

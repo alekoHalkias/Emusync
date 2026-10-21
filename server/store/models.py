@@ -51,6 +51,8 @@ class GameDevice:
     rom_rel_path: str = ""          # path relative to the console's network root
     local_rom_path: str = ""        # on-demand local copy; empty until localized
     rom_sha256: str = ""            # master hash captured at localize time
+    layout: str = "Single"          # 'Single' (one file per game) or 'Shared' (multi-game shared file)
+    shared_id: str = ""             # identifier for a shared memory card/file when layout='Shared'
 
 
 @dataclass
