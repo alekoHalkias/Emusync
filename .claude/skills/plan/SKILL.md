@@ -1,55 +1,81 @@
 ---
 name: plan
-description: Use when the user runs /plan, or automatically at the end of /issue, on a feature/<issue-number>-* branch whose issue needs an implementation plan before any code is written.
-
-DO NOT MAKE CHANGES TO CODE BEFORE SHOWING PLAN.
+description: Read a GitHub issue and the code it touches, then write a reuse-first, step-by-step implementation plan to plans/<issue>-<slug>.md on the issue's feature branch. Use when the user runs /plan <issue|PR>, after /issue, or when ship needs a fix plan for failing tests. Never edits product code.
 ---
 
-# /plan — plan the current branch's issue
+# /plan - write the plan file
 
-Follows CLAUDE.md's "Execution approval policy" — read-only commands run automatically, no confirmation needed. The "wait for approval" in step 9 is a deliberate workflow checkpoint on the *plan itself* (per the user's design for this pipeline), not a generic "may I run this command" gate — clarifying questions in step 6 are asked because the answer is genuinely unknown, not to seek permission.
+Stage 2 of 4: issue -> plan -> implement -> ship. Never edit product code in this skill.
+
+## Rules (all stages)
+
+- No emojis anywhere: plan files, commit messages, PR titles/bodies, PR comments.
+- The plan file and GitHub are the only workflow state. Never rely on conversation memory.
+
+## Resolve (shared by all four skills)
+
+Input is an issue number or a PR number.
+- PR number: `gh pr view <N> --repo alekoHalkias/Emusync --json body,headRefName,state` and read the issue from `Closes #X`.
+- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the plan at `plans/<N>-*.md` on that branch.
+
+Stage:
+| State | Next skill |
+|---|---|
+| No branch or no plan file | plan |
+| Plan has unchecked `- [ ]` steps (`Status: planned` = awaiting approval) | implement |
+| All steps checked, `PR: none` | ship |
+| `PR: #M` and status `shipped` | done - report it |
+| `Status: blocked` | stop, show the failure report |
+
+If invoked at the wrong stage, say so and invoke the right skill.
 
 ## Steps
 
-1. Get the current branch:
-   ```bash
-   git branch --show-current
+1. Resolve the issue number. `gh issue view <N> --repo alekoHalkias/Emusync --json number,title,body,comments` and read all of it.
+2. Branch. If no `*/<N>-*` branch exists: `git fetch --prune && git branch -r`, stop and flag any `feature/*` or `copilot/*` branch touching the same files; otherwise `git checkout main && git pull && git checkout -b feature/<N>-<slug>`. If it exists, check it out. Never work on `main`.
+3. Read the code. Trace the real flow end to end through every file the change touches. Consult CLAUDE.md Rules and the relevant section of docs/ARCHITECTURE.md / docs/GOTCHAS.md; the plan must comply with every rule that applies.
+4. Reuse search (required). For each piece of logic the work needs, grep for an existing helper, store method, route, CLI command, IPC handler, type, or component that does it or nearly does. Extend or call it instead of writing a parallel copy. New code is allowed only with a one-line reason why nothing existing fits.
+5. If a design decision is genuinely open (data shape, UX, which layer owns it), ask the user. Do not ask what the code can answer.
+6. If the work is too big for one reviewable PR, propose splitting into separate issues and stop.
+7. Write `plans/<N>-<slug>.md`:
    ```
-   Extract the issue number from the `feature/<issue-number>-...` naming convention (CLAUDE.md). If the branch doesn't match that pattern (e.g. `main`, or an unlinked name), ask the user which issue number to plan for — do not guess.
+   # Plan: #<N> <issue title>
 
-2. Fetch the issue:
-   ```bash
-   gh issue view <issue-number> --repo alekoHalkias/Emusync --json number,title,body,comments
+   Issue: #<N>
+   Branch: feature/<N>-<slug>
+   PR: none
+   Status: planned
+   Fix attempts: 0
+
+   ## Goal
+   One sentence.
+
+   ## Steps
+   - [ ] 1. <what changes, observable result>
+     - Files: path/a.py, path/b.ts
+     - Reuses: path/a.py:existing_fn
+     - New: <thing> - <why nothing existing fits>
+   - [ ] 2. ...
+   - [ ] N. Tests: <test file, cases>. No mocks, real SQLite.
+   - [ ] N+1. Docs: CLAUDE.md / docs/ARCHITECTURE.md updates, or "none needed - <why>".
+
+   ## Checklist
+   Schema bump: yes/no. New IPC channel (+ emusync.d.ts): yes/no. New CLI subcommand: yes/no. Config/data file change: yes/no.
+
+   ## Not in this plan
+   ## Log
    ```
-   Fallback via curl + `GITHUB_TOKEN` if `gh` is unavailable:
-   ```bash
-   curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues/<issue-number>"
-   curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues/<issue-number>/comments"
-   ```
+   Steps must be small enough to finish and verify one at a time.
+8. Commit the plan file only: `git add plans/<N>-*.md && git commit -m "Add implementation plan for #<N>"`.
+9. Show the plan to the user and stop. On approval, invoke `implement` with the issue number. On requested changes, revise, recommit, re-present.
 
-3. Read the issue title, body, and comments in full. Cross-reference CLAUDE.md's Key Files index, docs/ARCHITECTURE.md's per-module detail (read the relevant section, not the whole file), and the actual code (not just the issue text) to find which files, IPC channels, DB tables, or components the work will touch.
+## Fix-plan mode (called by ship)
 
-4. **Reuse search (required before drafting).** For every piece of new logic the work seems to need, grep for an existing helper, type, IPC handler, CLI subcommand, store method, or component that already does it (or nearly does). Extend or call the existing one rather than writing a parallel copy; CLAUDE.md's gotchas record several times a duplicated implementation drifted apart. The plan must list, per step, what is reused (`path:symbol`) and what is genuinely new, with a one-line reason for each new thing.
-
-5. **Conflict and gotcha checks.**
-   - `git fetch --prune && git branch -r`: if another `feature/*` or `copilot/*` branch likely touches the same files, flag it to the user before going further (CLAUDE.md Step 2).
-   - Scan CLAUDE.md's "Common gotchas" for entries on the areas this work touches (schema migrations, shared-memcard consoles, folder-vs-file saves, `emusync.toml` vs GUI-only settings, IPC typing in `emusync.d.ts`, etc.) and make the plan comply with each one that applies.
-   - If the issue is too large for one reviewable PR, propose a split into separate issues instead of one giant plan.
-
-6. If the issue is ambiguous or leaves a design/config decision open (data shape, UX behavior, naming, which layer owns something, edge-case handling), ask the user targeted clarifying questions before finalizing the plan. Don't ask about things you can resolve by reading the code. Don't ask "should I proceed" once the plan is clear — only ask what's genuinely undecided.
-
-7. Draft the plan in this shape:
-   - **Goal:** one sentence, tied to the issue number.
-   - **Steps:** ordered; each names the files/modules touched, what is reused vs new (step 4), and the observable result.
-   - **Cross-cutting checklist** (state yes/no and where): schema version bump (`schema.py` `_migrate` + `_SCHEMA`); new IPC channel (`preload.ts` + `emusync.d.ts`); new CLI subcommand; config fields or `~/.emusync/` files.
-   - **Tests:** per CLAUDE.md's testing requirements (new API route, new Store method, bug-fix regression), naming the test file; no mocks.
-   - **Docs:** which of CLAUDE.md / docs/ARCHITECTURE.md need updating and why.
-   - **Not in this plan:** adjacent work deliberately left out.
-   - **Risks / open questions:** anything unresolved after step 6.
-
-8. Present the plan and stop. Do not edit code yet.
-
-9. Wait for the user's reply.
-   - Full approval ("approved", "looks good", "proceed"): invoke the `implement` skill via the Skill tool. Do not ask "should I proceed" again; answers already given in step 6 stand and are not re-asked.
-   - Approval with changes ("yes but…"): apply the changes, then invoke `implement` with the revised plan. Re-present first only if the change alters scope, schema, or a public interface.
-   - Rejection or requested rework: revise and re-present before invoking `implement`.
+When ship passes failing test output: do steps 3-4 scoped to the failure, then append to the existing plan file (do not create a new issue, branch, or plan):
+```
+## Fix attempt <k>
+Failure: <test id> - <error summary>
+Cause: <identified cause>
+- [ ] F<k>.1 ...
+```
+Commit it and invoke `implement` directly - no user approval pause in this mode.

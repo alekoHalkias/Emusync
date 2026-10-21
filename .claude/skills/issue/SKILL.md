@@ -1,50 +1,47 @@
 ---
 name: issue
-description: Wrap up the previous PR and start the next one - prompts for what the new issue should be, checks open GitHub issues for a match, and either adopts one or files a new issue plus its branch. Use when the user runs /issue.
+description: Turn a feature idea or bug description into a professionally formatted GitHub issue on alekoHalkias/Emusync, then hand off to the plan skill. Use when the user runs /issue or describes a feature/bug they want filed. Also accepts an issue or PR number to resume the workflow at whatever stage it is in.
 ---
 
-# /issue — wrap up, then start the next issue
+# /issue - file the issue
 
-Follows CLAUDE.md's "Execution approval policy" and "Development workflow" (Steps 1–3) — see those sections for the full approval rules and `gh` setup instructions; not repeated here.
+Stage 1 of 4: issue -> plan -> implement -> ship.
+
+## Rules (all stages)
+
+- No emojis anywhere: issue titles/bodies, plan files, commit messages, PR titles/bodies, PR comments.
+- Professional, plain tone. No filler, no marketing language.
+
+## Resume mode
+
+If args are a number (`123`, `#123`, or `PR 45`) instead of a description, do not file anything. Resolve the stage as described in the `plan` skill's "Resolve" section and invoke the skill for that stage.
 
 ## Steps
 
-1. Verify the previous work is actually done before declaring it done — don't take "merged" on faith:
-   ```bash
-   git branch --show-current
-   gh pr view --json number,state,mergedAt,url 2>/dev/null
+1. If no description was given, ask the user what the feature or bug is.
+2. Check for duplicates: `gh issue list --repo alekoHalkias/Emusync --state open --limit 100 --search "<keywords>"`. If one matches, show it and ask whether to use it instead; if yes, skip to step 5 with that number.
+3. Read enough code to name the affected area accurately (module/file names, not a full plan). Do not design the solution here.
+4. Write the body to a temp file in the scratchpad and create the issue:
+   `gh issue create --repo alekoHalkias/Emusync --title "<title>" --body-file <file> --label <enhancement|bug>`
+   (drop `--label` if the label does not exist). Title: short, imperative, no prefix tags.
+
+   Feature body:
    ```
-   - If the current branch has an OPEN PR: stop and tell the user "PR #N is still open — merge it, then run /issue again" (include the URL). Do not proceed to ask about a new issue.
-   - If there's no PR for this branch (e.g. already on `main`, or the branch was never pushed) or the PR is MERGED: proceed. Output exactly this line:
-     > pr merged, make a new issue.
-
-   Then ask the user what the new issue should be about (if `args` already contains a description, use that instead of asking).
-
-2. Check for `gh` (CLAUDE.md's "How Claude agents create issues" has the setup steps if it's missing):
-   ```bash
-   which gh
+   ## Summary
+   ## Motivation
+   ## Proposed Behavior
+   ## Affected Area
+   ## Acceptance Criteria
+   - [ ] ...
    ```
-   If missing and no `GITHUB_TOKEN` env var is set, tell the user to run `gh auth login` or set `GITHUB_TOKEN`, then stop.
-
-3. List open issues:
-   ```bash
-   curl -s "https://api.github.com/repos/alekoHalkias/Emusync/issues?state=open&per_page=50"
+   Bug body:
    ```
-   If one or more open issues look relevant to what the user described, show the candidates (number + title) and ask whether to use one of those instead of filing a new one.
-   - If the user picks an existing issue: skip straight to step 5 (branch) using that issue's number/title. Do not create a new issue.
-   - If the user says none fit (or there were no candidates), continue to step 4.
-
-4. Draft a title and body for the new issue from the user's description (title: short, imperative; body: what/why + acceptance criteria) and create it automatically, per CLAUDE.md's "How Claude agents create issues" (`gh issue create`, curl fallback with `GITHUB_TOKEN`). Note the returned issue number.
-
-5. Create and check out the linked branch (CLAUDE.md Step 2/3):
-   ```bash
-   git fetch --prune && git branch -r
+   ## Summary
+   ## Steps to Reproduce
+   ## Expected Behavior
+   ## Actual Behavior
+   ## Affected Area
+   ## Acceptance Criteria
+   - [ ] ...
    ```
-   If another open branch already touches the same area, warn the user about the overlap in your report, but still proceed — this is informational, not an approval gate.
-   ```bash
-   git checkout main && git pull && git checkout -b feature/<issue-number>-short-description
-   ```
-
-6. Report back: the issue used or created (number/URL) and the branch now checked out.
-
-7. Invoke the `plan` skill (via the Skill tool) for this issue/branch — do not ask permission first, this is the expected next step in the workflow.
+5. Report the issue number and URL, then invoke the `plan` skill with the issue number.
