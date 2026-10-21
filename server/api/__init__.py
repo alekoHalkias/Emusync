@@ -8,7 +8,7 @@ routes. Public surface is unchanged: `from server import api` still exposes
 from __future__ import annotations
 
 from ._core import app, init
-from . import devices, games, transfers, blobs, locks, defs, conflicts, settings, mods
+from . import devices, games, transfers, blobs, locks, defs, conflicts, settings, mods, metadata
 
 # Order is not load-bearing across routers (no same-depth literal/param
 # collisions exist between them); the one collision — /games/overview vs
@@ -22,5 +22,6 @@ app.include_router(defs.router)
 app.include_router(conflicts.router)
 app.include_router(settings.router)
 app.include_router(mods.router)
+app.include_router(metadata.router)
 
 __all__ = ["app", "init"]
