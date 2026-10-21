@@ -332,3 +332,7 @@ Eden stores each installed mod for a title as its own subfolder under `load/<tit
 ## Game metadata (#578)
 
 `server/api/metadata.py`: `GET/PUT/DELETE /games/{slug}/metadata`. Cached in the `game_metadata` table (schema v28: `synopsis`, `release_date`, `cover_url`, `source`, `fetched_at`; `server/store/metadata.py`). GET refetches a missing or 30-day-stale non-manual row from Wikipedia (keyless, search then page summary) when config `auto_fetch_metadata` is true; failures fall back to the stale row, then empty fields. PUT stores a `source='manual'` row that auto-fetch never overwrites; DELETE clears it.
+
+## Big Picture themes (#527)
+
+User themes are folders in `<config dir>/themes/<id>/`: `theme.json` (`name`, `author`, optional `css` filename, default `theme.css`), the CSS (scoped under `html[data-bigpicture][data-theme="<id>"]`), optional assets and `logos/<consoleKey>.svg`. `gui/electron/themes.ts` owns the scan, `theme:list` / `theme:get` IPC and the `emusync-theme://<id>/<path>` protocol (assets only, `..` escapes rejected via `themeFile`). The selected id is `theme` in `display.json` (`display:setTheme`; `display:get` returns it). `App.tsx` injects the CSS into `<style id="theme">` and sets `data-theme` on `<html>`. The bundled look is `renderer/src/themes/default.css`, always loaded as the base layer, so themes override only what they change; gamepad focus styles stay in `styles.css`. `art:getConsoleLogo` checks the theme's `logos/` first.

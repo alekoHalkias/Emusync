@@ -3,7 +3,7 @@
 Issue: #527
 Branch: feature/527-bigpicture-themes
 PR: none
-Status: planned
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -31,8 +31,8 @@ Users drop a folder (`theme.json`, `theme.css`, assets) in `<configDir>/themes/`
 - [x] 7. Per-console logos: in `art:getConsoleLogo`, first check `<themes>/<selectedTheme>/logos/<consoleKey>.svg` (return data URL), else existing Carbon/ART_BOOK flow. ConsoleLogo refetches when theme changes (pass theme id as effect dep from App via ConsoleGrid prop).
   - Files: gui/electron/art.ts, gui/renderer/src/components/ConsoleGrid.tsx, gui/renderer/src/App.tsx
   - Reuses: art.ts getConsoleLogo toUrl pattern; themes.ts path-safe resolver from step 1
-- [ ] 8. Tests: no JS test harness exists (gui/package.json has none) and no Python/API/Store surface changes, so no automated tests; manual check: sample theme folder in themes dir, switch in settings, asset url loads, `..` traversal returns 404, bad theme.json skipped. `make test-changed` still run.
-- [ ] 9. Docs: docs/ARCHITECTURE.md (themes.ts module row, `theme` IPC group, `display.json` gains `theme`, themes dir under config); CLAUDE.md rule line (themes dir, GUI-only setting in display.json, focus styles in base layer). Pre-commit requires CLAUDE.md staged with main.ts/preload.ts.
+- [x] 8. Tests: no JS test harness exists (gui/package.json has none) and no Python/API/Store surface changes, so no automated tests; manual check: sample theme folder in themes dir, switch in settings, asset url loads, `..` traversal returns 404, bad theme.json skipped. `make test-changed` still run.
+- [x] 9. Docs: docs/ARCHITECTURE.md (themes.ts module row, `theme` IPC group, `display.json` gains `theme`, themes dir under config); CLAUDE.md rule line (themes dir, GUI-only setting in display.json, focus styles in base layer). Pre-commit requires CLAUDE.md staged with main.ts/preload.ts.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes (theme:list, theme:get, display:setTheme). New CLI subcommand: no. Config/data file change: yes (display.json `theme`; new `<configDir>/themes/` dir).
@@ -45,5 +45,6 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (theme:list, theme:get, d
 - Default theme stays always-on as the base layer rather than a selectable overlay, so partial themes inherit it.
 
 ## Log
+Step 9: docs were staged from HEAD blobs (CLAUDE.md, ARCHITECTURE.md) because the working copies hold unrelated uncommitted rewrites; the same additions were also applied to the working copies, which remain uncommitted.
 Step 6: empty-list hint is generic text (no IPC to expose the config dir path; the plan said to show the folder location).
 Step 1: CLAUDE.md rule line staged early (from HEAD blob, not the working copy which has unrelated uncommitted edits) to satisfy the pre-commit hook; step 9 still covers ARCHITECTURE.md.
