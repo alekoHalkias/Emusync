@@ -22,7 +22,7 @@ Stage:
 | State | Next skill |
 |---|---|
 | No branch or no plan file | plan |
-| Plan has unchecked `- [ ]` steps | implement |
+| Plan has unchecked `- [ ]` steps (`Status: planned` = awaiting approval) | implement |
 | All steps checked, `PR: none` | ship |
 | `PR: #M` and status `shipped` | done - report it |
 | `Status: blocked` | stop, show the failure report |

@@ -47,6 +47,7 @@ Every code change goes through `/issue` → `/plan` → `/implement` → `/ship`
 
 - **Detect new issues.** If the user describes a feature, bug, or change they want (even casually, without saying "issue"), invoke `/issue` with that description before anything else. Do not start reading-to-fix or editing.
 - **No code edits outside `/implement`.** Do not edit, write, or delete any tracked file except via `/implement` working an approved plan file `plans/<N>-*.md` on its `feature/<N>-*` branch (`/plan` writes only the plan file; `/ship` writes only plan status and fix steps). If asked to change code directly, refuse briefly and route through the pipeline: `/issue` for new work, or `/plan <N>` / `/implement <N>` to resume.
+- **Enforced** by the PreToolUse hook `.claude/hooks/require_plan.py`: Edit/Write on repo files outside `plans/` and `.claude/` is blocked unless the branch's plan has `Status: implementing` (set by `/implement`). Never edit around it via shell.
 - **Resume, don't restart.** Given an issue or PR number, resolve the stage per `/plan`'s "Resolve" section and continue there.
 - **Exempt:** read-only investigation and answering questions; editing `.claude/skills/` itself when the user explicitly asks to change the workflow.
 - No emojis in issues, plans, commits, or PRs. Never commit to `main`. PR body uses `Closes #N`.

@@ -36,7 +36,7 @@ Stage 4 of 4: issue -> plan -> implement -> ship.
       ```
       Write `PR: #<M>` into the plan file, commit, push.
       If `PR: #<M>` already exists: just commit and push; the PR updates itself. Add a short PR comment summarizing the fix if this was a fix loop.
-   c. Check mergeability: `gh pr view <M> --json mergeable`. If conflicting and trivial, merge `origin/main` and resolve; otherwise report it.
+   c. Check mergeability: `gh pr view <M> --json mergeable`. If conflicting and trivial, set `Status: implementing` (the edit hook requires it), merge `origin/main`, resolve, then set `Status: shipped` again and commit; otherwise report it.
    d. Sync the server PC (standing instruction):
       `ssh -o BatchMode=yes server@192.168.4.111 'cd ~/Github/Emusync && git fetch -q --prune && git checkout <branch> && git pull -q; systemctl --user restart emusync-server && sleep 4 && curl -s localhost:8765/health'`
       Leave any uncommitted change on the server alone; report checkout failures instead of discarding.

@@ -15,6 +15,7 @@ Stage 3 of 4: issue -> plan -> implement -> ship.
 ## Steps
 
 1. Resolve the issue and stage per the `plan` skill's "Resolve" section. Check out the branch. If there is no plan file, invoke `plan` instead. If every step is already checked, invoke `ship`.
+   Then set `Status: implementing` in the plan file and commit it. This records plan approval and unlocks the edit hook (`.claude/hooks/require_plan.py`), which blocks edits to repo files outside `plans/` and `.claude/` under any other status.
 2. Read the plan file. Find the first unchecked `- [ ]` step. Earlier checked steps are done - do not redo them, but read the code they touched before continuing.
 3. For each unchecked step, in order:
    a. Implement exactly that step, following CLAUDE.md conventions and the step's Reuses list.
