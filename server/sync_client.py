@@ -151,6 +151,9 @@ class GameDeviceConfig:
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
+    # Layout for save sharing (issue #577).
+    layout: str = "Single"           # 'Single' or 'Shared'
+    shared_id: str = ""              # identifier for a shared memcard/file when layout='Shared'
     # Console-level network/local folder config; transient — populates the console row.
     device_network_folder: str = ""
     device_local_folder: str = ""

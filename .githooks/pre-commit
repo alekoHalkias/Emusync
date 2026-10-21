@@ -1,7 +1,24 @@
 #!/usr/bin/env bash
 # Pre-commit checks:
+#   0. Block commits containing Python files that don't compile.
 #   1. Warn when architecture-defining files change without CLAUDE.md being updated.
 #   2. Warn when committing on a branch that isn't linked to a GitHub issue.
+
+# ── Python syntax check (staged files) ────────────────────────────────────────
+# A garbled merge/overwrite once broke every test at import time (#585).
+
+PY=.venv/bin/python
+[ -x "$PY" ] || PY=python3
+staged_py=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$')
+if [ -n "$staged_py" ]; then
+  # shellcheck disable=SC2086
+  if ! "$PY" -m py_compile $staged_py; then
+    echo ""
+    echo "✖  Syntax error in a staged Python file (see above). Fix it before committing."
+    echo ""
+    exit 1
+  fi
+fi
 
 # ── Issue-linked branch check ─────────────────────────────────────────────────
 

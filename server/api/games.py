@@ -38,6 +38,9 @@ class GameDeviceRequest(BaseModel):
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
+    # Layout for save sharing (issue #577).
+    layout: str = "Single"           # 'Single' or 'Shared'
+    shared_id: str = ""              # identifier for a shared memcard/file when layout='Shared'
     # Transient: populate the console row's per-console network/local folders.
     device_network_folder: str = ""
     device_local_folder: str = ""
@@ -110,10 +113,19 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     gd = _get_store().get_game_device(slug, device_id)
     if not gd:
         raise HTTPException(status_code=404, detail="No device config for this game")
-    return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command,
-            "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path,
-            "rom_source": gd.rom_source, "rom_rel_path": gd.rom_rel_path,
-            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256}
+    return {
+        "rom_path": gd.rom_path,
+        "save_path": gd.save_path,
+        "launch_command": gd.launch_command,
+        "state_path": gd.state_path,
+        "rom_folder_path": gd.rom_folder_path,
+        "rom_source": gd.rom_source,
+        "rom_rel_path": gd.rom_rel_path,
+        "local_rom_path": gd.local_rom_path,
+        "rom_sha256": gd.rom_sha256,
+        "layout": gd.layout,
+        "shared_id": gd.shared_id
+    }
 
 
 @router.delete("/games/{slug}/device")
@@ -169,6 +181,8 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
             rom_rel_path=req.rom_rel_path,
             local_rom_path=req.local_rom_path,
             rom_sha256=req.rom_sha256,
+            layout=req.layout or "Single",
+            shared_id=req.shared_id,
         )
     )
 
