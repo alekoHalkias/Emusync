@@ -10,7 +10,7 @@ Fix attempts: 0
 Users drop a folder (`theme.json`, `theme.css`, assets) in `<configDir>/themes/` and pick it in settings; Big Picture restyles live with no reload.
 
 ## Steps
-- [ ] 1. Main-process theme module: scan `<configDir>/themes/*/theme.json`, `theme:list` -> `[{id,name,author}]` (id = folder name, always plus bundled `default`), `theme:get(id)` -> `{css}` read from the file named by `theme.json` `css` (default `theme.css`; path must resolve inside the theme dir). Register `emusync-theme://<id>/<path>` protocol (privileged scheme before ready, `protocol.handle` after) serving files from the themes dir only, rejecting `..` escapes. Register IPC in main.ts.
+- [x] 1. Main-process theme module: scan `<configDir>/themes/*/theme.json`, `theme:list` -> `[{id,name,author}]` (id = folder name, always plus bundled `default`), `theme:get(id)` -> `{css}` read from the file named by `theme.json` `css` (default `theme.css`; path must resolve inside the theme dir). Register `emusync-theme://<id>/<path>` protocol (privileged scheme before ready, `protocol.handle` after) serving files from the themes dir only, rejecting `..` escapes. Register IPC in main.ts.
   - Files: gui/electron/themes.ts (new), gui/electron/main.ts
   - Reuses: gui/electron/paths.ts:configDir, gui/electron/display.ts registerDisplayIpc pattern
   - New: themes.ts - no existing theme/protocol code; kept separate from display.ts (file size rule, ~300 lines)
@@ -45,3 +45,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (theme:list, theme:get, d
 - Default theme stays always-on as the base layer rather than a selectable overlay, so partial themes inherit it.
 
 ## Log
+Step 1: CLAUDE.md rule line staged early (from HEAD blob, not the working copy which has unrelated uncommitted edits) to satisfy the pre-commit hook; step 9 still covers ARCHITECTURE.md.
