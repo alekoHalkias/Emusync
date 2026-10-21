@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 27
+_SCHEMA_VERSION = 28
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -209,6 +209,14 @@ CREATE TABLE IF NOT EXISTS console_save_conflicts (
     loser_hash        TEXT NOT NULL DEFAULT '',
     resolved_at       TEXT NOT NULL,
     status            TEXT NOT NULL DEFAULT 'open'
+);
+CREATE TABLE IF NOT EXISTS game_metadata (
+    slug         TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE,
+    synopsis     TEXT NOT NULL DEFAULT '',
+    release_date TEXT NOT NULL DEFAULT '',
+    cover_url    TEXT NOT NULL DEFAULT '',
+    source       TEXT NOT NULL,
+    fetched_at   TEXT NOT NULL
 );
 """
 
@@ -549,4 +557,14 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # response it already fetches instead of maintaining its own copy.
         _try(conn, "ALTER TABLE console_defs ADD COLUMN shared_memcard INTEGER NOT NULL DEFAULT 0")
         _try(conn, "ALTER TABLE console_defs ADD COLUMN shared_state INTEGER NOT NULL DEFAULT 0")
+    if from_version < 28:
+        # Per-game metadata cache + manual overrides (issue #578).
+        _try(conn, """CREATE TABLE IF NOT EXISTS game_metadata (
+    slug         TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE,
+    synopsis     TEXT NOT NULL DEFAULT '',
+    release_date TEXT NOT NULL DEFAULT '',
+    cover_url    TEXT NOT NULL DEFAULT '',
+    source       TEXT NOT NULL,
+    fetched_at   TEXT NOT NULL
+)""")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

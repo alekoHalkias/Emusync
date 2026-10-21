@@ -17,7 +17,7 @@ Server caches per-game metadata (synopsis, release date, cover URL) fetched keyl
 - [x] 1. Reset the failed first attempt. Run `git stash push -u -- server/api/igdb.py server/api/defs.py server/api/games.py server/config.py server/store tests/test_metadata server/sync_client.py` first so nothing is lost, then `git checkout main -- server/api/defs.py server/api/games.py server/config.py server/store server/sync_client.py` and delete `server/api/igdb.py`, `tests/test_metadata/`, and untracked `tests/test_metadata.py`. Result: product code identical to main (this also drops the INSERT OR REPLACE change to `add_game`, which violated CLAUDE.md).
   - Files: the above
   - Reuses: main
-- [ ] 2. Schema v29: table `game_metadata(slug TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE, synopsis TEXT NOT NULL DEFAULT '', release_date TEXT NOT NULL DEFAULT '', cover_url TEXT NOT NULL DEFAULT '', source TEXT NOT NULL, fetched_at TEXT NOT NULL)`. Add to `_SCHEMA`, `if from_version < 29` in `_migrate()`, bump `_SCHEMA_VERSION`, keep the fresh-DB stamp.
+- [x] 2. Schema v28: table `game_metadata(slug TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE, synopsis TEXT NOT NULL DEFAULT '', release_date TEXT NOT NULL DEFAULT '', cover_url TEXT NOT NULL DEFAULT '', source TEXT NOT NULL, fetched_at TEXT NOT NULL)`. Add to `_SCHEMA`, `if from_version < 28` in `_migrate()`, bump `_SCHEMA_VERSION`, keep the fresh-DB stamp.
   - Files: server/store/schema.py
   - Reuses: schema.py `_try`, existing migration pattern
 - [ ] 3. Store methods `get_metadata(slug)`, `set_metadata(slug, fields, source)` (refuses to overwrite a `manual` row unless source is `manual`), `delete_metadata(slug)`. New mixin file because games.py is near the size limit; add to `Store` bases.
@@ -31,14 +31,14 @@ Server caches per-game metadata (synopsis, release date, cover URL) fetched keyl
   - Files: server/api/metadata.py, server/api/__init__.py (or wherever routers register)
   - Reuses: server/api/defs.py router/auth pattern, server/config.py load
   - New: metadata.py - no existing external-fetch service in server/
-- [ ] 6. Tests (real SQLite, no mocks, tests/test_metadata_api.py): manual PUT persists and survives GET with toggle on; DELETE then GET with toggle off returns empty default; unknown slug 404; store refuses auto overwrite of manual; stale auto row refetch path exercised by pointing the fetch base URL at a tiny local `live_server`-style stub (configurable module constant) incl. error/offline case returning default without raising; migration test from v28 DB creates the table.
+- [ ] 6. Tests (real SQLite, no mocks, tests/test_metadata_api.py): manual PUT persists and survives GET with toggle on; DELETE then GET with toggle off returns empty default; unknown slug 404; store refuses auto overwrite of manual; stale auto row refetch path exercised by pointing the fetch base URL at a tiny local `live_server`-style stub (configurable module constant) incl. error/offline case returning default without raising; migration test from v27 DB creates the table.
   - Files: tests/test_metadata_api.py
   - Reuses: tests/conftest.py client, AUTH
 - [ ] 7. Docs: docs/ARCHITECTURE.md (routes, table, config field `auto_fetch_metadata`), docs/GOTCHAS.md (manual never overwritten, Wikipedia keyless/fuzzy match, 30-day TTL). CLAUDE.md update required by the hook for config.py (one-line rule).
   - Files: docs/ARCHITECTURE.md, docs/GOTCHAS.md, CLAUDE.md
 
 ## Checklist
-Schema bump: yes (29). New IPC channel: no. New CLI subcommand: no. Config/data file change: yes (`auto_fetch_metadata`).
+Schema bump: yes (28). New IPC channel: no. New CLI subcommand: no. Config/data file change: yes (`auto_fetch_metadata`).
 
 ## Not in this plan
 - GUI display/toggle UI and manual-entry form (follow-up issue); cover download/caching (GUI art pipeline already covers art).
@@ -46,3 +46,5 @@ Schema bump: yes (29). New IPC channel: no. New CLI subcommand: no. Config/data 
 
 ## Log
 - Attempt 1 (blocked): tests had no assertions, igdb.py misused httpx and was not wired in, add_game changed to INSERT OR REPLACE. Superseded by this plan.
+- Step 1: server/sync_client.py revert to main left uncommitted (hook requires CLAUDE.md); commits with the docs step.
+- Step 2: main is at schema v27, so the bump is to v28 (plan said 29).
