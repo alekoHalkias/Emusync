@@ -16,7 +16,9 @@ import sys
 
 
 def git(cwd, *args):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True).stdout.strip()
+    # Drop GIT_DIR etc. (set inside git hooks) so cwd decides the repo.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    return subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True).stdout.strip()
 
 
 def check(data):
