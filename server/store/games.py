@@ -206,34 +206,14 @@ class GameDeviceMixin:
 
     def list_game_devices_for_device(self, device_id: str) -> list[dict]:
         rows = self._conn.execute(
-            """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
-                      gd.launch_command, gd.state_path, gd.rom_folder_path,
-                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
-                      gd.rom_sha256, gd.layout, gd.shared_id
-               FROM game_devices gd
-               JOIN games g ON g.slug = gd.game_slug
-               WHERE gd.device_id = ?
-               ORDER BY g.name""",
-            (device_id,),
-        ).fetchall()
-        return [dict(r) for r in rows], gd.state_path, gd.rom_folder_path,
-                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
-                      gd.rom_sha256, gd.layout, gd.shared_id
-               FROM game_devices gd
-               JOIN games g ON g.slug = gd.game_slug
-               WHERE gd.device_id = ?
-               ORDER BY g.name""",
-            (device_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]dict]:
-        rows = self._conn.execute(
-            """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
-                      gd.launch_command, gd.state_path, gd.rom_folder_path,
-                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path
-               FROM game_devices gd
-               JOIN games g ON g.slug = gd.game_slug
-               WHERE gd.device_id = ?
-               ORDER BY g.name""",
+            """SELECT g.slug, g.name, g.console,
+                gd.rom_path, gd.save_path, gd.launch_command, gd.state_path,
+                gd.rom_folder_path, gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
+                gd.rom_sha256, gd.layout, gd.shared_id
+            FROM game_devices gd
+            JOIN games g ON g.slug = gd.game_slug
+            WHERE gd.device_id = ?
+            ORDER BY g.name""",
             (device_id,),
         ).fetchall()
         return [dict(r) for r in rows]
