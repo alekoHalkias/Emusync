@@ -3,7 +3,7 @@
 Issue: #578
 Branch: feature/578-better-metadata
 PR: none
-Status: planned
+Status: implemented
 Fix attempts: 1
 
 ## Goal
@@ -34,7 +34,7 @@ Server caches per-game metadata (synopsis, release date, cover URL) fetched keyl
 - [x] 6. Tests (real SQLite, no mocks, tests/test_metadata_api.py): manual PUT persists and survives GET with toggle on; DELETE then GET with toggle off returns empty default; unknown slug 404; store refuses auto overwrite of manual; stale auto row refetch path exercised by pointing the fetch base URL at a tiny local `live_server`-style stub (configurable module constant) incl. error/offline case returning default without raising; migration test from v27 DB creates the table.
   - Files: tests/test_metadata_api.py
   - Reuses: tests/conftest.py client, AUTH
-- [ ] 7. Docs: docs/ARCHITECTURE.md (routes, table, config field `auto_fetch_metadata`), docs/GOTCHAS.md (manual never overwritten, Wikipedia keyless/fuzzy match, 30-day TTL). CLAUDE.md update required by the hook for config.py (one-line rule).
+- [x] 7. Docs: docs/ARCHITECTURE.md (routes, table, config field `auto_fetch_metadata`), docs/GOTCHAS.md (manual never overwritten, Wikipedia keyless/fuzzy match, 30-day TTL). CLAUDE.md update required by the hook for config.py (one-line rule).
   - Files: docs/ARCHITECTURE.md, docs/GOTCHAS.md, CLAUDE.md
 
 ## Checklist

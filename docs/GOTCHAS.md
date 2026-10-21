@@ -101,3 +101,10 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - **Two console-image sources (#505):** `getConsoleIcon` = RetroArch XMB mono glyphs (desktop grid); `getConsoleLogo` = es-theme-carbon colour SVGs via `CARBON_FOLDER` (Big Picture wheel); 3DS/Switch/PS3 from art-book-next-es-de `ART_BOOK_LOGO` (no license — fetch at runtime, never bundle). Fallback: mono icon → abbr text.
 - **Bulk Steam button (#516):** adds the not-yet-added ones; only an all-added selection flips to Remove (shortcut only; art/collection left inert).
 - **Timestamps are UTC;** a tz-less ISO string parses as local in JS → use `parseUtc()` in `time.tsx`.
+
+## Game metadata (#578)
+
+- Manual rows (`source='manual'`) are protected in `Store.set_metadata` itself, not in the route, so no caller can clobber them. DELETE is the only way back to auto-fetch.
+- Wikipedia is a fuzzy keyless match (`"<name> video game"`, first hit). It yields synopsis and thumbnail only; there is no release date, so that field is manual-only. Wrong match: PUT the right text.
+- Fetch never raises and retries once (1s) on 429/5xx. `WIKI_BASE` is a module constant so tests can point it at a local stub server.
+- `auto_fetch_metadata` is written to `emusync.toml` only when false (default true).
