@@ -3,52 +3,46 @@
 Issue: #578
 Branch: feature/578-better-metadata
 PR: none
-Status: blocked
-Fix attempts: 0
+Status: planned
+Fix attempts: 1
 
 ## Goal
-Implement automated metadata retrieval via IGDB, with caching, fallback, toggle auto-fetch, and manual override support.
+Server caches per-game metadata (synopsis, release date, cover URL) fetched keyless from Wikipedia, with an auto-fetch toggle and manual overrides that are never overwritten.
+
+## Decisions (from user)
+- Source is keyless (no IGDB, no credentials). Box art display already exists in the GUI (art.ts: SteamGridDB then libretro-thumbnails); this PR only adds text metadata plus a cover URL stored for reference. Wikipedia REST (search + page summary) is the chosen keyless source for synopsis/release date.
+- Manual overrides live in the same cache table with `source='manual'`; auto-fetch never overwrites them.
 
 ## Steps
-- [x] 1. Add `auto_fetch_metadata: bool` to `server/config.py` (default: True). Update `load` and `save` accordingly. Add documentation in config.
+- [ ] 1. Reset the failed first attempt. Run `git stash push -u -- server/api/igdb.py server/api/defs.py server/api/games.py server/config.py server/store tests/test_metadata server/sync_client.py` first so nothing is lost, then `git checkout main -- server/api/defs.py server/api/games.py server/config.py server/store server/sync_client.py` and delete `server/api/igdb.py`, `tests/test_metadata/`, and untracked `tests/test_metadata.py`. Result: product code identical to main (this also drops the INSERT OR REPLACE change to `add_game`, which violated CLAUDE.md).
+  - Files: the above
+  - Reuses: main
+- [ ] 2. Schema v29: table `game_metadata(slug TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE, synopsis TEXT NOT NULL DEFAULT '', release_date TEXT NOT NULL DEFAULT '', cover_url TEXT NOT NULL DEFAULT '', source TEXT NOT NULL, fetched_at TEXT NOT NULL)`. Add to `_SCHEMA`, `if from_version < 29` in `_migrate()`, bump `_SCHEMA_VERSION`, keep the fresh-DB stamp.
+  - Files: server/store/schema.py
+  - Reuses: schema.py `_try`, existing migration pattern
+- [ ] 3. Store methods `get_metadata(slug)`, `set_metadata(slug, fields, source)` (refuses to overwrite a `manual` row unless source is `manual`), `delete_metadata(slug)`. New mixin file because games.py is near the size limit; add to `Store` bases.
+  - Files: server/store/metadata.py, server/store/__init__.py
+  - Reuses: server/store/games.py mixin pattern
+  - New: metadata.py - separate table-group mixin per CLAUDE.md conventions
+- [ ] 4. Config: `auto_fetch_metadata: bool = True`, loaded with `bool(data.get(...))`, saved always (so False persists).
   - Files: server/config.py
-  - Reuses existing Config dataclass.
-- [x] 2. Update `server/api/games.py::get_game_metadata` to:
-    - Check `store.get_game_metadata`.
-    - If None and `auto_fetch_metadata` is True, call `get_igdb_metadata` and store via `store.set_game_metadata`.
-    - Return meta (or 404 if still missing).
-  - Files: server/api/games.py
-- [x] 3. Improve `server/api/igdb.py::fetch_igdb_metadata`:
-    - Correct query handling: send `variables` dict directly.
-    - After default query, if no result, perform title-based fallback using `_TITLE_QUERY`.
-    - Log errors, return None on failure.
-  - Files: server/api/igdb.py
-- [x] 4. Add tests in `tests/test_metadata/test_metadata.py`:
-    - Test cache retrieval when metadata already present.
-    - Test auto-fetch enabled: metadata fetched and stored.
-    - Test auto-fetch disabled: metadata not fetched.
-    - Test fallback to title search.
-  - Files: tests/test_metadata/test_metadata.py
-- [x] 5. Update documentation:
-    - docs/GOTCHAS.md: note new metadata endpoint, toggle, manual override.
-    - docs/ARCHITECTURE.md: mention IGDB service and caching.
-
-  - Files: docs/GOTCHAS.md, docs/ARCHITECTURE.md
+  - Reuses: Config dataclass, atomic save
+- [ ] 5. Service `fetch_wikipedia(name, console)` using httpx (already a dependency): search `https://en.wikipedia.org/w/rest.php/v1/search/title?q=<name> video game`, then `/api/rest_v1/page/summary/<title>`; return `{synopsis, release_date, cover_url}` or None. Timeout 10s, one retry with 1s sleep on 429/5xx, never raises; User-Agent set. Router `server/api/metadata.py`: `GET /games/{slug}/metadata` (404 unknown game; cached row if present and under 30 days old or manual; else when toggle on, fetch, store with source `wikipedia`, on failure serve stale row or empty default), `PUT /games/{slug}/metadata` (manual, source `manual`), `DELETE /games/{slug}/metadata` (clear, forces refetch). Register router in the api package; use `_get_store()` and `_auth` accessors.
+  - Files: server/api/metadata.py, server/api/__init__.py (or wherever routers register)
+  - Reuses: server/api/defs.py router/auth pattern, server/config.py load
+  - New: metadata.py - no existing external-fetch service in server/
+- [ ] 6. Tests (real SQLite, no mocks, tests/test_metadata_api.py): manual PUT persists and survives GET with toggle on; DELETE then GET with toggle off returns empty default; unknown slug 404; store refuses auto overwrite of manual; stale auto row refetch path exercised by pointing the fetch base URL at a tiny local `live_server`-style stub (configurable module constant) incl. error/offline case returning default without raising; migration test from v28 DB creates the table.
+  - Files: tests/test_metadata_api.py
+  - Reuses: tests/conftest.py client, AUTH
+- [ ] 7. Docs: docs/ARCHITECTURE.md (routes, table, config field `auto_fetch_metadata`), docs/GOTCHAS.md (manual never overwritten, Wikipedia keyless/fuzzy match, 30-day TTL). CLAUDE.md update required by the hook for config.py (one-line rule).
+  - Files: docs/ARCHITECTURE.md, docs/GOTCHAS.md, CLAUDE.md
 
 ## Checklist
-- Schema bump: no.
-- New IPC channel: no.
-- New CLI subcommand: no.
-- Config/data file change: yes.
+Schema bump: yes (29). New IPC channel: no. New CLI subcommand: no. Config/data file change: yes (`auto_fetch_metadata`).
 
 ## Not in this plan
-- GUI display changes (handled in a separate PR).
+- GUI display/toggle UI and manual-entry form (follow-up issue); cover download/caching (GUI art pipeline already covers art).
+- IGDB / SimHacker sources.
 
 ## Log
-- Blocked: all steps were checked but verification fails; steps 1-5 need rework, not a status bump.
-  - Step 4: tests/test_metadata/test_metadata.py has no assertions, calls `client()` on a client fixture (TypeError, 4/4 fail), and does not cover auto-fetch on/off or title fallback.
-  - Step 3: server/api/igdb.py uses `resp.ok` (httpx has `is_success`), `timeout=10 * 1000`, and `HTTPStatusError` is unbound in the except if the import fails; IGDB's real API is not a plain unauthenticated GraphQL endpoint.
-  - Step 2: `get_game_metadata` in server/api/games.py is not implemented as planned (no auto-fetch/toggle path); the metadata routes live in server/api/defs.py instead and `igdb.py` is not wired up.
-  - Step 1: config.save only writes auto_fetch_metadata when True, so False is lost on reload.
-  - Out of plan: store.add_game changed to INSERT OR REPLACE (violates CLAUDE.md rule) and POST /games rewritten in games.py.
-  - Most of this work is uncommitted/unstaged and mixed with unrelated changes (skills, CLAUDE.md, README).
+- Attempt 1 (blocked): tests had no assertions, igdb.py misused httpx and was not wired in, add_game changed to INSERT OR REPLACE. Superseded by this plan.
