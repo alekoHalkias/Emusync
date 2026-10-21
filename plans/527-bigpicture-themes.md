@@ -3,7 +3,7 @@
 Issue: #527
 Branch: feature/527-bigpicture-themes
 PR: none
-Status: implemented
+Status: shipped
 Fix attempts: 0
 
 ## Goal
