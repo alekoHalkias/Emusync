@@ -17,7 +17,7 @@ Users drop a folder (`theme.json`, `theme.css`, assets) in `<configDir>/themes/`
 - [x] 2. Persist selection: add `theme: string` (default `"default"`) to `Display` in display.json; `display:get` returns it, new `display:setTheme(id)` saves it. Not in emusync.toml (#499).
   - Files: gui/electron/display.ts
   - Reuses: display.ts load()/save()
-- [ ] 3. Preload + types: `theme.list/get`, `display.setTheme`, theme in `display.get` result type.
+- [x] 3. Preload + types: `theme.list/get`, `display.setTheme`, theme in `display.get` result type.
   - Files: gui/electron/preload.ts, gui/renderer/src/emusync.d.ts
 - [ ] 4. Move the `html[data-bigpicture]` colour/typography block (styles.css lines ~836-862) into `gui/renderer/src/themes/default.css`, imported by styles.css/App so it is the reference example (header comment documents the variables, selector scope, `emusync-theme://` asset URLs, `logos/<consoleKey>.svg`). It stays scoped `html[data-bigpicture]` (lower specificity than `[data-theme="<id>"]`) so partial user themes layer over it. Backdrop, wheel and gamepad focus rules stay in the base styles.css (#500: themes cannot break navigation).
   - Files: gui/renderer/src/styles.css, gui/renderer/src/themes/default.css (new)

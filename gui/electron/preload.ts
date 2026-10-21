@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld("emusync", {
     localIp: (): Promise<string | null> => ipcRenderer.invoke("server:local-ip"),
   },
   display: {
-    get: (): Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean }> => ipcRenderer.invoke("display:get"),
+    get: (): Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean; theme: string }> => ipcRenderer.invoke("display:get"),
     onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void): (() => void) => {
       const handler = (_e: unknown, d: { fullscreen: boolean; bigPicture: boolean }) => cb(d);
       ipcRenderer.on("display:changed", handler);
@@ -38,6 +38,11 @@ contextBridge.exposeInMainWorld("emusync", {
     },
     cycleScale: (): Promise<number> => ipcRenderer.invoke("display:cycleScale"),
     toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke("display:toggleFullscreen"),
+    setTheme: (theme: string): Promise<string> => ipcRenderer.invoke("display:setTheme", theme),
+  },
+  theme: {
+    list: (): Promise<Array<{ id: string; name: string; author: string }>> => ipcRenderer.invoke("theme:list"),
+    get: (id: string): Promise<{ css: string } | null> => ipcRenderer.invoke("theme:get", id),
   },
   launcher: {
     path: (): Promise<string> => ipcRenderer.invoke("launcher:path"),
