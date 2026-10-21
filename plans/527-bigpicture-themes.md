@@ -25,7 +25,7 @@ Users drop a folder (`theme.json`, `theme.css`, assets) in `<configDir>/themes/`
 - [x] 5. Renderer apply: in App.tsx, when `display.theme !== "default"`, `theme.get(id)` -> inject into `<style id="theme">`, set `documentElement.dataset.theme`; switching removes/replaces both. Applies only while Big Picture is on.
   - Files: gui/renderer/src/App.tsx
   - Reuses: existing data-bigpicture effect at App.tsx:45
-- [ ] 6. Theme picker in settings Display section (select fed by `theme.list`, calls `display.setTheme`, `onDisplay({theme})`); empty-list hint shows folder location via the existing data-folder row pattern.
+- [x] 6. Theme picker in settings Display section (select fed by `theme.list`, calls `display.setTheme`, `onDisplay({theme})`); empty-list hint shows folder location via the existing data-folder row pattern.
   - Files: gui/renderer/src/components/ServerStatusButton.tsx
   - Reuses: ServerStatusButton display/onDisplay props
 - [ ] 7. Per-console logos: in `art:getConsoleLogo`, first check `<themes>/<selectedTheme>/logos/<consoleKey>.svg` (return data URL), else existing Carbon/ART_BOOK flow. ConsoleLogo refetches when theme changes (pass theme id as effect dep from App via ConsoleGrid prop).
@@ -45,4 +45,5 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (theme:list, theme:get, d
 - Default theme stays always-on as the base layer rather than a selectable overlay, so partial themes inherit it.
 
 ## Log
+Step 6: empty-list hint is generic text (no IPC to expose the config dir path; the plan said to show the folder location).
 Step 1: CLAUDE.md rule line staged early (from HEAD blob, not the working copy which has unrelated uncommitted edits) to satisfy the pre-commit hook; step 9 still covers ARCHITECTURE.md.
