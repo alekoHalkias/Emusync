@@ -41,13 +41,15 @@ Stack: Python 3.10+/Click, FastAPI+uvicorn, SQLite, zeroconf, tomlkit, httpx; El
 
 No permission pause for anything scoped to this repo or its GitHub (read, edit, `gh`/`git`/build/test, issue/PR creation, commit/push). Pause only for changes outside the repo, or irreversible git ops (`push --force`, `reset --hard`, `checkout --`/`restore` over uncommitted work, `branch -D`, `--no-verify`, `--amend` on published commits). Verify external state (e.g. "PR merged?") via `gh`/`git`. Clarifying questions are fine.
 
-## Workflow — before touching code
+## Workflow — mandatory skills pipeline
 
-Skills `/issue` → `/plan` → `/implement` automate this. Manual:
-1. Find/create an issue (`gh issue list --repo alekoHalkias/Emusync`; create with `gh issue create`, fallback `curl` + `$GITHUB_TOKEN`; if neither, tell the user to `gh auth login`).
-2. `git fetch --prune && git branch -r` — stop and flag if a `feature/*`/`copilot/*` branch touches the same files.
-3. Branch `feature/<issue>-short-desc` from fresh `main` (skip if already on one). Never commit to `main`.
-4. PR body uses `Closes #N`.
+Every code change goes through `/issue` → `/plan` → `/implement` → `/ship` (`.claude/skills/`). No exceptions for "small" fixes.
+
+- **Detect new issues.** If the user describes a feature, bug, or change they want (even casually, without saying "issue"), invoke `/issue` with that description before anything else. Do not start reading-to-fix or editing.
+- **No code edits outside `/implement`.** Do not edit, write, or delete any tracked file except via `/implement` working an approved plan file `plans/<N>-*.md` on its `feature/<N>-*` branch (`/plan` writes only the plan file; `/ship` writes only plan status and fix steps). If asked to change code directly, refuse briefly and route through the pipeline: `/issue` for new work, or `/plan <N>` / `/implement <N>` to resume.
+- **Resume, don't restart.** Given an issue or PR number, resolve the stage per `/plan`'s "Resolve" section and continue there.
+- **Exempt:** read-only investigation and answering questions; editing `.claude/skills/` itself when the user explicitly asks to change the workflow.
+- No emojis in issues, plans, commits, or PRs. Never commit to `main`. PR body uses `Closes #N`.
 
 Stop and warn if: another branch edits the same key files; the issue is assigned/active elsewhere; branch has no issue number.
 Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version}-linux-x86_64.AppImage`, `EmuSync-{version}-windows-x64-setup.exe`.
