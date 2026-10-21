@@ -2,7 +2,7 @@
 
 Issue: #578
 Branch: feature/578-better-metadata
-PR: none
+PR: #588
 Status: shipped
 Fix attempts: 0
 
