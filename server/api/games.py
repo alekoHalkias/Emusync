@@ -44,8 +44,11 @@ async def add_game(request: Request, body: dict) -> GameResponse:
     name = body.get("name")
     if not name:
         raise HTTPException(status_code=400, detail="name required")
-    game = store.add_game(name)
-    return GameResponse(**game.model_dump(exclude_none=True))
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    game = store.add_game(slug, name)
+    from dataclasses import asdict
+    return GameResponse(**asdict(game))
 
 @router.get("/games/overview")
 async def list_games(

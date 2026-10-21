@@ -3,7 +3,7 @@
 Issue: #578
 Branch: feature/578-better-metadata
 PR: none
-Status: planned
+Status: blocked
 Fix attempts: 0
 
 ## Goal
@@ -45,4 +45,10 @@ Implement automated metadata retrieval via IGDB, with caching, fallback, toggle 
 - GUI display changes (handled in a separate PR).
 
 ## Log
-- None yet.
+- Blocked: all steps were checked but verification fails; steps 1-5 need rework, not a status bump.
+  - Step 4: tests/test_metadata/test_metadata.py has no assertions, calls `client()` on a client fixture (TypeError, 4/4 fail), and does not cover auto-fetch on/off or title fallback.
+  - Step 3: server/api/igdb.py uses `resp.ok` (httpx has `is_success`), `timeout=10 * 1000`, and `HTTPStatusError` is unbound in the except if the import fails; IGDB's real API is not a plain unauthenticated GraphQL endpoint.
+  - Step 2: `get_game_metadata` in server/api/games.py is not implemented as planned (no auto-fetch/toggle path); the metadata routes live in server/api/defs.py instead and `igdb.py` is not wired up.
+  - Step 1: config.save only writes auto_fetch_metadata when True, so False is lost on reload.
+  - Out of plan: store.add_game changed to INSERT OR REPLACE (violates CLAUDE.md rule) and POST /games rewritten in games.py.
+  - Most of this work is uncommitted/unstaged and mixed with unrelated changes (skills, CLAUDE.md, README).
