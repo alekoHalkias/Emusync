@@ -2,7 +2,7 @@
 
 Issue: #527
 Branch: feature/527-bigpicture-themes
-PR: none
+PR: #589
 Status: shipped
 Fix attempts: 0
 
