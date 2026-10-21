@@ -32,6 +32,8 @@ class Config:
     recent_import_folders: dict = field(default_factory=dict)
     # Opt-in background save/state watcher in sync-daemon (issue #242).
     watch_saves: bool = False
+    # Auto-fetch game metadata (synopsis/release date) from Wikipedia (issue #578).
+    auto_fetch_metadata: bool = True
     # Per-console remembered import ROM source + local-copy destination (issue #255).
     import_rom_source: dict = field(default_factory=dict)
     import_local_folder: dict = field(default_factory=dict)
@@ -77,6 +79,7 @@ def load() -> Config:
         import_rom_source=dict(data.get("import_rom_source", {})),
         import_local_folder=dict(data.get("import_local_folder", {})),
         art_type_by_console=dict(data.get("art_type_by_console", {})),
+        auto_fetch_metadata=bool(data.get("auto_fetch_metadata", True)),
     )
 
 
@@ -93,6 +96,8 @@ def save(cfg: Config) -> None:
         doc.add("server_pin", cfg.server_pin)
     if cfg.watch_saves:
         doc.add("watch_saves", cfg.watch_saves)
+    if not cfg.auto_fetch_metadata:  # default True; only persist the opt-out
+        doc.add("auto_fetch_metadata", False)
     if cfg.recent_import_folders:
         doc.add("recent_import_folders", cfg.recent_import_folders)
     if cfg.import_rom_source:

@@ -24,7 +24,7 @@ Server caches per-game metadata (synopsis, release date, cover URL) fetched keyl
   - Files: server/store/metadata.py, server/store/__init__.py
   - Reuses: server/store/games.py mixin pattern
   - New: metadata.py - separate table-group mixin per CLAUDE.md conventions
-- [ ] 4. Config: `auto_fetch_metadata: bool = True`, loaded with `bool(data.get(...))`, saved always (so False persists).
+- [x] 4. Config: `auto_fetch_metadata: bool = True`, loaded with `bool(data.get(...))`, saved always (so False persists).
   - Files: server/config.py
   - Reuses: Config dataclass, atomic save
 - [ ] 5. Service `fetch_wikipedia(name, console)` using httpx (already a dependency): search `https://en.wikipedia.org/w/rest.php/v1/search/title?q=<name> video game`, then `/api/rest_v1/page/summary/<title>`; return `{synopsis, release_date, cover_url}` or None. Timeout 10s, one retry with 1s sleep on 429/5xx, never raises; User-Agent set. Router `server/api/metadata.py`: `GET /games/{slug}/metadata` (404 unknown game; cached row if present and under 30 days old or manual; else when toggle on, fetch, store with source `wikipedia`, on failure serve stale row or empty default), `PUT /games/{slug}/metadata` (manual, source `manual`), `DELETE /games/{slug}/metadata` (clear, forces refetch). Register router in the api package; use `_get_store()` and `_auth` accessors.
