@@ -37,6 +37,16 @@ class GameDetails(BaseModel):
     igdb: Optional[dict] = Field(None, description="IGDB metadata (title, synopsis, cover art)")
 
 
+@router.post("/games")
+async def add_game(request: Request, body: dict) -> GameResponse:
+    """Create a new game."""
+    store = _get_store()
+    name = body.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="name required")
+    game = store.add_game(name)
+    return GameResponse(**game.model_dump(exclude_none=True))
+
 @router.get("/games/overview")
 async def list_games(
     request: Request,
