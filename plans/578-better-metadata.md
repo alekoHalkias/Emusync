@@ -20,7 +20,7 @@ Server caches per-game metadata (synopsis, release date, cover URL) fetched keyl
 - [x] 2. Schema v28: table `game_metadata(slug TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE, synopsis TEXT NOT NULL DEFAULT '', release_date TEXT NOT NULL DEFAULT '', cover_url TEXT NOT NULL DEFAULT '', source TEXT NOT NULL, fetched_at TEXT NOT NULL)`. Add to `_SCHEMA`, `if from_version < 28` in `_migrate()`, bump `_SCHEMA_VERSION`, keep the fresh-DB stamp.
   - Files: server/store/schema.py
   - Reuses: schema.py `_try`, existing migration pattern
-- [ ] 3. Store methods `get_metadata(slug)`, `set_metadata(slug, fields, source)` (refuses to overwrite a `manual` row unless source is `manual`), `delete_metadata(slug)`. New mixin file because games.py is near the size limit; add to `Store` bases.
+- [x] 3. Store methods `get_metadata(slug)`, `set_metadata(slug, fields, source)` (refuses to overwrite a `manual` row unless source is `manual`), `delete_metadata(slug)`. New mixin file because games.py is near the size limit; add to `Store` bases.
   - Files: server/store/metadata.py, server/store/__init__.py
   - Reuses: server/store/games.py mixin pattern
   - New: metadata.py - separate table-group mixin per CLAUDE.md conventions
