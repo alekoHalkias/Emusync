@@ -71,6 +71,7 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version
 **Config / paths / DB**
 - Never hardcode paths: use `server/paths.py` / `gui/electron/paths.ts` (XDG dirs; `EMUSYNC_*_DIR` disables migration; #564).
 - GUI-only settings go in `display.json`, not `emusync.toml` (Python drops unknown keys, #499). All config writes atomic + 0600; corrupt TOML renamed `.corrupt-<ms>` (#535).
+- Game metadata (`game_metadata`, #578): keyless Wikipedia fetch, gated by `auto_fetch_metadata` (toml, default true); `source=manual` rows are never overwritten by auto-fetch (docs/GOTCHAS.md).
 - Schema change: add `if from_version < N` in `_migrate()`, bump `_SCHEMA_VERSION`, add to `_SCHEMA`; keep the fresh-DB `user_version` stamp. One SQLite connection per thread. `no such column` → delete `emusync.db`.
 - New IPC channel → also add to `gui/renderer/src/emusync.d.ts`. Main process uses `fetch`, not `http.get`.
 - `server_host` is `""` on server devices (fall back to localhost; guard on `server_port`). `config:load` returns `null` if absent/corrupt. Pairing token regex `Pairing token: (\S*)` (blank PIN). Token prints before uvicorn binds — poll `/health`. `server:start` returns `{ok:false,error}` on early exit (#534). `install.sh`/`server:preflight` check Python/venv (#536).

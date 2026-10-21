@@ -328,3 +328,7 @@ Eden stores each installed mod for a title as its own subfolder under `load/<tit
 
 
 - **`cli/run_ps3.py`** (#422): PS3/RPCS3 — `_resolve_written_ps3_save` adopts the single `dev_hdd0/home/00000001/savedata/<TITLE_ID>/` folder written during a session (native, flatpak, EmuDeck roots), like Wii's learned save. `ps3` console def in `consoles_data.py` scans `.iso`/`.pkg`; directory-style (`PS3_GAME/`) games are not scannable yet.
+
+## Game metadata (#578)
+
+`server/api/metadata.py`: `GET/PUT/DELETE /games/{slug}/metadata`. Cached in the `game_metadata` table (schema v28: `synopsis`, `release_date`, `cover_url`, `source`, `fetched_at`; `server/store/metadata.py`). GET refetches a missing or 30-day-stale non-manual row from Wikipedia (keyless, search then page summary) when config `auto_fetch_metadata` is true; failures fall back to the stale row, then empty fields. PUT stores a `source='manual'` row that auto-fetch never overwrites; DELETE clears it.

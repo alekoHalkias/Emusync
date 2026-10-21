@@ -16,6 +16,7 @@ from server.store.devices import DeviceMixin
 from server.store.events import EventMixin
 from server.store.games import GameDeviceMixin, GameMixin
 from server.store.locks import LOCK_TTL_HOURS, LockMixin
+from server.store.metadata import MetadataMixin
 from server.store.models import (
     Console,
     Device,
@@ -44,6 +45,7 @@ class Store(
     ConflictMixin,
     SettingsMixin,
     SwitchModMixin,
+    MetadataMixin,
     StoreBase,
 ):
     """SQLite-backed store. CRUD is split across the mixins above; connection and
