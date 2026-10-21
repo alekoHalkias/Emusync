@@ -46,7 +46,7 @@ fi
 if [ -d "$SCRIPT_DIR/.git" ]; then
     echo "==> Installing git hooks..."
     git -C "$SCRIPT_DIR" config core.hooksPath .githooks
-    echo "    Git hooks installed (pre-commit will warn on CLAUDE.md drift)."
+    echo "    Git hooks installed (pre-commit: syntax + CLAUDE.md drift; pre-push: lint + test-changed)."
 fi
 
 echo ""
