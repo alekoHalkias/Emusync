@@ -385,6 +385,7 @@ export default function App(): React.ReactElement {
             <ConsoleGrid
               games={games}
               bigPicture={display.bigPicture}
+              theme={display.theme}
               onSelectConsole={(key, label, abbr) =>
                 setScreen({ name: "console", key, label, abbr })
               }

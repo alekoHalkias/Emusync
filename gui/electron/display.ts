@@ -12,6 +12,8 @@ const SCALES = [1, 1.25, 1.5, 2];
 
 interface Display { scale: number; fullscreen: boolean; bigPicture: boolean; theme: string }
 
+export const selectedTheme = (): string => load().theme;
+
 function load(): Display {
   let saved: Partial<Display> = {};
   try {

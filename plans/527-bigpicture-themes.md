@@ -28,7 +28,7 @@ Users drop a folder (`theme.json`, `theme.css`, assets) in `<configDir>/themes/`
 - [x] 6. Theme picker in settings Display section (select fed by `theme.list`, calls `display.setTheme`, `onDisplay({theme})`); empty-list hint shows folder location via the existing data-folder row pattern.
   - Files: gui/renderer/src/components/ServerStatusButton.tsx
   - Reuses: ServerStatusButton display/onDisplay props
-- [ ] 7. Per-console logos: in `art:getConsoleLogo`, first check `<themes>/<selectedTheme>/logos/<consoleKey>.svg` (return data URL), else existing Carbon/ART_BOOK flow. ConsoleLogo refetches when theme changes (pass theme id as effect dep from App via ConsoleGrid prop).
+- [x] 7. Per-console logos: in `art:getConsoleLogo`, first check `<themes>/<selectedTheme>/logos/<consoleKey>.svg` (return data URL), else existing Carbon/ART_BOOK flow. ConsoleLogo refetches when theme changes (pass theme id as effect dep from App via ConsoleGrid prop).
   - Files: gui/electron/art.ts, gui/renderer/src/components/ConsoleGrid.tsx, gui/renderer/src/App.tsx
   - Reuses: art.ts getConsoleLogo toUrl pattern; themes.ts path-safe resolver from step 1
 - [ ] 8. Tests: no JS test harness exists (gui/package.json has none) and no Python/API/Store surface changes, so no automated tests; manual check: sample theme folder in themes dir, switch in settings, asset url loads, `..` traversal returns 404, bad theme.json skipped. `make test-changed` still run.

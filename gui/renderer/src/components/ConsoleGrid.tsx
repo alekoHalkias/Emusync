@@ -66,14 +66,14 @@ function ConsoleIcon({ consoleKey, abbr }: { consoleKey: string; abbr: string })
 }
 
 /** Big Picture wheel (#505): colour wordmark logo, falling back to the monochrome icon/text. */
-function ConsoleLogo({ consoleKey, abbr }: { consoleKey: string; abbr: string }): React.ReactElement | null {
+function ConsoleLogo({ consoleKey, abbr, theme }: { consoleKey: string; abbr: string; theme?: string }): React.ReactElement | null {
   const [state, setState] = useState<{ url: string | null; done: boolean }>({ url: null, done: false });
 
   useEffect(() => {
     window.emusync.art.getConsoleLogo(consoleKey)
       .then((url) => setState({ url, done: true }))
       .catch(() => setState({ url: null, done: true }));
-  }, [consoleKey]);
+  }, [consoleKey, theme]);
 
   if (state.url) return <img src={state.url} alt={abbr} className="wheel-logo" />;
   // Render nothing while loading so the fallback icon doesn't flash first.
@@ -84,9 +84,10 @@ type Props = {
   games: GameRow[];
   onSelectConsole: (consoleKey: string, consoleLabel: string, consoleAbbr: string) => void;
   bigPicture?: boolean;
+  theme?: string; // refetches themed wheel logos on change (#527)
 };
 
-export default function ConsoleGrid({ games, onSelectConsole, bigPicture }: Props): React.ReactElement {
+export default function ConsoleGrid({ games, onSelectConsole, bigPicture, theme }: Props): React.ReactElement {
   const [consoleDefs, setConsoleDefs] = useState<ConsoleDef[]>([]);
 
   useEffect(() => {
@@ -134,7 +135,7 @@ export default function ConsoleGrid({ games, onSelectConsole, bigPicture }: Prop
     return (
       <ConsoleWheel
         items={cards.map((c) => ({ ...c, color: CONSOLE_COLOR[c.key] ?? DEFAULT_COLOR }))}
-        renderIcon={(c) => <ConsoleLogo consoleKey={c.key} abbr={c.abbr} />}
+        renderIcon={(c) => <ConsoleLogo consoleKey={c.key} abbr={c.abbr} theme={theme} />}
         onSelect={(c) => onSelectConsole(c.key, c.label, c.abbr)}
       />
     );
