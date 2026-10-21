@@ -14,7 +14,7 @@ Server caches per-game metadata (synopsis, release date, cover URL) fetched keyl
 - Manual overrides live in the same cache table with `source='manual'`; auto-fetch never overwrites them.
 
 ## Steps
-- [ ] 1. Reset the failed first attempt. Run `git stash push -u -- server/api/igdb.py server/api/defs.py server/api/games.py server/config.py server/store tests/test_metadata server/sync_client.py` first so nothing is lost, then `git checkout main -- server/api/defs.py server/api/games.py server/config.py server/store server/sync_client.py` and delete `server/api/igdb.py`, `tests/test_metadata/`, and untracked `tests/test_metadata.py`. Result: product code identical to main (this also drops the INSERT OR REPLACE change to `add_game`, which violated CLAUDE.md).
+- [x] 1. Reset the failed first attempt. Run `git stash push -u -- server/api/igdb.py server/api/defs.py server/api/games.py server/config.py server/store tests/test_metadata server/sync_client.py` first so nothing is lost, then `git checkout main -- server/api/defs.py server/api/games.py server/config.py server/store server/sync_client.py` and delete `server/api/igdb.py`, `tests/test_metadata/`, and untracked `tests/test_metadata.py`. Result: product code identical to main (this also drops the INSERT OR REPLACE change to `add_game`, which violated CLAUDE.md).
   - Files: the above
   - Reuses: main
 - [ ] 2. Schema v29: table `game_metadata(slug TEXT PRIMARY KEY REFERENCES games(slug) ON DELETE CASCADE, synopsis TEXT NOT NULL DEFAULT '', release_date TEXT NOT NULL DEFAULT '', cover_url TEXT NOT NULL DEFAULT '', source TEXT NOT NULL, fetched_at TEXT NOT NULL)`. Add to `_SCHEMA`, `if from_version < 29` in `_migrate()`, bump `_SCHEMA_VERSION`, keep the fresh-DB stamp.

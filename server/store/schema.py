@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 28
+_SCHEMA_VERSION = 27
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -53,8 +53,6 @@ CREATE TABLE IF NOT EXISTS game_devices (
     rom_rel_path    TEXT NOT NULL DEFAULT '',
     local_rom_path  TEXT NOT NULL DEFAULT '',
     rom_sha256      TEXT NOT NULL DEFAULT '',
-    layout          TEXT NOT NULL DEFAULT 'Single',
-    shared_id       TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (game_slug, device_id)
 );
 CREATE TABLE IF NOT EXISTS saves (
@@ -551,12 +549,4 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # response it already fetches instead of maintaining its own copy.
         _try(conn, "ALTER TABLE console_defs ADD COLUMN shared_memcard INTEGER NOT NULL DEFAULT 0")
         _try(conn, "ALTER TABLE console_defs ADD COLUMN shared_state INTEGER NOT NULL DEFAULT 0")
-    if from_version < 28:
-        # Add layout (Single|Shared) and shared_id fields to game_devices.
-        # Shared layouts allow multiple games on a single console to share a
-        # memory card file; see issue #577 for details. The console-wide
-        # shared_memcard/shared_state flags still control which consoles use
-        # a shared memcard layout across all games (PS2/DC/GC/PSP/3DS).
-        _try(conn, "ALTER TABLE game_devices ADD COLUMN layout TEXT NOT NULL DEFAULT 'Single'")
-        _try(conn, "ALTER TABLE game_devices ADD COLUMN shared_id TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
