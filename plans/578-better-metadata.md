@@ -3,8 +3,8 @@
 Issue: #578
 Branch: feature/578-better-metadata
 PR: none
-Status: implemented
-Fix attempts: 1
+Status: shipped
+Fix attempts: 0
 
 ## Goal
 Server caches per-game metadata (synopsis, release date, cover URL) fetched keyless from Wikipedia, with an auto-fetch toggle and manual overrides that are never overwritten.
@@ -49,3 +49,4 @@ Schema bump: yes (28). New IPC channel: no. New CLI subcommand: no. Config/data 
 - Step 1: server/sync_client.py revert to main left uncommitted (hook requires CLAUDE.md); commits with the docs step.
 - Step 2: main is at schema v27, so the bump is to v28 (plan said 29).
 - Step 5: Wikipedia summary has no release date, so auto-fetch fills synopsis and cover_url only; release_date is manual-only. Sync (not async) routes, run in the threadpool.
+- Ship: full suite 516 passed; 1 pre-existing failure (test_new_consoles dolphin flatpak) also fails on main in this environment.
