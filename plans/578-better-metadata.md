@@ -29,9 +29,10 @@ Implement automated metadata retrieval via IGDB, with caching, fallback, toggle 
     - Test auto-fetch disabled: metadata not fetched.
     - Test fallback to title search.
   - Files: tests/test_metadata/test_metadata.py
-- [ ] 5. Update documentation:
+- [x] 5. Update documentation:
     - docs/GOTCHAS.md: note new metadata endpoint, toggle, manual override.
     - docs/ARCHITECTURE.md: mention IGDB service and caching.
+
   - Files: docs/GOTCHAS.md, docs/ARCHITECTURE.md
 
 ## Checklist
