@@ -10,7 +10,7 @@ from typing import Optional
 
 import click
 
-from cli.common import _parse_iso_utc
+from cli.common import _mtime, _newest_matching, _parse_iso_utc, _find_touched_path
 from cli.run_conflicts import _warn_save_conflict
 from server.sync_client import _memcard_payload_bytes
 
@@ -121,13 +121,6 @@ _SAVE_EXTS = {"srm", "sav", "save", "fla", "eep", "mcr", "rtc", "dsv", "ss0"}
 _STATE_RE = re.compile(r"\.state(\d+|\.auto)?$", re.IGNORECASE)
 
 
-def _mtime(p: Path) -> float:
-    try:
-        return p.stat().st_mtime
-    except OSError:
-        return 0.0
-
-
 def _saves_root(save_path: str) -> Path:
     """Directory tree to search for the real save. Saves use the content-dir
     layout savesRoot/<content>/<content>.<ext>, so the root is two levels up;
@@ -135,25 +128,6 @@ def _saves_root(save_path: str) -> Path:
     parent = Path(save_path).parent
     grand = parent.parent
     return grand if grand != parent else parent
-
-
-def _newest_matching(root: Path, since: float, match) -> Optional[Path]:
-    """Newest file under *root* (recursively) modified at/after *since* for which
-    match(file) is truthy, or None."""
-    if not root.exists():
-        return None
-    best: Optional[Path] = None
-    best_m = since
-    for f in root.rglob("*"):
-        try:
-            if not f.is_file() or not match(f):
-                continue
-            m = _mtime(f)
-        except OSError:
-            continue
-        if m >= since and (best is None or m > best_m):
-            best, best_m = f, m
-    return best
 
 
 def _resolve_written_save(configured: str, since: float) -> Optional[str]:
@@ -166,14 +140,12 @@ def _resolve_written_save(configured: str, since: float) -> Optional[str]:
     """
     if not configured:
         return None
-    p = Path(configured)
-    if p.exists() and _mtime(p) >= since:
-        return configured
-    found = _newest_matching(
-        _saves_root(configured), since,
-        lambda f: f.suffix.lstrip(".").lower() in _SAVE_EXTS and ".bak" not in f.suffixes,
+    found = _find_touched_path(
+        configured, since,
+        match=lambda f: f.suffix.lstrip(".").lower() in _SAVE_EXTS and ".bak" not in f.suffixes,
+        search_root=_saves_root(configured)
     )
-    return str(found) if found else None
+    return found
 
 
 def _resolve_written_state(configured: str, since: float) -> Optional[str]:
@@ -186,9 +158,10 @@ def _resolve_written_state(configured: str, since: float) -> Optional[str]:
     if not configured:
         return None
     folder = Path(configured)
-    if folder.is_dir() and any(
-        _mtime(f) >= since for f in folder.rglob("*") if f.is_file()
-    ):
-        return configured
-    found = _newest_matching(folder.parent, since, lambda f: bool(_STATE_RE.search(f.name)))
-    return str(found.parent) if found else None
+    found = _find_touched_path(
+        configured, since,
+        match=lambda f: bool(_STATE_RE.search(f.name)),
+        search_root=folder.parent,
+        is_dir=True
+    )
+    return found

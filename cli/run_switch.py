@@ -22,8 +22,8 @@ from typing import Optional
 
 import click
 
+from cli.common import _mtime
 from cli.detect import _switch_title_id_from_rom  # noqa: F401 — re-exported for existing callers/tests
-from cli.run_reconcile import _mtime
 
 # Native + flatpak Eden NAND roots (mirrors _WII_NAND_ROOTS in cli/run_wii.py).
 # Eden has no Flathub package yet (AppImage-only), so there's no flatpak root —

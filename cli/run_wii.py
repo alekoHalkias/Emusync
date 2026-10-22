@@ -22,7 +22,7 @@ from typing import Optional
 
 import click
 
-from cli.run_reconcile import _mtime
+from cli.common import _mtime
 
 # Native + flatpak Wii NAND roots (mirrors _DOLPHIN's native/flatpak GC paths
 # in cli/consoles_data.py, one level up from the GC folder).

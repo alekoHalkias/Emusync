@@ -57,10 +57,9 @@ from cli.run_ps2 import (  # noqa: F401 — re-exported for existing callers/tes
     _SHARED_MEMCARD_CONSOLES,
     _SHARED_STATE_CONSOLES,
 )
+from cli.common import _mtime, _newest_matching
 from cli.run_reconcile import (  # noqa: F401 — re-exported for existing callers/tests
     _decide_save_action,
-    _mtime,
-    _newest_matching,
     _reconcile_save,
     _resolve_written_save,
     _resolve_written_state,

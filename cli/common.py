@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -85,6 +86,84 @@ def _print_table(headers: list[str], rows: list[list]) -> None:
     click.echo("  ".join("-" * w for w in col_widths))
     for row in rows:
         click.echo("  ".join(str(row[i]).ljust(col_widths[i]) for i in range(n)))
+
+
+def _mtime(p) -> float:
+    """Return the modification time of a path, or 0.0 on error."""
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _newest_matching(root, since, match):
+    """Return the newest file under *root* (recursively) modified at/after *since*
+    for which match(file) is truthy, or None."""
+    if not root.exists():
+        return None
+    best = None
+    best_m = since
+    for f in root.rglob("*"):
+        try:
+            if not f.is_file() or not match(f):
+                continue
+            m = _mtime(f)
+        except OSError:
+            continue
+        if m >= since and (best is None or m > best_m):
+            best, best_m = f, m
+    return best
+
+
+def _find_touched_path(configured: str, since: float, match, search_root: Optional[Path] = None, is_dir=False, parent_only=False) -> Optional[str]:
+    """Return the path (file or directory) actually written this session, or None.
+
+    Args:
+        configured: The configured path (may be empty or None)
+        since: Only consider modifications at/after this timestamp
+        match: Function to test whether a path matches what we're looking for
+        search_root: Optional base directory to search in if 'configured' wasn't touched.
+                     If None, defaults to configured's parent (for files) or itself (for dirs).
+        is_dir: If True, return the directory containing the match, not the file itself
+        parent_only: If True, only check if the configured directory itself was touched (not its files)
+    """
+    if not configured:
+        return None
+
+    configured_path = Path(configured)
+
+    # If configured is a directory and parent_only is True, just check if the directory itself
+    # was modified since *since*.
+    if parent_only and configured_path.is_dir():
+        if _mtime(configured_path) >= since:
+            return configured
+        return None
+
+    # Check if the configured file/folder was written this session.
+    if is_dir:
+        # Check only files directly in the directory (not subdirectories)
+        if configured_path.is_dir() and any(_mtime(f) >= since for f in configured_path.iterdir() if f.is_file()):
+            return configured
+    else:
+        if configured_path.exists() and _mtime(configured_path) >= since:
+            return configured
+
+    # Configured wasn't touched — look for the newest matching file/folder elsewhere.
+    if search_root:
+        root = search_root
+    elif configured_path.is_dir():
+        root = configured_path
+    else:
+        root = configured_path.parent
+
+    found = _newest_matching(root, since, match)
+    if found is None:
+        return None
+
+    # Return the directory containing the match if requested, otherwise the file itself.
+    if is_dir or parent_only:
+        return str(found.parent)
+    return str(found)
 
 
 def _show_game_running_popup(game_name: str, device_name: str) -> None:

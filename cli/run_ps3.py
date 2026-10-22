@@ -11,7 +11,7 @@ from typing import Optional
 
 import click
 
-from cli.run_reconcile import _mtime
+from cli.common import _mtime
 
 _SAVEDATA_SUFFIX = "dev_hdd0/home/00000001/savedata"
 # Native, flatpak, and EmuDeck-redirected data dirs.
