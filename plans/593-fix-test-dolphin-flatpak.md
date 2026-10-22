@@ -2,7 +2,7 @@
 
 Issue: #593
 Branch: feature/593-fix-test-dolphin-flatpak
-PR: none
+PR: #594
 Status: implemented
 Fix attempts: 0
 
