@@ -10,10 +10,10 @@ from typing import Optional
 
 import click
 
+from cli.common import _mtime
 from cli.consoles_data import _IMPORT_CONSOLES
 from cli.detect import _dolphin_card_format
 from cli.run_conflicts import _notify
-from cli.run_reconcile import _mtime
 
 logger = logging.getLogger("emusync.run")
 
