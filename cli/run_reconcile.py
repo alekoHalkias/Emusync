@@ -10,7 +10,7 @@ from typing import Optional
 
 import click
 
-from cli.common import _mtime, _parse_iso_utc, _find_touched_path
+from cli.common import _mtime, _newest_matching, _parse_iso_utc, _find_touched_path
 from cli.run_conflicts import _warn_save_conflict
 from server.sync_client import _memcard_payload_bytes
 
@@ -140,13 +140,12 @@ def _resolve_written_save(configured: str, since: float) -> Optional[str]:
     """
     if not configured:
         return None
-    p = Path(configured)
-    # Search in the parent directory (or grandparent if different) for newer files
-    search_root = _saves_root(configured)
-    found = _newest_matching(search_root, since,
-                             lambda f: f.suffix.lstrip(".").lower() in _SAVE_EXTS
-                                       and ".bak" not in f.suffixes)
-    return str(found) if found else None
+    found = _find_touched_path(
+        configured, since,
+        match=lambda f: f.suffix.lstrip(".").lower() in _SAVE_EXTS and ".bak" not in f.suffixes,
+        search_root=_saves_root(configured)
+    )
+    return found
 
 
 def _resolve_written_state(configured: str, since: float) -> Optional[str]:
@@ -159,10 +158,10 @@ def _resolve_written_state(configured: str, since: float) -> Optional[str]:
     if not configured:
         return None
     folder = Path(configured)
-    # Check if the configured folder was written this session
-    if folder.is_dir() and any(_mtime(f) >= since for f in folder.iterdir() if f.is_file()):
-        return configured
-    # Look for the newest state file in the parent directory
-    search_root = folder.parent
-    found = _newest_matching(search_root, since, lambda f: bool(_STATE_RE.search(f.name)))
-    return str(found.parent) if found else None
+    found = _find_touched_path(
+        configured, since,
+        match=lambda f: bool(_STATE_RE.search(f.name)),
+        search_root=folder.parent,
+        is_dir=True
+    )
+    return found

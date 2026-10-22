@@ -115,18 +115,17 @@ def _newest_matching(root, since, match):
     return best
 
 
-def _find_touched_path(configured: str, since: float, match, is_dir=False, parent_only=False) -> Optional[str]:
+def _find_touched_path(configured: str, since: float, match, search_root: Optional[Path] = None, is_dir=False, parent_only=False) -> Optional[str]:
     """Return the path (file or directory) actually written this session, or None.
 
     Args:
         configured: The configured path (may be empty or None)
         since: Only consider modifications at/after this timestamp
         match: Function to test whether a path matches what we're looking for
+        search_root: Optional base directory to search in if 'configured' wasn't touched.
+                     If None, defaults to configured's parent (for files) or itself (for dirs).
         is_dir: If True, return the directory containing the match, not the file itself
         parent_only: If True, only check if the configured directory itself was touched (not its files)
-
-    Conservative policy: if configured exists and was modified since *since*, keep it.
-    Only when it was *not* do we adopt the path containing the newest matching file.
     """
     if not configured:
         return None
@@ -150,9 +149,14 @@ def _find_touched_path(configured: str, since: float, match, is_dir=False, paren
             return configured
 
     # Configured wasn't touched — look for the newest matching file/folder elsewhere.
-    # For is_dir scenarios, we check the parent directory for matching files.
-    search_root = configured_path.parent if configured_path.is_dir() else configured_path
-    found = _newest_matching(search_root, since, match)
+    if search_root:
+        root = search_root
+    elif configured_path.is_dir():
+        root = configured_path
+    else:
+        root = configured_path.parent
+
+    found = _newest_matching(root, since, match)
     if found is None:
         return None
 
