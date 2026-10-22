@@ -3,6 +3,7 @@
 import { ipcMain, dialog } from "electron";
 import { existsSync, writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, renameSync } from "fs";
 import { homedir } from "os";
+import { spawn } from "child_process";
 import { dataDir } from "./paths";
 import { join, dirname, basename, extname } from "path";
 import { rt } from "./runtime";
@@ -56,6 +57,24 @@ export function registerFilesIpc(): void {
       const stats = statSync(savePath);
       return stats.mtime.toISOString().slice(0, 19);
     } catch { return null; }
+  });
+
+  // Compute the SHA-256 hex digest of a file (issue #579).
+  ipcMain.handle("files:get-file-hash", (_event, filePath: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const proc = spawn(rt.PYTHON, ["-c",
+        "import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())",
+        filePath,
+      ]);
+      let output = "";
+      proc.stdout.on("data", (d: Buffer) => (output += d.toString()));
+      proc.stderr.on("data", (d: Buffer) => { /* ignore */ });
+      proc.on("close", (code) => {
+        if (code === 0) resolve(output.trim());
+        else reject(new Error(`hash failed (code ${code})`));
+      });
+      proc.on("error", (e: Error) => reject(e));
+    });
   });
 
   ipcMain.handle("files:get-latest-in-folder", (_event, dirPath: string) =>

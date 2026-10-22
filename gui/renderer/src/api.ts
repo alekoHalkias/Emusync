@@ -283,6 +283,25 @@ export const listConflicts = (): Promise<SaveConflict[]> => _fetch("GET", "/conf
 export const dismissConflict = (id: string): Promise<{ ok: boolean }> =>
   _fetch("POST", `/conflicts/${id}/dismiss`);
 
+// ── conflict check (issue #579) ────────────────────────────────────────────────
+
+export type ConflictCheck = {
+  diverged: boolean;
+  local_hash?: string;
+  server_hash?: string;
+  server_pushed_at?: string;
+  baseline_hash?: string;
+  baseline_synced_at?: string;
+};
+
+/** Check whether the local save hash diverges from the server (issue #579). */
+export const checkSaveConflict = (slug: string, localHash: string): Promise<ConflictCheck> =>
+  _fetch("GET", `/games/${slug}/conflicts/check?local_hash=${encodeURIComponent(localHash)}`);
+
+/** Check whether the local state hash diverges from the server (issue #579). */
+export const checkStateConflict = (slug: string, localHash: string): Promise<ConflictCheck> =>
+  _fetch("GET", `/games/${slug}/state/conflicts/check?local_hash=${encodeURIComponent(localHash)}`);
+
 /** This device's own configured games (slug/name/console/paths) — used to find
  * a shared-memcard console's local card path when recovering a console-level
  * conflict, since any game on that console has the same save_path (#482). */
