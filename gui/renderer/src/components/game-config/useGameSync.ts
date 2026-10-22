@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { getConsoleMemcardMeta, getGameDevice, getSaveMeta, getStateMeta, type SaveMeta } from "../../api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  getConsoleMemcardMeta, getGameDevice, getSaveMeta, getStateMeta,
+  checkSaveConflict, checkStateConflict, type SaveMeta, type ConflictCheck,
+} from "../../api";
 import { IDLE_OP, type SyncOp } from "./SyncLine";
 
 // Save/state/memcard sync status + push/pull handlers for GameConfig's sync
@@ -18,6 +21,16 @@ export function useGameSync(
   const [stateOp, setStateOp] = useState<SyncOp>(IDLE_OP);
   const [serverMemcardMeta, setServerMemcardMeta] = useState<SaveMeta>(null);
   const [memcardOp, setMemcardOp] = useState<SyncOp>(IDLE_OP);
+
+  // Conflict modal state (issue #579).
+  const [conflictModal, setConflictModal] = useState<{
+    open: boolean;
+    kind: "save" | "state";
+    localHash: string;
+    serverHash: string;
+    serverPushedAt: string;
+  } | null>(null);
+  const conflictResolverRef = useRef<((winner: "local" | "server") => void) | null>(null);
 
   const loadSyncInfo = useCallback(async () => {
     if (!slug) return;
@@ -43,9 +56,59 @@ export function useGameSync(
 
   useEffect(() => { loadSyncInfo(); }, [loadSyncInfo]);
 
+  // ── conflict check (issue #579) ─────────────────────────────────────────────
+
+  /** Check for divergence and show the modal if both sides moved past baseline.
+   *  Returns the resolved action: 'push', 'pull', or 'noop'. */
+  async function checkConflictForAction(
+    slug: string,
+    path: string,
+    kind: "save" | "state",
+    intendedAction: "push" | "pull",
+  ): Promise<"push" | "pull" | "noop"> {
+    // Get the local hash
+    const localHash = await window.emusync.files.getFileHash(path).catch(() => null);
+    if (!localHash) return intendedAction; // can't hash → proceed with intended action
+
+    // Check divergence
+    const checkFn = kind === "save" ? checkSaveConflict : checkStateConflict;
+    const result: ConflictCheck = await checkFn(slug, localHash).catch(() => ({ diverged: false }));
+
+    if (!result.diverged) return intendedAction;
+
+    // Show conflict modal — will resolve via setConflictModal + handleConflictChoice
+    return new Promise<"push" | "pull" | "noop">((resolve) => {
+      setConflictModal({
+        open: true,
+        kind,
+        localHash,
+        serverHash: result.server_hash!,
+        serverPushedAt: result.server_pushed_at!,
+      });
+      conflictResolverRef.current = (winner: "local" | "server") => {
+        setConflictModal(null);
+        conflictResolverRef.current = null;
+        if (winner === "local") {
+          resolve(intendedAction === "push" ? "push" : "noop"); // keep local
+        } else {
+          resolve("pull"); // use server
+        }
+      };
+    });
+  }
+
+  function handleConflictChoice(winner: "local" | "server"): void {
+    conflictResolverRef.current?.(winner);
+  }
+
   async function handlePushSave(): Promise<void> {
     if (!slug || !savePath) return;
     setSaveOp({ status: "busy", action: "push", msg: "" });
+    const action = await checkConflictForAction(slug, savePath, "save", "push");
+    if (action === "noop") {
+      setSaveOp({ status: "ok", action: "push", msg: "Kept local version (server outdated)" });
+      return;
+    }
     const result = await window.emusync.save.push(slug, savePath);
     if (result.ok) {
       setSaveOp({ status: "ok", action: "push", msg: "Pushed to server" });
@@ -85,6 +148,11 @@ export function useGameSync(
   async function handlePullSave(): Promise<void> {
     if (!slug || !savePath) return;
     setSaveOp({ status: "busy", action: "pull", msg: "" });
+    const action = await checkConflictForAction(slug, savePath, "save", "pull");
+    if (action === "noop") {
+      setSaveOp({ status: "ok", action: "pull", msg: "Kept local version (skipped pull)" });
+      return;
+    }
     const result = await window.emusync.save.pull(slug, savePath);
     if (result.ok) {
       if (result.pulled) {
@@ -131,12 +199,20 @@ export function useGameSync(
   async function handlePushState(): Promise<void> {
     if (!slug || !statePath) return;
     setStateOp({ status: "busy", action: "push", msg: "" });
+    // For state folders, hash the latest file (not the whole folder)
+    const latest = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
+    const statePathForHash = latest?.path || statePath;
+    const action = await checkConflictForAction(slug, statePathForHash, "state", "push");
+    if (action === "noop") {
+      setStateOp({ status: "ok", action: "push", msg: "Kept local version (server outdated)" });
+      return;
+    }
     const result = await window.emusync.state.push(slug, statePath);
     if (result.ok) {
       setStateOp({ status: "ok", action: "push", msg: "Pushed to server" });
       await loadSyncInfo();
-      const latest = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
-      setLatestStateFile(latest);
+      const updated = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
+      setLatestStateFile(updated);
     } else {
       setStateOp({ status: "error", action: "push", msg: result.error || "Push failed" });
     }
@@ -145,12 +221,19 @@ export function useGameSync(
   async function handlePullState(): Promise<void> {
     if (!slug || !statePath) return;
     setStateOp({ status: "busy", action: "pull", msg: "" });
+    const latest = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
+    const statePathForHash = latest?.path || statePath;
+    const action = await checkConflictForAction(slug, statePathForHash, "state", "pull");
+    if (action === "noop") {
+      setStateOp({ status: "ok", action: "pull", msg: "Kept local version (skipped pull)" });
+      return;
+    }
     const result = await window.emusync.state.pull(slug, statePath);
     if (result.ok) {
       if (result.pulled) {
         setStateOp({ status: "ok", action: "pull", msg: "Pulled — previous state backed up to .bak" });
-        const latest = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
-        setLatestStateFile(latest);
+        const updated = await window.emusync.files.getLatestInFolder(statePath).catch(() => null);
+        setLatestStateFile(updated);
       } else {
         setStateOp({ status: "ok", action: "pull", msg: "No server state yet" });
       }
@@ -162,6 +245,7 @@ export function useGameSync(
   return {
     localSaveTime, serverSaveMeta, latestStateFile, serverStateMeta,
     saveOp, stateOp, serverMemcardMeta, memcardOp,
+    conflictModal, handleConflictChoice,
     loadSyncInfo, handlePushSave, handlePullSave, handleSeedSwitchSave,
     handlePushMemcard, handlePullMemcard, handlePushState, handlePullState,
   };

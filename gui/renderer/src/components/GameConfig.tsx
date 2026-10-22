@@ -6,6 +6,7 @@ import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
 import { useGameSync } from "./game-config/useGameSync";
 import SteamRestartModal from "./SteamRestartModal";
+import SyncConflictModal from "./SyncConflictModal";
 import { CheckIcon, FolderIcon, GamepadIcon, PlayIcon, PlusIcon, TrashIcon, WarningIcon } from "./icons";
 
 /**
@@ -98,6 +99,7 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const sharedStateLayout = usesSharedStateLayout(gameConsole);
 
   const sync = useGameSync(slug, savePath, statePath, gameConsole, sharedLayout);
+  const { conflictModal, handleConflictChoice } = sync;
 
   useEffect(() => {
     if (!slug) return;
@@ -653,6 +655,18 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           busy={steamBusy}
           onYes={restartSteamAndAdd}
           onNo={() => setShowSteamRestart(false)}
+        />
+      )}
+
+      {conflictModal && (
+        <SyncConflictModal
+          gameName={name}
+          kind={conflictModal.kind}
+          localHash={conflictModal.localHash}
+          serverHash={conflictModal.serverHash}
+          serverPushedAt={conflictModal.serverPushedAt}
+          onChoose={handleConflictChoice}
+          onClose={() => {}}
         />
       )}
 
