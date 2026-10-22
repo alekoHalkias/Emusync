@@ -241,6 +241,8 @@ def test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin(mon
     # Force every native_bins candidate to appear absent, regardless of what's
     # actually installed on the machine running this test.
     monkeypatch.setattr("cli.detect.os.path.exists", lambda p: False)
+    monkeypatch.setattr("cli.detect.os.path.isdir", lambda p: False)
+    monkeypatch.setattr("cli.detect.os.listdir", lambda d: [])
 
     class _FakeResult:
         stdout = "org.DolphinEmu.dolphin-emu\n"
