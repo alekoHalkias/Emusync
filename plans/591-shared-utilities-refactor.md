@@ -7,8 +7,8 @@ PR: none
 
 Issue: #591
 Branch: feature/591-shared-utilities-refactor
-PR: none
-Status: implemented
+PR: #592
+Status: shipped
 Fix attempts: 0
 
 ## Goal
