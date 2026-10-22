@@ -12,7 +12,7 @@ Fix `test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin` s
 
 ## Steps
 
-- [ ] 1. Add `os.path.isdir` and `os.listdir` mocks to the test
+- [x] 1. Add `os.path.isdir` and `os.listdir` mocks to the test
   - Files: tests/test_new_consoles.py
   - Reuses: none (pure test fix)
   - New: two monkeypatch calls after the existing `os.path.exists` mock:
@@ -22,9 +22,9 @@ Fix `test_gamecube_standalone_dolphin_detected_via_flatpak_when_no_native_bin` s
     ```
   - Why: `_resolve_case_insensitive()` falls through to `os.path.isdir()` + `os.listdir()` when `os.path.exists` is False; without these mocks the real filesystem is probed and finds `/usr/bin/dolphin-emu`.
 
-- [ ] 2. Tests: run `make test-changed` to verify the fix and no regressions.
+- [x] 2. Tests: run `make test-changed` to verify the fix and no regressions.
 
-- [ ] 3. Docs: none needed - pure test fix.
+- [x] 3. Docs: none needed - pure test fix.
 
 ## Checklist
 Schema bump: no. New IPC channel: no. New CLI subcommand: no. Config/data file change: no.
