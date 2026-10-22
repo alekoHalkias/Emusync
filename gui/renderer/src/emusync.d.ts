@@ -32,10 +32,15 @@ export interface EmusyncBridge {
     localIp: () => Promise<string | null>;
   };
   display: {
-    get: () => Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean }>;
+    get: () => Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean; theme: string }>;
     onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void) => () => void;
     cycleScale: () => Promise<number>;
     toggleFullscreen: () => Promise<boolean>;
+    setTheme: (theme: string) => Promise<string>;
+  };
+  theme: {
+    list: () => Promise<Array<{ id: string; name: string; author: string }>>;
+    get: (id: string) => Promise<{ css: string } | null>;
   };
   launcher: {
     path: () => Promise<string>;

@@ -38,7 +38,7 @@ export default function App(): React.ReactElement {
   useGamepadNav();
 
   // Big Picture controls (#499): current UI scale + fullscreen state.
-  const [display, setDisplay] = useState({ scale: 1, fullscreen: false, bigPicture: false });
+  const [display, setDisplay] = useState({ scale: 1, fullscreen: false, bigPicture: false, theme: "default" });
   useEffect(() => { window.emusync.display.get().then(setDisplay); }, []);
   // Main pushes this when fullscreen changes (F11/Alt+Enter/OS) — Big Picture follows it.
   useEffect(() => window.emusync.display.onChange((d) => setDisplay((prev) => ({ ...prev, ...d }))), []);
@@ -47,6 +47,23 @@ export default function App(): React.ReactElement {
     if (display.bigPicture) document.documentElement.dataset.bigpicture = "";
     else delete document.documentElement.dataset.bigpicture;
   }, [display.bigPicture]);
+
+  // User theme (#527): inject its CSS into <style id="theme"> and key it off <html data-theme>.
+  useEffect(() => {
+    const root = document.documentElement;
+    const clear = () => { document.getElementById("theme")?.remove(); delete root.dataset.theme; };
+    if (!display.bigPicture || !display.theme || display.theme === "default") { clear(); return; }
+    let live = true;
+    window.emusync.theme.get(display.theme).then((t) => {
+      if (!live) return;
+      if (!t) { clear(); return; }
+      let el = document.getElementById("theme");
+      if (!el) { el = document.createElement("style"); el.id = "theme"; document.head.appendChild(el); }
+      el.textContent = t.css;
+      root.dataset.theme = display.theme;
+    }).catch(clear);
+    return () => { live = false; };
+  }, [display.bigPicture, display.theme]);
 
   // Shared game list — data source for both ConsoleGrid and GameGrid.
   // Only active after setup is complete; the hook starts polling on mount.
@@ -368,6 +385,7 @@ export default function App(): React.ReactElement {
             <ConsoleGrid
               games={games}
               bigPicture={display.bigPicture}
+              theme={display.theme}
               onSelectConsole={(key, label, abbr) =>
                 setScreen({ name: "console", key, label, abbr })
               }

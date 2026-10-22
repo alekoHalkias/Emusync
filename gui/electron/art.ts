@@ -11,6 +11,8 @@ import type SGDBImport from "steamgriddb";
 import { getSteamGridDbKey } from "./steamgriddb";
 import { CONFIG_PATH } from "./runtime";
 import { loadServerCfg } from "./config-store";
+import { selectedTheme } from "./display";
+import { themeFile } from "./themes";
 
 // steamgriddb is a pure-ESM package ("type": "module"); the Electron main
 // bundle is CJS, and CJS require() of an ESM module throws ERR_REQUIRE_ESM
@@ -300,6 +302,10 @@ export function registerArtIpc(): void {
     "art:getConsoleLogo",
     async (_event, consoleKey: string): Promise<string | null> => {
       try {
+        // Theme-supplied logo (#527) wins over the downloaded one.
+        const themed = themeFile(selectedTheme(), `logos/${consoleKey.toLowerCase()}.svg`);
+        if (themed && existsSync(themed)) return `data:image/svg+xml;base64,${readFileSync(themed).toString("base64")}`;
+
         mkdirSync(CONSOLE_DIR, { recursive: true });
         const dest = join(CONSOLE_DIR, `${consoleKey}-logo.svg`);
         const toUrl = () => `data:image/svg+xml;base64,${readFileSync(dest).toString("base64")}`;

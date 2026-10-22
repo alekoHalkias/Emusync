@@ -1,0 +1,35 @@
+/* Bundled default Big Picture theme (#503, #527) and the reference for user themes.
+ *
+ * A user theme is a folder in <config dir>/themes/<id>/ containing:
+ *   theme.json   {"name": "...", "author": "...", "css": "theme.css"}   (css optional)
+ *   theme.css    overrides, scoped:  html[data-bigpicture][data-theme="<id>"] { ... }
+ *   assets       reference as  url("emusync-theme://<id>/background.jpg")
+ *   logos/<consoleKey>.svg   per-console wheel logos (checked before the downloaded ones)
+ * This file is always loaded as the base, so a theme only needs to override what it changes
+ * (the --vars below are the main knobs). Gamepad focus styles are in styles.css and not themable. */
+html[data-bigpicture] {
+  --bg: #05070d;
+  --surface: #0d1320;
+  --surface2: #162036;
+  --surface3: #101828;
+  --accent: #38e8ff;
+  --accent-hover: #7af0ff;
+  --text: #f2f7ff;
+  --text-muted: #7f8fb0;
+  --border: #1e2b47;
+  --radius: 16px;
+  --radius-lg: 24px;
+  --font: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --shadow-card: 0 0 32px color-mix(in srgb, var(--bp-accent, #38e8ff) 35%, transparent);
+}
+html[data-bigpicture] .layout,
+html[data-bigpicture] .content { background: transparent; position: relative; z-index: 1; }
+html[data-bigpicture] .topbar {
+  background: rgba(5, 7, 13, 0.55);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+html[data-bigpicture] .topbar-title,
+html[data-bigpicture] .btn,
+html[data-bigpicture] .console-card-label { text-transform: uppercase; letter-spacing: 0.12em; }
+html[data-bigpicture] .topbar-title { background: none; -webkit-text-fill-color: var(--accent); color: var(--accent); }
