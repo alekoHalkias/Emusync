@@ -364,11 +364,9 @@ export default function App(): React.ReactElement {
               <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>
                 + Import
               </button>
-              {display.bigPicture && (
-                <button className="btn btn-ghost" onClick={() => setThemeImportOpen(true)}>
-                  Themes
-                </button>
-              )}
+              <button className="btn btn-ghost" onClick={() => setThemeImportOpen(true)}>
+                Themes
+              </button>
             </>
           )}
           <ConflictsButton />
