@@ -78,9 +78,10 @@ Add a `.theme` ZIP import mechanism for Big Picture user themes and refactor the
   - Files: `docs/ARCHITECTURE.md`, `CLAUDE.md`
   - Update: add `.theme` ZIP import format, `theme:import` IPC, `ThemeEngine` API
 
-- [ ] 10. Add bundled Solarized theme
-  - Files: `gui/renderer/src/themes/solarized/theme.json`, `gui/renderer/src/themes/solarized/theme.css`
+- [x] 10. Add bundled Solarized theme
+  - Files: `gui/electron/themes/bundled/solarized/theme.json`, `gui/electron/themes/bundled/solarized/theme.css`
   - New: warm earthy Solarized Dark color palette overriding the default's cool blue tones
+  - Bundled themes moved from `gui/renderer/src/themes/` to `gui/electron/themes/bundled/` and copied to `<configDir>/themes/` on startup so they appear in `listThemes()`
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes (`theme:import`). New CLI subcommand: no. Config/data file change: no.
