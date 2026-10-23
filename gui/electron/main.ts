@@ -21,7 +21,7 @@ import { registerArtworkIpc } from "./artwork";
 import { registerSteamGridDbIpc } from "./steamgriddb";
 import { registerSteamIpc } from "./steam";
 import { registerSwitchTitleDbIpc } from "./switchtitledb";
-import { registerThemeScheme, registerThemeIpc } from "./themes";
+import { registerThemeScheme, ThemeEngine } from "./themes";
 
 // Register all IPC handlers up front (renderer can only call them once a window
 // has loaded, which happens after app.whenReady below).
@@ -40,7 +40,7 @@ registerArtworkIpc();
 registerSteamGridDbIpc();
 registerSteamIpc();
 registerSwitchTitleDbIpc();
-registerThemeIpc();
+ThemeEngine.registerIpc();
 
 // ── app lifecycle ─────────────────────────────────────────────────────────────
 

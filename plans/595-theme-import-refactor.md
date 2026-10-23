@@ -11,22 +11,22 @@ Add a `.theme` ZIP import mechanism for Big Picture user themes and refactor the
 
 ## Steps
 
-- [ ] 1. Add `ThemeImportModal` component to the renderer
+- [x] 1. Add `ThemeImportModal` component to the renderer
   - Files: `gui/renderer/src/components/ThemeImportModal.tsx`
   - New: Theme import modal UI — file picker for `.theme` ZIP or theme folder, progress indicator, error display
   - IPC: `theme:import` handler in main process (see step 2)
   - Adds a "Themes" button in the topbar (next to Import button) that opens the modal when in Big Picture mode
 
-- [ ] 2. Add theme import logic to `gui/electron/themes.ts`
+- [x] 2. Add theme import logic to `gui/electron/themes.ts`
   - Files: `gui/electron/themes.ts`
   - Reuses: `themeFile()` for path validation (rejects `..` escapes)
-  - New: `importTheme(zipPath: string): Promise<string>` — extracts ZIP, validates manifest (`name`, `author` required), generates a safe ID from the manifest name (slugify, deduplicate against existing IDs), writes to `<configDir>/themes/<id>/`, returns the ID
+  - New: `importThemeZip(zipPath: string): Promise<string>` — extracts ZIP, validates manifest (`name` required), generates a safe ID from the manifest name (slugify, deduplicate against existing IDs), writes to `<configDir>/themes/<id>/`, returns the ID
   - New: `importThemeFolder(folderPath: string): Promise<string>` — same validation, uses folder's basename as ID
   - New: `theme:import` IPC handler accepting a file path or folder path
-  - ZIP extraction uses Node `fs` + `zlib` (no new dependencies)
+  - ZIP extraction uses `adm-zip` (added as dependency; no built-in ZIP parser in Node)
   - Manifest schema: `{ name: string; author?: string; css?: string }` — `css` defaults to `"theme.css"`
 
-- [ ] 3. Refactor `gui/electron/themes.ts` to expose a clean public API
+- [x] 3. Refactor `gui/electron/themes.ts` to expose a clean public API
   - Files: `gui/electron/themes.ts`
   - Reuses: existing `listThemes()`, `getThemeCss()`, `themeFile()`, `registerThemeScheme()`
   - Refactor: extract the core logic into an exported object `ThemeEngine`:
@@ -45,22 +45,22 @@ Add a `.theme` ZIP import mechanism for Big Picture user themes and refactor the
   - `registerThemeScheme()` stays standalone (protocol registration is Electron-specific)
   - `themeFile()` and `readManifest()` remain internal helpers
 
-- [ ] 4. Simplify renderer CSS injection in `App.tsx`
+- [x] 4. Simplify renderer CSS injection in `App.tsx`
   - Files: `gui/renderer/src/App.tsx`
   - Reuses: `window.emusync.theme.get(id)` return value
-  - Simplify: the existing effect (lines 52-66) stays mostly as-is but uses the refactored `ThemeEngine` API implicitly through the preload types. No structural change to the CSS injection logic — the engine still returns `{ css: string }` which the renderer injects.
+  - No structural change to the CSS injection logic — the engine still returns `{ css: string }` which the renderer injects.
 
-- [ ] 5. Add `theme:import` type to `emusync.d.ts`
+- [x] 5. Add `theme:import` type to `emusync.d.ts`
   - Files: `gui/renderer/src/emusync.d.ts`
   - Reuses: existing `theme` namespace
   - New: `import: (path: string) => Promise<string>` in `window.emusync.theme`
 
-- [ ] 6. Wire up the "Themes" button in the topbar
+- [x] 6. Wire up the "Themes" button in the topbar
   - Files: `gui/renderer/src/App.tsx`
   - New: state for theme modal open/close
   - New: `<button className="btn btn-ghost" onClick={() => setThemeImportOpen(true)}>Themes</button>` in the topbar actions area (visible when `display.bigPicture`)
 
-- [ ] 7. Update `preload.ts` with the new `theme:import` channel
+- [x] 7. Update `preload.ts` with the new `theme:import` channel
   - Files: `gui/electron/preload.ts`
   - Reuses: existing `theme` namespace in preload
 

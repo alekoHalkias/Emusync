@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("emusync", {
   theme: {
     list: (): Promise<Array<{ id: string; name: string; author: string }>> => ipcRenderer.invoke("theme:list"),
     get: (id: string): Promise<{ css: string } | null> => ipcRenderer.invoke("theme:get", id),
+    import: (path: string): Promise<string> => ipcRenderer.invoke("theme:import", path),
   },
   launcher: {
     path: (): Promise<string> => ipcRenderer.invoke("launcher:path"),
