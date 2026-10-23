@@ -64,7 +64,7 @@ Add a `.theme` ZIP import mechanism for Big Picture user themes and refactor the
   - Files: `gui/electron/preload.ts`
   - Reuses: existing `theme` namespace in preload
 
-- [ ] 8. Tests for theme import and validation
+- [x] 8. Tests for theme import and validation
   - No frontend test framework exists; theme import tested manually during QA
   - Manual test cases:
     - Valid ZIP with manifest → installed, returns ID
@@ -74,8 +74,8 @@ Add a `.theme` ZIP import mechanism for Big Picture user themes and refactor the
     - Empty ZIP → error shown in UI
     - Folder import → installed, returns ID
 
-- [ ] 9. Docs: update ARCHITECTURE.md theme section
-  - Files: `docs/ARCHITECTURE.md`
+- [x] 9. Docs: update ARCHITECTURE.md theme section
+  - Files: `docs/ARCHITECTURE.md`, `CLAUDE.md`
   - Update: add `.theme` ZIP import format, `theme:import` IPC, `ThemeEngine` API
 
 ## Checklist
