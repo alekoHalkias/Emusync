@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./styles.css";
-import "./themes/default.css";
+import "../../electron/themes/bundled/default/theme.css";
 
 // Nothing in the app uses drag-and-drop. Suppress the native behaviour so click-dragging a
 // card's art <img> can't start an OS drag (froze the app, #551) and a dropped file can't navigate the window.
