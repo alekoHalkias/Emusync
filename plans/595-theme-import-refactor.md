@@ -3,7 +3,7 @@
 Issue: #595
 Branch: feature/595-theme-import-refactor
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
