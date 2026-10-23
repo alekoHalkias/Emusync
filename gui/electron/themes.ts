@@ -2,6 +2,9 @@
 // theme.json ({name, author, css}), a CSS file and optional assets. Assets are
 // served via emusync-theme://<id>/<path> (see registerThemeScheme).
 //
+// Bundled themes live in gui/electron/themes/bundled/<id>/ and are copied to
+// <config dir>/themes/<id>/ on first launch so they appear in listThemes().
+//
 // Theme import (#595): .theme/.zip files are extracted, validated (manifest
 // required, safe paths), and installed into <config dir>/themes/<id>/.
 import { app, ipcMain, net, protocol } from "electron";
@@ -12,18 +15,29 @@ import { configDir } from "./paths";
 
 const SCHEME = "emusync-theme";
 export const themesDir = (): string => join(configDir(), "themes");
+const bundledThemesDir = (): string => join(resolve(__dirname, ".."), "electron", "themes", "bundled");
 
 export interface ThemeInfo { id: string; name: string; author: string }
 
 // --- Internal helpers ---
 
-/** Resolve rel inside the theme's folder; null if id/rel escape it. */
+/** Resolve rel inside the theme's folder; null if id/rel escape it. Checks user dir first, then bundled. */
 export function themeFile(id: string, rel: string): string | null {
+  // Check user themes first
   const root = resolve(themesDir());
-  const dir = resolve(root, id);
-  if (!dir.startsWith(root + sep)) return null;
-  const file = resolve(dir, rel);
-  return file.startsWith(dir + sep) ? file : null;
+  const userDir = resolve(root, id);
+  if (userDir.startsWith(root + sep)) {
+    const file = resolve(userDir, rel);
+    if (file.startsWith(userDir + sep)) return file;
+  }
+  // Fall back to bundled themes
+  const bundledRoot = resolve(bundledThemesDir());
+  const bundledDir = resolve(bundledRoot, id);
+  if (bundledDir.startsWith(bundledRoot + sep)) {
+    const file = resolve(bundledDir, rel);
+    if (file.startsWith(bundledDir + sep)) return file;
+  }
+  return null;
 }
 
 function readManifest(id: string): Record<string, unknown> | null {
@@ -31,6 +45,33 @@ function readManifest(id: string): Record<string, unknown> | null {
   try {
     return f && existsSync(f) ? JSON.parse(readFileSync(f, "utf-8")) : null;
   } catch { return null; } // bad theme.json — skip the theme
+}
+
+/** Copy bundled themes to config dir if not already present. */
+function initBundledThemes(): void {
+  let bundledIds: string[] = [];
+  try { bundledIds = readdirSync(bundledThemesDir()).filter((d) => statSync(join(bundledThemesDir(), d)).isDirectory()); } catch { return; }
+  const existing = new Set<string>();
+  try {
+    for (const d of readdirSync(themesDir())) {
+      if (statSync(join(themesDir(), d)).isDirectory()) existing.add(d);
+    }
+  } catch { /* no themes dir yet */ }
+  for (const id of bundledIds) {
+    if (existing.has(id)) continue; // user already has this theme
+    const src = join(bundledThemesDir(), id);
+    const dest = join(themesDir(), id);
+    const copyRecursive = (srcPath: string, destPath: string): void => {
+      mkdirSync(destPath, { recursive: true });
+      for (const entry of readdirSync(srcPath, { withFileTypes: true })) {
+        const s = join(srcPath, entry.name);
+        const d = join(destPath, entry.name);
+        if (entry.isDirectory()) copyRecursive(s, d);
+        else writeFileSync(d, readFileSync(s));
+      }
+    };
+    copyRecursive(src, dest);
+  }
 }
 
 /** Slugify a theme name into a safe directory ID; deduplicate against existing IDs. */
@@ -202,6 +243,8 @@ export const ThemeEngine = {
 
   /** Register theme IPC handlers. */
   registerIpc: (): void => {
+    // Copy bundled themes to config dir so they appear in listThemes().
+    initBundledThemes();
     ipcMain.handle("theme:list", () => ThemeEngine.list());
     ipcMain.handle("theme:get", (_e, id: string) => ThemeEngine.get(id));
     ipcMain.handle("theme:import", async (_e, path: string) => {
