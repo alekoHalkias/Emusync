@@ -1,0 +1,29 @@
+/* Solarized Dark Big Picture theme (#595): warm earthy tones, contrasting the
+ * default's cool blue palette. Overrides only the CSS custom properties that
+ * the base layer (default.css) defines. */
+html[data-bigpicture][data-theme="solarized"] {
+  --bg: #002b36;
+  --surface: #073642;
+  --surface2: #0a4050;
+  --surface3: #062e3a;
+  --accent: #2aa198;
+  --accent-hover: #43b8b0;
+  --text: #93a1a1;
+  --text-muted: #586e75;
+  --border: #0a4050;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --font: "Georgia", "Times New Roman", serif;
+  --shadow-card: 0 0 24px color-mix(in srgb, var(--bp-accent, #2aa198) 25%, transparent);
+}
+html[data-bigpicture][data-theme="solarized"] .topbar {
+  background: rgba(0, 43, 54, 0.65);
+}
+html[data-bigpicture][data-theme="solarized"] .topbar-title,
+html[data-bigpicture][data-theme="solarized"] .btn,
+html[data-bigpicture][data-theme="solarized"] .console-card-label {
+  letter-spacing: 0.08em;
+}
+html[data-bigpicture][data-theme="solarized"] .console-wheel-label {
+  text-shadow: 0 0 20px color-mix(in srgb, var(--accent) 50%, transparent);
+}

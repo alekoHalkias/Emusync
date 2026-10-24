@@ -41,6 +41,7 @@ export interface EmusyncBridge {
   theme: {
     list: () => Promise<Array<{ id: string; name: string; author: string }>>;
     get: (id: string) => Promise<{ css: string } | null>;
+    import: (path: string) => Promise<string>;
   };
   launcher: {
     path: () => Promise<string>;

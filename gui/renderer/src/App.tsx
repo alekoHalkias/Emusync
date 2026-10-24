@@ -8,6 +8,7 @@ import ConflictsButton from "./components/ConflictsButton";
 import ConsoleGrid from "./components/ConsoleGrid";
 import GameGrid from "./components/GameGrid";
 import ImportWizard from "./components/ImportWizard";
+import ThemeImportModal from "./components/ThemeImportModal";
 import { useGameList } from "./components/game-list/useGameList";
 import { applySwitchTitleId } from "./components/console-import/postImport";
 import { setConsoleDefsForLayout } from "./components/console-import/helpers";
@@ -28,6 +29,7 @@ export default function App(): React.ReactElement {
   const [screen, setScreen] = useState<Screen>({ name: "loading" });
   const [isServer, setIsServer] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [themeImportOpen, setThemeImportOpen] = useState(false);
   const [gameRunning, setGameRunning] = useState(false);
   const localizeJob = useLocalizeJob();
   const [gameIsExternal, setGameIsExternal] = useState(false);
@@ -358,9 +360,14 @@ export default function App(): React.ReactElement {
         {/* Right: topbar actions */}
         <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
           {(screen.name === "games" || screen.name === "console") && (
-            <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>
-              + Import
-            </button>
+            <>
+              <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>
+                + Import
+              </button>
+              <button className="btn btn-ghost" onClick={() => setThemeImportOpen(true)}>
+                Themes
+              </button>
+            </>
           )}
           <ConflictsButton />
           <ServerStatusButton isServer={isServer} onRepaired={handleRepaired} display={display} onDisplay={(d) => setDisplay((prev) => ({ ...prev, ...d }))} />
@@ -420,6 +427,14 @@ export default function App(): React.ReactElement {
         <ImportWizard
           onClose={() => setImportOpen(false)}
           onImported={() => reload(true)}
+        />
+      )}
+
+      {/* Theme import modal — Big Picture mode only */}
+      {themeImportOpen && (
+        <ThemeImportModal
+          onClose={() => setThemeImportOpen(false)}
+          onImported={() => { reload(true); setThemeImportOpen(false); }}
         />
       )}
     </div>
