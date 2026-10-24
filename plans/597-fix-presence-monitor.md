@@ -3,7 +3,7 @@
 Issue: #597
 Branch: feature/597-fix-presence-monitor
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -14,15 +14,12 @@ Synchronize the `_monitor_presence` background thread with presence updates to p
   - Files: `server/api/_core.py`
   - Reuses: `_presence_lock`, `_online_devices`, `_device_names`, `_store.list_devices()`, `_store.release_device_locks()`, `_print_activity()`, `_game_label()`
   - New: None - expanding existing lock scope.
-- [ ] 2. Ensure `_store.release_device_locks(d.id)` and subsequent `_store.log_event` calls are within the same critical section to avoid interleaving updates.
+- [x] 2. Ensure `_store.release_device_locks(d.id)` and subsequent `_store.log_event` calls are within the same critical section to avoid interleaving updates.
   - Files: `server/api/_core.py`
   - Reuses: `_presence_lock`
   - New: None
-- [ ] 3. Tests: `tests/test_devices.py`. Add a test case that simulates concurrent presence updates and monitor sweeps to check for race conditions or SQLite contention.
-  - Files: `tests/test_devices.py`
-  - Reuses: `client` fixture, `AUTH` headers
-  - New: Concurrent presence/lock-release test case.
-- [ ] 4. Docs: none needed - internal server logic change.
+- [x] 3. Tests: `tests/test_devices.py`. Add a test case that simulates concurrent presence updates and monitor sweeps to check for race conditions or SQLite contention.
+- [x] 4. Docs: none needed - internal server logic change.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
@@ -30,6 +27,5 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 ## Not in this plan
 
 ## Log
-
-end of plan
-ask to implement it.
+- 2026-10-24: Nested `with _presence_lock` inside the sweep deadlocked the monitor thread (same thread, non-reentrant lock); removed the inner acquire — the outer lock already covers release/log.
+- 2026-10-24: Step 3 test runs the real `_monitor_presence` for one iteration (patched sleep stops the thread) concurrently with presence updates; full `tests/test_devices.py` 20 passed.

@@ -2,12 +2,17 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import tempfile
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import pytest
 
+from server import api as api_module
+from server.api import _core
 from server.store import Store, GameDevice
-from tests.conftest import AUTH, DEVICE_ID, DEVICE_NAME, _device_auth
+from tests.conftest import AUTH, DEVICE_ID, DEVICE_NAME, MASTER_PIN, _device_auth
 
 
 # ── devices endpoint ──────────────────────────────────────────────────────────
@@ -337,3 +342,81 @@ async def test_game_config_save_does_not_overwrite_edited_console_folders(client
     assert got["device_save_folder"] == "/new/saves"
     assert got["device_state_folder"] == "/new/states"
     assert got["device_emulator"] == "custom"
+
+
+# ── presence monitor vs live updates (#597) ───────────────────────────────────
+
+def test_monitor_sweep_concurrent_with_presence_updates():
+    """A monitor sweep racing with live presence updates must not crash or
+    double-log: the stale device's lock is released exactly once and its
+    game_stopped event recorded, with the updates thread seeing no errors."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        api_module.init(store, MASTER_PIN)
+        store.ensure_device("stale-dev", "Old PC")
+        store.add_game("g1", "Game One", "GBA")
+        store.acquire_lock("g1", "stale-dev")
+        # Age the device past the offline threshold (bypassing touch_device,
+        # which can only stamp "now").
+        old = (datetime.now(timezone.utc) - timedelta(
+            seconds=_core.OFFLINE_TIMEOUT_SECONDS + 60)).isoformat()
+        store._conn.execute(
+            "UPDATE devices SET last_ip = ?, last_seen_at = ? WHERE id = ?",
+            ("127.0.0.1", old, "stale-dev"),
+        )
+        store._conn.commit()
+        with _core._presence_lock:
+            _core._online_devices.add("stale-dev")
+            _core._device_names["stale-dev"] = "Old PC"
+
+        # Run the REAL monitor for exactly one iteration: the first patched
+        # sleep returns instantly, the next raises KeyboardInterrupt, which
+        # threading treats as a silent thread exit.
+        countdown = iter((0,))
+
+        def one_shot_sleep(_seconds):
+            try:
+                next(countdown)
+            except StopIteration:
+                raise KeyboardInterrupt
+
+        def run_monitor_once():
+            try:
+                _core._monitor_presence()
+            except KeyboardInterrupt:
+                pass  # one_shot_sleep's stop signal
+
+        with patch("time.sleep", one_shot_sleep):
+            monitor = threading.Thread(target=run_monitor_once)
+            monitor.start()
+
+            # Concurrently simulate _auth-side presence updates.
+            errors: list[Exception] = []
+
+            def live_updates():
+                try:
+                    # Only the lock-guarded bookkeeping _auth does; raw sqlite
+                    # touches from other request handlers are serialized by
+                    # SQLite itself, not by _presence_lock.
+                    for _ in range(200):
+                        with _core._presence_lock:
+                            _core._online_devices.add("stale-dev")
+                            _core._device_names["stale-dev"] = "Old PC"
+                except Exception as exc:
+                    errors.append(exc)
+
+            updates = threading.Thread(target=live_updates)
+            updates.start()
+            updates.join(10)
+            monitor.join(10)
+
+        assert errors == []
+        assert not monitor.is_alive()
+        assert store.get_lock("g1") is None
+        events = store.list_events()
+        stopped = [
+            e for e in events
+            if e["type"] == "game_stopped" and e["game_slug"] == "g1"
+            and e["device_id"] == "stale-dev"
+        ]
+        assert len(stopped) == 1
