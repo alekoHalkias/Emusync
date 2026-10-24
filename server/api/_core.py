@@ -65,28 +65,30 @@ def _monitor_presence() -> None:
         if _store is None:
             continue
         try:
-            devices = _store.list_devices()
-            now = datetime.now(timezone.utc)
-            for d in devices:
-                if d.last_seen_at is None:
-                    continue
-                last_seen = datetime.fromisoformat(d.last_seen_at)
-                if (now - last_seen).total_seconds() > OFFLINE_TIMEOUT_SECONDS:
-                    went_offline = False
-                    with _presence_lock:
+            with _presence_lock:
+                devices = _store.list_devices()
+                now = datetime.now(timezone.utc)
+                for d in devices:
+                    if d.last_seen_at is None:
+                        continue
+                    last_seen = datetime.fromisoformat(d.last_seen_at)
+                    if (now - last_seen).total_seconds() > OFFLINE_TIMEOUT_SECONDS:
+                        went_offline = False
                         if d.id in _online_devices:
                             _online_devices.discard(d.id)
                             name = _device_names.pop(d.id, d.name)
                             _print_activity(f"{name} went offline")
                             went_offline = True
-                    # Release any locks the now-offline device still holds so a
-                    # crashed device doesn't block a game until the TTL (issue #238).
-                    if went_offline:
-                        for slug in _store.release_device_locks(d.id):
-                            _store.log_event("game_stopped", slug, d.id)
+                        # Release any locks the now-offline device still holds so a
+                        # crashed device doesn't block a game until the TTL (issue #238).
+                        if went_offline:
+                            # Already inside the outer _presence_lock; a nested
+                            # acquire of the same threading.Lock would deadlock.
+                            for slug in _store.release_device_locks(d.id):
+                                _store.log_event("game_stopped", slug, d.id)
                             _print_activity(
-                                f"{_game_label(slug)} lock released ({name} went offline)"
-                            )
+                                    f"{_game_label(slug)} lock released ({name} went offline)"
+                                )
         except Exception:
             # Never let a transient failure kill the monitor thread silently —
             # log it (with traceback) and keep polling (issue #241).
