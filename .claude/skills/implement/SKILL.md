@@ -24,4 +24,15 @@ Stage 3 of 4: issue -> plan -> implement -> ship.
    d. Commit the step's files plus the plan file: `git commit -m "#<N> step <n>: <summary>"`. Stage specific paths, never `git add -A`. If the hook demands CLAUDE.md be staged, update CLAUDE.md for real (the plan's Docs step) rather than touching it.
    One commit per step means an interrupted run loses at most the step in progress.
 4. If a step cannot be done as written (wrong assumption, missing code), stop, write the blocker under `## Log`, set `Status: blocked`, commit, and report to the user. Do not improvise a different design.
+   a. **Record the rollback state.** Note the current git commit hash (`git rev-parse HEAD`) and the plan step number. Append a `## Rollback` section to the plan file:
+      ```
+      ## Rollback
+      - **Last known good state:** commit `<hash>` before step `<n>`
+      - **Blocked at:** step `<n>` — `<one-line blocker summary>`
+      - **State at failure:** `git diff <hash>..HEAD --stat`
+      ```
+   b. **Offer rollback vs. fix.** Present both options to the user:
+      - **Rollback:** `git reset --hard <hash>` to restore the repo to the last known good state before this step. The plan retains the blocker for later review.
+      - **Fix:** Keep the current state and invoke `plan` in fix-plan mode to generate a fix plan on top of the broken state.
+      Default to rollback if the user does not respond within a reasonable time, or if the blocker is a fundamental design error (not a test bug or minor adjustment).
 5. When all steps are checked, set `Status: implemented`, commit, and invoke `ship` with the issue number.

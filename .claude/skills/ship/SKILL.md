@@ -36,11 +36,19 @@ Stage 4 of 4: issue -> plan -> implement -> ship.
       ```
       Write `PR: #<M>` into the plan file, commit, push.
       If `PR: #<M>` already exists: just commit and push; the PR updates itself. Add a short PR comment summarizing the fix if this was a fix loop.
-   c. Check mergeability: `gh pr view <M> --json mergeable`. If conflicting and trivial, set `Status: implementing` (the edit hook requires it), merge `origin/main`, resolve, then set `Status: shipped` again and commit; otherwise report it.
-   d. Sync the server PC (standing instruction):
+   c. Run code review: invoke `review` on the branch diff against `main`.
+      - If any finding has category `gotcha-violation` or `correctness`, block ship. Report findings to user, set `Status: implementing` in the plan file, and re-invoke `implement` for fixes. Commit the fix, push, and re-run ship from step 2.
+      - If findings are only `docs-stale`, `test-gap`, or `style`, note them in a PR comment but continue to the next step.
+   d. Check mergeability: `gh pr view <M> --json mergeable`. If conflicting and trivial, set `Status: implementing` (the edit hook requires it), merge `origin/main`, resolve, then set `Status: shipped` again and commit; otherwise report it.
+   e. Sync the server PC (standing instruction):
       `ssh -o BatchMode=yes server@192.168.4.111 'cd ~/Github/Emusync && git fetch -q --prune && git checkout <branch> && git pull -q; systemctl --user restart emusync-server && sleep 4 && curl -s localhost:8765/health'`
       Leave any uncommitted change on the server alone; report checkout failures instead of discarding.
-   e. Report the PR URL and a one-line summary.
+   f. Run documentation sync: invoke `docs` on the branch diff against `main` to update ARCHITECTURE.md, GOTCHAS.md, and CLAUDE.md.
+      - Commit doc updates to the same branch (they appear in the same PR).
+      - Use `git add` with specific paths, never `git add -A`.
+      - Push the doc updates to the PR branch.
+      - Report which files were updated and what changed in each.
+   g. Report the PR URL and a one-line summary.
 4. On failure:
    a. Identify the failure from the output: test id, error, and the code it points at. Read that code. Do not guess from the test name alone.
    b. Increment `Fix attempts` in the plan file and commit.
