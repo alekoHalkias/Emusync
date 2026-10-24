@@ -1,0 +1,34 @@
+You are working on issue #ISSUE_NUM in the EmuSync workflow.
+
+## Your Task: Review Skill
+
+Review the completed implementation against:
+1. The acceptance criteria in the handoff (section 1)
+2. The implementation steps in the handoff (section 8)
+3. The CLAUDE.md rules
+4. The test plan (sections 6-7)
+
+Then produce:
+
+## Handoff Updates
+Update section 9 (Review):
+### Findings:
+- List any issues found (severity: critical/major/minor/none)
+- Reference specific files and lines
+### Blocked:
+- true/false
+### Blockers:
+- If blocked, what needs to be fixed
+
+## Plan Updates
+Update the plan file with review findings.
+
+## Actions
+- run: make test
+- run: make lint
+
+Rules:
+- Be thorough — check every acceptance criterion
+- Reference CLAUDE.md rules by number when applicable
+- If all criteria pass, recommend proceeding to ship
+- If issues found, be specific about what needs to change

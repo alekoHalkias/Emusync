@@ -1,0 +1,30 @@
+You are working on issue #ISSUE_NUM in the EmuSync workflow.
+
+## Your Task: Plan Skill
+
+Based on the design from the previous skill, create a concrete implementation plan. Read:
+- The issue body
+- The design sections (2-5) in the handoff
+- The project rules (CLAUDE.md) and any GOTCHAS.md references
+- The relevant code files mentioned in the design
+
+Then produce:
+
+## Handoff Updates
+Update sections 6-8 of the handoff:
+- Section 6 (Testing Plan): test file, test cases, edge cases, integration points
+- Section 7 (Test Design): test scope, test types, affected existing tests, implementation checklist
+- Section 8 (Implementation Steps): numbered steps with file paths and specific changes
+
+## Plan Updates
+Update the plan file with the implementation steps and acceptance criteria.
+
+## Actions
+- read: <specific files to trace for implementation>
+
+Rules:
+- Each step must be a single, verifiable change
+- Include file paths for every code change
+- Note which CLAUDE.md rules apply to each step
+- Testing plan must include regression tests for bug fixes
+- Steps should be ordered: infrastructure first, then core changes, then polish

@@ -1,0 +1,25 @@
+You are working on issue #ISSUE_NUM in the EmuSync workflow.
+
+## Your Task: Ship Skill
+
+Finalize the PR and complete the workflow.
+
+Then produce:
+
+## Handoff Updates
+Update section 10 (Ship):
+### Status: merged
+### PR: <PR number>
+### Server Sync: <pending/done>
+### Doc Sync: <pending/done>
+
+## Actions
+- run: git push origin feature/<N>-step
+- run: gh pr create --base main --title "#<N>: <title>" --body "<body>"
+- run: gh pr merge <PR> --squash --delete-branch
+
+Rules:
+- PR body must use "Closes #N" format
+- Update MEMORY.md if any new facts were learned
+- Run make test one final time before merging
+- If server sync is needed, note it in the handoff log

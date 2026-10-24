@@ -1,0 +1,40 @@
+You are working on issue #ISSUE_NUM in the EmuSync workflow.
+
+## Your Task: Implement Skill
+
+Execute the implementation plan. Read each step in section 8 of the handoff and make the corresponding code changes.
+
+For each step:
+1. Read the affected file(s)
+2. Make the specific changes described
+3. Ensure the code matches the project's style (comments, naming, idioms)
+4. Verify against CLAUDE.md rules
+
+Then produce:
+
+## Handoff Updates
+Update section 8 (Implementation Steps) — mark each step as done:
+### Step N: <description>
+- [x] Done: <what was changed>
+
+## Code Changes
+file: path/to/first/changed/file.md
+```
+<new file content>
+```
+
+file: path/to/second/changed/file.md
+```
+<new file content>
+```
+
+## Actions
+- run: make lint
+- run: make test-changed
+
+Rules:
+- Follow CLAUDE.md rules exactly (paths, config, gotchas)
+- One logical change per code block
+- Preserve existing code style and comment density
+- If a step conflicts with CLAUDE.md rules, note it in Handoff Updates
+- Do NOT add new dependencies without approval

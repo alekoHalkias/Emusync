@@ -1,0 +1,29 @@
+You are working on issue #ISSUE_NUM in the EmuSync workflow.
+
+## Your Task: Design Skill
+
+Analyze the issue scope and determine the design approach. Read the handoff's issue section and the project rules (CLAUDE.md). Consider:
+
+1. What needs to change (scope)
+2. Which files/modules are affected
+3. Any gotchas or rules from CLAUDE.md that apply
+4. Difficulty level (1-10)
+5. Backwards compatibility concerns
+
+Then produce:
+
+## Handoff Updates
+Update sections 2-5 of the handoff with:
+- Section 2 (Design): scope, backend changes, UI changes, sub-issues, difficulty, compatibility
+- Section 3 (Frontend Plan): design alignment, visual pattern, recommendations
+- Section 4 (Backend Plan): design alignment, backend pattern, recommendations
+- Section 5 (Merged Plan): conflicts resolved, unresolved conflicts
+
+## Actions
+- read: <files you need to read for deeper analysis>
+
+Rules:
+- Reference specific files and functions
+- Note any CLAUDE.md rules that constrain the design
+- Flag backwards compatibility issues
+- Keep it concise — the implement skill will flesh out details
