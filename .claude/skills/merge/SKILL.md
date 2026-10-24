@@ -11,6 +11,7 @@ Reads two plan files, identifies conflicts, merges them into a single reconciled
 
 - No emojis anywhere in the output.
 - Professional, plain tone.
+- The handoff file is the workflow state carrier. Always read it first; never rely on conversation memory.
 - The reconciled plan is the source of truth — no partial merges.
 - If a conflict is ambiguous (both plans plausibly correct), flag it for user decision and stop.
 
@@ -20,12 +21,14 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
 
 ## Steps
 
-1. **Load both plans.** Read the two plan files. Extract:
+1. **Read the handoff file** at `plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections from the GitHub issue.
+
+2. **Load both plans.** Read the two plan files. Extract:
    - Each plan's steps (with file lists and reuse lists).
    - Each plan's Checklist section (schema bump, IPC channels, CLI subcommands, config changes).
    - The plan's Goal and issue number.
 
-2. **Identify conflicts.** Check for:
+3. **Identify conflicts.** Check for:
    - **Same file touched by both plans:** Both plans edit the same file (even at different line ranges). This is a merge conflict that needs resolution.
    - **IPC channel asymmetry:** One plan defines a new `ipcMain.handle` or `ipcRenderer.invoke` channel, but the other plan doesn't add the corresponding `emusync.d.ts` type or renderer/main handler.
    - **Schema mismatch:** Backend plan adds/changes a DB column, but frontend plan assumes the old schema (e.g., reads a field that no longer exists, or writes to a column that was renamed).
@@ -33,7 +36,7 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
    - **Config key mismatch:** Backend plan changes a config field name or structure, but frontend plan still reads the old key.
    - **Step ordering conflicts:** Steps from both plans are interleaved in a way that one plan's step depends on the other plan's step running first.
 
-3. **Resolve conflicts.**
+4. **Resolve conflicts.**
    - **Same file, different lines:** Merge the changes into a single step that touches the file. List both plans' objectives in the step description. Combine the Reuses lists.
    - **Same file, same lines:** Flag as ambiguous — both plans modify the same code region. Present both approaches to the user and ask which to keep.
    - **IPC asymmetry:** Add the missing handler/type to the reconciled plan. The backend plan typically owns the channel definition; the frontend plan owns the renderer-side type and invocation.
@@ -42,7 +45,7 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
    - **Config key mismatch:** Backend plan takes priority. Update frontend config reads.
    - **Step ordering:** Reorder steps so dependencies come first. Backend changes (schema, API, store) before frontend changes (IPC, UI). Steps that touch the same file go together.
 
-4. **Write the reconciled plan.** Output a single plan file:
+5. **Write the reconciled plan.** Output a single plan file:
    ```
    # Merged Plan: #<N> <issue title>
 
@@ -75,9 +78,14 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
    ## Log
    ```
 
-5. **Commit and present.**
+6. **Update the handoff file.** Rewrite section 5 (Merged Plan) with the conflicts resolved and unresolved lists. Rewrite section 8 (Implementation Steps) with the merged steps. Update the Metadata section: set `Status: planned`. Append to the Log:
+   ```
+   - <YYYY-MM-DD> merge: <N> conflicts resolved, <M> unresolved
+   ```
+
+7. **Commit and present.**
    ```bash
    git add plans/<N>-*.md
    git commit -m "#<N>: merge reconciled plan from fplan and bplan"
    ```
-   Present the reconciled plan to the user, listing all conflicts resolved and any that need user input. On approval, invoke `implement` with the issue number.
+   Present the reconciled plan to the user, listing all conflicts resolved and any that need user input. On approval, invoke `tplan` with the issue number.

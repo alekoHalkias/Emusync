@@ -3,7 +3,7 @@
 Issue: #597
 Branch: feature/597-fix-presence-monitor
 PR: #598
-Status: shipped
+Status: implementing
 Fix attempts: 0
 
 ## Goal
