@@ -6,7 +6,7 @@
 #
 # Output: a single markdown string written to stdout.
 
-source "$(dirname "$0")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 # ── Fetch issue body from GitHub ───────────────────────────────────
 fetch_issue_body() {
@@ -43,11 +43,15 @@ read_plan_file() {
   issue_num="$(handoff_issue "$handoff_file")"
   local repo
   repo="$(repo_root)"
-  local plan_file="$repo/plans/${issue_num}-*.md"
+  local issue_slug
+  issue_slug="$(echo "$issue_num" | tr ' :/' '---' | sed 's/--*/-/g; s/^-//; s/-$//')"
+  local plan_files
+  plan_files="$(find "$repo/plans" -maxdepth 1 -name "${issue_slug}-*.md" ! -name "*handoff*" 2>/dev/null | head -1)"
 
-  for f in $plan_file; do
-    [[ "$(basename "$f")" != *"handoff"* ]] && cat "$f" && return 0
-  done
+  if [[ -n "$plan_files" && -f "$plan_files" ]]; then
+    cat "$plan_files"
+    return 0
+  fi
 
   echo "[No plan file yet]"
   return 1
@@ -67,7 +71,7 @@ read_skill_file() {
 
   # Fallback: use prompt template
   local script_dir
-  script_dir="$(dirname "$0")"
+  script_dir="$(dirname "${BASH_SOURCE[0]}")"
   local prompt_file="$script_dir/../prompts/${skill_name}.prompt"
   if [[ -f "$prompt_file" ]]; then
     echo "Skill: $skill_name (using prompt template)"
@@ -107,18 +111,25 @@ build_prompt() {
   repo="$(github_remote)"
   local issue_num
   issue_num="$(handoff_issue "$handoff_file")"
+  local branch
+  branch="$(handoff_branch "$handoff_file")"
 
   cat <<EOF
 You are a workflow skill runner for this project. Follow the skill instructions below carefully.
 
 ## Skill: $skill_name
 ## Issue: #$issue_num
-## Branch: $(handoff_branch "$handoff_file")
+## Branch: $branch
+## Repo: $repo
 
 EOF
 
   echo "=== SKILL DEFINITION ==="
-  read_skill_file "$skill_name"
+  # Substitute placeholders in skill definition
+  local skill_def
+  skill_def="$(read_skill_file "$skill_name")"
+  skill_def="$(echo "$skill_def" | sed "s|<ISSUE_NUM>|$issue_num|g; s|<REPO>|$repo|g; s|<BRANCH>|$branch|g")"
+  echo "$skill_def"
   echo ""
   echo ""
 

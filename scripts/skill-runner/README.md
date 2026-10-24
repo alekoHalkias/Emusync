@@ -26,8 +26,11 @@ skill-runner.sh ──→ lib/
 ## Usage
 
 ```bash
-# Basic usage
-scripts/skill-runner/skill-runner.sh <issue-number>
+# Fresh issue — pass a description; skill-runner creates the GitHub issue + handoff
+scripts/skill-runner/skill-runner.sh "add dark mode to the device list"
+
+# Resume an existing issue by number
+scripts/skill-runner/skill-runner.sh 600
 
 # With options
 scripts/skill-runner/skill-runner.sh 600 --model local --step fix
@@ -38,6 +41,11 @@ scripts/skill-runner/skill-runner.sh 600 --dry-run
 # Skip git operations
 scripts/skill-runner/skill-runner.sh 600 --no-commit --no-push
 ```
+
+When given a description (not a number), the runner:
+1. Creates `plans/<slug>-handoff.md` with `Status: created`
+2. Runs the `issue` skill which creates the GitHub issue and populates the handoff
+3. Continues through the pipeline automatically
 
 ## Options
 
@@ -155,10 +163,17 @@ file: path/to/file.md
 <new content>
 ```
 
+create-file: path/to/new/file.md
+```
+<new content>
+```
+
 ## Actions
 - run: <command>
 - read: <file path>
 ```
+
+`file:` writes to an existing file. `create-file:` creates a new file (used by the issue skill to generate the handoff).
 
 ## Requirements
 

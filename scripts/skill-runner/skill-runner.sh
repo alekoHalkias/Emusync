@@ -31,6 +31,7 @@ source "$SCRIPT_DIR/lib/github.sh"
 
 # ── Parse arguments ────────────────────────────────────────────────
 ISSUE_NUM=""
+ISSUE_DESC=""
 STEP_SLUG="step"
 DRY_RUN=false
 NO_COMMIT=false
@@ -46,7 +47,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run)      DRY_RUN=true; shift ;;
     --max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: $0 <issue-number> [options]"
+      echo "Usage: $0 <issue-number|description> [options]"
       echo "Options:"
       echo "  --model <backend>       local | openai | claude-code"
       echo "  --step <slug>           Branch slug (default: step)"
@@ -67,25 +68,119 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$ISSUE_NUM" ]] || die "Usage: $0 <issue-number>"
+[[ -n "$ISSUE_NUM" ]] || die "Usage: $0 <issue-number|description>"
 
 # ── Validate dependencies ──────────────────────────────────────────
 validate_deps
 
-# ── Locate handoff file ────────────────────────────────────────────
+# ── Locate (or create) handoff file ────────────────────────────────
 REPO_ROOT="$(repo_root)"
 HANDOFF_FILE="$REPO_ROOT/plans/${ISSUE_NUM}-handoff.md"
 
 if [[ ! -f "$HANDOFF_FILE" ]]; then
-  die "Handoff file not found: $HANDOFF_FILE"
+  # No handoff exists — this is a fresh issue description.
+  # Create the handoff with Status: created so the issue skill runs first.
+  log "No handoff file — creating initial handoff for issue description"
+  mkdir -p "$REPO_ROOT/plans"
+
+  # Sanitize the issue description for use as a filename/branch slug
+  ISSUE_SLUG="$(echo "$ISSUE_NUM" | tr ' :/' '---' | sed 's/--*/-/g; s/^-//; s/-$//')"
+  HANDOFF_FILE="$REPO_ROOT/plans/${ISSUE_SLUG}-handoff.md"
+
+  cat > "$HANDOFF_FILE" <<HEOF
+# Handoff: $ISSUE_NUM
+
+## Metadata
+- Issue: $ISSUE_NUM
+- Branch: feature/${ISSUE_SLUG}-step
+- PR: none
+- Status: created
+- Created: $(date '+%Y-%m-%d')
+- Fix attempts: 0
+
+## 1. Issue
+### Summary
+TBD
+
+### Motivation
+TBD
+
+### Steps to reproduce / expected behavior
+TBD
+
+### Affected area
+TBD
+
+### Acceptance criteria
+- [ ] TBD
+
+## 2. Design
+### Scope: TBD
+### Backend Changes: TBD
+### UI Changes: TBD
+### Sub-issues: TBD
+### Difficulty: TBD/10
+### Backwards Compatibility: TBD
+
+## 3. Frontend Plan
+### Design Alignment: TBD
+### Visual Pattern: TBD
+### Recommendations: TBD
+
+## 4. Backend Plan
+### Design Alignment: TBD
+### Backend Pattern: TBD
+### Recommendations: TBD
+
+## 5. Merged Plan
+### Conflicts Resolved: none
+### Unresolved Conflicts: none
+
+## 6. Testing Plan
+### Test File: TBD
+### Test Cases: TBD
+### Edge Cases: TBD
+### Integration Points: TBD
+
+## 7. Test Design
+### Test Scope: TBD
+### Test Types: TBD
+### Test Cases: TBD
+### Affected Existing Tests: TBD
+### Implementation Checklist: TBD
+
+## 8. Implementation Steps
+### Steps: TBD
+
+## 9. Review
+### Findings: TBD
+### Blocked: TBD
+### Blockers: TBD
+
+## 10. Ship
+### Status: pending
+### PR: none
+### Server Sync: pending
+### Doc Sync: pending
+
+## 11. Fix Attempts
+### Attempt 1: none
+### Attempt 2: none
+### Attempt 3: none
+
+## 12. Log
+- $(date '+%Y-%m-%d %H:%M') handoff created (fresh issue)
+HEOF
+
+  log "Created handoff: $HANDOFF_FILE"
 fi
 
 # ── Set up git branch ──────────────────────────────────────────────
-BRANCH="feature/${ISSUE_NUM}-${STEP_SLUG}"
-git checkout "$BRANCH" 2>/dev/null || create_branch "$ISSUE_NUM" "$STEP_SLUG"
+BRANCH="feature/${ISSUE_SLUG:-$ISSUE_NUM}-${STEP_SLUG}"
+git checkout "$BRANCH" 2>/dev/null || create_branch "${ISSUE_SLUG:-$ISSUE_NUM}" "$STEP_SLUG"
 
 # ── Commit function for the pipeline ───────────────────────────────
-commit_fn() {
+do_commit() {
   if ! $NO_COMMIT; then
     commit_handoff "$HANDOFF_FILE" "skill-runner: update handoff"
     if ! $NO_PUSH; then
@@ -112,6 +207,11 @@ run_skill() {
   if $DRY_RUN; then
     log "DRY RUN — prompt saved to $prompt_file"
     log "Prompt size: $(wc -l < "$prompt_file") lines"
+    # Copy first prompt to a known location for inspection
+    if [[ ! -f /tmp/skill-runner-dry-run-prompt.md ]]; then
+      cp "$prompt_file" /tmp/skill-runner-dry-run-prompt.md
+      log "First prompt saved to /tmp/skill-runner-dry-run-prompt.md"
+    fi
     rm -f "$response_file" "$prompt_file"
     return 0
   fi
@@ -144,9 +244,8 @@ run_skill() {
 }
 
 # ── Wire up the pipeline ───────────────────────────────────────────
-run_skill_fn="$run_skill"
-export -f run_skill_fn
-export run_skill_fn
+run_skill_fn="run_skill"
+commit_fn="do_commit"
 
 log "Starting pipeline for issue #$ISSUE_NUM"
 log "Handoff: $HANDOFF_FILE"

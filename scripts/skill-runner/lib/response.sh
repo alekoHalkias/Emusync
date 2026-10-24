@@ -19,7 +19,7 @@
 #   - run: <command>
 #   - read: <file path>
 
-source "$(dirname "$0")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 # ── Extract a section from response ────────────────────────────────
 extract_section() {
@@ -99,13 +99,24 @@ write_code_changes() {
   [[ -z "$changes" ]] && return 0
 
   local current_file=""
+  local create_mode=false
   local in_code_block=false
   local code_content=""
 
   while IFS= read -r line; do
+    if [[ "$line" =~ ^create-file:[[:space:]]*(.+)$ ]]; then
+      current_file="${BASH_REMATCH[1]}"
+      current_file="$(echo "$current_file" | xargs)"
+      create_mode=true
+      in_code_block=false
+      code_content=""
+      continue
+    fi
+
     if [[ "$line" =~ ^file:[[:space:]]*(.+)$ ]]; then
       current_file="${BASH_REMATCH[1]}"
       current_file="$(echo "$current_file" | xargs)"
+      create_mode=false
       in_code_block=false
       code_content=""
       continue
@@ -118,7 +129,11 @@ write_code_changes() {
           full_path="$(repo_root)/$current_file"
           mkdir -p "$(dirname "$full_path")"
           printf '%s\n' "$code_content" > "$full_path"
-          log "Wrote code change: $current_file"
+          if $create_mode; then
+            log "Created file: $current_file"
+          else
+            log "Wrote code change: $current_file"
+          fi
         fi
         in_code_block=false
         code_content=""

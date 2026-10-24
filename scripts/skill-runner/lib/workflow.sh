@@ -6,7 +6,7 @@
 #
 # Additional terminal states: blocked, aborted.
 
-source "$(dirname "$0")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 # ── Status → skill mapping ─────────────────────────────────────────
 status_to_skill() {
@@ -112,7 +112,7 @@ run_pipeline() {
       log "Status updated: $status → $next_status"
     fi
 
-    if [[ -n "$commit_fn" ]]; then
+    if [[ -n "${commit_fn:-}" ]]; then
       "$commit_fn" "$handoff_file"
     fi
   done

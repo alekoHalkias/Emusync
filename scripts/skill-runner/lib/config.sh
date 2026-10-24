@@ -43,12 +43,12 @@ if [[ -n "$_project_config" ]]; then
     [[ "$_key" =~ ^EMUSYNC_ ]] || continue
     _val="$(echo "$_val" | xargs)"
     case "$_key" in
-      EMUSYNC_DEFAULT_MODEL)  [[ -z "${EMUSYNC_DEFAULT_MODEL}" ]] && _model="$_val" ;;
-      EMUSYNC_API_URL)        [[ -z "${EMUSYNC_API_URL}" ]] && _api_url="$_val" ;;
-      EMUSYNC_API_KEY)        [[ -z "${EMUSYNC_API_KEY}" ]] && _api_key="$_val" ;;
-      EMUSYNC_MAX_TOKENS)     [[ -z "${EMUSYNC_MAX_TOKENS}" ]] && _max_tokens="$_val" ;;
-      EMUSYNC_TEMPERATURE)    [[ -z "${EMUSYNC_TEMPERATURE}" ]] && _temperature="$_val" ;;
-      EMUSYNC_MODEL_NAME)     [[ -z "${EMUSYNC_MODEL_NAME}" ]] && _model_name="$_val" ;;
+      EMUSYNC_DEFAULT_MODEL)  [[ -z "${EMUSYNC_DEFAULT_MODEL:-}" ]] && _model="$_val" ;;
+      EMUSYNC_API_URL)        [[ -z "${EMUSYNC_API_URL:-}" ]] && _api_url="$_val" ;;
+      EMUSYNC_API_KEY)        [[ -z "${EMUSYNC_API_KEY:-}" ]] && _api_key="$_val" ;;
+      EMUSYNC_MAX_TOKENS)     [[ -z "${EMUSYNC_MAX_TOKENS:-}" ]] && _max_tokens="$_val" ;;
+      EMUSYNC_TEMPERATURE)    [[ -z "${EMUSYNC_TEMPERATURE:-}" ]] && _temperature="$_val" ;;
+      EMUSYNC_MODEL_NAME)     [[ -z "${EMUSYNC_MODEL_NAME:-}" ]] && _model_name="$_val" ;;
     esac
   done < "$_project_config"
 fi
@@ -86,6 +86,7 @@ github_remote() {
   [[ -n "$remote" ]] || die "No git remote found"
   echo "$remote" | sed 's|git@github.com:||; s|\.git$||; s|https://github.com/||'
 }
+
 
 validate_deps() {
   require_cmd "git"

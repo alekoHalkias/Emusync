@@ -3,31 +3,115 @@ You are working on issue #ISSUE_NUM in the EmuSync workflow.
 ## Your Task: Issue Skill
 
 Parse the user's description of this issue. Determine:
-1. A clear summary (1-2 sentences)
-2. The motivation (why this matters)
-3. Reproduction steps or expected behavior
-4. Which areas of the codebase are affected
-5. Acceptance criteria (checklist)
-
-Then produce:
-
-## Handoff Updates
-Update section 1 (Issue) of the handoff with:
-- Summary
-- Motivation
-- Steps to reproduce / expected behavior
-- Affected area
-- Acceptance criteria (checkbox list)
-
-## Plan Updates
-If this is a new issue, write the initial scope into the plan file.
-If a plan already exists, update it with the issue scope.
+1. A clear, concise title (1 line, imperative, no prefix tags)
+2. A summary (1-2 sentences)
+3. The motivation (why this matters)
+4. Reproduction steps or expected behavior
+5. Which areas of the codebase are affected
+6. Acceptance criteria (checklist)
 
 ## Actions
-- run: echo "Issue skill complete"
+
+### 1. Create the GitHub issue
+Run this command to create the issue:
+- run: gh issue create --repo <repo> --title "<title>" --body-file <temp-file> --label enhancement
+
+Build the issue body from the summary, motivation, steps, affected area, and acceptance criteria.
+
+### 2. Write the handoff file
+Write the full handoff file using the format below. This creates/replaces `plans/<N>-handoff.md`:
+
+create-file: plans/<N>-handoff.md
+```markdown
+# Handoff: <title>
+
+## Metadata
+- Issue: #N
+- Branch: feature/<N>-step
+- PR: none
+- Status: issue_done
+- Created: <today's date>
+- Fix attempts: 0
+
+## 1. Issue
+### Summary
+<summary>
+
+### Motivation
+<motivation>
+
+### Steps to reproduce / expected behavior
+<steps>
+
+### Affected area
+<affected area with specific file/dir references>
+
+### Acceptance criteria
+- [ ] <criterion 1>
+- [ ] <criterion 2>
+
+## 2. Design
+### Scope: TBD
+### Backend Changes: TBD
+### UI Changes: TBD
+### Sub-issues: TBD
+### Difficulty: TBD/10
+### Backwards Compatibility: TBD
+
+## 3. Frontend Plan
+### Design Alignment: TBD
+### Visual Pattern: TBD
+### Recommendations: TBD
+
+## 4. Backend Plan
+### Design Alignment: TBD
+### Backend Pattern: TBD
+### Recommendations: TBD
+
+## 5. Merged Plan
+### Conflicts Resolved: none
+### Unresolved Conflicts: none
+
+## 6. Testing Plan
+### Test File: TBD
+### Test Cases: TBD
+### Edge Cases: TBD
+### Integration Points: TBD
+
+## 7. Test Design
+### Test Scope: TBD
+### Test Types: TBD
+### Test Cases: TBD
+### Affected Existing Tests: TBD
+### Implementation Checklist: TBD
+
+## 8. Implementation Steps
+### Steps: TBD
+
+## 9. Review
+### Findings: TBD
+### Blocked: TBD
+### Blockers: TBD
+
+## 10. Ship
+### Status: pending
+### PR: none
+### Server Sync: pending
+### Doc Sync: pending
+
+## 11. Fix Attempts
+### Attempt 1: none
+### Attempt 2: none
+### Attempt 3: none
+
+## 12. Log
+- <date> issue: workflow initialized
+- <date> issue_done: issue created, handoff populated
+```
 
 Rules:
 - Keep the summary concise but complete
 - Affected area should reference specific directories/files
 - Acceptance criteria must be testable (checkbox items)
+- Title: short, imperative, no prefix tags like "Feature:" or "Bug:"
 - Do NOT write code changes here — that comes in later skills

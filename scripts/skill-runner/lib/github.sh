@@ -3,7 +3,7 @@
 #
 # Handles: issue create, PR create, PR merge, status check.
 
-source "$(dirname "$0")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 create_issue() {
   local repo="$1"

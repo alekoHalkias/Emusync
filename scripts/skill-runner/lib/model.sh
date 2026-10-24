@@ -8,7 +8,7 @@
 #
 # Usage: call_model "<prompt>" > <output_file>
 
-source "$(dirname "$0")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 # ── Local / OpenAI API caller ──────────────────────────────────────
 call_openai_api() {

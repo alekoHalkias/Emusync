@@ -3,7 +3,7 @@
 #
 # Handles: branch create/checkout, commit, push.
 
-source "$(dirname "$0")/config.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/config.sh"
 
 # ── Create and checkout a feature branch ───────────────────────────
 create_branch() {
