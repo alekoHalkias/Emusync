@@ -3,7 +3,7 @@
 Issue: #600
 Branch: feature/600-skill-runner-minimal
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
