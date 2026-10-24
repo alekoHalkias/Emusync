@@ -10,7 +10,7 @@ Fix attempts: 0
 Synchronize the `_monitor_presence` background thread with presence updates to prevent race conditions and SQLite contention.
 
 ## Steps
-- [ ] 1. Wrap `_monitor_presence` logic in `_presence_lock` to ensure atomicity with `_auth` presence updates.
+- [x] 1. Wrap `_monitor_presence` logic in `_presence_lock` to ensure atomicity with `_auth` presence updates.
   - Files: `server/api/_core.py`
   - Reuses: `_presence_lock`, `_online_devices`, `_device_names`, `_store.list_devices()`, `_store.release_device_locks()`, `_print_activity()`, `_game_label()`
   - New: None - expanding existing lock scope.
@@ -18,8 +18,8 @@ Synchronize the `_monitor_presence` background thread with presence updates to p
   - Files: `server/api/_core.py`
   - Reuses: `_presence_lock`
   - New: None
-- [ ] 3. Tests: `tests/test_integration.py`. Add a test case that simulates concurrent presence updates and monitor sweeps to check for race conditions or SQLite contention.
-  - Files: `tests/test_integration.py`
+- [ ] 3. Tests: `tests/test_devices.py`. Add a test case that simulates concurrent presence updates and monitor sweeps to check for race conditions or SQLite contention.
+  - Files: `tests/test_devices.py`
   - Reuses: `client` fixture, `AUTH` headers
   - New: Concurrent presence/lock-release test case.
 - [ ] 4. Docs: none needed - internal server logic change.
