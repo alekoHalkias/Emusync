@@ -59,7 +59,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: rich (from deps)
   - New: stage prefix mapping ([ISSUE], [DESIGN], [BPLAN], etc.), progress bars for steps, gate display with approval prompts
 
-- [ ] 10. Gate logic: plan approval, ship approval, revision feedback loop
+- [x] 10. Gate logic: plan approval, ship approval, revision feedback loop
   - Files: workflow-cli/workflow_cli/gates.py
   - Reuses: progress.py for display, actions.py for ask_user
   - New: summary rendering, approve/revise/reject decision flow, revision feedback formatting for LLM
