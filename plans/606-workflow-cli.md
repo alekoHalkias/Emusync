@@ -74,7 +74,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: config.py for project lookup, stages.py for routing, progress.py for output
   - New: subcommands (init, resume, status, cancel, list, plan, handoff), project lookup by repo path or name, main orchestration loop
 
-- [ ] 13. System prompts and JSON schema: generic action format instructions, LLM response schema
+- [x] 13. System prompts and JSON schema: generic action format instructions, LLM response schema
   - Files: workflow-cli/workflow_cli/prompts/system.py, workflow-cli/workflow_cli/prompts/schema.py
   - Reuses: pydantic for schema validation
   - New: system prompt templates (action format rules, no-emoji policy, handoff-as-state-carrier), JSON action schema
