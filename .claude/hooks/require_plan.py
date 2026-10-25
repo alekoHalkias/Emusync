@@ -39,6 +39,8 @@ def check(data):
         return f"Branch '{branch}' is not linked to an issue. Code changes go through /issue -> /plan -> /implement."
     n = m.group(1)
     plans = glob.glob(os.path.join(root, "plans", f"{n}-*.md"))
+    # The handoff matches the same glob and uses `- Status:`; prefer the plan file.
+    plans = [p for p in plans if not p.endswith("-handoff.md")] or plans
     if not plans:
         return f"No plan file plans/{n}-*.md. Run /plan {n} first."
     with open(plans[0]) as f:
