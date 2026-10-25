@@ -10,49 +10,51 @@
 
 ## 1. Issue
 ### Summary
-Build a standalone, project-agnostic Python CLI (`workflow-cli`) that orchestrates a skill-based development workflow using a local LLM (via llama-swap). The CLI handles all tool execution (git, gh, file I/O, linting, testing) while the local LLM acts as a structured planner — returning JSON batches of typed actions for the CLI to execute.
+Build a standalone, project-agnostic Python CLI (`workflow-cli`) that orchestrates a skill-based development workflow using a local LLM (via llama-swap). All workflow state lives inside the CLI's own directory tree — zero files are written into the target repo. The CLI handles all tool execution (git, gh, file I/O, linting, testing) while the local LLM acts as a structured planner — returning JSON batches of typed actions for the CLI to execute.
 
 ### Motivation
-Claude Code is the current workflow orchestrator via `.claude/skills/`. This project is designed to replace it (or any proprietary AI coding assistant) with a self-contained, open tool that any project can adopt by providing its own skill definitions, rules, and configuration. It separates the orchestration engine (the CLI) from project-specific knowledge (skills, rules, hooks in config files).
+Claude Code is the current workflow orchestrator via `.claude/skills/`. This project is designed to replace it (or any proprietary AI coding assistant) with a self-contained, open tool that leaves no artifacts in the repos it operates on. It separates the orchestration engine (the CLI) from project-specific knowledge (skills, rules, hooks stored in the CLI's own `projects/` directory).
 
 ### Proposed Behavior / Steps to Reproduce
 - A standalone Python package (`workflow-cli`) installable system-wide.
-- Projects configure their own skills, rules, and hooks via `.workflow-cli/config.yaml`.
-- The CLI discovers the project root, reads config, and manages the full workflow pipeline (issue → design → plan → implement → ship).
+- `workflow-cli init <repo-path>` scans the repo for rule files, tech stack, test/lint commands, and writes a project config into `workflow-cli/projects/<repo-id>/config.yaml`.
+- The CLI manages the full workflow pipeline (issue → design → plan → implement → ship) with all state stored in `workflow-cli/projects/<repo-id>/`.
 - The LLM (via llama-swap) returns JSON batches of typed actions (`bash`, `gh`, `read`, `write`, `edit`, `ask_user`, `approve`, `skip`, `error`).
 - The CLI executes each action, feeds results back to the LLM, and iterates until the skill completes.
 - Stage gates (plan approval, ship approval) pause for user confirmation.
-- State is carried by a handoff file (`plans/<N>-handoff.md`) and a secondary runtime state file (`.workflow-cli/state.json`).
-- The CLI is project-agnostic: it knows nothing about any specific repo. All project knowledge lives in config files.
+- State is carried by handoff files in `workflow-cli/projects/<repo-id>/handoff/` and runtime state in `workflow-cli/projects/<repo-id>/state.json`.
+- The CLI is project-agnostic: it knows nothing about any specific repo. All project knowledge lives in its own `projects/` directory.
+- The target repo is never modified by the CLI beyond git operations (branch create, commit, push, PR).
 
 ### Affected Area
-- New standalone Python package (outside the EmuSync repo, or optionally vendored within it).
+- New standalone Python package (outside the EmuSync repo).
 - Would eventually replace or supplement the current Claude Code `.claude/skills/` pipeline.
-- EmuSync would adopt it by writing a `.workflow-cli/config.yaml` and copying/linking skill definitions.
+- EmuSync would be registered via `workflow-cli init ~/Github/Emusync` — no files written to the repo.
 
 ### Acceptance Criteria
-- [ ] `workflow-cli init` scaffolds `.workflow-cli/config.yaml` in a project root
-- [ ] `workflow-cli <N>` discovers project, resumes existing workflow, or starts fresh
+- [ ] `workflow-cli init <repo-path>` scans repo, discovers rule files, tech stack, commands, writes config to `workflow-cli/projects/<repo-id>/config.yaml`
+- [ ] `workflow-cli <N>` discovers project from CLI's projects directory, resumes existing workflow, or starts fresh
 - [ ] `workflow-cli status` shows current workflow state (issue, branch, stage, timestamps)
 - [ ] `workflow-cli cancel <N>` marks a workflow as blocked without changes
 - [ ] LLM integration via llama-swap: sends prompts, parses JSON action batches, handles retries
 - [ ] Action executor supports all types: bash, gh, read, write, edit, ask_user, approve, skip, error
 - [ ] Stage router correctly advances through: issue → design → fplan/bplan → merge → tplan → implement → review → ship
-- [ ] Handoff file read/write with the 12-section template
-- [ ] Runtime state tracked in `.workflow-cli/state.json` (LLM usage, timing, run history)
+- [ ] Handoff file read/write with the 12-section template, stored in CLI's projects directory
+- [ ] Runtime state tracked in `workflow-cli/projects/<repo-id>/state.json` (LLM usage, timing, run history)
 - [ ] Branch management: creates `feature/<N>-<slug>` from main, never works on main
 - [ ] Progress display with stage prefixes and gate summaries
 - [ ] Fix loop: detects test failures, re-invokes plan/implement, retries up to 3 times
 - [ ] Server sync hook: configurable SSH command executed during ship stage
 - [ ] Project-agnostic: works with a minimal config, no hardcoded repo knowledge
+- [ ] Zero files written into the target repo by the CLI (except git operations)
 
 ## 2. Design
-### Scope: Standalone Python CLI package (~12 modules). No EmuSync code touched. Terminal-only output.
-### Backend Changes: New package: cli.py (arg parser + main loop), config.py (project config loading), state.py (handoff + state.json), stages.py (stage router), skills.py (skill loader + prompt builder), llm.py (llama-swap client), actions.py (action executor), progress.py (terminal output), gates.py (approval/revision logic), project.py (config loader + hook executor), prompts/ (system prompts + JSON schema). pyproject.toml, tests/.
+### Scope: Standalone Python CLI package (~12 modules). All state stored in CLI's own `projects/<repo-id>/` directory. Zero files written into target repo. Terminal-only output.
+### Backend Changes: New package: cli.py (arg parser + main loop), config.py (project config + repo discovery), state.py (handoff + state.json in projects dir), stages.py (stage router), skills.py (skill loader + prompt builder), llm.py (llama-swap client), actions.py (action executor), progress.py (terminal output), gates.py (approval/revision logic), project.py (hook executor), prompts/ (system prompts + JSON schema). pyproject.toml, skills/, tests/.
 ### UI Changes: None. Terminal-only progress display with stage prefixes, gate summaries, and color-coded output.
 ### Plan Target: bplan
 ### Sub-issues: None — single cohesive tool.
-### Difficulty: 7/10 — ~12 modules, LLM integration with retry logic, JSON parsing/validation, git/gh CLI orchestration, multi-stage state machine, fix loop with rollback.
+### Difficulty: 7/10 — ~12 modules, LLM integration with retry logic, JSON parsing/validation, git/gh CLI orchestration, multi-stage state machine, fix loop with rollback, repo discovery on init.
 ### Backwards Compatibility: N/A — standalone tool outside EmuSync. Additive only.
 
 ## 3. Frontend Plan
@@ -61,9 +63,9 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 ### Recommendations: TBD
 
 ## 4. Backend Plan
-### Design Alignment: Standalone Python package, not part of EmuSync. Standard Python CLI patterns. Uses rich for terminal output, pydantic for JSON validation, httpx for HTTP, pyyaml for config.
-### Backend Pattern: Modular CLI with separate concerns: config loading, state management, stage routing, skill loading, LLM client, action execution, progress display, gate logic, hook execution. Each module is independently testable.
-### Recommendations: Use click or argparse for CLI args. Use rich for colored terminal output. Use pydantic for LLM response validation. Atomic file writes for all config/state files. No external API server — CLI-only tool.
+### Design Alignment: Standalone Python package, not part of EmuSync. Standard Python CLI patterns. All state stored in CLI's own directory tree (`workflow-cli/projects/<repo-id>/`). Zero files written to target repo. Uses rich for terminal output, pydantic for JSON validation, httpx for HTTP, pyyaml for config.
+### Backend Pattern: Modular CLI with separate concerns: repo discovery (on init), config loading, state management (in CLI's projects dir), stage routing, skill loading (from CLI's skills/), LLM client, action execution, progress display, gate logic, hook execution. Each module is independently testable.
+### Recommendations: Use click or argparse for CLI args. Use rich for colored terminal output. Use pydantic for LLM response validation. Atomic file writes for all config/state files. No external API server — CLI-only tool. `init` command does repo scanning (rule files, tech stack, test/lint commands) and writes everything into `projects/<repo-id>/`.
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
@@ -84,21 +86,21 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 
 ## 8. Implementation Steps
 ### Steps:
-- Step 1: Scaffolding — pyproject.toml, package structure, entry point. Files: workflow-cli/pyproject.toml, workflow_cli/__init__.py, workflow_cli/__main__.py. Reuses: none. New: project structure.
-- Step 2: Config loader — YAML config parsing with PyYAML, pydantic validation. Files: workflow_cli/config.py. Reuses: none. New: config models.
-- Step 3: State manager — handoff file + state.json management. Files: workflow_cli/state.py. Reuses: none. New: Markdown/JSON file I/O.
-- Step 4: Stage router — state machine for handoff status → next skill. Files: workflow_cli/stages.py. Reuses: none. New: stage transition logic.
-- Step 5: Skill loader — read SKILL.md, inject context. Files: workflow_cli/skills.py. Reuses: none. New: prompt assembly.
-- Step 6: LLM client — llama-swap HTTP client with retry. Files: workflow_cli/llm.py. Reuses: httpx. New: HTTP + JSON parsing + retry.
-- Step 7: Action executor — typed action dispatch. Files: workflow_cli/actions.py. Reuses: subprocess, stdlib. New: action dispatch.
-- Step 8: Progress emitter — colored terminal output. Files: workflow_cli/progress.py. Reuses: rich. New: stage prefixes + gates.
-- Step 9: Gate logic — approval/revision flow. Files: workflow_cli/gates.py. Reuses: progress.py, actions.py. New: approval decisions.
-- Step 10: Project hooks — server_sync, doc_sync, pre_ship. Files: workflow_cli/project.py. Reuses: config.py, actions.py. New: SSH/command execution.
-- Step 11: CLI arg parser + main loop. Files: workflow_cli/cli.py. Reuses: config.py, stages.py, progress.py. New: subcommands + main loop.
-- Step 12: System prompts + JSON schema. Files: workflow_cli/prompts/system.py, prompts/schema.py. Reuses: pydantic. New: prompt templates.
-- Step 13: Default skill templates. Files: workflow-cli/skills/*/SKILL.md. Reuses: EmuSync skills as reference. New: project-agnostic skills.
-- Step 14: Tests. Files: workflow-cli/tests/*.py. Reuses: pytest. New: unit tests.
-- Step 15: Backend design guide. Files: .claude/backend-design-guide.md. Reuses: none. New: workflow-cli patterns doc.
+- Step 1: Scaffolding — pyproject.toml, package structure, entry point. Files: workflow-cli/pyproject.toml, workflow_cli/__init__.py, workflow_cli/__main__.py. Reuses: none. New: project structure with flat package layout.
+- Step 2: Config loader — YAML config parsing with PyYAML, pydantic validation. Files: workflow_cli/config.py. Reuses: none. New: config models for project settings, hooks, LLM settings.
+- Step 3: Repo discovery — scan target repo for rule files, tech stack, test/lint commands, git info. Files: workflow_cli/config.py (discover_repo function). Reuses: subprocess, pathlib. New: repo scanning logic (find CLAUDE.md, CONTRIBUTING.md, package.json, pyproject.toml, Makefile, etc.).
+- Step 4: State manager — handoff files + state.json in CLI's projects dir. Files: workflow_cli/state.py. Reuses: none. New: Markdown/JSON file I/O, paths under `projects/<repo-id>/handoff/` and `projects/<repo-id>/state.json`.
+- Step 5: Stage router — state machine for handoff status → next skill. Files: workflow_cli/stages.py. Reuses: none. New: stage transition logic.
+- Step 6: Skill loader — read SKILL.md from CLI's skills/ dir or projects/<repo-id>/skills/ (overrides), inject context. Files: workflow_cli/skills.py. Reuses: none. New: prompt assembly with fallback skill resolution.
+- Step 7: LLM client — llama-swap HTTP client with retry. Files: workflow_cli/llm.py. Reuses: httpx. New: HTTP + JSON parsing + retry.
+- Step 8: Action executor — typed action dispatch. Files: workflow_cli/actions.py. Reuses: subprocess, stdlib. New: action dispatch.
+- Step 9: Progress emitter — colored terminal output. Files: workflow_cli/progress.py. Reuses: rich. New: stage prefixes + gates.
+- Step 10: Gate logic — approval/revision flow. Files: workflow_cli/gates.py. Reuses: progress.py, actions.py. New: approval decisions.
+- Step 11: Project hooks — server_sync, doc_sync, pre_ship. Files: workflow_cli/project.py. Reuses: config.py, actions.py. New: SSH/command execution.
+- Step 12: CLI arg parser + main loop. Files: workflow_cli/cli.py. Reuses: config.py, stages.py, progress.py. New: subcommands (init, resume, status, cancel, list, plan, handoff) + main loop.
+- Step 13: System prompts + JSON schema. Files: workflow_cli/prompts/system.py, prompts/schema.py. Reuses: pydantic. New: prompt templates.
+- Step 14: Default skill templates. Files: workflow-cli/skills/*/SKILL.md. Reuses: EmuSync skills as reference. New: project-agnostic skills.
+- Step 15: Tests. Files: workflow-cli/tests/*.py. Reuses: pytest. New: unit tests for state, stages, actions, config, progress, llm.
 
 ## 9. Review
 ### Findings: TBD
@@ -119,4 +121,5 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 ## 12. Log
 - 2026-10-25 issue: workflow initialized, issue #606 created
 - 2026-10-25 design: scope=standalone Python CLI (~12 modules), plan_target=bplan, difficulty=7/10, breaking=no
-- 2026-10-25 bplan: 15 steps written, backend_pattern=standalone Python CLI with llama-swap integration
+- 2026-10-25 bplan: 15 steps written, backend_pattern=standalone Python CLI with all state in CLI's projects dir, zero files in target repo
+- 2026-10-25 revise: moved all state from target repo to CLI's projects/<repo-id>/ directory, added repo discovery step, removed backend design guide step
