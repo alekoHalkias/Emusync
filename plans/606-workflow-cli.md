@@ -89,6 +89,35 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: pytest (from dev deps)
   - New: real file I/O tests (no mocks for state), HTTP mock for llama-swap, subprocess mock for actions
 
+## Testing
+- **Test File**: workflow-cli/tests/ (pytest, real file I/O, no mocks for state)
+- **Test Cases**:
+  - config.py: valid config parsing, invalid config handling, default values, repo discovery (rule files found/missing, tech stack detection, graceful missing files)
+  - state.py: handoff file read/write (12-section template), state JSON read/write, atomic writes, path resolution, Markdown section parsing
+  - stages.py: valid transitions (created→designed→planned→implementing→implemented→shipped), invalid transitions rejected, status parsing from handoff
+  - skills.py: skill discovery from CLI's skills/, override resolution from projects/<repo-id>/skills/, prompt assembly, fallback when skill not found
+  - llm.py: HTTP POST to llama-swap, JSON response parsing, retry logic (3 attempts, exponential backoff), model error handling, timeout handling
+  - actions.py: bash action (command execution, stdout/stderr/exit_code), gh action, read action, write action (atomic), edit action (exact string match, not-found error), ask_user, approve, skip/error
+  - progress.py: stage prefix output, gate display, color coding
+  - gates.py: plan approval flow, ship approval flow, revision feedback loop
+  - project.py: server_sync hook execution, doc_sync hook execution, pre-ship validation
+  - cli.py: subcommand parsing (init, resume, status, cancel, list, plan, handoff), project discovery
+  - prompts/schema.py: JSON schema validation of LLM responses
+- **Edge Cases**:
+  - LLM returns invalid JSON (retry with reformatted prompt)
+  - LLM endpoint unavailable (health check, error report)
+  - Edit action with old_string not found (report with context, no auto-retry)
+  - Handoff file corrupt/malformed (error, do not crash)
+  - Config file corrupt (error, do not proceed)
+  - Concurrent workflow access (file locking for state.json)
+  - Empty skills directory (error with helpful message)
+  - Target repo without .git (init fails with error)
+- **Integration Points**:
+  - cli.py + config.py + stages.py: full init flow (discover project, create config, create branch)
+  - llm.py + skills.py + actions.py: full skill execution loop (prompt → LLM → actions → results → next prompt)
+  - gates.py + actions.py: user approval flow (present summary → capture decision → proceed or revise)
+  - project.py + actions.py: hook execution (server sync via SSH, doc sync via file copy)
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: yes (workflow-cli). Config/data file change: no (new project, state stored in CLI's own directory).
 

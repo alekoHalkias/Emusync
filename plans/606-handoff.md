@@ -72,10 +72,10 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: workflow-cli/tests/ (pytest, real file I/O, no mocks for state)
+### Test Cases: config.py (valid/invalid parsing, defaults, repo discovery), state.py (handoff read/write, state JSON, atomic writes, Markdown parsing), stages.py (valid/invalid transitions), skills.py (discovery, overrides, prompt assembly, fallback), llm.py (HTTP POST, JSON parsing, retry, error handling), actions.py (bash/gh/read/write/edit/ask_user/approve/skip/error), progress.py (stage prefixes, gates), gates.py (approval/revision flows), project.py (hooks), cli.py (subcommands), prompts/schema.py (JSON validation)
+### Edge Cases: LLM invalid JSON retry, LLM unavailable, edit not-found, corrupt handoff/config, concurrent access (file locking), empty skills dir, non-git repo
+### Integration Points: init flow (cli+config+stages), skill loop (llm+skills+actions), approval flow (gates+actions), hook execution (project+actions)
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -123,3 +123,4 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - 2026-10-25 design: scope=standalone Python CLI (~12 modules), plan_target=bplan, difficulty=7/10, breaking=no
 - 2026-10-25 bplan: 15 steps written, backend_pattern=standalone Python CLI with all state in CLI's projects dir, zero files in target repo
 - 2026-10-25 revise: moved all state from target repo to CLI's projects/<repo-id>/ directory, added repo discovery step, removed backend design guide step
+- 2026-10-25 tplan: 11 test modules defined, 4 integration points, edge cases covered (invalid JSON, corrupt files, concurrent access, non-git repo)
