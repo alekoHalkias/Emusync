@@ -5,7 +5,7 @@ hooks:
   server_sync: {}
 lint_commands: {}
 llama_swap:
-  model: Qwen2.5-Coder-32B-Instruct.Q4_K_S.gguf
+  model: qwen3.6-mtp
   url: http://localhost:8001
 plan_path: plans/{N}-{slug}.md
 project:

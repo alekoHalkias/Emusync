@@ -141,8 +141,10 @@ def run_orchestration(project_id: str, issue_number: str) -> int:
             repo_root = project_dir.parent.parent
 
     # Initialize LLM client from config
-    llama_url = config.llama_swap.url if hasattr(config, 'llama_swap') else "http://localhost:8001"
-    llm = LLMClient(base_url=llama_url)
+    llama_swap_cfg = config.llama_swap if hasattr(config, 'llama_swap') else None
+    llama_url = llama_swap_cfg.url if llama_swap_cfg else "http://localhost:8001"
+    llama_model = llama_swap_cfg.model if llama_swap_cfg else "qwen3.6-mtp"
+    llm = LLMClient(base_url=llama_url, model=llama_model)
 
     # Read or create handoff
     handoff = read_handoff(project_id, issue_number)
