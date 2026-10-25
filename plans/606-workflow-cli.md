@@ -24,7 +24,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: none
   - New: pydantic models for ProjectConfig, LlamaSwapConfig, HooksConfig; repo discovery (rule files, tech stack, test/lint commands, git info); atomic config saves
 
-- [ ] 3. Repo discovery: scan target repo for rule files, tech stack, test/lint commands, git info
+- [x] 3. Repo discovery: scan target repo for rule files, tech stack, test/lint commands, git info
   - Files: workflow-cli/workflow_cli/config.py (discover_repo function)
   - Reuses: subprocess, pathlib
   - New: repo scanning logic — finds CLAUDE.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, package.json, pyproject.toml, Makefile, etc.

@@ -88,7 +88,7 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 ### Steps:
 - Step 1: DONE — pyproject.toml, package structure, entry point. Files: workflow-cli/pyproject.toml, workflow_cli/__init__.py, workflow_cli/__main__.py. Reuses: none. New: project structure with flat package layout.
 - Step 2: DONE — YAML config parsing with PyYAML, pydantic validation. Files: workflow_cli/config.py. Reuses: none. New: config models for project settings, hooks, LLM settings; repo discovery; atomic config saves.
-- Step 3: Repo discovery — scan target repo for rule files, tech stack, test/lint commands, git info. Files: workflow_cli/config.py (discover_repo function). Reuses: subprocess, pathlib. New: repo scanning logic (find CLAUDE.md, CONTRIBUTING.md, package.json, pyproject.toml, Makefile, etc.).
+- Step 3: DONE (combined with step 2) — repo scanning logic in config.py (discover_repo function). Reuses: subprocess, pathlib. New: finds CLAUDE.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, package.json, pyproject.toml, Makefile, etc.
 - Step 4: State manager — handoff files + state.json in CLI's projects dir. Files: workflow_cli/state.py. Reuses: none. New: Markdown/JSON file I/O, paths under `projects/<repo-id>/handoff/` and `projects/<repo-id>/state.json`.
 - Step 5: Stage router — state machine for handoff status → next skill. Files: workflow_cli/stages.py. Reuses: none. New: stage transition logic.
 - Step 6: Skill loader — read SKILL.md from CLI's skills/ dir or projects/<repo-id>/skills/ (overrides), inject context. Files: workflow_cli/skills.py. Reuses: none. New: prompt assembly with fallback skill resolution.
@@ -126,3 +126,4 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - 2026-10-25 tplan: 11 test modules defined, 4 integration points, edge cases covered (invalid JSON, corrupt files, concurrent access, non-git repo)
 - 2026-10-25 implement: step 1 done (scaffolding: pyproject.toml, package structure, entry point)
 - 2026-10-25 implement: step 2 done (config loader: pydantic models, repo discovery, atomic saves)
+- 2026-10-25 implement: step 3 done (repo discovery — combined with step 2 into config.py)
