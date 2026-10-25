@@ -29,11 +29,10 @@ if [[ -z "$ISSUE" ]] || [[ ! -f "plans/${ISSUE}-handoff.md" ]]; then
   if [[ -n "$summary" ]]; then
     if [[ -z "$ISSUE" ]] || ! gh issue view "$ISSUE" >/dev/null 2>&1; then
       echo "Creating issue..."
-      ISSUE_NUM=$(gh issue create \
+      ISSUE_URL=$(gh issue create \
         --title "EmuSync: $summary" \
-        --label "workflow" \
-        --body "Auto-created by run-skill.sh" \
-        --json number | jq -r '.number')
+        --body "Auto-created by run-skill.sh")
+      ISSUE_NUM=$(echo "$ISSUE_URL" | sed 's|.*/issues/||')
       echo "Created issue #${ISSUE_NUM}"
       ISSUE="${ISSUE_NUM}"
     fi
