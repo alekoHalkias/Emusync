@@ -4,7 +4,7 @@
   - Issue: #604
   - Branch: feature/604-test-suite-goes-over-the-whole-list-of-t
   - PR: none
-  - Status: planned
+  - Status: implementing
   - Created: 2026-10-25
   - Last updated: 2026-10-25
   - Fix attempts: 0
