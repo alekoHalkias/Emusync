@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from workflow_cli.config import load_project_config, register_project
+from workflow_cli.orchestrate import run_orchestration
 from workflow_cli.progress import (
     console,
     print_done,
@@ -23,6 +24,7 @@ from workflow_cli.progress import (
     print_warning,
 )
 from workflow_cli.stages import next_skill, parse_status, validate_transition
+from workflow_cli.state import read_handoff
 
 logger = logging.getLogger(__name__)
 
@@ -48,26 +50,12 @@ def cmd_resume(args: argparse.Namespace) -> int:
     project_id = args.project_id
     issue_number = args.issue
 
-    # Load project config
-    config = load_project_config(project_id)
-    if config is None:
-        print_error(f"Project not found: {project_id}")
-        return 1
+    # Check if handoff exists (project registered for this issue?)
+    handoff = read_handoff(project_id, issue_number)
+    if handoff is None:
+        print_warning(f"No handoff found for #{issue_number}. Running init flow first...")
 
-    # Determine next skill
-    skill = next_skill("")  # Would read handoff in real implementation
-    print_header(f"Resuming: {project_id} #{issue_number}", "implementing")
-    print_info(f"Next skill: {skill}")
-
-    # In the real implementation, this would:
-    # 1. Read the handoff file
-    # 2. Determine the current status
-    # 3. Call the LLM with the appropriate skill
-    # 4. Execute actions
-    # 5. Update handoff
-    # For now, this is a placeholder
-    print_warning("Full orchestration loop not yet implemented")
-    return 0
+    return run_orchestration(project_id, issue_number)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -79,9 +67,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         print_error(f"Project not found: {project_id}")
         return 1
 
-    print_header(f"Status: {config.name}", "")
+    print_header(f"Status: {config.project.name}", "")
     print_info(f"Project ID: {project_id}")
-    print_info(f"Repo path: {config.repo_path}")
+    repo_path = config.repo_path if hasattr(config, 'repo_path') else config.project.repo
+    print_info(f"Repo path: {repo_path}")
     print_info(f"Default branch: {config.project.default_branch}")
     return 0
 
@@ -116,7 +105,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
     issue_number = args.issue
 
     print_header(f"Plan: {project_id} #{issue_number}", "")
-    print_info("Plan file would be displayed here.")
+    # Plan files are in the target repo
+    print_info("Plan file not found — run 'init' in the target repo first.")
     return 0
 
 
@@ -125,8 +115,13 @@ def cmd_handoff(args: argparse.Namespace) -> int:
     project_id = args.project_id
     issue_number = args.issue
 
+    handoff = read_handoff(project_id, issue_number)
+    if handoff is None:
+        print_warning(f"No handoff found for #{issue_number}")
+        return 1
+
     print_header(f"Handoff: {project_id} #{issue_number}", "")
-    print_info("Handoff file would be displayed here.")
+    console.print(handoff)
     return 0
 
 

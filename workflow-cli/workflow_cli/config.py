@@ -71,6 +71,7 @@ class ProjectSettings(BaseModel):
     test_commands: list[str] = Field(default_factory=lambda: ["make test-changed"])
     lint_commands: dict[str, str] = field(default_factory=dict)
     hooks: HooksConfig = Field(default_factory=HooksConfig)
+    repo_path: str = Field(default="", description="Absolute path to the target repository")
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +263,7 @@ def register_project(repo_path: str, name: str | None = None) -> str:
         rule_files=info.rule_files,
         test_commands=info.test_commands,
         lint_commands=info.lint_commands,
+        repo_path=str(info.root),
     )
 
     project_id = repo_slug.replace("/", "-").replace(".", "-").lower()
