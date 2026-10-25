@@ -44,7 +44,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: none
   - New: skill discovery with fallback resolution, prompt assembly (system + skill + rules + handoff + plan + code), context file injection
 
-- [ ] 7. LLM client: send prompts to llama-swap, parse JSON action batches, handle retries and timeouts
+- [x] 7. LLM client: send prompts to llama-swap, parse JSON action batches, handle retries and timeouts
   - Files: workflow-cli/workflow_cli/llm.py
   - Reuses: httpx (from deps)
   - New: HTTP POST to llama-swap endpoint, JSON response parsing with pydantic validation, exponential backoff retry (3 attempts), model error handling

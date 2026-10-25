@@ -130,3 +130,4 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - 2026-10-25 implement: step 4 done (state manager: handoff file CRUD, state.json, atomic writes)
 - 2026-10-25 implement: step 5 done (stage router: state machine, status parsing, skill dispatch)
 - 2026-10-25 implement: step 6 done (skill loader: skill discovery with fallback resolution, prompt assembly)
+- 2026-10-25 implement: step 7 done (LLM client: llama-swap HTTP client with retry, JSON parsing, markdown fence stripping)
