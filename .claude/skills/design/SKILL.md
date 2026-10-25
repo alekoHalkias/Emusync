@@ -12,6 +12,7 @@ Stage 1.5 of 4: issue -> design -> plan -> implement -> ship.
 - No emojis anywhere: issue titles/bodies, plan files, commit messages, PR titles/bodies, PR comments.
 - Professional, plain tone. No filler, no marketing language.
 - The handoff file is the workflow state carrier. Always read it first; never rely on conversation memory.
+- Minimize new code. Favor extending or reusing existing helpers, components, routes, and patterns. Decompose the issue to touch the smallest possible surface area.
 
 ## Resolve (shared by all four skills)
 
@@ -51,8 +52,10 @@ If invoked at the wrong stage, say so and invoke the right skill.
    - **Console detection**: If `consoles_data.py` entries change, old paired devices may misidentify consoles.
    If any breaking change is detected, add +2 to the difficulty rating (see step 6).
 
-5. Decomposition:
+5. Decomposition (minimize scope):
    - Can the issue be split into sub-issues (e.g., a backend-only API addition vs. the UI that uses it)?
+   - For each sub-issue, identify which existing code can be extended or reused rather than rewritten. Prefer changes that touch fewer files.
+   - If the issue can be solved by modifying one existing function or adding a small parameter, propose that over a larger refactor.
    - If yes, list the proposed sub-issues with brief summaries.
 
 6. Difficulty assessment:

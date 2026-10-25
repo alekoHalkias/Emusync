@@ -12,6 +12,7 @@ Stage 2.2 of 4: issue -> design -> bplan -> implement -> ship.
 - No emojis anywhere: plan files, commit messages, PR titles/bodies, PR comments.
 - The handoff file is the workflow state carrier. Always read it first; never rely on conversation memory.
 - Never edit product code in this skill. Only read it to write the plan.
+- Minimize new code. Favor extending or reusing existing helpers, store methods, API routes, CLI commands, and patterns. Each step should touch the smallest possible surface area.
 - write a line at the end of the handoff file for each step, showing which files it touches, which existing code it reuses, and why nothing existing fits if new code is needed.
 
 ## Resolve (shared by all four skills)
@@ -52,7 +53,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
    - If the request conflicts with current patterns, suggest modifications to fit the project format.
    - If no design principle exists for a requested change, propose a recommendation based on the established style and update the guide.
 
-7. Reuse search (required). For each piece of logic the work needs, grep for an existing helper, store method, route, CLI command, or utility that does it or nearly does. Extend or call it instead of writing a parallel copy. New code is allowed only with a one-line reason why nothing existing fits.
+7. Reuse search (required, primary strategy). Every step must start by searching for existing code that already does what is needed — helpers, store methods, API routes, CLI commands, utilities. Extend or call existing code rather than writing parallel copies. New code is a last resort and requires a one-line justification explaining why nothing existing fits. If a step can be done by modifying one existing function call, that is preferred over adding a new function.
 
 8. If a design decision is genuinely open (data shape, DB schema, protocol, etc.), ask the user. Do not ask what the code can answer.
 
