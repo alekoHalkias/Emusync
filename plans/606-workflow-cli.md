@@ -3,7 +3,7 @@
 Issue: #606
 Branch: feature/606-workflow-cli
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
