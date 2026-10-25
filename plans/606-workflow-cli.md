@@ -39,7 +39,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: none
   - New: state machine mapping handoff status → next skill, with validation of valid transitions
 
-- [ ] 6. Skill loader: read SKILL.md from CLI's skills/ dir or projects/<repo-id>/skills/ (overrides), inject context
+- [x] 6. Skill loader: read SKILL.md from CLI's skills/ dir or projects/<repo-id>/skills/ (overrides), inject context
   - Files: workflow-cli/workflow_cli/skills.py
   - Reuses: none
   - New: skill discovery with fallback resolution, prompt assembly (system + skill + rules + handoff + plan + code), context file injection

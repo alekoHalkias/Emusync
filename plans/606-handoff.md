@@ -91,7 +91,7 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - Step 3: DONE (combined with step 2) — repo scanning logic in config.py (discover_repo function). Reuses: subprocess, pathlib. New: finds CLAUDE.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, package.json, pyproject.toml, Makefile, etc.
 - Step 4: DONE — handoff files + state.json in CLI's projects dir. Files: workflow_cli/state.py. Reuses: none. New: Markdown file I/O (create, read, update section, append log), JSON management (read, write, update run), atomic writes, 12-section template.
 - Step 5: DONE — state machine for handoff status → next skill. Files: workflow_cli/stages.py. Reuses: none. New: parse_status, next_skill, validate_transition, is_terminal, needs_plan_target.
-- Step 6: Skill loader — read SKILL.md from CLI's skills/ dir or projects/<repo-id>/skills/ (overrides), inject context. Files: workflow_cli/skills.py. Reuses: none. New: prompt assembly with fallback skill resolution.
+- Step 6: DONE — skill discovery with fallback (project overrides > CLI defaults), prompt assembly. Files: workflow_cli/skills.py. Reuses: config.py (_projects_dir). New: find_skill(), load_skill(), build_prompt(), load_project_rules().
 - Step 7: LLM client — llama-swap HTTP client with retry. Files: workflow_cli/llm.py. Reuses: httpx. New: HTTP + JSON parsing + retry.
 - Step 8: Action executor — typed action dispatch. Files: workflow_cli/actions.py. Reuses: subprocess, stdlib. New: action dispatch.
 - Step 9: Progress emitter — colored terminal output. Files: workflow_cli/progress.py. Reuses: rich. New: stage prefixes + gates.
@@ -129,3 +129,4 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - 2026-10-25 implement: step 3 done (repo discovery — combined with step 2 into config.py)
 - 2026-10-25 implement: step 4 done (state manager: handoff file CRUD, state.json, atomic writes)
 - 2026-10-25 implement: step 5 done (stage router: state machine, status parsing, skill dispatch)
+- 2026-10-25 implement: step 6 done (skill loader: skill discovery with fallback resolution, prompt assembly)
