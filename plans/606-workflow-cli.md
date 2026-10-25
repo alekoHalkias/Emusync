@@ -19,10 +19,10 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: none — new project
   - New: project structure with flat package layout
 
-- [ ] 2. Config loader: YAML config parsing with PyYAML, pydantic validation
+- [x] 2. Config loader: YAML config parsing with PyYAML, pydantic validation
   - Files: workflow-cli/workflow_cli/config.py
   - Reuses: none
-  - New: pydantic models for ProjectConfig, LlamaSwapConfig, HooksConfig
+  - New: pydantic models for ProjectConfig, LlamaSwapConfig, HooksConfig; repo discovery (rule files, tech stack, test/lint commands, git info); atomic config saves
 
 - [ ] 3. Repo discovery: scan target repo for rule files, tech stack, test/lint commands, git info
   - Files: workflow-cli/workflow_cli/config.py (discover_repo function)
