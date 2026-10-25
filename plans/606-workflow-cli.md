@@ -64,7 +64,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: progress.py for display, actions.py for ask_user
   - New: summary rendering, approve/revise/reject decision flow, revision feedback formatting for LLM
 
-- [ ] 11. Project hooks: execute server_sync, doc_sync, pre_ship hooks from config
+- [x] 11. Project hooks: execute server_sync, doc_sync, pre_ship hooks from config
   - Files: workflow-cli/workflow_cli/project.py
   - Reuses: config.py for hook config, actions.py for bash execution
   - New: SSH command execution for server_sync, file sync for doc_sync, pre-ship validation commands
