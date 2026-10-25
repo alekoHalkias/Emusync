@@ -69,7 +69,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: config.py for hook config, actions.py for bash execution
   - New: SSH command execution for server_sync, file sync for doc_sync, pre-ship validation commands
 
-- [ ] 12. CLI arg parser + main loop: discover project from CLI's projects dir, resolve issue/PR, dispatch to stage router
+- [x] 12. CLI arg parser + main loop: discover project from CLI's projects dir, resolve issue/PR, dispatch to stage router
   - Files: workflow-cli/workflow_cli/cli.py
   - Reuses: config.py for project lookup, stages.py for routing, progress.py for output
   - New: subcommands (init, resume, status, cancel, list, plan, handoff), project lookup by repo path or name, main orchestration loop

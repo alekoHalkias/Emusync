@@ -135,3 +135,4 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - 2026-10-25 implement: step 9 done (progress emitter: rich-based colored output, stage prefixes, gate display)
 - 2026-10-25 implement: step 10 done (gate logic: approval/revision flow, gate validation, summary formatting)
 - 2026-10-25 implement: step 11 done (project hooks: server_sync, doc_sync, pre_ship execution)
+- 2026-10-25 implement: step 12 done (CLI arg parser + main loop: init, resume, status, cancel, list, plan, handoff subcommands)
