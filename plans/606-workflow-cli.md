@@ -14,7 +14,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
 - **Recommendations**: Use `rich` for terminal progress display. Use `pydantic` for JSON schema validation. Use `httpx` for llama-swap HTTP client. Use `pyyaml` for project config. No external API server — CLI-only tool. `init` command scans repo and writes config into `projects/<repo-id>/`.
 
 ## Steps
-- [ ] 1. Scaffolding: pyproject.toml, package structure, entry point
+- [x] 1. Scaffolding: pyproject.toml, package structure, entry point
   - Files: workflow-cli/pyproject.toml, workflow-cli/workflow_cli/__init__.py, workflow-cli/workflow_cli/__main__.py
   - Reuses: none — new project
   - New: project structure with flat package layout

@@ -86,7 +86,7 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 
 ## 8. Implementation Steps
 ### Steps:
-- Step 1: Scaffolding — pyproject.toml, package structure, entry point. Files: workflow-cli/pyproject.toml, workflow_cli/__init__.py, workflow_cli/__main__.py. Reuses: none. New: project structure with flat package layout.
+- Step 1: DONE — pyproject.toml, package structure, entry point. Files: workflow-cli/pyproject.toml, workflow_cli/__init__.py, workflow_cli/__main__.py. Reuses: none. New: project structure with flat package layout.
 - Step 2: Config loader — YAML config parsing with PyYAML, pydantic validation. Files: workflow_cli/config.py. Reuses: none. New: config models for project settings, hooks, LLM settings.
 - Step 3: Repo discovery — scan target repo for rule files, tech stack, test/lint commands, git info. Files: workflow_cli/config.py (discover_repo function). Reuses: subprocess, pathlib. New: repo scanning logic (find CLAUDE.md, CONTRIBUTING.md, package.json, pyproject.toml, Makefile, etc.).
 - Step 4: State manager — handoff files + state.json in CLI's projects dir. Files: workflow_cli/state.py. Reuses: none. New: Markdown/JSON file I/O, paths under `projects/<repo-id>/handoff/` and `projects/<repo-id>/state.json`.
@@ -124,3 +124,4 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - 2026-10-25 bplan: 15 steps written, backend_pattern=standalone Python CLI with all state in CLI's projects dir, zero files in target repo
 - 2026-10-25 revise: moved all state from target repo to CLI's projects/<repo-id>/ directory, added repo discovery step, removed backend design guide step
 - 2026-10-25 tplan: 11 test modules defined, 4 integration points, edge cases covered (invalid JSON, corrupt files, concurrent access, non-git repo)
+- 2026-10-25 implement: step 1 done (scaffolding: pyproject.toml, package structure, entry point)
