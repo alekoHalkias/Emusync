@@ -82,7 +82,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     print_header(f"Status: {config.name}", "")
     print_info(f"Project ID: {project_id}")
     print_info(f"Repo path: {config.repo_path}")
-    print_info(f"Default branch: {config.settings.default_branch}")
+    print_info(f"Default branch: {config.project.default_branch}")
     return 0
 
 
@@ -106,7 +106,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         project_id = config_file.parent.name
         config = load_project_config(project_id)
         if config:
-            print_info(f"{project_id}: {config.name} ({config.repo_path})")
+            print_info(f"{project_id}: {config.project.name} ({config.project.repo})")
     return 0
 
 
