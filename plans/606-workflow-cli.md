@@ -84,7 +84,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: EmuSync's .claude/skills/ as reference (adapted, not copied)
   - New: project-agnostic skill definitions that reference project config for rules and hooks
 
-- [ ] 15. Tests: unit tests for state, stages, actions, llm, config, progress
+- [x] 15. Tests: unit tests for state, stages, actions, llm, config, progress
   - Files: workflow-cli/tests/test_state.py, test_stages.py, test_actions.py, test_llm.py, test_config.py, test_progress.py
   - Reuses: pytest (from dev deps)
   - New: real file I/O tests (no mocks for state), HTTP mock for llama-swap, subprocess mock for actions
