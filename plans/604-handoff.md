@@ -3,8 +3,8 @@
 ## Metadata
   - Issue: #604
   - Branch: feature/604-test-suite-goes-over-the-whole-list-of-t
-  - PR: none
-  - Status: planned
+  - PR: #608
+  - Status: implemented
   - Created: 2026-10-25
   - Last updated: 2026-10-25
   - Fix attempts: 0
@@ -107,6 +107,7 @@ Steps to reproduce the problem:
 - 2026-10-25 issue: invoking design skill for #604
 - 2026-10-25 design: scope=tooling-only, difficulty=5/10, breaking=no
 - 2026-10-25 plan: written, awaiting approval
+- 2026-10-25 implement: steps 1-6 done — full rewrite of scripts/test_changed.py with AST map, file-type routing, transitive deps, and integration. Verified 6 scenarios.
 
 ## Rollback
 - **Last known good state:** main
