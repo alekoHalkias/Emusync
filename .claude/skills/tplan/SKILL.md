@@ -12,6 +12,7 @@ Stage 2.3 of 4: issue -> design -> fplan/bplan -> implement -> ship.
 - No emojis anywhere: plan files, commit messages, PR titles/bodies, PR comments.
 - The handoff file is the workflow state carrier. Always read it first; never rely on conversation memory.
 - Never edit product code in this skill. Only read it to write the plan.
+- Minimize new test code. Favor extending or reusing existing test helpers, fixtures, and patterns. Each test step should leverage what is already available.
 - write a line at the end of the handoff file for each step, showing which files it touches, which existing code it reuses, and why nothing existing fits if new code is needed.
 
 ## Resolve (shared by all four skills)
@@ -52,7 +53,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
    - Identify gaps: missing test cases, insufficient coverage, edge cases not addressed.
    - If no testing principle exists for a planned change, propose recommendations based on the established style and update the guide.
 
-7. Reuse search (required). For each piece of logic the work needs, grep for an existing test helper, fixture, or utility that does it or nearly does. Extend or call it instead of writing a parallel copy. New test code is allowed only with a one-line reason why nothing existing fits.
+7. Reuse search (required, primary strategy). Every step must start by searching for existing test helpers, fixtures, utilities, and patterns that cover the case. Extend or call existing test infrastructure rather than writing parallel copies. New test code is a last resort and requires a one-line justification explaining why nothing existing fits. If a test case can be added by extending an existing fixture or parameterizing an existing test, that is preferred over writing a new test function.
 
 8. If a testing decision is genuinely open (test structure, mock vs real DB, coverage depth), ask the user. Do not ask what the code can answer.
 

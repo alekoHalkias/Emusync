@@ -42,7 +42,7 @@ Stage 4 of 4: issue -> plan -> implement -> ship.
    c. Run code review: invoke `review` on the branch diff against `main`.
       - If any finding has category `gotcha-violation` or `correctness`, block ship. Report findings to user, set `Status: implementing` in the handoff file, and re-invoke `implement` for fixes. Commit the fix, push, and re-run ship from step 2.
       - If findings are only `docs-stale`, `test-gap`, or `style`, note them in a PR comment but continue to the next step.
-   d. Check mergeability: `gh pr view <M> --json mergeable`. If conflicting and trivial, set `Status: implementing` (the edit hook requires it), merge `origin/main`, resolve, then set `Status: shipped` again and commit; otherwise report it.
+   d. Check mergeability: `gh pr view <M> --json mergeable`. If conflicting, report it to the user and stop — do not merge `origin/main` or resolve conflicts automatically. If mergeable, continue.
    e. Sync the server PC (standing instruction):
       `ssh -o BatchMode=yes server@192.168.4.111 'cd ~/Github/Emusync && git fetch -q --prune && git checkout <branch> && git pull -q; systemctl --user restart emusync-server && sleep 4 && curl -s localhost:8765/health'`
       Leave any uncommitted change on the server alone; report checkout failures instead of discarding.
