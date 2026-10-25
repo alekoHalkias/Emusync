@@ -12,9 +12,9 @@ This file documents all workflow skills and their responsibilities.
 
 ### 2. design (`./.claude/skills/design/SKILL.md`)
 - **Stage**: 1.5 of 4
-- **Purpose**: Analyze issue scope, split into UI/Backend parts, propose sub-issues, assign difficulty
-- **Output**: Appends `## Design Analysis` block to GitHub issue + rewrites `plans/<N>-handoff.md` section 2
-- **Next**: Invokes `fplan` and/or `bplan` based on analysis, then `tplan`
+- **Purpose**: Analyze issue scope, split into UI/Backend parts, propose sub-issues, assign difficulty, determine which plan skill(s) to invoke
+- **Output**: Appends `## Design Analysis` block to GitHub issue (with `Plan target: bplan/fplan/both`) + rewrites `plans/<N>-handoff.md` section 2
+- **Next**: Invokes `bplan` (backend-only), `fplan` (frontend-only), or both (both sides, then `merge`), then `tplan`
 
 ### 3. fplan (`./.claude/skills/fplan/SKILL.md`)
 - **Stage**: 2.1 of 4
@@ -110,25 +110,24 @@ A single workflow-wide state document that every skill reads, updates with its s
        │
        ▼
 ┌─────────────┐
-│   /design   │  Stage 1.5: Analyze scope, split UI/Backend, assign difficulty
+│   /design   │  Stage 1.5: Analyze scope, split UI/Backend,
+│             │  assign difficulty, set Plan target (bplan/fplan/both)
 └──────┬──────┘
        │
-       ├── Backend changes? ────► /bplan ──► .claude/backend-design-guide.md
+       ├── Backend only (bplan) ──► /bplan ──► .claude/backend-design-guide.md
        │                              (Stage 2.2)
        │
-       └── UI changes? ─────────► /fplan ──► .claude/frontend-design-guide.md
-                                      (Stage 2.1)
+       ├── Frontend only (fplan) ─► /fplan ──► .claude/frontend-design-guide.md
+       │                                     (Stage 2.1)
+       │
+       └── Both sides ────────────► /bplan ──► /fplan ──► /merge ──►
+                                              (both plans, then reconcile)
 
-       Both guides:
+       All guides:
        - Auto-created on first run
        - Auto-updated with new patterns
        - Auto-compressed at 100+ lines
 
-       ▼
-┌─────────────┐
-│   /merge    │  Stage 2.15: Reconcile fplan+bplan into one plan (if both ran)
-└──────┬──────┘
-       │
        ▼
 ┌─────────────┐
 │   /tplan    │  Stage 2.3: Add testing guidelines and steps
@@ -173,6 +172,13 @@ A single workflow-wide state document that every skill reads, updates with its s
 - **Tracks**: Test patterns, fixtures, integration test structure, SQLite testing
 - **Updated by**: `tplan` when new testing patterns are introduced
 - **Compressed at**: 100+ lines
+
+## Deprecated skills
+
+### plan (`./.claude/skills/plan/SKILL.md`) — DEPRECATED
+The generic `plan` skill has been superseded by the split `fplan`/`bplan` pipeline.
+The `design` skill now explicitly routes to `bplan` (backend-only), `fplan` (frontend-only),
+or both (with automatic `merge` invocation). Do not use `plan` for new issues.
 
 ## Plan File Template
 

@@ -1,6 +1,6 @@
 ---
 name: merge
-description: Reconcile two plan files (e.g., fplan and bplan) into a single unified plan, resolving file-level conflicts, missing IPC channels, and schema mismatches. Use when two independent plans need to be integrated before implementation.
+description: Reconcile two plan files (e.g., fplan and bplan) into a single unified plan, resolving file-level conflicts, missing IPC channels, and schema mismatches. Invoked automatically by the design skill when both plan targets are needed. Use when two independent plans need to be integrated before implementation.
 ---
 
 # /merge — fplan/bplan reconciliation
@@ -88,4 +88,4 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
    git add plans/<N>-*.md
    git commit -m "#<N>: merge reconciled plan from fplan and bplan"
    ```
-   Present the reconciled plan to the user, listing all conflicts resolved and any that need user input. On approval, invoke `tplan` with the issue number.
+   Present the reconciled plan to the user, listing all conflicts resolved and any that need user input. This skill is invoked automatically by the design skill when both plan targets are needed — after presenting the reconciled plan, invoke `tplan` with the issue number.
