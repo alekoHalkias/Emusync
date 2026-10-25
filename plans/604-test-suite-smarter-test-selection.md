@@ -3,7 +3,7 @@
 Issue: #604
 Branch: feature/604-test-suite-goes-over-the-whole-list-of-t
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
@@ -60,5 +60,11 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 - Adding per-test timing or parallelism
 - Caching the import graph (could be a future optimization)
 - Supporting other test frameworks (pytest-only)
+
+## Additional Steps (beyond original plan)
+- [ ] 7. Write docs/WORKFLOW.md — end-to-end workflow guide documenting the full `/issue` -> `/design` -> `/plan` -> `/implement` -> `/ship` pipeline, handoff file format, and resume mode.
+  - Files: docs/WORKFLOW.md
+  - Reuses: none (new document)
+  - New: comprehensive workflow reference for the skill-based pipeline
 
 ## Log
