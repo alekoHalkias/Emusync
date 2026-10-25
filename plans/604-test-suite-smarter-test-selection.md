@@ -61,12 +61,6 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 - Caching the import graph (could be a future optimization)
 - Supporting other test frameworks (pytest-only)
 
-## Additional Steps (beyond original plan)
-- [ ] 7. Write docs/WORKFLOW.md — end-to-end workflow guide documenting the full `/issue` -> `/design` -> `/plan` -> `/implement` -> `/ship` pipeline, handoff file format, and resume mode.
-  - Files: docs/WORKFLOW.md
-  - Reuses: none (new document)
-  - New: comprehensive workflow reference for the skill-based pipeline
-
 ## Log
 - Step 1-4: Implemented all strategies (AST map, file-type routing, transitive deps, integration) in a single rewrite of scripts/test_changed.py.
 - Step 5: Verified 6 scenarios — all selected correct test files.
