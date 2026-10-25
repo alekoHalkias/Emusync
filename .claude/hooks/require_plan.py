@@ -41,7 +41,10 @@ def check(data):
     plans = glob.glob(os.path.join(root, "plans", f"{n}-*.md"))
     if not plans:
         return f"No plan file plans/{n}-*.md. Run /plan {n} first."
-    with open(plans[0]) as f:
+    # Prefer the plan file (not the handoff file) for status check
+    plan_files = [p for p in plans if "handoff" not in p]
+    target = plan_files[0] if plan_files else plans[0]
+    with open(target) as f:
         status = re.search(r"^Status:\s*(\S+)", f.read(), re.M)
     if not status or status.group(1) != "implementing":
         found = status.group(1) if status else "missing"
