@@ -1,6 +1,6 @@
 ---
 name: issue
-description: Turn a feature idea or bug description into a professionally formatted GitHub issue on alekoHalkias/Emusync, then hand off to the plan skill. Use when the user runs /issue or describes a feature/bug they want filed. Also accepts an issue or PR number to resume the workflow at whatever stage it is in.
+description: Turn a feature idea or bug description into a professionally formatted GitHub issue on alekoHalkias/Emusync, then hand off to the design skill. Use when the user runs /issue or describes a feature/bug they want filed. Also accepts an issue or PR number to resume the workflow at whatever stage it is in.
 ---
 
 # /issue - file the issue
@@ -15,7 +15,7 @@ Stage 1 of 4: issue -> plan -> implement -> ship.
 
 ## Resume mode
 
-If args are a number (`123`, `#123`, or `PR 45`) instead of a description, do not file anything. Resolve the stage as described in the `plan` skill's "Resolve" section and invoke the skill for that stage.
+If args are a number (`123`, `#123`, or `PR 45`) instead of a description, do not file anything. Resolve the stage as described in the `design` skill's "Resolve" section and invoke the skill for that stage.
 
 ## Steps
 
@@ -73,6 +73,7 @@ If args are a number (`123`, `#123`, or `PR 45`) instead of a description, do no
    ### Scope: TBD
    ### Backend Changes: TBD
    ### UI Changes: TBD
+   ### Plan Target: TBD (bplan / fplan / both)
    ### Sub-issues: TBD
    ### Difficulty: TBD
    ### Backwards Compatibility: TBD

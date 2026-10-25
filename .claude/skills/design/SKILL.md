@@ -23,7 +23,7 @@ Stage:
 | State | Next skill |
 |---|---|
 | No branch or no handoff file | design |
-| Design complete | plan |
+| Design complete (Plan target set) | bplan / fplan / both (see step 9) |
 | Plan has unchecked `- [ ]` steps (`Status: planned` = awaiting approval) | implement |
 | All steps checked, `PR: none` | ship |
 | `PR: #M` and status `shipped` | done - report it |
@@ -67,6 +67,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
      ## Design Analysis
      - **Backend:** <summary of changes>
      - **UI:** <summary of changes>
+     - **Plan target:** bplan / fplan / both (which plan skill to invoke)
      - **Sub-issues:** <list of proposed sub-issues, or "none">
      - **Difficulty:** <N>/10
      ## Backwards Compatibility
@@ -74,9 +75,12 @@ If invoked at the wrong stage, say so and invoke the right skill.
      - **Details:** <summary of any breaking changes, or "none">
      ```
 
-8. Update the handoff file. Rewrite sections 2 (Design) with the analysis results. Update the Metadata section: set `Status: designed`. Append to the Log:
+8. Update the handoff file. Rewrite section 2 (Design) with the analysis results, including a `Plan target` field stating which plan skill(s) to invoke: `bplan`, `fplan`, or `both`. Update the Metadata section: set `Status: designed`. Append to the Log:
    ```
-   - <YYYY-MM-DD> design: scope=<backend+ui>, difficulty=<N>/10, breaking=<yes/no>
+   - <YYYY-MM-DD> design: scope=<backend+ui>, plan_target=<bplan|fplan|both>, difficulty=<N>/10, breaking=<yes/no>
    ```
 
-9. Report the analysis to the user and invoke the `plan` skill with the issue number.
+9. Report the analysis to the user and invoke the appropriate plan skill(s):
+   - **Backend only** (`Plan target: bplan`): invoke `bplan` with the issue number. On completion, invoke `tplan`.
+   - **Frontend only** (`Plan target: fplan`): invoke `fplan` with the issue number. On completion, invoke `tplan`.
+   - **Both sides** (`Plan target: both`): invoke `bplan` first, then `fplan`. After both plan files are written and committed, invoke `merge` to reconcile them. On merge completion, invoke `tplan`.
