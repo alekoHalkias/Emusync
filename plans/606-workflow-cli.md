@@ -79,7 +79,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: pydantic for schema validation
   - New: system prompt templates (action format rules, no-emoji policy, handoff-as-state-carrier), JSON action schema
 
-- [ ] 14. Default skill templates: SKILL.md files for all pipeline stages
+- [x] 14. Default skill templates: SKILL.md files for all pipeline stages
   - Files: workflow-cli/skills/issue/SKILL.md, fplan/SKILL.md, bplan/SKILL.md, merge/SKILL.md, tplan/SKILL.md, test-design/SKILL.md, implement/SKILL.md, review/SKILL.md, ship/SKILL.md
   - Reuses: EmuSync's .claude/skills/ as reference (adapted, not copied)
   - New: project-agnostic skill definitions that reference project config for rules and hooks
