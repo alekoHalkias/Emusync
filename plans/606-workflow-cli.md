@@ -49,7 +49,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: httpx (from deps)
   - New: HTTP POST to llama-swap endpoint, JSON response parsing with pydantic validation, exponential backoff retry (3 attempts), model error handling
 
-- [ ] 8. Action executor: execute typed actions (bash, gh, read, write, edit, ask_user, approve, skip, error)
+- [x] 8. Action executor: execute typed actions (bash, gh, read, write, edit, ask_user, approve, skip, error)
   - Files: workflow-cli/workflow_cli/actions.py
   - Reuses: subprocess for bash/gh, stdlib for file I/O
   - New: action dispatch by type, result collection, ask_user integration, edit with exact string matching
