@@ -34,7 +34,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: none — follows same 12-section handoff template as EmuSync skills
   - New: Markdown file parsing/writing, JSON management, paths under `projects/<repo-id>/handoff/` and `projects/<repo-id>/state.json`, atomic writes
 
-- [ ] 5. Stage router: read handoff status, determine next skill, handle stage transitions
+- [x] 5. Stage router: read handoff status, determine next skill, handle stage transitions
   - Files: workflow-cli/workflow_cli/stages.py
   - Reuses: none
   - New: state machine mapping handoff status → next skill, with validation of valid transitions

@@ -90,7 +90,7 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - Step 2: DONE — YAML config parsing with PyYAML, pydantic validation. Files: workflow_cli/config.py. Reuses: none. New: config models for project settings, hooks, LLM settings; repo discovery; atomic config saves.
 - Step 3: DONE (combined with step 2) — repo scanning logic in config.py (discover_repo function). Reuses: subprocess, pathlib. New: finds CLAUDE.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, package.json, pyproject.toml, Makefile, etc.
 - Step 4: DONE — handoff files + state.json in CLI's projects dir. Files: workflow_cli/state.py. Reuses: none. New: Markdown file I/O (create, read, update section, append log), JSON management (read, write, update run), atomic writes, 12-section template.
-- Step 5: Stage router — state machine for handoff status → next skill. Files: workflow_cli/stages.py. Reuses: none. New: stage transition logic.
+- Step 5: DONE — state machine for handoff status → next skill. Files: workflow_cli/stages.py. Reuses: none. New: parse_status, next_skill, validate_transition, is_terminal, needs_plan_target.
 - Step 6: Skill loader — read SKILL.md from CLI's skills/ dir or projects/<repo-id>/skills/ (overrides), inject context. Files: workflow_cli/skills.py. Reuses: none. New: prompt assembly with fallback skill resolution.
 - Step 7: LLM client — llama-swap HTTP client with retry. Files: workflow_cli/llm.py. Reuses: httpx. New: HTTP + JSON parsing + retry.
 - Step 8: Action executor — typed action dispatch. Files: workflow_cli/actions.py. Reuses: subprocess, stdlib. New: action dispatch.
@@ -128,3 +128,4 @@ Claude Code is the current workflow orchestrator via `.claude/skills/`. This pro
 - 2026-10-25 implement: step 2 done (config loader: pydantic models, repo discovery, atomic saves)
 - 2026-10-25 implement: step 3 done (repo discovery — combined with step 2 into config.py)
 - 2026-10-25 implement: step 4 done (state manager: handoff file CRUD, state.json, atomic writes)
+- 2026-10-25 implement: step 5 done (stage router: state machine, status parsing, skill dispatch)
