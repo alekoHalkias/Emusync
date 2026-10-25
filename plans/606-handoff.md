@@ -4,7 +4,7 @@
 - Issue: #606
 - Branch: feature/606-workflow-cli
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-25
 - Fix attempts: 0
 
