@@ -140,8 +140,9 @@ def run_orchestration(project_id: str, issue_number: str) -> int:
             print_warning(f"Stored repo_path not found: {repo_path_str}")
             repo_root = project_dir.parent.parent
 
-    # Initialize LLM client
-    llm = LLMClient()
+    # Initialize LLM client from config
+    llama_url = config.llama_swap.url if hasattr(config, 'llama_swap') else "http://localhost:8001"
+    llm = LLMClient(base_url=llama_url)
 
     # Read or create handoff
     handoff = read_handoff(project_id, issue_number)
