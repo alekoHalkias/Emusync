@@ -29,7 +29,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: subprocess, pathlib
   - New: repo scanning logic — finds CLAUDE.md, CONTRIBUTING.md, docs/ARCHITECTURE.md, package.json, pyproject.toml, Makefile, etc.
 
-- [ ] 4. State manager: handoff files + state.json in CLI's projects dir
+- [x] 4. State manager: handoff files + state.json in CLI's projects dir
   - Files: workflow-cli/workflow_cli/state.py
   - Reuses: none — follows same 12-section handoff template as EmuSync skills
   - New: Markdown file parsing/writing, JSON management, paths under `projects/<repo-id>/handoff/` and `projects/<repo-id>/state.json`, atomic writes
