@@ -54,7 +54,7 @@ Build a standalone, project-agnostic Python CLI that orchestrates a skill-based 
   - Reuses: subprocess for bash/gh, stdlib for file I/O
   - New: action dispatch by type, result collection, ask_user integration, edit with exact string matching
 
-- [ ] 9. Progress emitter: color-coded stage prefixes, gate summaries, step progress
+- [x] 9. Progress emitter: color-coded stage prefixes, gate summaries, step progress
   - Files: workflow-cli/workflow_cli/progress.py
   - Reuses: rich (from deps)
   - New: stage prefix mapping ([ISSUE], [DESIGN], [BPLAN], etc.), progress bars for steps, gate display with approval prompts
