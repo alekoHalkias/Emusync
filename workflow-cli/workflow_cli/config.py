@@ -36,7 +36,7 @@ class ProjectConfig(BaseModel):
 class LlamaSwapConfig(BaseModel):
     """LLM endpoint configuration."""
 
-    url: str = Field(default="http://localhost:8080", description="llama-swap HTTP endpoint")
+    url: str = Field(default="http://localhost:8001", description="llama-swap HTTP endpoint")
     model: str = Field(
         default="Qwen2.5-Coder-32B-Instruct.Q4_K_S.gguf",
         description="Model name to use",

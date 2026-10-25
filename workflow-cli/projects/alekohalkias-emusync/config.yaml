@@ -1,0 +1,25 @@
+handoff_path: plans/{N}-handoff.md
+hooks:
+  doc_sync: {}
+  pre_ship: []
+  server_sync: {}
+lint_commands: {}
+llama_swap:
+  model: Qwen2.5-Coder-32B-Instruct.Q4_K_S.gguf
+  url: http://localhost:8001
+plan_path: plans/{N}-{slug}.md
+project:
+  branch_prefix: feature
+  default_branch: feature/606-workflow-cli
+  name: Emusync
+  remote: origin
+  repo: alekoHalkias/Emusync
+repo_path: /home/Aleko/Documents/Scripts/Emusync
+rule_files:
+- CLAUDE.md
+- docs/ARCHITECTURE.md
+- docs/GOTCHAS.md
+- README.md
+skills_dir: .claude/skills
+test_commands:
+- make test
