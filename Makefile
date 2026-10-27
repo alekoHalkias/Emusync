@@ -1,6 +1,6 @@
 .PHONY: install dev-server dev-gui build-gui lint test test-changed release install-service uninstall-service
 
-VENV := .venv
+VENV := .cache/.venv
 PYTHON := $(VENV)/bin/python
 
 install:
@@ -16,7 +16,7 @@ build-gui:
 	cd src/gui && npm run build
 
 lint:
-	$(VENV)/bin/python -m py_compile src/server/config.py src/server/store/*.py src/server/mdns.py src/server/api/*.py src/server/sync_client.py src/emusync.py src/cli/*.py
+	$(PYTHON) -m py_compile src/server/config.py src/server/store/*.py src/server/mdns.py src/server/api/*.py src/server/sync_client.py src/emusync.py src/cli/*.py
 	@echo "Python syntax OK"
 
 test:
