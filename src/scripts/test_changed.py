@@ -15,6 +15,7 @@ from collections import deque
 ROOT = Path(__file__).resolve().parent.parent
 TESTS_DIR = ROOT / "src/tests"
 SRC_DIRS = [ROOT / "src/server", ROOT / "src/cli"]
+VENV_PYTHON = str(ROOT / ".cache/.venv/bin/python")
 
 
 def changed_files() -> list[str]:
@@ -453,7 +454,7 @@ def main() -> int:
     if not changed:
         print("No changes detected vs. main — running full suite.")
         return subprocess.run(
-            [".cache/.venv/bin/python", "-m", "pytest", "src/tests/", "-v"],
+            [VENV_PYTHON, "-m", "pytest", "src/tests/", "-v"],
             cwd=ROOT,
         ).returncode
 
@@ -464,14 +465,14 @@ def main() -> int:
         print(f"Changed files: {changed}")
         print("No matching test file found — running full suite as a safety net.")
         return subprocess.run(
-            [".cache/.venv/bin/python", "-m", "pytest", "src/tests/", "-v"],
+            [VENV_PYTHON, "-m", "pytest", "src/tests/", "-v"],
             cwd=ROOT,
         ).returncode
 
     if selected == {"__full_suite__"}:
         print("conftest.py changed — running full suite.")
         return subprocess.run(
-            [".cache/.venv/bin/python", "-m", "pytest", "src/tests/", "-v"],
+            [VENV_PYTHON, "-m", "pytest", "src/tests/", "-v"],
             cwd=ROOT,
         ).returncode
 
@@ -479,7 +480,7 @@ def main() -> int:
     for t in sorted(selected):
         print(f"  - {t}")
     args = [
-        ".cache/.venv/bin/python",
+        VENV_PYTHON,
         "-m",
         "pytest",
         *(f"src/tests/{t}" for t in sorted(selected)),
