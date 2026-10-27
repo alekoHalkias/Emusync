@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from collections import deque
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 TESTS_DIR = ROOT / "src/tests"
 SRC_DIRS = [ROOT / "src/server", ROOT / "src/cli"]
 VENV_PYTHON = str(ROOT / ".cache/.venv/bin/python")
