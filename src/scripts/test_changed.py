@@ -141,7 +141,7 @@ _CONFIG_EXTENSIONS = {".toml", ".json"}
 
 # Explicit file-to-test mappings for files with no clean AST module match
 _FILE_TYPE_ROUTES: dict[str, set[str]] = {
-    "tests/conftest.py": {"__full_suite__"},
+    "src/tests/conftest.py": {"__full_suite__"},
     "cli/consoles_data.py": {
         "test_cli_console_import.py",
         "test_core_detection.py",
@@ -369,7 +369,7 @@ _FILE_TYPE_ROUTES: dict[str, set[str]] = {
 
 def _route_by_type(changed_file: str, all_test_files: set[str]) -> set[str] | None:
     """Return tests to run for a changed file based on its type, or None."""
-    if changed_file == "tests/conftest.py":
+    if changed_file == "src/tests/conftest.py":
         return {"__full_suite__"}
 
     path = Path(changed_file)
@@ -453,7 +453,7 @@ def main() -> int:
     if not changed:
         print("No changes detected vs. main — running full suite.")
         return subprocess.run(
-            [".venv/bin/python", "-m", "pytest", "tests/", "-v"],
+            [".cache/.venv/bin/python", "-m", "pytest", "src/tests/", "-v"],
             cwd=ROOT,
         ).returncode
 
@@ -464,14 +464,14 @@ def main() -> int:
         print(f"Changed files: {changed}")
         print("No matching test file found — running full suite as a safety net.")
         return subprocess.run(
-            [".venv/bin/python", "-m", "pytest", "tests/", "-v"],
+            [".cache/.venv/bin/python", "-m", "pytest", "src/tests/", "-v"],
             cwd=ROOT,
         ).returncode
 
     if selected == {"__full_suite__"}:
         print("conftest.py changed — running full suite.")
         return subprocess.run(
-            [".venv/bin/python", "-m", "pytest", "tests/", "-v"],
+            [".cache/.venv/bin/python", "-m", "pytest", "src/tests/", "-v"],
             cwd=ROOT,
         ).returncode
 
@@ -479,10 +479,10 @@ def main() -> int:
     for t in sorted(selected):
         print(f"  - {t}")
     args = [
-        ".venv/bin/python",
+        ".cache/.venv/bin/python",
         "-m",
         "pytest",
-        *(f"tests/{t}" for t in sorted(selected)),
+        *(f"src/tests/{t}" for t in sorted(selected)),
         "-v",
     ]
     return subprocess.run(args, cwd=ROOT).returncode
