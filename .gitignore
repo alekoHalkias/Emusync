@@ -1,19 +1,18 @@
+# Build artifacts
+.cache/
+
 # Python
-__pycache__/
 *.py[cod]
 *.spec
-.venv/
-backend/build/
-backend/dist/
 
 # Node / Electron
-gui/node_modules/
-gui/dist/
-gui/out/
+src/gui/node_modules/
+src/gui/dist/
+src/gui/out/
 
 # Local test ROMs and saves (never commit)
 roms/
-tests/test_rom_folders/
+src/tests/test_rom_folders/
 
 # Config
 .emusync/

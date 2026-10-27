@@ -7,7 +7,7 @@
 # ── Python syntax check (staged files) ────────────────────────────────────────
 # A garbled merge/overwrite once broke every test at import time (#585).
 
-PY=.venv/bin/python
+PY=.cache/.venv/bin/python
 [ -x "$PY" ] || PY=python3
 staged_py=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$')
 if [ -n "$staged_py" ]; then
@@ -48,16 +48,16 @@ if ! $branch_is_exempt; then
 fi
 
 ARCH_FILES=(
-  emusync.py
-  server/api.py
-  server/config.py
-  server/store.py
-  server/mdns.py
-  server/sync_client.py
-  gui/electron/main.ts
-  gui/electron/preload.ts
-  requirements.txt
-  gui/package.json
+  src/emusync.py
+  src/server/api/__init__.py
+  src/server/config.py
+  src/server/store/__init__.py
+  src/server/mdns.py
+  src/server/sync_client.py
+  src/gui/electron/main.ts
+  src/gui/electron/preload.ts
+  src/requirements.txt
+  src/gui/package.json
 )
 
 changed_arch=()

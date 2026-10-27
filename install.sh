@@ -19,13 +19,13 @@ fi
 echo "==> Setting up Python virtual environment..."
 python3 -m venv "$VENV"
 "$VENV/bin/pip" install --upgrade pip -q
-"$VENV/bin/pip" install -r "$SCRIPT_DIR/requirements.txt" -q
+"$VENV/bin/pip" install -r "$SCRIPT_DIR/src/requirements.txt" -q
 echo "    Python dependencies installed."
 
 echo "==> Creating launcher script..."
 cat > "$SCRIPT_DIR/emusync" <<EOF
 #!/usr/bin/env bash
-exec "$VENV/bin/python" "$SCRIPT_DIR/emusync.py" "\$@"
+exec "$VENV/bin/python" "$SCRIPT_DIR/src/emusync.py" "\$@"
 EOF
 chmod +x "$SCRIPT_DIR/emusync"
 echo "    Launcher: $SCRIPT_DIR/emusync"
@@ -36,11 +36,11 @@ elif command -v npm &>/dev/null && [ "$(node -p 'process.versions.node.split("."
     echo "    [skip] Node $(node -v) is too old (need 18+) — GUI dependencies not installed."
 elif command -v npm &>/dev/null; then
     echo "==> Installing Node dependencies for GUI..."
-    cd "$SCRIPT_DIR/gui" && npm install -q
+    cd "$SCRIPT_DIR/src/gui" && npm install -q
     echo "    Node dependencies installed."
 else
     echo "    [skip] npm not found — GUI dependencies not installed."
-    echo "           Install Node.js, then run: cd gui && npm install"
+    echo "           Install Node.js, then run: cd src/gui && npm install"
 fi
 
 if [ -d "$SCRIPT_DIR/.git" ]; then
@@ -51,13 +51,13 @@ fi
 
 echo ""
 echo "Done! To use the CLI:"
-echo "  $SCRIPT_DIR/emusync --help"
+echo "  $SCRIPT_DIR/src/emusync --help"
 echo ""
 echo "To run the GUI in development:"
-echo "  cd gui && npm run dev"
+echo "  cd src/gui && npm run dev"
 echo ""
 echo "Add $SCRIPT_DIR to PATH or symlink the launcher for system-wide use:"
-echo "  ln -s $SCRIPT_DIR/emusync ~/.local/bin/emusync"
+echo "  ln -s $SCRIPT_DIR/src/emusync ~/.local/bin/emusync"
 echo ""
 echo "To run the server automatically on login (recommended for Steam Deck):"
 echo "  make install-service"

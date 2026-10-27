@@ -1,0 +1,6 @@
+{
+  "llama_swap_url": "http://localhost:8080",
+  "model": "auto",
+  "repo_path": "/home/Aleko/Documents/Scripts/Emusync",
+  "github_token": "/home/Aleko/.github_token"
+}

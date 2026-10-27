@@ -42,11 +42,11 @@ Follows CLAUDE.md's "Execution approval policy" — updating docs is a normal co
    - Are any functions mentioned in the doc still present? If renamed or deleted, update.
    - Are any new functions worth documenting? If they're public API, store methods, or IPC handlers, add them.
 
-3. **Check the IPC bridge.** If any `gui/electron/` module changed, compare against the IPC bridge section in ARCHITECTURE.md:
+3. **Check the IPC bridge.** If any `src/gui/electron/` module changed, compare against the IPC bridge section in ARCHITECTURE.md:
    - New `ipcMain.handle` → add to the bridge table.
    - Removed channel → delete from the bridge.
    - Changed signature → update.
-   - Also check `gui/renderer/src/emusync.d.ts` matches.
+   - Also check `src/gui/renderer/src/emusync.d.ts` matches.
 
 4. **Check GOTCHAS.md.** For each changed area, scan GOTCHAS.md for related entries:
    - Is the gotcha still accurate? (code may have evolved)

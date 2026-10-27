@@ -22,7 +22,7 @@ Stage 3 of 4: issue -> plan -> implement -> ship.
 
 3. For each unchecked step, in order:
    a. Implement exactly that step, following CLAUDE.md conventions and the step's Reuses list.
-   b. Verify it: `make lint` for Python, `cd gui && npx tsc --noEmit -p tsconfig.node.json && npx tsc --noEmit -p tsconfig.web.json` for TypeScript, and run the tests closest to the change (`.venv/bin/python -m pytest tests/<file> -v`).
+   b. Verify it: `make lint` for Python, `cd src/gui && npx tsc --noEmit -p tsconfig.node.json && npx tsc --noEmit -p tsconfig.web.json` for TypeScript, and run the tests closest to the change (`.cache/.venv/bin/python -m pytest src/tests/<file> -v`).
    c. Mark it done in the plan file: `- [ ]` -> `- [x]`. If the step deviated from the plan, add one line under `## Log` in the plan file: `Step <n>: <what differed and why>`.
    d. Update the handoff file. In section 8 (Implementation Steps), mark step <n> as done and append any deviation to its Log line. Update the Metadata section: set `Status: implementing`. Append to the Log:
       ```
