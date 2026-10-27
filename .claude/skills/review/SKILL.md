@@ -32,9 +32,9 @@ Reads the diff, checks every change against CLAUDE.md rules and docs/GOTCHAS.md,
 3. **Read the rules that apply.** Load [docs/GOTCHAS.md](docs/GOTCHAS.md) and the "Rules" section of [CLAUDE.md](CLAUDE.md). You do not need to read the whole file — jump to the gotcha entries relevant to the files being changed (use the issue-number anchors, e.g. `#490` for shared-memcard, `#460` for baseline, `#478` for envelope, `#535` for config writes, `#539` for console folders, `#564` for paths, `#518` for `%ROM%`, etc.).
 
 4. **Check each changed file against the rules.** Specifically scan for:
-   - **Hardcoded paths** — any literal path string that should come from `server/paths.py` or `gui/electron/paths.ts` (#564).
+   - **Hardcoded paths** — any literal path string that should come from `src/server/paths.py` or `gui/electron/paths.ts` (#564).
    - **Hardcoded console flags** — any new Set or literal list for shared-memcard/shared-state consoles that should read from `console_defs` instead (#490).
-   - **Path/typing drift** — new IPC channels missing from `gui/renderer/src/emusync.d.ts` (#78); new config fields in `emusync.toml` that should be `display.json` instead (#499).
+   - **Path/typing drift** — new IPC channels missing from `src/gui/renderer/src/emusync.d.ts` (#78); new config fields in `emusync.toml` that should be `display.json` instead (#499).
    - **Blob hashing** — any code hashing `memcard_bytes()` instead of `_memcard_payload_bytes()` (#478).
    - **Schema changes** — new DB columns without a corresponding `_migrate()` block and `_SCHEMA_VERSION` bump (#535).
    - **Config writes** — any `writeFileSync` without atomic `.tmp` + rename + 0600 mode (#535).
@@ -60,7 +60,7 @@ Reads the diff, checks every change against CLAUDE.md rules and docs/GOTCHAS.md,
 
    | # | Severity | Category | File:Line | Summary |
    |---|----------|----------|-----------|---------|
-   | 1 | High     | gotcha-violation | server/api/blobs.py:142 | Hashes enveloped bytes instead of payload |
+   | 1 | High     | gotcha-violation | src/server/api/blobs.py:142 | Hashes enveloped bytes instead of payload |
    | 2 | Medium   | test-gap | (none) | New endpoint /games/{slug}/conflicts/check has no integration test |
    ...
    ```

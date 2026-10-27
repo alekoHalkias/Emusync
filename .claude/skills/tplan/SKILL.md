@@ -41,7 +41,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 3. Branch. If no `*/<N>-*` branch exists: `git fetch --prune && git branch -r`, stop and flag any `feature/*` or `copilot/*` branch touching the same files; otherwise `git checkout main && git pull && git checkout -b feature/<N>-<slug>`. If it exists, check it out. Never work on `main`.
 
 4. Testing Design Management:
-   - Load/Create Test Guide: Read `.claude/testing-guide.md`. If it doesn't exist, create it by analyzing `tests/` and existing test patterns in the codebase.
+   - Load/Create Test Guide: Read `.claude/testing-guide.md`. If it doesn't exist, create it by analyzing `src/tests/` and existing test patterns in the codebase.
    - Discovery: Analyze current testing patterns (integration test structure, fixtures, SQLite usage, CLI testing, Electron IPC testing).
    - Update Guide: If the current issue introduces a new, reusable testing pattern or modifies an existing one, update `.claude/testing-guide.md`.
    - Maintenance: If the guide exceeds 100 lines, compress it by merging similar patterns and removing redundant examples.

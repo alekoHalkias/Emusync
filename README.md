@@ -111,7 +111,7 @@ Click the **Server online / Server offline** button to open the server panel:
 All CLI commands use the Python virtual environment:
 
 ```bash
-.venv/bin/python emusync.py <command>
+src/.cache/.venv/bin/python src/emusync.py <command>
 ```
 
 Or if you have the launcher script: `./emusync <command>`
@@ -124,7 +124,7 @@ Or if you have the launcher script: `./emusync <command>`
 Starts the EmuSync server on this machine. Run this on your gaming PC if you're not using the GUI.
 
 ```bash
-.venv/bin/python emusync.py server start
+src/.cache/.venv/bin/python src/emusync.py server start
 ```
 
 The server listens on port `8765` and advertises itself on the LAN so other devices can find it. If you've set a PIN in the config, it's used as the pairing code. Leave it blank and any device can pair without a code.
@@ -133,7 +133,7 @@ The server listens on port `8765` and advertises itself on the LAN so other devi
 Kicks all paired devices off the server. They'll need to re-pair before they can sync again. Useful if you've changed your PIN or a device is no longer yours.
 
 ```bash
-.venv/bin/python emusync.py server clear-devices
+src/.cache/.venv/bin/python src/emusync.py server clear-devices
 ```
 
 ---
@@ -144,7 +144,7 @@ Kicks all paired devices off the server. They'll need to re-pair before they can
 Pairs this machine with an EmuSync server. Use this on your Steam Deck or second PC if you prefer the CLI over the GUI setup screen.
 
 ```bash
-.venv/bin/python emusync.py device pair --host 192.168.1.50 --token 1234
+src/.cache/.venv/bin/python src/emusync.py device pair --host 192.168.1.50 --token 1234
 ```
 
 | Flag | Description |
@@ -157,7 +157,7 @@ Pairs this machine with an EmuSync server. Use this on your Steam Deck or second
 Shows every device that's currently paired with the server. Useful for checking what's connected or cleaning up old devices.
 
 ```bash
-.venv/bin/python emusync.py device list
+src/.cache/.venv/bin/python src/emusync.py device list
 ```
 
 ---
@@ -168,7 +168,7 @@ Shows every device that's currently paired with the server. Useful for checking 
 Registers a game with EmuSync so it can be synced. You'll do this once per game.
 
 ```bash
-.venv/bin/python emusync.py game add --name "Pokemon Emerald" \
+src/.cache/.venv/bin/python src/emusync.py game add --name "Pokemon Emerald" \
   --rom "/home/user/roms/emerald.gba" \
   --save "/home/user/.config/retroarch/saves/emerald.srm" \
   --command "retroarch -L /path/to/mgba_libretro.so /home/user/roms/emerald.gba"
@@ -185,14 +185,14 @@ Registers a game with EmuSync so it can be synced. You'll do this once per game.
 Lists all games registered with EmuSync, including their slugs (short IDs used in other commands).
 
 ```bash
-.venv/bin/python emusync.py game list
+src/.cache/.venv/bin/python src/emusync.py game list
 ```
 
 #### `game edit`
 Updates the name or paths for a game — handy if you moved your ROMs or switched emulators.
 
 ```bash
-.venv/bin/python emusync.py game edit pokemon-emerald \
+src/.cache/.venv/bin/python src/emusync.py game edit pokemon-emerald \
   --save "/new/path/to/emerald.srm"
 ```
 
@@ -202,7 +202,7 @@ Pass any combination of `--name`, `--rom`, `--save`, `--command`.
 Removes a game from EmuSync management. This does **not** delete your ROM or save files — it just stops EmuSync from tracking it.
 
 ```bash
-.venv/bin/python emusync.py game remove pokemon-emerald
+src/.cache/.venv/bin/python src/emusync.py game remove pokemon-emerald
 ```
 
 ---
@@ -213,7 +213,7 @@ Removes a game from EmuSync management. This does **not** delete your ROM or sav
 The heart of EmuSync. Pulls your save from the server, launches the emulator, then pushes the save back when you quit. This is what runs in the background every time you hit Play in the GUI.
 
 ```bash
-.venv/bin/python emusync.py run --game pokemon-emerald -- retroarch -L /path/to/core.so /path/to/rom.gba
+src/.cache/.venv/bin/python src/emusync.py run --game pokemon-emerald -- retroarch -L /path/to/core.so /path/to/rom.gba
 ```
 
 Everything after `--` is the emulator command. EmuSync wraps it and handles the sync automatically.
@@ -234,7 +234,7 @@ Steam will pass the game's own launch command as `%command%`, and EmuSync will w
 Shows the current lock and save status for every managed game. Useful for checking if a save is stuck locked (e.g. after a crash) or seeing which device last pushed a save and when.
 
 ```bash
-.venv/bin/python emusync.py sync status
+src/.cache/.venv/bin/python src/emusync.py sync status
 ```
 
 ---
