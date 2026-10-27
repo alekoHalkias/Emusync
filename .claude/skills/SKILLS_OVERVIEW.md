@@ -69,6 +69,12 @@ This file documents all workflow skills and their responsibilities.
 - **Stage**: 4 of 4
 - **Purpose**: Create PR, run tests, handle fix-plans if needed
 - **Output**: GitHub PR + rewrites `plans/<N>-handoff.md` sections 10, 11
+- **Next**: done (invoke `cleanup` once PR is merged/closed)
+
+### 11. cleanup (`./.claude/skills/cleanup/SKILL.md`)
+- **Stage**: post-ship
+- **Purpose**: Confirm PR merged/closed, remove plan/handoff files, prune feature branch
+- **Output**: Deleted plan files, pruned branch
 - **Next**: done
 
 ## Handoff File (`plans/<N>-handoff.md`)
@@ -153,6 +159,11 @@ A single workflow-wide state document that every skill reads, updates with its s
        ▼
 ┌─────────────┐
 │   /ship     │  Stage 4: Create PR, run tests, fix-plans if needed, server sync
+└──────┬──────┘
+       │
+       ▼ (once PR merged/closed)
+┌─────────────┐
+│  /cleanup   │  Post-ship: confirm closure, remove plan files, prune branch
 └─────────────┘
 ```
 

@@ -43,7 +43,7 @@ No permission pause for anything scoped to this repo or its GitHub (read, edit, 
 
 ## Workflow — mandatory skills pipeline
 
-Every code change goes through `/issue` → `/design` → `/fplan` or `/bplan` → `/merge` (if both) → `/tplan` → `/implement` → `/review` → `/ship` (`.claude/skills/`). No exceptions for "small" fixes.
+Every code change goes through `/issue` → `/design` → `/fplan` or `/bplan` → `/merge` (if both) → `/tplan` → `/implement` → `/review` → `/ship` → `/cleanup` (`.claude/skills/`). No exceptions for "small" fixes.
 
 - **Detect new issues.** If the user describes a feature, bug, or change they want (even casually, without saying "issue"), invoke `/issue` with that description before anything else. Do not start reading-to-fix or editing.
 - **No code edits outside `/implement`.** Do not edit, write, or delete any tracked file except via `/implement` working an approved plan file `src/plans/<N>-*.md` on its `feature/<N>-*` branch. Each skill writes to `src/plans/<N>-handoff.md` (the workflow state carrier) and its own outputs. If asked to change code directly, refuse briefly and route through the pipeline: `/issue` for new work, or `/plan <N>` / `/implement <N>` to resume.
