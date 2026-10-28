@@ -16,7 +16,7 @@ Stage 4 of 4: issue -> plan -> implement -> ship.
 
 ## Steps
 
-1. Resolve the issue and stage per the `plan` skill's "Resolve" section. Check out the branch and read the handoff file at `plans/<N>-handoff.md`. If any plan step is unchecked, invoke `implement` instead.
+1. Resolve the issue and stage per the `plan` skill's "Resolve" section. Check out the branch and read the handoff file at `tools/plans/<N>-handoff.md`. If any plan step is unchecked, invoke `implement` instead.
 
 2. Run tests: `make test-changed`, then `make test`. Capture the output.
 

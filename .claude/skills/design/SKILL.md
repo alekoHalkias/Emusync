@@ -18,7 +18,7 @@ Stage 1.5 of 4: issue -> design -> plan -> implement -> ship.
 
 Input is an issue number or a PR number.
 - PR number: `gh pr view <N> --repo alekoHalkias/Emusync --json body,headRefName,state` and read the issue from `Closes #X`.
-- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the handoff at `plans/<N>-handoff.md` on that branch.
+- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the handoff at `tools/plans/<N>-handoff.md` on that branch.
 
 Stage:
 | State | Next skill |
@@ -36,7 +36,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 
 1. Resolve the issue number. `gh issue view <N> --repo alekoHalkias/Emusync --json number,title,body,comments` and read all of it.
 
-2. Read the handoff file at `plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue section from what you just read.
+2. Read the handoff file at `tools/plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue section from what you just read.
 
 3. Analyze the scope.
    - Identify **Backend changes**: Python/FastAPI, SQLite/Store, CLI, mDNS, etc.

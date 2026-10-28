@@ -18,11 +18,11 @@ Stage 2.5 of 4: issue -> plan -> test-design -> implement -> ship.
 
 1. Resolve the issue and stage per the `plan` skill's "Resolve" section. Check out the branch. If no handoff file exists, invoke `issue` instead.
 
-2. Read the handoff file at `plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections.
+2. Read the handoff file at `tools/plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections.
 
-3. Read the implementation plan file `plans/<N>-<slug>.md`.
+3. Read the implementation plan file `tools/plans/<N>-<slug>.md`.
 
-4. Generate a test design in a new file `plans/<N>-test-design.md` with the following structure:
+4. Generate a test design in a new file `tools/plans/<N>-test-design.md` with the following structure:
    ```
    ## Test Scope
    <What is being tested and, crucially, what is out of scope.>

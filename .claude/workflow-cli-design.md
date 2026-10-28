@@ -86,7 +86,7 @@ def ensure_branch(repo: Path, issue_id: int | str) -> None
 ```
 
 - `detect_repo`: walks up from cwd to find `.git/`.
-- `resolve_handoff`: returns `plans/<N>-handoff.md` where N is the numeric issue ID.
+- `resolve_handoff`: returns `tools/plans/<N>-handoff.md` where N is the numeric issue ID.
 - `resolve_branch`: returns `feature/<N>-<slug>` where slug comes from the issue title.
 - `ensure_branch`: creates the feature branch from main if it doesn't exist.
 

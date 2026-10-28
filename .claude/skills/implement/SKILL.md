@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Execute the plan file plans/<issue>-<slug>.md one step at a time, checking off each step in the file as it completes so an interrupted run can resume. Use when the user runs /implement <issue|PR>, after a plan is approved, or when ship has appended fix steps.
+description: Execute the plan file tools/plans/<issue>-<slug>.md one step at a time, checking off each step in the file as it completes so an interrupted run can resume. Use when the user runs /implement <issue|PR>, after a plan is approved, or when ship has appended fix steps.
 ---
 
 # /implement - work the plan file
@@ -16,9 +16,9 @@ Stage 3 of 4: issue -> plan -> implement -> ship.
 ## Steps
 
 1. Resolve the issue and stage per the `plan` skill's "Resolve" section. Check out the branch. If there is no handoff file, invoke `issue` instead. If every step is already checked, invoke `ship`.
-   Then set `Status: implementing` in the handoff file and commit it. This records plan approval and unlocks the edit hook (`.claude/hooks/require_plan.py`), which blocks edits to repo files outside `plans/` and `.claude/` under any other status.
+   Then set `Status: implementing` in the handoff file and commit it. This records plan approval and unlocks the edit hook (`.claude/hooks/require_plan.py`), which blocks edits to repo files outside `tools/plans/` and `.claude/` under any other status.
 
-2. Read the handoff file at `plans/<N>-handoff.md` and the plan file at `plans/<N>-<slug>.md`. Find the first unchecked `- [ ]` step. Earlier checked steps are done - do not redo them, but read the code they touched before continuing.
+2. Read the handoff file at `tools/plans/<N>-handoff.md` and the plan file at `tools/plans/<N>-<slug>.md`. Find the first unchecked `- [ ]` step. Earlier checked steps are done - do not redo them, but read the code they touched before continuing.
 
 3. For each unchecked step, in order:
    a. Implement exactly that step, following CLAUDE.md conventions and the step's Reuses list.

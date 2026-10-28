@@ -21,7 +21,7 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
 
 ## Steps
 
-1. **Read the handoff file** at `plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections from the GitHub issue.
+1. **Read the handoff file** at `tools/plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections from the GitHub issue.
 
 2. **Load both plans.** Read the two plan files. Extract:
    - Each plan's steps (with file lists and reuse lists).
@@ -85,7 +85,7 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
 
 7. **Commit and present.**
    ```bash
-   git add plans/<N>-*.md
+   git add tools/plans/<N>-*.md
    git commit -m "#<N>: merge reconciled plan from fplan and bplan"
    ```
    Present the reconciled plan to the user, listing all conflicts resolved and any that need user input. This skill is invoked automatically by the design skill when both plan targets are needed — after presenting the reconciled plan, invoke `tplan` with the issue number.
