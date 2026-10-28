@@ -19,7 +19,7 @@ Stage 2.2 of 4: issue -> design -> bplan -> implement -> ship.
 
 Input is an issue number or a PR number.
 - PR number: `gh pr view <N> --repo alekoHalkias/Emusync --json body,headRefName,state` and read the issue from `Closes #X`.
-- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the handoff at `plans/<N>-handoff.md` on that branch.
+- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the handoff at `tools/plans/<N>-handoff.md` on that branch.
 
 Stage:
 | State | Next skill |
@@ -36,7 +36,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 
 1. Resolve the issue number. `gh issue view <N> --repo alekoHalkias/Emusync --json number,title,body,comments` and read all of it.
 
-2. Read the handoff file at `plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections from the GitHub issue and any existing plan file.
+2. Read the handoff file at `tools/plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections from the GitHub issue and any existing plan file.
 
 3. Branch. If no `*/<N>-*` branch exists: `git fetch --prune && git branch -r`, stop and flag any `feature/*` or `copilot/*` branch touching the same files; otherwise `git checkout main && git pull && git checkout -b feature/<N>-<slug>`. If it exists, check it out. Never work on `main`.
 
@@ -59,7 +59,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 
 9. If the work is too big for one reviewable PR, propose splitting into separate issues and stop.
 
-10. Write `plans/<N>-<slug>.md` (the executable plan file):
+10. Write `tools/plans/<N>-<slug>.md` (the executable plan file):
     ```
     # Plan: #<N> <issue title>
 
@@ -98,7 +98,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
     - <YYYY-MM-DD> bplan: <N> steps written, backend_pattern=<summary>
     ```
 
-12. Commit the plan file, design guide, and handoff file: `git add plans/<N>-*.md .claude/backend-design-guide.md && git commit -m "Add backend implementation plan for #<N> with design alignment and guide update"`.
+12. Commit the plan file, design guide, and handoff file: `git add tools/plans/<N>-*.md .claude/backend-design-guide.md && git commit -m "Add backend implementation plan for #<N> with design alignment and guide update"`.
 
 13. Show the plan to the user and stop. On approval, invoke `tplan` with the issue number. If they request changes, revise, recommit, re-present.
 

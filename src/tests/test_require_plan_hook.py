@@ -25,7 +25,7 @@ def test_blocks_code_on_unlinked_branch(tmp_path):
 
 def test_allows_plans_and_claude_dirs(tmp_path):
     repo = _repo(tmp_path, "main")
-    assert _check(repo, "src/plans/5-x.md") is None
+    assert _check(repo, "tools/plans/5-x.md") is None
     assert _check(repo, ".claude/skills/plan/SKILL.md") is None
 
 
@@ -37,8 +37,8 @@ def test_allows_paths_outside_repo(tmp_path):
 def test_requires_plan_file_then_implementing_status(tmp_path):
     repo = _repo(tmp_path, "feature/5-thing")
     assert "Run /plan 5" in _check(repo, "server/x.py")
-    (repo / "src" / "plans").mkdir(parents=True)
-    plan = repo / "src" / "plans" / "5-thing.md"
+    (repo / "tools" / "plans").mkdir(parents=True)
+    plan = repo / "tools" / "plans" / "5-thing.md"
     plan.write_text("Status: planned\n")
     assert "Status: planned" in _check(repo, "server/x.py")
     plan.write_text("Status: implementing\n")

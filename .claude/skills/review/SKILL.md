@@ -27,7 +27,7 @@ Reads the diff, checks every change against CLAUDE.md rules and docs/GOTCHAS.md,
    ```
    If `args` is a commit range or a raw diff text was provided, use that directly.
 
-2. **Read the handoff file** at `plans/<N>-handoff.md` (resolve issue number from the branch name or PR body). If it does not exist, create it using the template from the `issue` skill, filling in what you can from the PR/branch.
+2. **Read the handoff file** at `tools/plans/<N>-handoff.md` (resolve issue number from the branch name or PR body). If it does not exist, create it using the template from the `issue` skill, filling in what you can from the PR/branch.
 
 3. **Read the rules that apply.** Load [docs/GOTCHAS.md](docs/GOTCHAS.md) and the "Rules" section of [CLAUDE.md](CLAUDE.md). You do not need to read the whole file — jump to the gotcha entries relevant to the files being changed (use the issue-number anchors, e.g. `#490` for shared-memcard, `#460` for baseline, `#478` for envelope, `#535` for config writes, `#539` for console folders, `#564` for paths, `#518` for `%ROM%`, etc.).
 

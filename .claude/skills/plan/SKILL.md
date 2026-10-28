@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Read a GitHub issue and the code it touches, then write a reuse-first, step-by-step implementation plan to plans/<issue>-<slug>.md on the issue's feature branch. Use when the user runs /plan <issue|PR>, after /issue, or when ship needs a fix plan for failing tests. Never edits product code.
+description: Read a GitHub issue and the code it touches, then write a reuse-first, step-by-step implementation plan to tools/plans/<issue>-<slug>.md on the issue's feature branch. Use when the user runs /plan <issue|PR>, after /issue, or when ship needs a fix plan for failing tests. Never edits product code.
 ---
 
 # /plan - write the plan file
@@ -16,7 +16,7 @@ Stage 2 of 4: issue -> plan -> implement -> ship. Never edit product code in thi
 
 Input is an issue number or a PR number.
 - PR number: `gh pr view <N> --repo alekoHalkias/Emusync --json body,headRefName,state` and read the issue from `Closes #X`.
-- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the plan at `plans/<N>-*.md` on that branch.
+- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the plan at `tools/plans/<N>-*.md` on that branch.
 
 Stage:
 | State | Next skill |
@@ -37,7 +37,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 4. Reuse search (required). For each piece of logic the work needs, grep for an existing helper, store method, route, CLI command, IPC handler, type, or component that does it or nearly does. Extend or call it instead of writing a parallel copy. New code is allowed only with a one-line reason why nothing existing fits.
 5. If a design decision is genuinely open (data shape, UX, which layer owns it), ask the user. Do not ask what the code can answer.
 6. If the work is too big for one reviewable PR, propose splitting into separate issues and stop.
-7. Write `plans/<N>-<slug>.md`:
+7. Write `tools/plans/<N>-<slug>.md`:
    ```
    # Plan: #<N> <issue title>
 
@@ -66,7 +66,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
    ## Log
    ```
    Steps must be small enough to finish and verify one at a time.
-8. Commit the plan file only: `git add plans/<N>-*.md && git commit -m "Add implementation plan for #<N>"`.
+8. Commit the plan file only: `git add tools/plans/<N>-*.md && git commit -m "Add implementation plan for #<N>"`.
 9. Show the plan to the user and stop. On approval, invoke `implement` with the issue number. On requested changes, revise, recommit, re-present.
 
 ## Fix-plan mode (called by ship)

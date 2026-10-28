@@ -19,7 +19,7 @@ Stage 2.3 of 4: issue -> design -> fplan/bplan -> implement -> ship.
 
 Input is an issue number or a PR number.
 - PR number: `gh pr view <N> --repo alekoHalkias/Emusync --json body,headRefName,state` and read the issue from `Closes #X`.
-- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the handoff at `plans/<N>-handoff.md` on that branch.
+- Issue number: `git fetch --prune`, then find the branch with `git branch -a --list "*/<N>-*"` and the handoff at `tools/plans/<N>-handoff.md` on that branch.
 
 Stage:
 | State | Next skill |
@@ -36,7 +36,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 
 1. Resolve the issue number. `gh issue view <N> --repo alekoHalkias/Emusync --json number,title,body,comments` and read all of it.
 
-2. Read the handoff file at `plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections from the GitHub issue and any existing plan file.
+2. Read the handoff file at `tools/plans/<N>-handoff.md`. If it does not exist, create it using the template from the `issue` skill, filling in the Issue and Design sections from the GitHub issue and any existing plan file.
 
 3. Branch. If no `*/<N>-*` branch exists: `git fetch --prune && git branch -r`, stop and flag any `feature/*` or `copilot/*` branch touching the same files; otherwise `git checkout main && git pull && git checkout -b feature/<N>-<slug>`. If it exists, check it out. Never work on `main`.
 
@@ -46,7 +46,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
    - Update Guide: If the current issue introduces a new, reusable testing pattern or modifies an existing one, update `.claude/testing-guide.md`.
    - Maintenance: If the guide exceeds 100 lines, compress it by merging similar patterns and removing redundant examples.
 
-5. Read the existing plan. Load `plans/<N>-<slug>.md` from either `fplan` or `bplan`.
+5. Read the existing plan. Load `tools/plans/<N>-<slug>.md` from either `fplan` or `bplan`.
 
 6. Test Alignment:
    - Compare the existing plan against `.claude/testing-guide.md`.
@@ -59,7 +59,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 
 9. If the testing scope is too big for one reviewable PR, propose splitting into separate issues and stop.
 
-10. Update `plans/<N>-<slug>.md`:
+10. Update `tools/plans/<N>-<slug>.md`:
     - Add a `## Testing` section before `## Checklist`
     - Insert test steps into the existing plan steps
     ```
@@ -110,7 +110,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
     - <YYYY-MM-DD> tplan: test_file=<path>, <N> test cases defined
     ```
 
-12. Commit the plan file, test guide, and handoff file: `git add plans/<N>-*.md .claude/testing-guide.md && git commit -m "Add testing plan for #<N> with test guidelines and guide update"`.
+12. Commit the plan file, test guide, and handoff file: `git add tools/plans/<N>-*.md .claude/testing-guide.md && git commit -m "Add testing plan for #<N> with test guidelines and guide update"`.
 
 13. Show the plan to the user and stop. On approval, invoke `implement` with the issue number. If they request changes, revise, recommit, re-present.
 

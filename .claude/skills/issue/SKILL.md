@@ -48,7 +48,7 @@ If args are a number (`123`, `#123`, or `PR 45`) instead of a description, do no
 
 5. Branch. If no `*/<N>-*` branch exists: `git fetch --prune && git checkout main && git pull && git checkout -b feature/<N>-<slug>`. If it exists, check it out. Never work on `main`.
 
-6. Create or read the handoff file at `plans/<N>-handoff.md`. If it does not exist, write it with the template below. If it exists, read it and fill in the Issue section (sections 1-2).
+6. Create or read the handoff file at `tools/plans/<N>-handoff.md`. If it does not exist, write it with the template below. If it exists, read it and fill in the Issue section (sections 1-2).
 
    Handoff template (write only if the file does not exist):
    ```

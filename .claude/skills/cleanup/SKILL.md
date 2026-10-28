@@ -21,13 +21,13 @@ Runs after a PR is merged or closed. Cleans up the plan files, handoff, and prun
 
 3. If the PR is merged or the issue is closed, confirm with the user (one-line: "PR #M merged — proceeding with cleanup.").
 
-4. Read the handoff file at `src/plans/<N>-handoff.md`. Append to the Log section:
+4. Read the handoff file at `tools/plans/<N>-handoff.md`. Append to the Log section:
    ```
    - <YYYY-MM-DD> cleanup: workflow closed
    ```
    Set `Status: closed` in the Metadata section. Commit and push the handoff update.
 
-5. Find the plan file(s) for this issue: `src/plans/<N>-*.md` (the handoff plus any `<N>-<slug>.md` plan files). Delete all matching plan files (not the handoff — that was already updated in step 4, so delete the handoff too after the log update).
+5. Find the plan file(s) for this issue: `tools/plans/<N>-*.md` (the handoff plus any `<N>-<slug>.md` plan files). Delete all matching plan files (not the handoff — that was already updated in step 4, so delete the handoff too after the log update).
 
 6. Get the branch name from the handoff file's `Branch:` line. Prune it:
    - Remote: `git push origin --delete <branch>`
