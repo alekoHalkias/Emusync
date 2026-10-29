@@ -4,7 +4,7 @@
 - Issue: #618
 - Branch: feature/618-refresh-rom-source (stacked on feature/616-game-location-refresh; PR #617 unmerged)
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -12,8 +12,13 @@
 See https://github.com/alekoHalkias/Emusync/issues/618
 
 ## 2. Design
-### Scope: TBD
-### Plan Target: TBD
+### Scope: Frontend-only. Extends useBrokenRoms.refresh (from #616) with a source check.
+### Backend Changes: None. Uses PUT /games/{slug}/device and getDeviceConsoles (console rows carry device_game_folder, device_local_folder, device_network_folder).
+### UI Changes: useBrokenRoms.ts (source check), GameGrid.tsx (toast text). Local = device_local_folder + device_game_folder; network = device_network_folder. Longest-prefix match wins; no match or no folders = unchanged. Network ROMs keep rom_rel_path/local_rom_path untouched.
+### Plan Target: fplan
+### Sub-issues: None.
+### Difficulty: 3/10
+### Backwards Compatibility: No breaking changes.
 
 ## 3. Frontend Plan
 TBD
@@ -38,3 +43,4 @@ TBD
 
 ## 12. Log
 - 2026-10-29 issue: workflow initialized, issue #618 created
+- 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
