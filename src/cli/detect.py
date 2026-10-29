@@ -280,11 +280,45 @@ def _detect_emulators_for_console(console_def: dict) -> list[dict]:
     return options
 
 
-def _scan_rom_dir(directory: str, depth: int = 0) -> list[str]:
-    """Recursively collect ROM files (depth ≤ 3)."""
+def _dir_matches_pattern(directory: str, pattern: str) -> bool:
+    """Check if *directory* contains the path structure described by *pattern*.
+
+    The pattern is a slash-separated path like ``PS3_GAME/USRDIR/EBOOT.BIN``.
+    All components except the last must be directories; the last must be a file.
+    Returns ``True`` when the full chain exists, ``False`` otherwise.
+    """
+    parts = pattern.split("/")
+    current = directory
+    for i, part in enumerate(parts):
+        candidate = os.path.join(current, part)
+        if i < len(parts) - 1:
+            # Intermediate components must be directories
+            if not os.path.isdir(candidate):
+                return False
+        else:
+            # The last component must be a file (not a directory)
+            return os.path.isfile(candidate)
+    return False
+
+
+def _scan_rom_dir(directory: str, depth: int = 0, *, console_key: str | None = None) -> list[str]:
+    """Recursively collect ROM files (depth ≤ 3).
+
+    When *console_key* is provided, also detect directory-style ROMs whose
+    parent directory matches the console's ``dir_rom_pattern`` (e.g.
+    ``PS3_GAME/USRDIR/EBOOT.BIN`` for PS3). A matching directory is yielded
+    as a ROM entry and its contents are not recursed into.
+    """
     if depth > 3:
         return []
     roms: list[str] = []
+    # Look up dir_rom_pattern for this console
+    dir_pattern: str | None = None
+    if console_key:
+        for console_def in _IMPORT_CONSOLES:
+            if console_def["key"] == console_key:
+                dir_pattern = console_def.get("dir_rom_pattern")
+                break
     try:
         with os.scandir(directory) as it:
             for entry in it:
@@ -293,7 +327,11 @@ def _scan_rom_dir(directory: str, depth: int = 0) -> list[str]:
                     if ext in _ROM_EXTENSIONS:
                         roms.append(entry.path)
                 elif entry.is_dir():
-                    roms.extend(_scan_rom_dir(entry.path, depth + 1))
+                    # Check for directory-style ROM before recursing
+                    if dir_pattern and _dir_matches_pattern(entry.path, dir_pattern):
+                        roms.append(entry.path)
+                    else:
+                        roms.extend(_scan_rom_dir(entry.path, depth + 1, console_key=console_key))
     except PermissionError:
         pass
     return roms
