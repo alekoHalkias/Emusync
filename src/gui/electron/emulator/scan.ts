@@ -82,16 +82,45 @@ function findFirstIdFolderTitlePath(sdRoot: string): string | null {
   return null;
 }
 
-function scanRomDir(dir: string, depth = 0): string[] {
+/** Check if *dir* contains the directory-structure described by *pattern*.
+
+ * The pattern is a slash-separated path like ``PS3_GAME/USRDIR/EBOOT.BIN``.
+ * All components except the last must be directories; the last must be a file.
+ */
+function dirMatchesPattern(dir: string, pattern: string): boolean {
+  const parts = pattern.split("/");
+  let current = dir;
+  for (let i = 0; i < parts.length; i++) {
+    const candidate = join(current, parts[i]);
+    if (i < parts.length - 1) {
+      // Intermediate components must be directories
+      if (!existsSync(candidate) || !statSync(candidate).isDirectory()) return false;
+    } else {
+      // The last component must be a file (not a directory)
+      return existsSync(candidate) && statSync(candidate).isFile();
+    }
+  }
+  return false;
+}
+
+function scanRomDir(dir: string, depth = 0, consoleKey?: string): string[] {
   if (depth > 3) return [];
   try {
     const entries = readdirSync(dir, { withFileTypes: true });
     const roms: string[] = [];
+    // Look up dirRomPattern for this console
+    const consoleDef = rt.cachedConsoleDefs?.[consoleKey ?? ""];
+    const dirPattern = consoleDef?.dirRomPattern;
     for (const e of entries) {
       if (e.isFile() && ROM_EXTENSIONS.has(extname(e.name).slice(1).toLowerCase())) {
         roms.push(join(dir, e.name));
       } else if (e.isDirectory()) {
-        roms.push(...scanRomDir(join(dir, e.name), depth + 1));
+        // Check for directory-style ROM before recursing
+        if (dirPattern && dirMatchesPattern(join(dir, e.name), dirPattern)) {
+          roms.push(join(dir, e.name));
+        } else {
+          roms.push(...scanRomDir(join(dir, e.name), depth + 1, consoleKey));
+        }
       }
     }
     return roms;
@@ -185,7 +214,7 @@ export function runEmulatorScan(params: {
   const defaultSaveExts = firstSys?.saveExts ?? DEFAULT_SAVE_EXTS;
 
   const roms: RomEntry[] = romDirs.flatMap(dir => {
-    const allInDir = scanRomDir(dir);
+    const allInDir = scanRomDir(dir, 0, consoleKey);
     console.error(`[scan] dir='${dir}' → scanRomDir found ${allInDir.length} files total`);
     const filtered = allInDir.filter(p =>
       romExtSet.has(extname(p).slice(1).toLowerCase()) &&

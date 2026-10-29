@@ -303,7 +303,7 @@ def console_import() -> None:
     rom_ext_set = set(console_def.get("rom_extensions") or console_def["system_keys"])
     all_files: list[str] = []
     for folder in scan_folders:
-        all_files.extend(_scan_rom_dir(folder))
+        all_files.extend(_scan_rom_dir(folder, console_key=console_def["key"]))
     matching = [p for p in all_files
                 if os.path.splitext(p)[1].lstrip(".").lower() in rom_ext_set]
     # Switch base/update/DLC all ship as .nsp — filter down to base games via
