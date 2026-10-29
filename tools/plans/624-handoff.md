@@ -4,7 +4,7 @@
 - Issue: #624
 - Branch: feature/624-upload-local-rom-to-network
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-10-29
 - Fix attempts: 0
 - Base: stacked on feature/622-move-local-rom (PR #623); touches MoveLocalRomPanel.tsx
