@@ -75,6 +75,22 @@ Add a "Refresh locations" button that flags games with missing ROMs via a red ex
   - Reuses: existing documentation patterns
   - New: documentation entries for new IPC and UI features
 
+## Testing
+- **Test File**: `src/tests/test_game_location_refresh.py`
+- **Test Cases**:
+  - `test_refresh_detects_missing_rom`: Register a game with a rom_path pointing to a non-existent file; verify `game_devices.rom_path` is unchanged but the game is flagged as broken.
+  - `test_refresh_ignores_existing_rom`: Register a game with a real rom_path; verify it is NOT flagged as broken.
+  - `test_relink_updates_rom_path`: PUT /games/{slug}/device with a new rom_path; verify the store reflects the update and the game is now valid.
+  - `test_relink_updates_rom_path_with_network`: PUT with `rom_source='network'` + new paths; verify both `rom_path` and `rom_source` are updated.
+  - `test_save_state_derivation`: Given a new rom_path, verify save_path derivation matches import-wizard heuristics (basename matching, content-dir subfolder, core-subfolder fallback).
+- **Edge Cases**:
+  - `test_broken_rom_on_other_device`: A game where `isLocal=false` — refresh should NOT flag it as broken (broken-rom checks only apply to local games).
+  - `test_relink_switch_folder_rom`: A Switch game where the ROM is a folder (e.g. `GAME/`); verify the folder-based rom_path is accepted.
+  - `test_relink_preserves_other_fields`: PUT updates rom_path but preserves launch_command, save_path, state_path, rom_folder_path.
+- **Integration Points**:
+  - `PUT /games/{slug}/device` endpoint (src/server/api/games.py:154) — verify rom_path update persists in real SQLite.
+  - Store `set_game_device` method — verify round-trip through SQLite.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes (files:exists). New CLI subcommand: no. Config/data file change: no.
 

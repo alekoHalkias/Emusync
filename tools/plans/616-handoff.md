@@ -68,10 +68,20 @@ Users frequently reorganize ROM folders, move drives, or change emulator install
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: src/tests/test_game_location_refresh.py
+### Test Cases:
+- Refresh detects missing rom_path
+- Refresh ignores existing rom_path
+- Re-link updates rom_path via PUT /games/{slug}/device
+- Re-link updates rom_path with network source
+- Save/state path derivation matches import-wizard heuristics
+### Edge Cases:
+- Broken rom on other device (isLocal=false, should not flag)
+- Switch folder-based ROM (folder path accepted)
+- Re-link preserves other fields (launch_command, save_path, state_path)
+### Integration Points:
+- PUT /games/{slug}/device endpoint (real SQLite)
+- Store set_game_device method (round-trip verification)
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -114,3 +124,4 @@ Users frequently reorganize ROM folders, move drives, or change emulator install
 - 2025-10-29 issue: workflow initialized, issue #616 created
 - 2025-10-29 design: scope=frontend-only, plan_target=fplan, difficulty=4/10, breaking=no
 - 2025-10-29 fplan: 11 steps written, visual_pattern=red exclamation badge on game card
+- 2025-10-29 tplan: test_file=src/tests/test_game_location_refresh.py, 5 test cases + 3 edge cases defined
