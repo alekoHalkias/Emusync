@@ -232,11 +232,12 @@ _IMPORT_CONSOLES = [
      "standalones": [_DOLPHIN],
      "suggestions": ["RetroArch with Dolphin core", "Dolphin standalone"]},
     # PS3 is standalone-only (RPCS3). Per-game saves in a learned savedata
-    # folder, like Wii/Switch (#422). Directory-style games (PS3_GAME/) aren't
-    # scannable yet — only .iso/.pkg files.
+    # folder, like Wii/Switch (#422). Supports both file-style ROMs (.iso/.pkg)
+    # and directory-style games (PS3_GAME/USRDIR/EBOOT.BIN).
     {"key": "ps3",     "label": "PlayStation 3",              "abbr": "PS3",
      "system_keys": [],
      "rom_extensions": ["iso", "pkg"],
+     "dir_rom_pattern": "PS3_GAME/USRDIR/EBOOT.BIN",
      "databases": ["Sony - PlayStation 3"],
      "folder_names": ["ps3", "playstation3", "playstation 3"],
      "standalones": [_RPCS3], "suggestions": ["RPCS3 standalone"]},

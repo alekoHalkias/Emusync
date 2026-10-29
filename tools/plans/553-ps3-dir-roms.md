@@ -1,5 +1,7 @@
 # Backend Plan: #553 Scan directory-style PS3 games (PS3_GAME/) for RPCS3
 
+- Status: implementing
+
 ## Goal
 
 Extend the ROM scanner to detect PS3 games stored as extracted folders (`<Game>/PS3_GAME/USRDIR/EBOOT.BIN`) alongside existing `.iso`/`.pkg` file detection.
