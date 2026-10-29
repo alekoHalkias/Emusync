@@ -1,6 +1,6 @@
 # Backend Plan: #553 Scan directory-style PS3 games (PS3_GAME/) for RPCS3
 
-- Status: implementing
+- Status: completed
 
 ## Goal
 
@@ -46,6 +46,8 @@ Pass the console key from the import wizard through to `_scan_rom_dir()` / `scan
 **File:** `src/cli/consoles_data.py`
 
 Update the PS3 console comment (line 234-236) to reflect that directory-style games are now supported.
+
+**Note:** Already done in Step 1 — the comment was updated alongside the `dir_rom_pattern` addition.
 
 ### Step 6: Tests — add `test_ps3_dir_roms.py`
 
