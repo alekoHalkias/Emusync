@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #626
 - Branch: feature/626-bulk-local-to-network
-- PR: none
+- PR: #627
 - Status: shipped
 - Created: 2026-10-29
 - Fix attempts: 0
