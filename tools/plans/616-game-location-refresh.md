@@ -29,12 +29,12 @@ Add a "Refresh locations" button that flags games with missing ROMs via a red ex
   - Reuses: existing IPC type declarations pattern
   - New: one method declaration
 
-- [ ] 4. Add red exclamation badge to GameCard.tsx — new `game-card-badge-broken` overlay, shown when `game.isBrokenLocation` is true. Icon: inline SVG exclamation circle, red `#e5484d` background.
+- [x] 4. Add red exclamation badge to GameCard.tsx — new `game-card-badge-broken` overlay, shown when `game.isBrokenLocation` is true. Icon: inline SVG exclamation circle, red `#e5484d` background.
   - Files: src/gui/renderer/src/components/GameCard.tsx
   - Reuses: existing `game-card-badges` container (line 82), same badge structure as `game-card-badge-locked` (line 88-92)
   - New: one badge conditional + one SVG icon — follows exact same pattern as existing badges
 
-- [ ] 5. Add CSS for the new badge in `src/gui/renderer/src/styles.css` — `.game-card-badge-broken` with red background, white text.
+- [x] 5. Add CSS for the new badge in `src/gui/renderer/src/styles.css` — `.game-card-badge-broken` with red background, white text.
   - Files: src/gui/renderer/src/styles.css
   - Reuses: existing `.game-card-badge` base styles
   - New: one CSS rule — color variation only
