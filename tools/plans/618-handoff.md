@@ -4,7 +4,7 @@
 - Issue: #618
 - Branch: feature/618-refresh-rom-source (stacked on feature/616-game-location-refresh; PR #617 unmerged)
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-29
 - Fix attempts: 0
 
