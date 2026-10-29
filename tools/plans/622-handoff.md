@@ -43,3 +43,10 @@ See tools/plans/622-move-local-rom.md
 3 NetworkRomPanel + GameConfig (reuses console lookup, busy/msg state)
 4 tests: none, manual
 5 docs ARCHITECTURE.md
+- 2026-10-29 tplan: test_file=none (manual + tsc), 4 cases defined
+
+## 6. Testing Plan
+### Test File: none (no harness for Electron main); tsc + make test-changed
+### Test Cases: move succeeds; inside-folder hides button
+### Edge Cases: dest exists; EXDEV; no console folder
+### Integration Points: PUT /games/{slug}/device

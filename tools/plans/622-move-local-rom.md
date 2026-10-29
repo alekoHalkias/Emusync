@@ -28,6 +28,12 @@ A local-source ROM outside its console's default local folder can be moved into 
 - [ ] 4. Tests: no Python/API behaviour changes; no renderer test harness exists. Manual verification noted in PR.
 - [ ] 5. Docs: ARCHITECTURE.md IPC list - add rom:moveToConsoleFolder.
 
+## Testing
+- **Test File**: none (no Python/API change; Electron main has no test harness). `make test-changed` must still pass; `npx tsc --noEmit` in src/gui for types.
+- **Test Cases**: manual - local ROM outside folder shows button and moves; ROM inside folder shows none.
+- **Edge Cases**: destination exists (refused); cross-filesystem (EXDEV copy path); no console folder set (error message).
+- **Integration Points**: PUT /games/{slug}/device persists rom_path and launch_command.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. Config/data file change: no.
 
