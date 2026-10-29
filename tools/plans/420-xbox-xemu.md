@@ -3,7 +3,7 @@
 Issue: #420
 Branch: feature/420-xbox-xemu
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
