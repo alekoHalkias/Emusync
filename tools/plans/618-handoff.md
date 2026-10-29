@@ -4,7 +4,7 @@
 - Issue: #618
 - Branch: feature/618-refresh-rom-source (stacked on feature/616-game-location-refresh; PR #617 unmerged)
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -52,3 +52,4 @@ TBD
 - 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-10-29 fplan: 5 steps written, no new UI
 - 2026-10-29 tplan: test_file=src/tests/test_game_location_refresh.py, 2 test cases defined
+- 2026-10-29 implement: steps 1-5 done (sourceFor, refresh corrects rom_source, toast, tests, docs)
