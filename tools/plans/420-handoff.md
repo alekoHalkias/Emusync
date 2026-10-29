@@ -97,9 +97,9 @@ Part of the console-expansion survey in #417 (Tier 2: standalone-only, no libret
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
+### Status: done
+### PR: https://github.com/alekoHalkias/Emusync/pull/615
+### Server Sync: done (feature/420-xbox-xemu branch on server)
 ### Doc Sync: pending
 
 ## 11. Fix Attempts
