@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #616
 - Branch: feature/616-game-location-refresh
-- PR: none
+- PR: #617
 - Status: shipped
 - Created: 2025-10-29
 - Fix attempts: 0
@@ -111,9 +111,9 @@ Users frequently reorganize ROM folders, move drives, or change emulator install
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### PR: #617
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -129,3 +129,4 @@ Users frequently reorganize ROM folders, move drives, or change emulator install
 - 2026-10-29 implement: steps 4-5 done (broken-location badge + CSS)
 - 2026-10-29 implement: steps 6-11 done (refresh button, LocationResolverModal, sibling auto-fix, tests, docs)
 - 2026-10-29 review: 2 findings (1 correctness fixed: sibling failure no longer aborts launch; 1 test-gap noted), blocked=no
+- 2026-10-29 ship: PR #617, server sync done, doc sync done (docs updated in step 11)
