@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #624
 - Branch: feature/624-upload-local-rom-to-network
-- PR: none
+- PR: #625
 - Status: shipped
 - Created: 2026-10-29
 - Fix attempts: 0
