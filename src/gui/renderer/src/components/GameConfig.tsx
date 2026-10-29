@@ -421,6 +421,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
               setRomPath(p);
               if (cmd !== undefined) setLaunchCommand(cmd);
             }}
+            onUploaded={(master, local, cmd, rel, sha) => {
+              netExtraRef.current = { ...netExtraRef.current, rom_rel_path: rel, rom_sha256: sha };
+              setRomSource("network");
+              setRomPath(master);
+              setLocalRomPath(local);
+              setLaunchCommand(cmd);
+            }}
           />
           <NetworkRomPanel
             slug={slug}
