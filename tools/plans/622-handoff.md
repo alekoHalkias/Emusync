@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #622
 - Branch: feature/622-move-local-rom
-- PR: none
-- Status: implemented
+- PR: #623
+- Status: shipped
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -51,3 +51,4 @@ See tools/plans/622-move-local-rom.md
 ### Edge Cases: dest exists; EXDEV; no console folder
 ### Integration Points: PUT /games/{slug}/device
 - 2026-10-29 implement: steps 1-5 done (IPC rom:moveToConsoleFolder, preload/d.ts, MoveLocalRomPanel, docs)
+- 2026-10-29 ship: PR #623 opened
