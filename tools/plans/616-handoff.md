@@ -4,7 +4,7 @@
 - Issue: #616
 - Branch: feature/616-game-location-refresh
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2025-10-29
 - Fix attempts: 0
 

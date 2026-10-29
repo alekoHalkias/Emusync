@@ -3,7 +3,7 @@
 Issue: #616
 Branch: feature/616-game-location-refresh
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
