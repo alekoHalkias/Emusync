@@ -4,7 +4,7 @@
 - Issue: #624
 - Branch: feature/624-upload-local-rom-to-network
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-29
 - Fix attempts: 0
 - Base: stacked on feature/622-move-local-rom (PR #623); touches MoveLocalRomPanel.tsx
@@ -27,3 +27,4 @@ See issue #624: per-game "Add to network drive" for local ROMs (reuse rom:upload
 2 GameConfig onUploaded (reuses state setters)
 3 tests: none
 4 docs ARCHITECTURE.md
+- 2026-10-29 implement: steps 1-4 done

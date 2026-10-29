@@ -3,7 +3,7 @@
 Issue: #624
 Branch: feature/624-upload-local-rom-to-network
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -14,15 +14,15 @@ A local-source ROM can be uploaded to the console's network folder from game set
 - **Recommendations**: none.
 
 ## Steps
-- [ ] 1. MoveLocalRomPanel: also load the console's `device_network_folder`; render the panel when the ROM is outside the local folder OR a network folder exists (local-source only); add "Add to network drive" button. Handler: rel = relPathUnder(romPath, [folder]), master = `${net}/${rel}`, `rom.uploadMaster(romPath, master)`, then `getGameDevice` + `setGameDevice` with rom_source network, rom_path master, local_rom_path = old romPath, rom_rel_path rel, rom_sha256, launch_command with old path replaced by master. Then notify parent.
+- [x] 1. MoveLocalRomPanel: also load the console's `device_network_folder`; render the panel when the ROM is outside the local folder OR a network folder exists (local-source only); add "Add to network drive" button. Handler: rel = relPathUnder(romPath, [folder]), master = `${net}/${rel}`, `rom.uploadMaster(romPath, master)`, then `getGameDevice` + `setGameDevice` with rom_source network, rom_path master, local_rom_path = old romPath, rom_rel_path rel, rom_sha256, launch_command with old path replaced by master. Then notify parent.
   - Files: src/gui/renderer/src/components/game-config/MoveLocalRomPanel.tsx
   - Reuses: rom.uploadMaster (never overwrites), console-import/helpers.ts:relPathUnder, api.ts:getGameDevice/setGameDevice, resolveRomPaths.ts presence="local" logic
   - New: one handler - the import-wizard logic is embedded in a bulk loop and not callable per game.
-- [ ] 2. GameConfig: on upload success set romSource to network, romPath to master, localRomPath to the local copy, launch command (new `onUploaded` prop), so the form matches server state and NetworkRomPanel appears.
+- [x] 2. GameConfig: on upload success set romSource to network, romPath to master, localRomPath to the local copy, launch command (new `onUploaded` prop), so the form matches server state and NetworkRomPanel appears.
   - Files: src/gui/renderer/src/components/GameConfig.tsx
   - Reuses: existing setRomSource/setRomPath/setLocalRomPath/setLaunchCommand
-- [ ] 3. Tests: none - no Python/API change, renderer/Electron have no harness; manual check. `make test-changed` and tsc must not regress.
-- [ ] 4. Docs: ARCHITECTURE.md MoveLocalRomPanel line mentions upload.
+- [x] 3. Tests: none - no Python/API change, renderer/Electron have no harness; manual check. `make test-changed` and tsc must not regress.
+- [x] 4. Docs: ARCHITECTURE.md MoveLocalRomPanel line mentions upload.
 
 ## Testing
 - **Test File**: none (manual + tsc + make test-changed)
@@ -37,3 +37,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 Moving the ROM and uploading in one click; deleting the local copy after upload.
 
 ## Log
+Step 2: onUploaded also refreshes netExtraRef (rel path, sha) so a later Save does not blank them.
