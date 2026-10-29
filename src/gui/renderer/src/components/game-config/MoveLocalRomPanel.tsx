@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { getDeviceConsoles, getGame, getGameDevice, setGameDevice, whoami } from "../../api";
-import { relPathUnder } from "../console-import/helpers";
-
-const norm = (p: string): string => p.replace(/\\/g, "/").replace(/\/+$/, "");
+import { getDeviceConsoles, getGame, whoami } from "../../api";
+import { norm, uploadLocalRom } from "./localToNetwork";
 
 // Local ROM actions: move a ROM outside its console's default local folder
 // into it (#622), and upload it to the console's network folder (#624).
@@ -61,18 +59,10 @@ export function MoveLocalRomPanel({
   async function handleUpload(): Promise<void> {
     setBusy(true); setMsg("Uploading…");
     try {
-      const rel = relPathUnder(norm(romPath), folder ? [norm(folder)] : []);
-      const master = `${norm(netFolder)}/${rel}`;
-      const up = await window.emusync.rom.uploadMaster(romPath, master);
-      if (!up.ok) { setMsg(up.error ?? "Upload failed."); return; }
-      const gd = await getGameDevice(slug!);
-      const launch = gd.launch_command ? gd.launch_command.split(romPath).join(master) : gd.launch_command;
-      await setGameDevice(slug!, {
-        ...gd, rom_source: "network", rom_path: master, local_rom_path: romPath,
-        rom_rel_path: rel, rom_sha256: up.sha256 ?? "", launch_command: launch,
-      });
-      onUploaded(master, romPath, launch ?? "", rel, up.sha256 ?? "");
-      setMsg(up.skipped ? "Already on the network drive; linked." : "Added to the network drive.");
+      const r = await uploadLocalRom(slug!, romPath, folder, netFolder);
+      if (!r.ok) { setMsg(r.error); return; }
+      onUploaded(r.master, romPath, r.launch, r.rel, r.sha);
+      setMsg(r.skipped ? "Already on the network drive; linked." : "Added to the network drive.");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Upload failed.");
     } finally {

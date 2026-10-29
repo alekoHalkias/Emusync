@@ -4,7 +4,7 @@
 - Issue: #626
 - Branch: feature/626-bulk-local-to-network
 - PR: none
-- Status: implementing
+- Status: shipped
 - Created: 2026-10-29
 - Fix attempts: 0
 - Base: stacked on feature/624-upload-local-rom-to-network (PR #625)
@@ -28,3 +28,4 @@ See issue #626.
 4 GameGrid wiring
 5 tests none
 6 docs
+- 2026-10-29 implement: steps 1-6 done
