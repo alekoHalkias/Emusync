@@ -243,6 +243,56 @@ export function registerRomIpc(): void {
     }
   );
 
+  // Move a local-source ROM that sits outside its console's default local
+  // folder into that folder (#622). Rename when possible; across filesystems
+  // copy + verify + delete the original.
+  ipcMain.handle(
+    "rom:moveToConsoleFolder",
+    async (event, slug: string): Promise<{ ok: boolean; romPath?: string; launchCommand?: string; error?: string }> => {
+      localizeCancelled = false;
+      try {
+        const { host, port, authHeaders } = loadServerCfg();
+        const gdRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+        if (!gdRes.ok) return { ok: false, error: "Game is not configured on this device" };
+        const gd = await gdRes.json() as any;
+        const src = (gd.rom_path as string) || "";
+        if (gd.rom_source === "network") return { ok: false, error: "Not a local ROM" };
+        if (!src || !existsSync(src)) return { ok: false, error: "ROM file not found" };
+        const folder = await consoleLocalFolder(host, port, authHeaders, slug);
+        if (!folder) return { ok: false, error: "No local folder set for this console" };
+        const dest = join(folder, basename(src));
+        if (resolvePath(dest) === resolvePath(src)) return { ok: false, error: "ROM is already in the console folder" };
+        if (existsSync(dest)) return { ok: false, error: "A file with that name already exists in the console folder" };
+        mkdirSync(folder, { recursive: true });
+        try {
+          renameSync(src, dest);
+        } catch (e: any) {
+          if (e.code !== "EXDEV") throw e;
+          const size = statSync(src).size;
+          const tmp = dest + ".part";
+          try {
+            if (!await copyWithProgress(src, tmp, size, slug, event.sender)) return { ok: false, error: "Move cancelled" };
+            if (await sha256OfFile(tmp) !== await sha256OfFile(src)) return { ok: false, error: "Copy verification failed" };
+            renameSync(tmp, dest);
+            unlinkSync(src);
+          } finally {
+            if (existsSync(tmp)) { try { unlinkSync(tmp); } catch { /* best effort */ } }
+          }
+        }
+        const launchCommand = gd.launch_command ? (gd.launch_command as string).split(src).join(dest) : gd.launch_command;
+        const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
+          method: "PUT",
+          headers: { ...authHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify({ ...gd, rom_path: dest, launch_command: launchCommand }),
+        });
+        if (!putRes.ok) return { ok: false, error: "Moved, but failed to update server config" };
+        return { ok: true, romPath: dest, launchCommand };
+      } catch (e: any) {
+        return { ok: false, error: e.message || "Move failed" };
+      }
+    }
+  );
+
   ipcMain.handle(
     "rom:delocalize",
     async (_event, slug: string): Promise<{ ok: boolean; launchCommand?: string; error?: string }> => {
