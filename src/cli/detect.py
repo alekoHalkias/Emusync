@@ -13,7 +13,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from cli.consoles_data import _IMPORT_SYSTEMS, _ROM_EXTENSIONS
+from cli.consoles_data import _IMPORT_CONSOLES, _IMPORT_SYSTEMS, _ROM_EXTENSIONS
 
 
 # Single source for RetroArch's native bin paths; gui/electron/emulator/detect.ts
@@ -298,18 +298,19 @@ def _dir_matches_pattern(directory: str, pattern: str) -> bool:
         else:
             # The last component must be a file (not a directory)
             return os.path.isfile(candidate)
+        current = candidate
     return False
 
 
 def _scan_rom_dir(directory: str, depth: int = 0, *, console_key: str | None = None) -> list[str]:
-    """Recursively collect ROM files (depth ≤ 3).
+    """Recursively collect ROM files (depth < 3).
 
     When *console_key* is provided, also detect directory-style ROMs whose
     parent directory matches the console's ``dir_rom_pattern`` (e.g.
     ``PS3_GAME/USRDIR/EBOOT.BIN`` for PS3). A matching directory is yielded
     as a ROM entry and its contents are not recursed into.
     """
-    if depth > 3:
+    if depth >= 3:
         return []
     roms: list[str] = []
     # Look up dir_rom_pattern for this console
@@ -328,9 +329,9 @@ def _scan_rom_dir(directory: str, depth: int = 0, *, console_key: str | None = N
                         roms.append(entry.path)
                 elif entry.is_dir():
                     # Check for directory-style ROM before recursing
-                    if dir_pattern and _dir_matches_pattern(entry.path, dir_pattern):
+                    if dir_pattern and _dir_matches_pattern(entry.path, dir_pattern) and depth + 1 < 3:
                         roms.append(entry.path)
-                    else:
+                    elif depth + 1 < 3:
                         roms.extend(_scan_rom_dir(entry.path, depth + 1, console_key=console_key))
     except PermissionError:
         pass
