@@ -52,3 +52,4 @@ See tools/plans/622-move-local-rom.md
 ### Integration Points: PUT /games/{slug}/device
 - 2026-10-29 implement: steps 1-5 done (IPC rom:moveToConsoleFolder, preload/d.ts, MoveLocalRomPanel, docs)
 - 2026-10-29 ship: PR #623 opened
+- 2026-10-29 review: 2 findings (directory ROM EXDEV, no harness test), blocked=no
