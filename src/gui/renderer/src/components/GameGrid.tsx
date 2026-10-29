@@ -11,6 +11,7 @@ import SteamRestartModal from "./SteamRestartModal";
 import { createSpeedMeter } from "./speedMeter";
 import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
 import Modal from "./Modal";
+import { useDevices } from "../DeviceContext";
 import LocationResolverModal from "./LocationResolverModal";
 import { isRomMissing, useBrokenRoms } from "./game-list/useBrokenRoms";
 import { CheckSquareIcon, DownloadIcon, GamepadIcon, GearIcon, RefreshIcon, SquareIcon, TrashIcon, WarningIcon } from "./icons";
@@ -52,6 +53,7 @@ type Props = {
 };
 
 export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged }: Props): React.ReactElement {
+  const { currentDeviceId } = useDevices();
   const { broken, refresh: refreshBroken, relink } = useBrokenRoms(gamesIn);
   const games = gamesIn.map((g) => (broken.has(g.slug) ? { ...g, isBrokenLocation: true } : g));
   const [resolveTarget, setResolveTarget] = useState<GameRow | null>(null);
@@ -415,8 +417,13 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   }
 
   async function handleRefreshLocations(): Promise<void> {
-    const n = await refreshBroken();
-    setBulkMsg({ text: n ? `${n} game${n !== 1 ? "s" : ""} with a missing ROM flagged.` : "All ROM locations are valid.", isError: n > 0 });
+    const { missing: n, corrected } = await refreshBroken(currentDeviceId ?? undefined);
+    const parts = [
+      n ? `${n} game${n !== 1 ? "s" : ""} with a missing ROM flagged.` : "All ROM locations are valid.",
+      corrected ? `${corrected} ROM source${corrected !== 1 ? "s" : ""} corrected (local/network).` : "",
+    ].filter(Boolean);
+    setBulkMsg({ text: parts.join(" "), isError: n > 0 });
+    if (corrected) onChanged();
   }
 
   async function handleLocated(newPath: string): Promise<void> {

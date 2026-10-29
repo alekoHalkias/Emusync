@@ -75,3 +75,36 @@ async def test_relink_does_not_touch_other_device(client):
 
     r = await client.get("/games/metroid/device", headers=other)
     assert r.json()["rom_path"] == "/b/metroid.gba"
+
+
+@pytest.mark.asyncio
+async def test_source_flip_to_network_sets_rel_path_and_keeps_local_copy(client):
+    await client.post("/games", json={"name": "Sonic"}, headers=AUTH)
+    await client.put("/games/sonic/device", json={
+        "rom_path": "/mnt/nas/gen/sonic.md", "save_path": "", "launch_command": "",
+        "local_rom_path": "/local/sonic.md",
+    }, headers=AUTH)
+
+    cfg = (await client.get("/games/sonic/device", headers=AUTH)).json()
+    cfg.update(rom_source="network", rom_rel_path="gen/sonic.md")
+    assert (await client.put("/games/sonic/device", json=cfg, headers=AUTH)).status_code == 200
+
+    got = (await client.get("/games/sonic/device", headers=AUTH)).json()
+    assert (got["rom_source"], got["rom_rel_path"]) == ("network", "gen/sonic.md")
+    assert (got["rom_path"], got["local_rom_path"]) == ("/mnt/nas/gen/sonic.md", "/local/sonic.md")
+
+
+@pytest.mark.asyncio
+async def test_source_flip_to_local_keeps_rom_path(client):
+    await client.post("/games", json={"name": "Tetris"}, headers=AUTH)
+    await client.put("/games/tetris/device", json={
+        "rom_path": "/local/tetris.gb", "save_path": "", "launch_command": "",
+        "rom_source": "network", "rom_rel_path": "gb/tetris.gb",
+    }, headers=AUTH)
+
+    cfg = (await client.get("/games/tetris/device", headers=AUTH)).json()
+    cfg["rom_source"] = "local"
+    await client.put("/games/tetris/device", json=cfg, headers=AUTH)
+
+    got = (await client.get("/games/tetris/device", headers=AUTH)).json()
+    assert (got["rom_source"], got["rom_path"]) == ("local", "/local/tetris.gb")
