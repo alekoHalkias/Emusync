@@ -4,7 +4,7 @@
 - Issue: #618
 - Branch: feature/618-refresh-rom-source (stacked on feature/616-game-location-refresh; PR #617 unmerged)
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -21,16 +21,21 @@ See https://github.com/alekoHalkias/Emusync/issues/618
 ### Backwards Compatibility: No breaking changes.
 
 ## 3. Frontend Plan
-TBD
+### Design Alignment: no new UI; reuses #616 toast. local = device_local_folder|device_game_folder, network = device_network_folder, longest prefix wins.
+### Recommendations: see tools/plans/618-refresh-rom-source.md
 
 ## 4. Backend Plan
 TBD
 
 ## 6. Testing Plan
-TBD
+### Test File: src/tests/test_game_location_refresh.py (source-flip round-trips)
 
 ## 8. Implementation Steps
-TBD
+1. sourceFor/relTo helpers in game-list/useBrokenRoms.ts (reuses norm; no containment helper exists).
+2. refresh(deviceId) corrects rom_source via getDeviceConsoles + GET/PUT (reuses updateRom, api.ts).
+3. GameGrid toast + deviceId from useDevices (reuses bulkMsg).
+4. Tests in test_game_location_refresh.py (2 cases).
+5. Docs: CLAUDE.md sentence.
 
 ## 9. Review
 TBD
@@ -44,3 +49,4 @@ TBD
 ## 12. Log
 - 2026-10-29 issue: workflow initialized, issue #618 created
 - 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
+- 2026-10-29 fplan: 5 steps written, no new UI
