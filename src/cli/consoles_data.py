@@ -421,6 +421,7 @@ def _prepare_console_seed_data() -> list[dict]:
             "abbr": console_def.get("abbr", console_def["key"].upper()),
             "suggestions": console_def.get("suggestions", []),
             "rom_extensions": console_def.get("rom_extensions", []),
+            "dir_rom_pattern": console_def.get("dir_rom_pattern"),
             "databases": console_def.get("databases", []),
             "system_keys": console_def.get("system_keys", []),
             "systems": {},
