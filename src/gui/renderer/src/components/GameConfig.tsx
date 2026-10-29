@@ -3,6 +3,7 @@ import { addGame, getGame, getGameDevice, setGameDevice, updateGame, type GameDe
 import { deleteGame } from "../gameDelete";
 import { sanitizeFilename, usesSharedSaveLayout, usesSharedStateLayout } from "./console-import/helpers";
 import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
+import { MoveLocalRomPanel } from "./game-config/MoveLocalRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
 import { useGameSync } from "./game-config/useGameSync";
 import SteamRestartModal from "./SteamRestartModal";
@@ -412,6 +413,15 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
             </button>
           </div>
           {errors.romPath && <span role="alert" className="error-msg">{errors.romPath}</span>}
+          <MoveLocalRomPanel
+            slug={slug}
+            romSource={romSource}
+            romPath={romPath}
+            onMoved={(p, cmd) => {
+              setRomPath(p);
+              if (cmd !== undefined) setLaunchCommand(cmd);
+            }}
+          />
           <NetworkRomPanel
             slug={slug}
             gameName={name}
