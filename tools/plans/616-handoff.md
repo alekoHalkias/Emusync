@@ -128,3 +128,4 @@ Users frequently reorganize ROM folders, move drives, or change emulator install
 - 2026-10-29 implement: steps 1-3 done (files:exists IPC + preload bridge, d.ts, isBrokenLocation on GameRow)
 - 2026-10-29 implement: steps 4-5 done (broken-location badge + CSS)
 - 2026-10-29 implement: steps 6-11 done (refresh button, LocationResolverModal, sibling auto-fix, tests, docs)
+- 2026-10-29 review: 2 findings (1 correctness fixed: sibling failure no longer aborts launch; 1 test-gap noted), blocked=no

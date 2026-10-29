@@ -36,9 +36,8 @@ export function useBrokenRoms(games: GameRow[]) {
       for (const dir of [folder, dirname(folder)]) {
         const candidate = `${dir}/${basename(other.romPath)}`;
         if (dir && (await window.emusync.files.exists(candidate))) {
-          await updateRom(other.slug, candidate);
-          done.add(other.slug);
-          fixed++;
+          // Best effort: the primary re-link already succeeded, so a sibling failure must not abort the launch.
+          if (await updateRom(other.slug, candidate).then(() => true, () => false)) { done.add(other.slug); fixed++; }
           break;
         }
       }
