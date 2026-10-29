@@ -4,7 +4,7 @@
 - Issue: #626
 - Branch: feature/626-bulk-local-to-network
 - PR: none
-- Status: created
+- Status: implementing
 - Created: 2026-10-29
 - Fix attempts: 0
 - Base: stacked on feature/624-upload-local-rom-to-network (PR #625)
@@ -13,8 +13,18 @@
 See issue #626.
 
 ## 2. Design
-### Scope: TBD
-### Plan Target: TBD
+### Scope: ui (renderer only)
+### Plan Target: fplan
 
 ## 12. Log
 - 2026-10-29 issue: workflow initialized
+- 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
+- 2026-10-29 fplan/tplan: 6 steps, tests manual
+
+## 8. Implementation Steps
+1 localToNetwork.ts helper
+2 useBrokenRoms candidates
+3 LocalToNetworkModal
+4 GameGrid wiring
+5 tests none
+6 docs
