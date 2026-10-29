@@ -45,6 +45,20 @@ Pass the console key from the import wizard through to `_scan_rom_dir()` / `scan
 
 Update the PS3 console comment (line 234-236) to reflect that directory-style games are now supported.
 
+### Step 6: Tests — add `test_ps3_dir_roms.py`
+
+**File:** `src/tests/test_ps3_dir_roms.py`
+
+New test file (follows `tmp_path` unit test pattern from `test_cli_console_import.py`). Cases:
+- Directory ROM pattern matches `PS3_GAME/USRDIR/EBOOT.BIN` — returns parent directory path
+- Directory ROM pattern does not match incomplete structure — falls through to normal recursion
+- Directory ROM pattern not present — normal recursion unchanged
+- File-style `.iso`/`.pkg` still detected alongside directory ROMs
+- Depth limit (3) still applies to directory ROM detection
+- Non-PS3 consoles are unaffected (pattern only checked when `console_key="ps3"`)
+
+Reuses: `tmp_path` fixture from pytest, `monkeypatch` for environment isolation. No existing test covers `_scan_rom_dir()` so this is a new file (justification: scanner logic has zero existing test coverage).
+
 ## Checklist
 
 - [x] Schema bump: no
@@ -55,7 +69,26 @@ Update the PS3 console comment (line 234-236) to reflect that directory-style ga
 - [x] `emusync.d.ts` update: no
 - [x] Server restart needed: no (scanner is client-side)
 
-## Risks
+## Testing
+- **Test File**: `src/tests/test_ps3_dir_roms.py`
+- **Test Cases**:
+  - `test_scan_rom_dir_detects_ps3_dir_rom`: PS3_GAME/USRDIR/EBOOT.BIN pattern yields parent directory
+  - `test_scan_rom_dir_incomplete_pattern_falls_through`: missing USRDIR/EBOOT.BIN recurses normally
+  - `test_scan_rom_dir_non_ps3_unaffected`: non-PS3 console_key skips dir_rom check
+  - `test_scan_rom_dir_file_and_dir_together`: .iso and PS3_GAME/ entry both found
+  - `test_scan_rom_dir_depth_limit_on_dir_rom`: depth > 3 returns empty for dir ROM
+- **Edge Cases**:
+  - Nested PS3_GAME inside another PS3_GAME (should not double-match)
+  - EBOOT.BIN is a directory (is_file() check prevents false match)
+  - Permission error on PS3_GAME subdirectory
+- **Integration Points**: None — scanner is pure client-side logic, no server/DB involvement.
+
+## Not in this plan
+- RPCS3 launch command for directory ROMs (EBOOT.BIN path resolution at run time)
+- ROM push/pull for directory ROMs (reuses Switch folder tar path, #441)
+- TypeScript scanner tests (GUI tests are out of scope for this backend plan)
+
+## Log
 
 - None identified. Purely additive scanner behavior. File-style PS3 ROMs continue to work as before.
 - The `dir_rom_pattern` check is console-specific, so it won't affect other consoles.

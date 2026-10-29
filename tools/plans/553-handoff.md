@@ -62,10 +62,10 @@ Split out of #422 / PR #526, which only scans `.iso` and `.pkg`. Many RPCS3 libr
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: `src/tests/test_ps3_dir_roms.py` (new, scanner has zero existing test coverage)
+### Test Cases: 5 cases — dir ROM pattern matches, incomplete pattern falls through, non-PS3 unaffected, file+dir together, depth limit on dir ROM
+### Edge Cases: nested PS3_GAME, EBOOT.BIN is directory, permission error on PS3_GAME
+### Integration Points: None — scanner is pure client-side logic, no server/DB involvement
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -97,3 +97,4 @@ Split out of #422 / PR #526, which only scans `.iso` and `.pkg`. Many RPCS3 libr
 - 2026-10-28 issue: workflow initialized
 - 2026-10-28 design: scope=backend (scanner + console def), plan_target=bplan, difficulty=4/10, breaking=no
 - 2026-10-28 bplan: written to 553-ps3-dir-roms.md, 5 steps, no schema/IPC/config changes
+- 2026-10-28 tplan: test_file=src/tests/test_ps3_dir_roms.py, 5 test cases + 3 edge cases defined
