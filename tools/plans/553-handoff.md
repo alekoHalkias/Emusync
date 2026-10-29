@@ -4,7 +4,7 @@
 - Issue: #553
 - Branch: feature/553-ps3-dir-roms
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-28
 - Fix attempts: 0
 
