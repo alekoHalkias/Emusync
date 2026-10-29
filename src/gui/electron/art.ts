@@ -242,6 +242,7 @@ const CONSOLE_LOGO: Record<string, string> = {
 const CARBON_FOLDER: Record<string, string> = {
   nes: "nes", snes: "snes", n64: "n64", nds: "nds", gb: "gb", gbc: "gbc", gba: "gba",
   genesis: "genesis", sms: "mastersystem", pce: "pcengine", psx: "psx", ps2: "ps2", psp: "psp",
+  xbox: "xbox",
   dc: "dreamcast", gamecube: "gc", wii: "wii", saturn: "saturn", gg: "gamegear", msx: "msx",
   atari2600: "atari2600", lynx: "atarilynx", ws: "wonderswan", wsc: "wonderswancolor",
 };

@@ -124,6 +124,32 @@ _EDEN = {
     },
 }
 
+# Xemu (Xbox) standalone — no libretro core exists. Xemu stores game saves
+# inside a virtual hard-disk image (`xbox_hdd.qcow2`) rather than plain
+# folders, so per-game save sync is infeasible without mounting the image.
+# Xbox is a shared-memcard console: the whole HDD image syncs as one blob
+# (same pattern as PS2/DC/GC/PSP/3DS, #420). Save states are per-game in
+# `~/.xemu/SState/` (normal folder, not shared).
+_XEMU = {
+    "id": "xemu", "label": "Xemu",
+    "native_bins": ["/usr/bin/xemu", "~/.local/bin/xemu",
+                    "~/Applications/xemu.AppImage", "~/.local/bin/xemu.AppImage"],
+    "flatpak_id": "com.xemu_emu.xemu",
+    "flatpak_exec": "flatpak run com.xemu_emu.xemu",
+    "dirs": {
+        "native": {
+            "save":    "~/.xemu/SState",
+            "state":   "~/.xemu/SState",
+            "memcard": "~/.xemu/xbox_hdd.qcow2",
+        },
+        "flatpak": {
+            "save":    "~/.var/app/com.xemu_emu.xemu/data/xemu/SState",
+            "state":   "~/.var/app/com.xemu_emu.xemu/data/xemu/SState",
+            "memcard": "~/.var/app/com.xemu_emu.xemu/data/xemu/xbox_hdd.qcow2",
+        },
+    },
+}
+
 # `databases` = the libretro database names for the console, matched against an
 # installed core's .info `database` field so ANY core for the console (present
 # or future) is recognized without being hardcoded in a core list (#400).
@@ -274,6 +300,17 @@ _IMPORT_CONSOLES = [
      "databases": ["Nintendo - Switch"],
      "folder_names": ["switch", "nintendo switch"],
      "standalones": [_EDEN], "suggestions": ["Eden standalone"]},
+    # Xbox is standalone-only (no libretro core) and follows the shared-memcard
+    # pattern — the whole HDD image (`xbox_hdd.qcow2`) syncs as one console-wide
+    # blob, just like PS2/DC/GC/PSP/3DS (#420). Supports both .iso and .xiso
+    # disc images (xemu's own extension for compressed ISOs).
+    {"key": "xbox",    "label": "Xbox",                       "abbr": "Xbox",
+     "system_keys": [],
+     "rom_extensions": ["iso", "xiso"],
+     "databases": ["Microsoft - Xbox"],
+     "folder_names": ["xbox"],
+     "standalones": [_XEMU], "suggestions": ["Xemu standalone"],
+     "shared_memcard": True, "shared_state": True},
 ]
 
 _IMPORT_SYSTEMS: dict[str, dict] = {
@@ -408,6 +445,7 @@ _ROM_EXTENSIONS = {
     "nsp", "xci",                 # Nintendo Switch (#419) — .nca excluded: it's a
                                   # raw internal content container, never a
                                   # standalone ROM file users have loose
+    "xiso",                       # Xbox (#420) — xemu's compressed ISO format
 }
 
 

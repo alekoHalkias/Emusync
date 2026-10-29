@@ -465,6 +465,13 @@ def _resolve_shared_memcard_save_state(emu: dict, console_abbr: str) -> tuple[di
         )
         default = os.path.join(save_dir, "0" * 32, "0" * 32, "title")
         candidates = [found[0]] if found else [default]
+    elif console_abbr == "Xbox":
+        # Xbox saves live inside the virtual HDD image (.qcow2). Probe for any
+        # .qcow2 file in the save dir (first sorted, or the canonical default).
+        found = sorted(p for p in glob.glob(os.path.join(save_dir, "*.qcow2"))
+                       if os.path.isfile(p))
+        default = os.path.join(save_dir, "xbox_hdd.qcow2")
+        candidates = [found[0]] if found else [default]
     else:  # PS2
         found = _find_first_by_ext(save_dir, ".ps2")
         candidates = [found or os.path.join(save_dir, _SHARED_MEMCARD_FALLBACK.get(console_abbr, "Mcd001.ps2"))]

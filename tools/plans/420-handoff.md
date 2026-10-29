@@ -112,3 +112,4 @@ Part of the console-expansion survey in #417 (Tier 2: standalone-only, no libret
 - 2025-07-27 design: scope=backend+trivial-ts-mirror, plan_target=bplan, difficulty=3/10, breaking=no
 - 2025-07-27 bplan: 5 steps written, backend_pattern=PS2-standalone-shared-memcard
 - 2025-07-27 tplan: test_file=src/tests/test_new_consoles.py, 6 test cases defined
+- 2025-07-27 implement: steps 1-6 done (consoles_data.py, detect.py, scan.ts, types.ts, art.ts, test_new_consoles.py)

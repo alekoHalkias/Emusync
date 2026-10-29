@@ -28,6 +28,7 @@ export const ROM_EXTENSIONS = new Set([
   "pkg",                               // PS3 (#422)
   "nsp", "xci",                        // Nintendo Switch (#419) — .nca excluded,
                                         // a raw internal container, never a loose ROM
+  "xiso",                              // Xbox (#420) — xemu's compressed ISO format
 ]);
 
 export const DEFAULT_SAVE_EXTS = ["srm", "sav", "save"];

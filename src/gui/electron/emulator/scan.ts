@@ -48,6 +48,16 @@ function resolveSharedCard(consoleKey: string, saveDir: string, saveRoot: string
     // first, falling back to the well-documented all-zeros default (#418).
     const found = findFirstIdFolderTitlePath(saveDir);
     candidates = [found ?? join(saveDir, "0".repeat(32), "0".repeat(32), "title")];
+  } else if (consoleKey === "xbox") {
+    // Xbox saves live inside the virtual HDD image (.qcow2). Probe for any
+    // .qcow2 file in the save dir (first sorted, or the canonical default).
+    let found: string[] = [];
+    try {
+      found = readdirSync(saveDir, { withFileTypes: true })
+        .filter(e => e.isFile() && e.name.toLowerCase().endsWith(".qcow2"))
+        .map(e => join(saveDir, e.name)).sort();
+    } catch { /* unreadable dir */ }
+    candidates = found.length > 0 ? [found[0]] : [join(saveRoot, "xbox_hdd.qcow2")];
   }
   return candidates.find(p => existsSync(p)) ?? candidates[0] ?? saveRoot;
 }

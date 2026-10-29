@@ -53,10 +53,10 @@ def test_new_console_defs_follow_ps2_pattern():
 def test_shared_membership_matches_console_abbrs():
     """run.py keys the shared sets by the game's stored console abbr — a
     mismatch with the def's abbr silently disables card sync."""
-    shared_abbrs = {_BY_KEY[k]["abbr"] for k in ("ps2", "dc", "gamecube", "psp", "3ds")}
+    shared_abbrs = {_BY_KEY[k]["abbr"] for k in ("ps2", "dc", "gamecube", "psp", "3ds", "xbox")}
     assert shared_abbrs == _SHARED_MEMCARD_CONSOLES
-    # Only PS2 shares its states; dc/gamecube/psp states are per-game.
-    assert _SHARED_STATE_CONSOLES == {"PS2"}
+    # PS2 and Xbox share their states; dc/gamecube/psp/3ds states are per-game.
+    assert _SHARED_STATE_CONSOLES == {"PS2", "Xbox"}
 
 
 def test_wii_is_not_a_shared_save_console():
@@ -472,3 +472,80 @@ def test_psp_savedata_folder_card_round_trips(tmp_path):
     _write_memcard(dest, data)
     assert (dest / "ULUS10041DATA00" / "DATA.BIN").read_bytes() == b"save-bytes"
     assert (dest / "UCUS98687DATA01" / "DATA.BIN").read_bytes() == b"other-save"
+
+
+# ── Xbox / Xemu standalone (#420) ──────────────────────────────────────────────
+
+def test_xbox_console_def_follows_ps2_pattern():
+    """Xbox has no system_keys (PSX disc cores never surface), explicit
+    rom_extensions including xiso, Xbox-specific databases field."""
+    cdef = _BY_KEY["xbox"]
+    assert cdef["system_keys"] == []
+    assert set(cdef["rom_extensions"]) == {"iso", "xiso"}
+    assert cdef["databases"] == ["Microsoft - Xbox"]
+    for ext in cdef["rom_extensions"]:
+        assert ext in _ROM_EXTENSIONS
+
+
+def test_xbox_shared_membership():
+    """Xbox follows the PS2 shared-memcard pattern — the whole HDD image
+    syncs as one console-wide blob (#420)."""
+    from cli.run_ps2 import _SHARED_MEMCARD_CONSOLES, _SHARED_STATE_CONSOLES
+    assert "Xbox" in _SHARED_MEMCARD_CONSOLES
+    assert "Xbox" in _SHARED_STATE_CONSOLES
+
+
+def test_xbox_standalone_xemu_def_follows_pcsx2_pattern():
+    """_XEMU mirrors _PCSX2's shape: native_bins/flatpak fields present,
+    registered as the xbox console's standalone."""
+    from cli.consoles_data import _XEMU
+    assert _XEMU["native_bins"]
+    assert _XEMU["flatpak_id"] == "com.xemu_emu.xemu"
+    assert _XEMU["dirs"]["native"]["memcard"] == "~/.xemu/xbox_hdd.qcow2"
+    assert _XEMU["dirs"]["native"]["save"] == "~/.xemu/SState"
+    assert _BY_KEY["xbox"]["standalones"] == [_XEMU]
+
+
+def test_xbox_card_prefers_existing_qcow2_over_default(tmp_path):
+    """When a .qcow2 file already exists in the save dir, the resolver
+    should find it rather than using the canonical default path."""
+    save_dir = tmp_path / "xemu"
+    save_dir.mkdir()
+    (save_dir / "xbox_hdd.qcow2").write_bytes(b"qcow2-data")
+    emu = {"save_dir": str(save_dir), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "Xbox")
+    assert save_match == {"path": str(save_dir / "xbox_hdd.qcow2"), "exists": True}
+
+
+def test_xbox_card_falls_back_to_default_when_no_qcow2_exists(tmp_path):
+    """When no .qcow2 file exists, the resolver falls back to the canonical
+    xbox_hdd.qcow2 path under the save dir."""
+    save_dir = tmp_path / "xemu"
+    save_dir.mkdir()
+    emu = {"save_dir": str(save_dir), "state_dir": None}
+    save_match, _ = _resolve_shared_memcard_save_state(emu, "Xbox")
+    assert save_match == {"path": str(save_dir / "xbox_hdd.qcow2"), "exists": False}
+
+
+def test_xbox_standalone_xemu_lists_native_and_flatpak_together(monkeypatch, tmp_path):
+    """Both a native binary and the flatpak are installed — detection must
+    list both as separate options, matching the Dolphin native+flatpak fix."""
+    from cli.consoles_data import _XEMU
+    from cli.detect import _detect_emulators_for_console
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr("cli.detect.Path.home", staticmethod(lambda: home))
+    native_bin = _XEMU["native_bins"][0]
+    monkeypatch.setattr("cli.detect.os.path.exists", lambda p: p == native_bin)
+
+    class _FakeResult:
+        stdout = "com.xemu_emu.xemu\n"
+
+    monkeypatch.setattr("cli.detect.subprocess.run", lambda *a, **k: _FakeResult())
+
+    console_def = {"standalones": [_XEMU], "system_keys": []}
+    options = _detect_emulators_for_console(console_def)
+
+    ids = {opt["id"] for opt in options}
+    assert ids == {"xemu-native", "xemu-flatpak"}
