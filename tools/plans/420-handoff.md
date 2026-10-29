@@ -4,7 +4,7 @@
 - Issue: #420
 - Branch: feature/420-xbox-xemu
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2025-07-27
 - Fix attempts: 0
 
