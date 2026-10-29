@@ -59,6 +59,9 @@ export function registerFilesIpc(): void {
     } catch { return null; }
   });
 
+  // Bare existence check, used by the Refresh locations scan (issue #616).
+  ipcMain.handle("files:exists", (_event, p: string): boolean => existsSync(p));
+
   // Compute the SHA-256 hex digest of a file (issue #579).
   ipcMain.handle("files:get-file-hash", (_event, filePath: string): Promise<string> => {
     return new Promise((resolve, reject) => {

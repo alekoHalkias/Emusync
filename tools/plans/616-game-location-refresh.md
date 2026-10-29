@@ -14,17 +14,17 @@ Add a "Refresh locations" button that flags games with missing ROMs via a red ex
 - **Recommendations**: Add `files:exists` IPC for batch path checks (simplest approach, no existing IPC does file-existence-only). Reuse `emulator:scan` IPC for background scan. Reuse `config:addRecentFolder` IPC for persisting library paths.
 
 ## Steps
-- [ ] 1. Add `files:exists` IPC handler in `electron/files.ts` — simple `existsSync` wrapper returning boolean.
+- [x] 1. Add `files:exists` IPC handler in `electron/files.ts` — simple `existsSync` wrapper returning boolean.
   - Files: src/gui/electron/files.ts
   - Reuses: `existsSync` from `fs` (already imported)
   - New: `files:exists` IPC — no existing IPC does bare file-existence check; `files:get-latest-in-folder` returns metadata not a boolean
 
-- [ ] 2. Add `isBrokenLocation` field to `GameRow` type in `game-list/types.ts`.
+- [x] 2. Add `isBrokenLocation` field to `GameRow` type in `game-list/types.ts`.
   - Files: src/gui/renderer/src/components/game-list/types.ts
   - Reuses: existing GameRow type augmentation pattern (isLocal, offline, etc.)
   - New: one field — `isBrokenLocation?: boolean`
 
-- [ ] 3. Update `emusync.d.ts` to declare `emusync.files.exists(path: string): Promise<boolean>`.
+- [x] 3. Update `emusync.d.ts` to declare `emusync.files.exists(path: string): Promise<boolean>`.
   - Files: src/gui/renderer/src/emusync.d.ts
   - Reuses: existing IPC type declarations pattern
   - New: one method declaration
@@ -101,3 +101,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (files:exists). New CLI s
 
 ## Log
 - 2025-10-29 fplan: 11 steps written, visual_pattern=red exclamation badge on game card
+Step 1: also added exists to preload.ts (plan omitted it; needed for window.emusync.files.exists). Steps 1-3 committed together.

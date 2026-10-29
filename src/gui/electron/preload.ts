@@ -77,6 +77,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("files:ensure-save", savePath),
     getSaveTime: (savePath: string): Promise<string | null> =>
       ipcRenderer.invoke("files:get-save-time", savePath),
+    exists: (p: string): Promise<boolean> =>
+      ipcRenderer.invoke("files:exists", p),
     getFileHash: (filePath: string): Promise<string> =>
       ipcRenderer.invoke("files:get-file-hash", filePath),
     getLatestInFolder: (dirPath: string): Promise<{ path: string; time: string } | null> =>

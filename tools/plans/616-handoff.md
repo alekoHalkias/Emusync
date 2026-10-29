@@ -125,3 +125,4 @@ Users frequently reorganize ROM folders, move drives, or change emulator install
 - 2025-10-29 design: scope=frontend-only, plan_target=fplan, difficulty=4/10, breaking=no
 - 2025-10-29 fplan: 11 steps written, visual_pattern=red exclamation badge on game card
 - 2025-10-29 tplan: test_file=src/tests/test_game_location_refresh.py, 5 test cases + 3 edge cases defined
+- 2026-10-29 implement: steps 1-3 done (files:exists IPC + preload bridge, d.ts, isBrokenLocation on GameRow)
