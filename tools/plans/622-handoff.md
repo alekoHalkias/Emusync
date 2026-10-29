@@ -4,7 +4,7 @@
 - Issue: #622
 - Branch: feature/622-move-local-rom
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-29
 - Fix attempts: 0
 
