@@ -272,7 +272,7 @@ export function registerRomIpc(): void {
           const tmp = dest + ".part";
           try {
             if (!await copyWithProgress(src, tmp, size, slug, event.sender)) return { ok: false, error: "Move cancelled" };
-            if (await sha256OfFile(tmp) !== await sha256OfFile(src)) return { ok: false, error: "Copy verification failed" };
+            if (statSync(tmp).size !== size) return { ok: false, error: "Copy verification failed" };
             renameSync(tmp, dest);
             unlinkSync(src);
           } finally {

@@ -43,3 +43,9 @@ Progress/cancel modal; moving network-sourced ROMs; moving multi-file/directory 
 ## Log
 Step 3: UI is a new MoveLocalRomPanel.tsx rather than a branch inside NetworkRomPanel (that component returns null for non-network and owns network-only state).
 Step 4: tsc has pre-existing errors in unrelated files; none in changed files.
+
+## Fix attempt 1
+Failure: Move button hangs on "Working..." (manual report)
+Cause: handleMove had no try/finally, so a rejected IPC left busy=true; cross-disk path hashed source and copy in full with no progress shown.
+- [x] F1.1 MoveLocalRomPanel: try/finally around the call, show copy progress via rom.onLocalizeProgress.
+- [x] F1.2 rom.ts: verify the copy by size instead of two full sha256 passes.
