@@ -11,7 +11,9 @@ import SteamRestartModal from "./SteamRestartModal";
 import { createSpeedMeter } from "./speedMeter";
 import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgressModal";
 import Modal from "./Modal";
-import { CheckSquareIcon, DownloadIcon, GamepadIcon, GearIcon, SquareIcon, TrashIcon, WarningIcon } from "./icons";
+import LocationResolverModal from "./LocationResolverModal";
+import { isRomMissing, useBrokenRoms } from "./game-list/useBrokenRoms";
+import { CheckSquareIcon, DownloadIcon, GamepadIcon, GearIcon, RefreshIcon, SquareIcon, TrashIcon, WarningIcon } from "./icons";
 
 // Mirrors the ArtType union in src/gui/electron/art.ts (issue #324).
 type ArtType = "grid" | "hero" | "logo" | "icon" | "wide_grid";
@@ -49,7 +51,10 @@ type Props = {
   onChanged: () => void;
 };
 
-export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props): React.ReactElement {
+export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged }: Props): React.ReactElement {
+  const { broken, refresh: refreshBroken, relink } = useBrokenRoms(gamesIn);
+  const games = gamesIn.map((g) => (broken.has(g.slug) ? { ...g, isBrokenLocation: true } : g));
+  const [resolveTarget, setResolveTarget] = useState<GameRow | null>(null);
   const [gameModal, setGameModal] = useState<GameModalTarget | null>(null);
   const [netPlayTarget, setNetPlayTarget] = useState<{ slug: string; name: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -399,12 +404,28 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
     setHasArt((prev) => (prev[slug] === found ? prev : { ...prev, [slug]: found }));
   }
 
-  function handlePlay(g: GameRow): void {
+  async function handlePlay(g: GameRow): Promise<void> {
     if (!g.isLocal) {
       setNetPlayTarget({ slug: g.slug, name: g.name });
+    } else if (g.isBrokenLocation || (await isRomMissing(g))) {
+      setResolveTarget(g);
     } else {
       onPlay(g.slug, g.name);
     }
+  }
+
+  async function handleRefreshLocations(): Promise<void> {
+    const n = await refreshBroken();
+    setBulkMsg({ text: n ? `${n} game${n !== 1 ? "s" : ""} with a missing ROM flagged.` : "All ROM locations are valid.", isError: n > 0 });
+  }
+
+  async function handleLocated(newPath: string): Promise<void> {
+    const g = resolveTarget!;
+    const fixed = await relink(g, newPath);
+    setResolveTarget(null);
+    if (fixed) setBulkMsg({ text: `Found ${fixed} additional ROM${fixed !== 1 ? "s" : ""} in the scanned folder.`, isError: false });
+    onChanged();
+    onPlay(g.slug, g.name);
   }
 
   return (
@@ -440,6 +461,14 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           title="Console folders for this device"
         >
           <GearIcon />
+        </button>
+        <button
+          className="btn btn-ghost game-grid-header-btn"
+          onClick={handleRefreshLocations}
+          aria-label="Refresh locations"
+          title="Check that every game's ROM still exists at its saved location"
+        >
+          <RefreshIcon />
         </button>
         <div style={{ flex: 1 }} />
         <button
@@ -579,6 +608,10 @@ export default function GameGrid({ consoleKey, games, onPlay, onChanged }: Props
           onYes={restartSteamAndBulkAdd}
           onNo={() => setShowSteamRestart(false)}
         />
+      )}
+
+      {resolveTarget && (
+        <LocationResolverModal game={resolveTarget} onClose={() => setResolveTarget(null)} onLocated={handleLocated} />
       )}
 
       {netPlayTarget && (

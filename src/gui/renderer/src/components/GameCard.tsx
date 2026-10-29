@@ -90,6 +90,11 @@ export default function GameCard({ game, consoleKey, consoleAccent, artType, sel
               <LockIcon />
             </span>
           )}
+          {game.isBrokenLocation && (
+            <span className="game-card-badge game-card-badge-broken" title="ROM not found at its saved location -- click Play to re-link">
+              !
+            </span>
+          )}
           {game.offline && (
             <span className="game-card-badge game-card-badge-offline" title="Server unreachable — showing cached data; save will sync once reconnected">
               <BoltIcon /> offline

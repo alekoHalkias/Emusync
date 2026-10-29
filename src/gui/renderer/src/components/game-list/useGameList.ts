@@ -84,6 +84,7 @@ export function useGameList(): UseGameList {
             lastSave,
             locked: g.locked,
             isLocal: g.is_local,
+            romPath: g.rom_path || undefined,
             savePath: g.save_path || undefined,
             statePath: g.state_path || undefined,
             romSource: g.rom_source,
