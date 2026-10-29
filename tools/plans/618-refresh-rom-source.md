@@ -33,6 +33,15 @@ Make Refresh locations also set each game's rom_source to 'local' or 'network' a
 - [ ] 5. Docs: one sentence in CLAUDE.md GUI rule for Refresh locations.
   - Files: CLAUDE.md
 
+## Testing
+- **Test File**: src/tests/test_game_location_refresh.py
+- **Test Cases**:
+  - test_source_flip_to_network: PUT with rom_source=network and rom_rel_path; local_rom_path and rom_path preserved.
+  - test_source_flip_to_local: PUT with rom_source=local; rom_path preserved.
+- **Edge Cases**:
+  - Prefix matching (longest wins, no match unchanged) is renderer-only; no renderer harness exists, covered by manual check.
+- **Integration Points**: PUT /games/{slug}/device on real SQLite.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

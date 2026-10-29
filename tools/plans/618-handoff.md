@@ -28,7 +28,8 @@ See https://github.com/alekoHalkias/Emusync/issues/618
 TBD
 
 ## 6. Testing Plan
-### Test File: src/tests/test_game_location_refresh.py (source-flip round-trips)
+### Test File: src/tests/test_game_location_refresh.py
+### Test Cases: source flip to network, source flip to local (reuses _relink-style helper, client fixture)
 
 ## 8. Implementation Steps
 1. sourceFor/relTo helpers in game-list/useBrokenRoms.ts (reuses norm; no containment helper exists).
@@ -50,3 +51,4 @@ TBD
 - 2026-10-29 issue: workflow initialized, issue #618 created
 - 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-10-29 fplan: 5 steps written, no new UI
+- 2026-10-29 tplan: test_file=src/tests/test_game_location_refresh.py, 2 test cases defined
