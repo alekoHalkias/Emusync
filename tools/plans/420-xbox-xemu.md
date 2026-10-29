@@ -35,8 +35,29 @@ Add the original Xbox console entry with Xemu standalone emulator support, treat
   - Reuses: `test_ps2_card_resolution_unchanged` pattern, `test_3ds_standalone_azahar_def_follows_pcsx2_pattern` pattern
   - New: `test_xbox_console_def_follows_ps2_pattern()`, `test_xbox_shared_membership()`, `test_xbox_standalone_xemu_def()`, `test_xbox_card_prefers_existing_qcow2()`, `test_xbox_card_falls_back_to_default()`
 
-- [ ] 5. Tests: `make test-changed`
-  - Run the full test suite or changed-file subset to verify no regressions.
+- [ ] 5. Add Xbox tests to `test_new_consoles.py`
+  - Files: `src/tests/test_new_consoles.py`
+  - Reuses: `test_ps2_card_resolution_unchanged`, `test_3ds_console_def_follows_ps2_pattern`, `test_3ds_card_prefers_existing_id_folder_over_default`, `test_3ds_standalone_azahar_lists_native_and_flatpak_together` patterns
+  - New: 6 test functions (see Testing section below)
+
+- [ ] 6. Run `make test-changed` to verify no regressions.
+
+## Testing
+- **Test File**: `src/tests/test_new_consoles.py`
+- **Test Cases**:
+  - `test_xbox_console_def_follows_ps2_pattern()`: Verify `system_keys=[]`, `rom_extensions=["iso","xiso"]`, `databases=[]`, extensions in `_ROM_EXTENSIONS`
+  - `test_xbox_shared_membership()`: Verify "Xbox" in `_SHARED_MEMCARD_CONSOLES`, not in `_SHARED_STATE_CONSOLES`
+  - `test_xbox_standalone_xemu_def_follows_pcsx2_pattern()`: Verify `_XEMU` has `native_bins`, `flatpak_id="com.xemu_emu.xemu"`, correct `dirs` paths, registered in `xbox` console def
+  - `test_xbox_card_prefers_existing_qcow2_over_default(tmp_path)`: Create `.qcow2` file in tmp save dir, verify resolver finds it
+  - `test_xbox_card_falls_back_to_default_when_no_qcow2_exists(tmp_path)`: No `.qcow2` file, verify fallback to canonical `xbox_hdd.qcow2` path
+  - `test_xbox_standalone_xemu_lists_native_and_flatpak_together(monkeypatch, tmp_path)`: Mock both native bin and flatpak installed, verify detection returns both `xemu-native` and `xemu-flatpak`
+- **Edge Cases**:
+  - Multiple `.qcow2` files in save dir — resolver should find the first (sorted) one, or the first matching extension
+  - Qcow2 file is a directory (unlikely but possible) — only files should match
+- **Integration Points**:
+  - `_resolve_shared_memcard_save_state()` in `detect.py` — unit tested with tmp_path
+  - `_SHARED_MEMCARD_CONSOLES` / `_SHARED_STATE_CONSOLES` in `run_ps2.py` — verified via console def flags
+  - `_detect_emulators_for_console()` in `detect.py` — tested via monkeypatch
 
 ## Checklist
 Schema bump: no. New IPC channel: no. New CLI subcommand: no. Config/data file change: no.

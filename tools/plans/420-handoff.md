@@ -64,17 +64,16 @@ Part of the console-expansion survey in #417 (Tier 2: standalone-only, no libret
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-
-## 7. Test Design
-### Test Scope: TBD
-### Test Types: TBD
-### Test Cases: TBD
-### Affected Existing Tests: TBD
-### Implementation Checklist: TBD
+### Test File: `src/tests/test_new_consoles.py`
+### Test Cases:
+  1. `test_xbox_console_def_follows_ps2_pattern()` — console def structure
+  2. `test_xbox_shared_membership()` — shared memcard membership
+  3. `test_xbox_standalone_xemu_def_follows_pcsx2_pattern()` — standalone def structure
+  4. `test_xbox_card_prefers_existing_qcow2_over_default(tmp_path)` — HDD image resolution finds existing .qcow2
+  5. `test_xbox_card_falls_back_to_default_when_no_qcow2_exists(tmp_path)` — fallback to canonical path
+  6. `test_xbox_standalone_xemu_lists_native_and_flatpak_together(monkeypatch, tmp_path)` — both native+flatpak detected
+### Edge Cases: Multiple .qcow2 files (first found wins); .qcow2 is a directory (should not match)
+### Integration Points: `_resolve_shared_memcard_save_state()` (detect.py), `_SHARED_MEMCARD_CONSOLES` (run_ps2.py), `_detect_emulators_for_console()` (detect.py)
 
 ## 8. Implementation Steps
 ### Steps:
@@ -87,9 +86,9 @@ Part of the console-expansion survey in #417 (Tier 2: standalone-only, no libret
   3. Add Xbox HDD image resolution to `_resolve_shared_memcard_save_state()` in `detect.py`
      - Files: `src/cli/detect.py`
      - Reuses: `glob.glob()` pattern from 3DS resolution, `_find_first_by_ext()` helper
-  4. Add Xbox tests to `test_new_consoles.py`
+  4. Add Xbox tests to `test_new_consoles.py` (6 test functions)
      - Files: `src/tests/test_new_consoles.py`
-     - Reuses: `test_ps2_card_resolution_unchanged`, `test_3ds_standalone_azahar_def_follows_pcsx2_pattern` patterns
+     - Reuses: `test_ps2_card_resolution_unchanged`, `test_3ds_*` patterns
   5. Run `make test-changed` to verify
 
 ## 9. Review
@@ -112,3 +111,4 @@ Part of the console-expansion survey in #417 (Tier 2: standalone-only, no libret
 - 2025-07-27 issue: workflow initialized, branch feature/420-xbox-xemu created
 - 2025-07-27 design: scope=backend+trivial-ts-mirror, plan_target=bplan, difficulty=3/10, breaking=no
 - 2025-07-27 bplan: 5 steps written, backend_pattern=PS2-standalone-shared-memcard
+- 2025-07-27 tplan: test_file=src/tests/test_new_consoles.py, 6 test cases defined
