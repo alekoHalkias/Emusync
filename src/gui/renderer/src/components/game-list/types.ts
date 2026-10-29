@@ -6,6 +6,7 @@ export type GameRow = Game & {
   lastSave?: string | null;
   locked?: boolean;
   isLocal: boolean;
+  romPath?: string;            // this device's rom_path (broken-location checks, #616)
   savePath?: string;
   statePath?: string;          // local state FOLDER (issue #285 recovery view)
   romSource?: string;          // 'local' | 'network' (issue #255)

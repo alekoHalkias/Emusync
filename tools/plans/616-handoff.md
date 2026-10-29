@@ -4,7 +4,7 @@
 - Issue: #616
 - Branch: feature/616-game-location-refresh
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2025-10-29
 - Fix attempts: 0
 
@@ -127,3 +127,4 @@ Users frequently reorganize ROM folders, move drives, or change emulator install
 - 2025-10-29 tplan: test_file=src/tests/test_game_location_refresh.py, 5 test cases + 3 edge cases defined
 - 2026-10-29 implement: steps 1-3 done (files:exists IPC + preload bridge, d.ts, isBrokenLocation on GameRow)
 - 2026-10-29 implement: steps 4-5 done (broken-location badge + CSS)
+- 2026-10-29 implement: steps 6-11 done (refresh button, LocationResolverModal, sibling auto-fix, tests, docs)

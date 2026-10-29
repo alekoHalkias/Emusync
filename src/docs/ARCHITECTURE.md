@@ -78,6 +78,7 @@ window.emusync.emulator.detect(consoleKey)  // scans for installed emulators: Re
 window.emusync.emulator.scan(consoleKey, emulatorOption, extraPaths[])  // scans only that console's ROM extensions; returns { emulators, romDirs, roms[] } with consoleName+coreName per entry
 window.emusync.files.ensureSave(path)       // creates an empty save file + parent dirs if missing
 window.emusync.files.getSaveTime(path)      // last-modified ISO string of the save file, or null if missing
+window.emusync.files.exists(path)          // boolean existsSync; Refresh locations / broken-ROM check (#616)
 window.emusync.files.getLatestInFolder(dir) // {path, time} for the newest file in dir, or null if empty/missing
 window.emusync.files.getPs2LastPlayed()      // {slug: ISO} — PS2 per-game last-played, joining ps2_serials.json with PCSX2's live playtime.dat
 window.emusync.files.renameGameFiles({romPath, savePath, stateFolder, newBase, reorganize, secondaryRomPath?}) // renames a game's ROM (+ optional secondary copy) and its save/state to `newBase`; reorganize=true nests a flat ROM under <dir>/<newBase>/; returns {ok, newRomPath, newSavePath, newStateFolder, newSecondaryRomPath?, error?}
