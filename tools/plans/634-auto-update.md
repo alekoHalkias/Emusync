@@ -3,7 +3,7 @@
 Issue: #634
 Branch: feature/634-auto-update
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
