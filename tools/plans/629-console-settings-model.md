@@ -37,19 +37,19 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - Files: src/gui/renderer/src/components/game-list/useBrokenRoms.ts
   - Reuses: `sourceFor` candidates array and `.filter(inside)`
   - New: none
-- [ ] 8. Modal body rewrite, group and fields: pick the primary row for the console (the row whose `device_game_folder` is non-blank, first wins; matches backend upsert); render one `config-form` with ROM folder, Save folder, States folder, Emulator, Network (NAS) folder. Copy field ("Copy network ROMs to") renders only when the network folder is non-blank, placeholder shows the ROM folder; on Save, blank copy folder with a network folder set is written as the ROM folder so `device_local_folder` consumers (Move/Network panels, cli/rom.py) see the effective value. Single PUT with all fields. Keep the shared-memcard note and the empty state.
+- [x] 8. Modal body rewrite, group and fields: pick the primary row for the console (the row whose `device_game_folder` is non-blank, first wins; matches backend upsert); render one `config-form` with ROM folder, Save folder, States folder, Emulator, Network (NAS) folder. Copy field ("Copy network ROMs to") renders only when the network folder is non-blank, placeholder shows the ROM folder; on Save, blank copy folder with a network folder set is written as the ROM folder so `device_local_folder` consumers (Move/Network panels, cli/rom.py) see the effective value. Single PUT with all fields. Keep the shared-memcard note and the empty state.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: existing `edit`/`browse`/`save` handlers, `updateDeviceConsole`, `usesSharedSaveLayout`; FIELDS array trimmed to the plain-text pickers
   - New: none (same component; no new file)
-- [ ] 9. Emulator dropdown: on open call `window.emusync.emulator.detect(consoleKey)`; options = detected `label`s plus a blank "Not set" entry plus the currently stored value if it is not among them (legacy derived or custom text). Stored value = the label string. Label-only: no launch_command rewrite.
+- [x] 9. Emulator dropdown: on open call `window.emusync.emulator.detect(consoleKey)`; options = detected `label`s plus a blank "Not set" entry plus the currently stored value if it is not among them (legacy derived or custom text). Stored value = the label string. Label-only: no launch_command rewrite.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: `emulator:detect` IPC and `DetectedEmulatorOption.label` (already typed in emusync.d.ts); ConsoleStep select markup
   - New: none; no IPC channel added
-- [ ] 10. Other ROM folders section (bottom): list `device_extra_folders` each with Remove, plus legacy rows' `device_game_folder` (other rows for this console) shown read-only with a one-line note; `Add folder` opens `dialog.openFolder`, ignores blanks and duplicates, and the section saves with the main Save button. Remove edits local state only.
+- [x] 10. Other ROM folders section (bottom): list `device_extra_folders` each with Remove, plus legacy rows' `device_game_folder` (other rows for this console) shown read-only with a one-line note; `Add folder` opens `dialog.openFolder`, ignores blanks and duplicates, and the section saves with the main Save button. Remove edits local state only.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: `browse` pattern, `window.emusync.dialog.openFolder`
   - New: none
-- [ ] 11. Retire the stale helper text ("Changing the ROM folder starts a new entry...") since upsert now routes differing folders into extras, and replace with one line about Other ROM folders.
+- [x] 11. Retire the stale helper text ("Changing the ROM folder starts a new entry...") since upsert now routes differing folders into extras, and replace with one line about Other ROM folders.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
 - [ ] 12. Verification: no JS test runner exists in the repo, so run `make lint` (tsc node+web), then drive the modal with the `run` skill: open a console with a network folder, an unset emulator, one extra folder; Save; reopen; confirm persistence and that Refresh locations does not flag a ROM under an extra folder as outside the console folder.
 - [ ] 13. Docs (merged): src/docs/ARCHITECTURE.md (consoles data model: new column, upsert routing; modal behavior if listed), CLAUDE.md (upsert rule line for extras; GUI rule line for ConsoleFoldersModal: one block per console, extras, label-only emulator, #629), .claude/frontend-design-guide.md (Settings forms entry).
@@ -97,5 +97,6 @@ none
 - GameConfig.tsx, MoveLocalRomPanel, NetworkRomPanel, localToNetwork (read-through only).
 
 ## Log
+Steps 8-11: one file rewrite committed together (they all edit ConsoleFoldersModal.tsx and cannot be built separately). Deviation: the 'Copy network ROMs to' blank-fill happens in save(), as planned; the old per-row Save/multi-block layout is gone, and the stale helper text is replaced by an 'added automatically' line.
 Steps 6-7: tsc (web) reports 3 errors that exist identically on the branch without these changes (SyncConflictModal icon style, abbr typing); not touched.
 Step 3: also skips a folder nested inside an already-known folder (primary, legacy rows, network), and fills a blank primary folder instead of adding an extra, so save-only-then-ROM games do not leave the primary blank.

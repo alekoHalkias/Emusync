@@ -105,10 +105,10 @@ User decisions (asked before design was finished):
 ### Steps (fplan)
 - F1. [done] api.ts DeviceConsole + device_extra_folders. Reuses existing type/fn. New: none.
 - F2. [done] useBrokenRoms.ts sourceFor adds extras as local candidates. Reuses candidates array. New: none.
-- F3. ConsoleFoldersModal.tsx group/fields/copy field. Reuses edit/browse/save, usesSharedSaveLayout. New: none.
-- F4. Same file: emulator select from emulator:detect. Reuses existing IPC, ConsoleStep markup. New: none.
-- F5. Same file: Other ROM folders section. Reuses browse + dialog.openFolder. New: none.
-- F6. Same file: replace stale helper text.
+- F3. [done] ConsoleFoldersModal.tsx group/fields/copy field. Reuses edit/browse/save, usesSharedSaveLayout. New: none.
+- F4. [done] Same file: emulator select from emulator:detect. Reuses existing IPC, ConsoleStep markup. New: none.
+- F5. [done] Same file: Other ROM folders section. Reuses browse + dialog.openFolder. New: none.
+- F6. [done] Same file: replace stale helper text.
 - F7. make lint + run skill manual check (no JS test runner exists).
 - F8. frontend-design-guide.md, CLAUDE.md, ARCHITECTURE.md.
 
@@ -141,3 +141,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 implement: step 4 done (GET returns extras; PUT Optional field, None preserves, cleaned list)
 - 2026-10-29 implement: step 5 done (8 API/upsert tests + v28 migration test, all passing)
 - 2026-10-29 implement: steps 6-7 done (DeviceConsole type, sourceFor extras as local)
+- 2026-10-29 implement: steps 8-11 done (ConsoleFoldersModal rewrite: one block, emulator select, conditional copy field, other ROM folders)
