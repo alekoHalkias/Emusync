@@ -4,7 +4,7 @@
 - Issue: #638
 - Branch: feature/638-release-publish-fix
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -23,13 +23,13 @@ Build jobs run `electron-builder --publish never`; upload latest*.yml with the i
 - [ ] A v* tag produces a release with AppImage, NSIS installer, and metadata
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: CI/build only
+### Backend Changes: None
+### UI Changes: None
+### Plan Target: bplan
+### Sub-issues: None
+### Difficulty: 2/10
+### Backwards Compatibility: No breaking changes
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -79,3 +79,4 @@ Build jobs run `electron-builder --publish never`; upload latest*.yml with the i
 
 ## 12. Log
 - 2026-10-30 issue: workflow initialized
+- 2026-10-30 design: scope=ci, plan_target=bplan, difficulty=2/10, breaking=no
