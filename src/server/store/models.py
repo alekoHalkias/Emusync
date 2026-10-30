@@ -1,7 +1,7 @@
 """Row-shaped dataclasses returned by the Store methods."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -34,6 +34,7 @@ class Console:
     device_emulator: str = ""
     device_network_folder: str = ""  # this device's NAS mount for the console (issue #255)
     device_local_folder: str = ""    # this device's local copy destination (issue #255)
+    device_extra_folders: list[str] = field(default_factory=list)  # additional ROM folders (issue #629)
 
 
 @dataclass

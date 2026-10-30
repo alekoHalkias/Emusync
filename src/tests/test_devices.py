@@ -344,6 +344,109 @@ async def test_game_config_save_does_not_overwrite_edited_console_folders(client
     assert got["device_emulator"] == "custom"
 
 
+# ── console extra folders (#629) ─────────────────────────────────────────────
+
+async def _put_game(client, name: str, rom: str, save: str = "", **extra) -> str:
+    slug = name.lower()
+    await client.post("/games", json={"name": name, "console": "SNES"}, headers=AUTH)
+    r = await client.put(f"/games/{slug}/device",
+                         json={"rom_path": rom, "save_path": save, **extra}, headers=AUTH)
+    assert r.status_code == 200
+    return slug
+
+
+async def _consoles(client) -> list[dict]:
+    return (await client.get(f"/devices/{DEVICE_ID}/consoles", headers=AUTH)).json()
+
+
+async def _put_console(client, c: dict, **changes) -> None:
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name")}
+    body.update(changes)
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_console_extra_folders_default_empty(client):
+    c = await _seed_console(client)
+    assert c["device_extra_folders"] == []
+
+
+@pytest.mark.asyncio
+async def test_put_console_extra_folders_roundtrip_and_normalize(client):
+    c = await _seed_console(client)
+    await _put_console(client, c, device_extra_folders=["/roms2", "  /roms3 ", "", "/roms2", c["device_game_folder"]])
+    assert (await _consoles(client))[0]["device_extra_folders"] == ["/roms2", "/roms3"]
+
+
+@pytest.mark.asyncio
+async def test_put_console_without_extra_folders_preserves_them(client):
+    """Regression: a pre-#629 client omits the field and must not blank the list."""
+    c = await _seed_console(client)
+    await _put_console(client, c, device_extra_folders=["/roms2"])
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name", "device_extra_folders")}
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    assert r.status_code == 200
+    assert (await _consoles(client))[0]["device_extra_folders"] == ["/roms2"]
+    await _put_console(client, c, device_extra_folders=[])
+    assert (await _consoles(client))[0]["device_extra_folders"] == []
+
+
+@pytest.mark.asyncio
+async def test_new_game_folder_becomes_extra_not_second_row(client):
+    await _seed_console(client)
+    await _put_game(client, "Zelda", "/other/snes/zelda.sfc", "/saves/snes/zelda.srm")
+    rows = await _consoles(client)
+    assert len(rows) == 1
+    assert rows[0]["device_extra_folders"] == ["/other"]
+    # Same folder again and a nested folder add nothing.
+    await _put_game(client, "Mario", "/other/snes/mario.sfc", "/saves/snes/mario.srm")
+    await _put_game(client, "Metroid", "/roms/snes/usa/metroid.sfc")
+    rows = await _consoles(client)
+    assert len(rows) == 1 and rows[0]["device_extra_folders"] == ["/other"]
+
+
+@pytest.mark.asyncio
+async def test_save_only_game_adds_no_row_or_extra(client):
+    await _seed_console(client)
+    await _put_game(client, "Zelda", "", "/saves/snes/zelda.srm")
+    rows = await _consoles(client)
+    assert len(rows) == 1 and rows[0]["device_extra_folders"] == []
+
+
+@pytest.mark.asyncio
+async def test_chosen_emulator_survives_new_folder_game(client):
+    """AC: the derived emulator never overwrites a user-chosen one, including via the extras path."""
+    c = await _seed_console(client)
+    await _put_console(client, c, device_emulator="custom")
+    await _put_game(client, "Zelda", "/other/snes/zelda.sfc", "/elsewhere/Snes9x/zelda.srm")
+    assert (await _consoles(client))[0]["device_emulator"] == "custom"
+
+
+@pytest.mark.asyncio
+async def test_legacy_two_row_console_keeps_both_rows(client):
+    await _seed_console(client)
+    store = _core._get_store()
+    first = store.list_consoles(DEVICE_ID)[0]
+    from server.store.models import Console
+    store.set_console(Console(id="legacy-2", device_id=DEVICE_ID, console_name="SNES",
+                              shortform_name="snes", device_game_folder="/legacy"))
+    await _put_game(client, "Zelda", "/legacy/snes/zelda.sfc")
+    await _put_game(client, "Mario", "/roms/snes/mario.sfc")
+    rows = await _consoles(client)
+    assert {r["device_game_folder"] for r in rows} == {first.device_game_folder, "/legacy"}
+    assert all(r["device_extra_folders"] == [] for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_network_game_folder_is_not_added_as_extra(client):
+    c = await _seed_console(client)
+    await _put_console(client, c, device_network_folder="/mnt/nas/snes")
+    await _put_game(client, "Zelda", "/mnt/nas/snes/zelda.sfc", "/saves/snes/zelda.srm",
+                    rom_folder_path="/mnt/nas/snes", rom_source="network")
+    assert (await _consoles(client))[0]["device_extra_folders"] == []
+
+
 # ── presence monitor vs live updates (#597) ───────────────────────────────────
 
 def test_monitor_sweep_concurrent_with_presence_updates():

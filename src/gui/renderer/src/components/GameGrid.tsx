@@ -13,6 +13,8 @@ import DownloadProgressModal, { type DownloadModalState } from "./DownloadProgre
 import Modal from "./Modal";
 import { useDevices } from "../DeviceContext";
 import LocationResolverModal from "./LocationResolverModal";
+import LocalToNetworkModal from "./LocalToNetworkModal";
+import type { LocalCandidate } from "./game-list/useBrokenRoms";
 import { isRomMissing, useBrokenRoms } from "./game-list/useBrokenRoms";
 import { CheckSquareIcon, DownloadIcon, GamepadIcon, GearIcon, RefreshIcon, SquareIcon, TrashIcon, WarningIcon } from "./icons";
 
@@ -76,6 +78,7 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   // Bumped per-slug when the settings modal closes, so that game's GameCard
   // remounts and re-fetches art (it may have just been edited in the
   // Artwork tab) without refetching every other card on the screen.
+  const [localCandidates, setLocalCandidates] = useState<LocalCandidate[]>([]);
   const [artRefresh, setArtRefresh] = useState<Record<string, number>>({});
   // Lifted from each GameCard's own art:get fetch (issue #345) rather than a
   // duplicate lookup — undefined until that card resolves, so the "with/
@@ -417,13 +420,14 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   }
 
   async function handleRefreshLocations(): Promise<void> {
-    const { missing: n, corrected } = await refreshBroken(currentDeviceId ?? undefined);
+    const { missing: n, corrected, candidates } = await refreshBroken(currentDeviceId ?? undefined);
     const parts = [
       n ? `${n} game${n !== 1 ? "s" : ""} with a missing ROM flagged.` : "All ROM locations are valid.",
       corrected ? `${corrected} ROM source${corrected !== 1 ? "s" : ""} corrected (local/network).` : "",
     ].filter(Boolean);
     setBulkMsg({ text: parts.join(" "), isError: n > 0 });
     if (corrected) onChanged();
+    setLocalCandidates(candidates);
   }
 
   async function handleLocated(newPath: string): Promise<void> {
@@ -619,6 +623,9 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
 
       {resolveTarget && (
         <LocationResolverModal game={resolveTarget} onClose={() => setResolveTarget(null)} onLocated={handleLocated} />
+      )}
+      {localCandidates.length > 0 && (
+        <LocalToNetworkModal candidates={localCandidates} onClose={(changed) => { setLocalCandidates([]); if (changed) onChanged(); }} />
       )}
 
       {netPlayTarget && (

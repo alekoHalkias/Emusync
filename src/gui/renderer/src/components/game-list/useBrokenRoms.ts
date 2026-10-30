@@ -18,6 +18,7 @@ export function sourceFor(romPath: string, c: DeviceConsole): { source: "local" 
   const candidates = [
     { source: "local" as const, folder: c.device_local_folder ?? "" },
     { source: "local" as const, folder: c.device_game_folder },
+    ...(c.device_extra_folders ?? []).map((folder) => ({ source: "local" as const, folder })),
     { source: "network" as const, folder: c.device_network_folder ?? "" },
   ].filter((x) => inside(x.folder, romPath));
   candidates.sort((a, b) => b.folder.length - a.folder.length);
@@ -29,19 +30,29 @@ export async function isRomMissing(g: GameRow): Promise<boolean> {
   return !(await window.emusync.files.exists(g.romPath));
 }
 
+/** A local-source game Refresh offers to move into the console folder and/or add to the network drive (#626). */
+export type LocalCandidate = { game: GameRow; folder: string; netFolder: string; canMove: boolean; canUpload: boolean };
+
 export function useBrokenRoms(games: GameRow[]) {
   const [broken, setBroken] = useState<Set<string>>(new Set());
 
-  async function refresh(deviceId?: string): Promise<{ missing: number; corrected: number }> {
+  async function refresh(deviceId?: string): Promise<{ missing: number; corrected: number; candidates: LocalCandidate[] }> {
     const missing = await Promise.all(games.map(isRomMissing));
     const next = new Set(games.filter((_, i) => missing[i]).map((g) => g.slug));
     setBroken(next);
     let corrected = 0;
+    const candidates: LocalCandidate[] = [];
     const consoles = deviceId ? await getDeviceConsoles(deviceId).catch(() => [] as DeviceConsole[]) : [];
     for (const g of games) {
       const c = consoles.find((x) => x.console_name.toLowerCase() === (g.console ?? "").toLowerCase());
       if (!c || !g.isLocal || !g.romPath || next.has(g.slug)) continue;
       const hit = sourceFor(g.romPath, c);
+      const folder = c.device_local_folder ?? "";
+      const netFolder = c.device_network_folder ?? "";
+      if ((!hit || hit.source === "local") && (g.romSource ?? "local") === "local") {
+        const canMove = !!folder && !inside(folder, g.romPath);
+        if (canMove || netFolder) candidates.push({ game: g, folder, netFolder, canMove, canUpload: !!netFolder });
+      }
       if (!hit || hit.source === (g.romSource ?? "local")) continue;
       try {
         const cfg = await getGameDevice(g.slug);
@@ -50,7 +61,7 @@ export function useBrokenRoms(games: GameRow[]) {
         corrected++;
       } catch { /* leave this game unchanged */ }
     }
-    return { missing: next.size, corrected };
+    return { missing: next.size, corrected, candidates };
   }
 
   /** Point `game` at `newPath`, remember its folder, then fix sibling broken games. Returns how many others were fixed. */

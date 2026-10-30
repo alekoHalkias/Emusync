@@ -190,3 +190,24 @@ def test_v9_to_v10_migration(tmp_path):
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(consoles)").fetchall()}
     assert {"device_network_folder", "device_local_folder"} <= cols
     conn.close()
+
+
+def test_v28_to_v29_migration_adds_extra_folders(tmp_path):
+    """A v28 consoles table gains device_extra_folders as '[]' without losing rows (#629)."""
+    from server.store import schema
+
+    conn = sqlite3.connect(str(tmp_path / "old.db"))
+    conn.row_factory = sqlite3.Row
+    conn.execute("""CREATE TABLE consoles (
+        id TEXT PRIMARY KEY, device_id TEXT NOT NULL, console_name TEXT NOT NULL,
+        shortform_name TEXT NOT NULL, device_game_folder TEXT NOT NULL DEFAULT '')""")
+    conn.execute("INSERT INTO consoles VALUES ('c1', 'd1', 'GBA', 'gba', '/roms/gba')")
+    conn.execute("PRAGMA user_version = 28")
+    conn.commit()
+
+    schema._migrate(conn, from_version=28)
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == schema._SCHEMA_VERSION
+    row = conn.execute("SELECT * FROM consoles").fetchone()
+    assert row["device_game_folder"] == "/roms/gba"
+    assert row["device_extra_folders"] == "[]"
