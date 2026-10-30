@@ -4,7 +4,7 @@
 - Issue: #638
 - Branch: feature/638-release-publish-fix
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -59,7 +59,11 @@ Build jobs run `electron-builder --publish never`; upload latest*.yml with the i
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/638-release-publish-fix.md (4 steps)
+- Step 1: touches package.json; reuses dist script; no new code.
+- Step 2: touches release.yml; reuses artifact steps; no new code.
+- Step 3: no tests (CI-only).
+- Step 4: touches CLAUDE.md; docs only.
 
 ## 9. Review
 ### Findings: TBD
@@ -80,3 +84,4 @@ Build jobs run `electron-builder --publish never`; upload latest*.yml with the i
 ## 12. Log
 - 2026-10-30 issue: workflow initialized
 - 2026-10-30 design: scope=ci, plan_target=bplan, difficulty=2/10, breaking=no
+- 2026-10-30 bplan: 4 steps written, backend_pattern=none (CI config)
