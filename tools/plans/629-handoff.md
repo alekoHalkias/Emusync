@@ -4,7 +4,7 @@
 - Issue: #629
 - Branch: feature/629-console-settings-model
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -109,8 +109,8 @@ User decisions (asked before design was finished):
 - F4. [done] Same file: emulator select from emulator:detect. Reuses existing IPC, ConsoleStep markup. New: none.
 - F5. [done] Same file: Other ROM folders section. Reuses browse + dialog.openFolder. New: none.
 - F6. [done] Same file: replace stale helper text.
-- F7. make lint + run skill manual check (no JS test runner exists).
-- F8. frontend-design-guide.md, CLAUDE.md, ARCHITECTURE.md.
+- F7. [done, manual GUI drive skipped] make lint + run skill manual check (no JS test runner exists).
+- F8. [done] frontend-design-guide.md, CLAUDE.md, ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -142,3 +142,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 implement: step 5 done (8 API/upsert tests + v28 migration test, all passing)
 - 2026-10-29 implement: steps 6-7 done (DeviceConsole type, sourceFor extras as local)
 - 2026-10-29 implement: steps 8-11 done (ConsoleFoldersModal rewrite: one block, emulator select, conditional copy field, other ROM folders)
+- 2026-10-29 implement: steps 12-13 done (lint, 159 tests pass, docs); all steps checked; manual GUI run not done

@@ -3,7 +3,7 @@
 Source plans: tools/plans/629-console-settings-model.md (bplan, steps 1-5 backend), tools/plans/629-console-settings-model-ui.md (fplan, steps 6-12 frontend)
 Branch: feature/629-console-settings-model
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -51,8 +51,8 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - New: none
 - [x] 11. Retire the stale helper text ("Changing the ROM folder starts a new entry...") since upsert now routes differing folders into extras, and replace with one line about Other ROM folders.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
-- [ ] 12. Verification: no JS test runner exists in the repo, so run `make lint` (tsc node+web), then drive the modal with the `run` skill: open a console with a network folder, an unset emulator, one extra folder; Save; reopen; confirm persistence and that Refresh locations does not flag a ROM under an extra folder as outside the console folder.
-- [ ] 13. Docs (merged): src/docs/ARCHITECTURE.md (consoles data model: new column, upsert routing; modal behavior if listed), CLAUDE.md (upsert rule line for extras; GUI rule line for ConsoleFoldersModal: one block per console, extras, label-only emulator, #629), .claude/frontend-design-guide.md (Settings forms entry).
+- [x] 12. Verification: no JS test runner exists in the repo, so run `make lint` (tsc node+web), then drive the modal with the `run` skill: open a console with a network folder, an unset emulator, one extra folder; Save; reopen; confirm persistence and that Refresh locations does not flag a ROM under an extra folder as outside the console folder.
+- [x] 13. Docs (merged): src/docs/ARCHITECTURE.md (consoles data model: new column, upsert routing; modal behavior if listed), CLAUDE.md (upsert rule line for extras; GUI rule line for ConsoleFoldersModal: one block per console, extras, label-only emulator, #629), .claude/frontend-design-guide.md (Settings forms entry).
   - Files: src/docs/ARCHITECTURE.md, CLAUDE.md, .claude/frontend-design-guide.md
   - Reuses: n/a; the two plans' docs steps (backend 6, frontend 8) touched the same CLAUDE.md and ARCHITECTURE.md, so they are one step
 
@@ -97,6 +97,8 @@ none
 - GameConfig.tsx, MoveLocalRomPanel, NetworkRomPanel, localToNetwork (read-through only).
 
 ## Log
+Step 12: make lint (Python syntax) and make test-changed (159 passed, 3 skipped) done; tsc web shows only the 3 pre-existing errors. The manual drive of the modal in the real Electron app was NOT performed (it would run against the user's real config and server); needs a human check.
+Step 13: frontend-design-guide.md entry was already added by fplan; ARCHITECTURE.md and CLAUDE.md updated here.
 Steps 8-11: one file rewrite committed together (they all edit ConsoleFoldersModal.tsx and cannot be built separately). Deviation: the 'Copy network ROMs to' blank-fill happens in save(), as planned; the old per-row Save/multi-block layout is gone, and the stale helper text is replaced by an 'added automatically' line.
 Steps 6-7: tsc (web) reports 3 errors that exist identically on the branch without these changes (SyncConflictModal icon style, abbr typing); not touched.
 Step 3: also skips a folder nested inside an already-known folder (primary, legacy rows, network), and fills a blank primary folder instead of adding an extra, so save-only-then-ROM games do not leave the primary blank.

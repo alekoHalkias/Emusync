@@ -67,7 +67,7 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version
 - Dolphin GC card format mismatch detected via `Dolphin.ini` (#428). RetroArch: saves `saves/<Core>/`; state_path may be a folder (tar.gz, `.bak` excluded from push, pulls non-destructive); expand `~` in cfg paths.
 - `%ROM%` token in `launch_command`, resolved at run time (#518).
 - `SyncClient.health()` retries opt-in (`retries=2` only in `run.py`, #458). Lock heartbeat ≤120s, must stay under the 5-min offline timeout (#458).
-- `store.add_game` is INSERT OR IGNORE; rename via `update_game_name`. `upsert_console_for_game` only fills blank folders (#539).
+- `store.add_game` is INSERT OR IGNORE; rename via `update_game_name`. `upsert_console_for_game` only fills blank folders (#539) and routes a game folder the console doesn't cover into `consoles.device_extra_folders` instead of a new row (#629; never a folder inside `device_network_folder`). `ConsoleFoldersModal` = one block per console, label-only emulator select, extras list; `sourceFor` treats extras as local.
 
 **Config / paths / DB**
 - Never hardcode paths: use `src/server/paths.py` / `src/gui/electron/paths.ts` (XDG dirs; `EMUSYNC_*_DIR` disables migration; #564).
