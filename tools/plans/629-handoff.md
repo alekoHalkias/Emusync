@@ -78,7 +78,7 @@ User decisions (asked before design was finished):
 ### Recommendations: Guide updated with the Optional-means-preserve rule. device_emulator needs no backend change (already fill-only-blank); pinned by a regression test.
 
 ## 5. Merged Plan
-### Conflicts Resolved: none
+### Conflicts Resolved: docs steps (CLAUDE.md, ARCHITECTURE.md) merged into one; backend-first ordering; PUT Optional/None field compatible with full-list frontend send; backend normalizes extras. Merged plan: tools/plans/629-console-settings-model.md (13 steps).
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
@@ -133,3 +133,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 issue: duplicate check found #628 and #629; user chose to continue under #629. #628 and feature/628-console-settings-model are now superseded, neither has code changes.
 - 2026-10-29 bplan: 6 steps written, backend_pattern=JSON extras column + Optional-preserve PUT field + upsert routes differing folder to extras
 - 2026-10-29 fplan: 8 steps written, visual_pattern=single console block, conditional copy field, emulator select, extras list
+- 2026-10-29 merge: 4 conflicts resolved, 0 unresolved
