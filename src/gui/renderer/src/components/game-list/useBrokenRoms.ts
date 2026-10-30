@@ -18,6 +18,7 @@ export function sourceFor(romPath: string, c: DeviceConsole): { source: "local" 
   const candidates = [
     { source: "local" as const, folder: c.device_local_folder ?? "" },
     { source: "local" as const, folder: c.device_game_folder },
+    ...(c.device_extra_folders ?? []).map((folder) => ({ source: "local" as const, folder })),
     { source: "network" as const, folder: c.device_network_folder ?? "" },
   ].filter((x) => inside(x.folder, romPath));
   candidates.sort((a, b) => b.folder.length - a.folder.length);

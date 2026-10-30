@@ -29,11 +29,11 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
 - [x] 5. Tests (real SQLite): see step list below.
   - Files: src/tests/test_devices.py (new cases near the #539 tests), src/tests/test_network_rom.py (migration case beside `test_v9_to_v10_migration`)
   - Cases: (a) GET returns `device_extra_folders == []` for a fresh console; (b) PUT sets extras, GET round-trips them, normalization drops blanks/dupes/primary folder; (c) PUT omitting the field preserves existing extras (regression for old clients); (d) second `PUT /games/{slug}/device` with a rom in a different folder for the same console adds an extra and leaves one console row; (e) same-folder repeat does not duplicate extras; save-only game (blank folder) adds no row; (f) hand-chosen `device_emulator` survives a later game config save with a different save dir (AC 4); (g) legacy two-row console still lists both rows and a new game in either row's folder creates no extras; (h) v28 DB migrates and gains the column with `[]`; (i) a network-sourced game whose `rom_folder_path` is inside the console's `device_network_folder` adds no extra; PUT 403/404 paths already covered.
-- [ ] 6. API types: `DeviceConsole` gains `device_extra_folders?: string[]`; `updateDeviceConsole` already takes the Omit type so the payload carries it. Doc comment updated.
+- [x] 6. API types: `DeviceConsole` gains `device_extra_folders?: string[]`; `updateDeviceConsole` already takes the Omit type so the payload carries it. Doc comment updated.
   - Files: src/gui/renderer/src/api.ts
   - Reuses: existing `DeviceConsole` / `updateDeviceConsole`
   - New: none
-- [ ] 7. Refresh classification: `sourceFor()` adds each `device_extra_folders` entry as a `local` candidate (longest-prefix logic unchanged), so #616 broken-ROM badge and #618 local/network tagging treat extras as local locations.
+- [x] 7. Refresh classification: `sourceFor()` adds each `device_extra_folders` entry as a `local` candidate (longest-prefix logic unchanged), so #616 broken-ROM badge and #618 local/network tagging treat extras as local locations.
   - Files: src/gui/renderer/src/components/game-list/useBrokenRoms.ts
   - Reuses: `sourceFor` candidates array and `.filter(inside)`
   - New: none
@@ -97,4 +97,5 @@ none
 - GameConfig.tsx, MoveLocalRomPanel, NetworkRomPanel, localToNetwork (read-through only).
 
 ## Log
+Steps 6-7: tsc (web) reports 3 errors that exist identically on the branch without these changes (SyncConflictModal icon style, abbr typing); not touched.
 Step 3: also skips a folder nested inside an already-known folder (primary, legacy rows, network), and fills a blank primary folder instead of adding an extra, so save-only-then-ROM games do not leave the primary blank.

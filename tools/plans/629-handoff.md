@@ -103,8 +103,8 @@ User decisions (asked before design was finished):
 - 5. [done] test_devices.py, test_network_rom.py: 9 cases (tplan added network-folder guard) (see plan file). Reuses `_seed_console`, migration test pattern.
 - 6. ARCHITECTURE.md, CLAUDE.md. New: none.
 ### Steps (fplan)
-- F1. api.ts DeviceConsole + device_extra_folders. Reuses existing type/fn. New: none.
-- F2. useBrokenRoms.ts sourceFor adds extras as local candidates. Reuses candidates array. New: none.
+- F1. [done] api.ts DeviceConsole + device_extra_folders. Reuses existing type/fn. New: none.
+- F2. [done] useBrokenRoms.ts sourceFor adds extras as local candidates. Reuses candidates array. New: none.
 - F3. ConsoleFoldersModal.tsx group/fields/copy field. Reuses edit/browse/save, usesSharedSaveLayout. New: none.
 - F4. Same file: emulator select from emulator:detect. Reuses existing IPC, ConsoleStep markup. New: none.
 - F5. Same file: Other ROM folders section. Reuses browse + dialog.openFolder. New: none.
@@ -140,3 +140,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 implement: step 3 done (upsert routes unknown folders to extras; deviation: nested-folder skip, blank primary fill)
 - 2026-10-29 implement: step 4 done (GET returns extras; PUT Optional field, None preserves, cleaned list)
 - 2026-10-29 implement: step 5 done (8 API/upsert tests + v28 migration test, all passing)
+- 2026-10-29 implement: steps 6-7 done (DeviceConsole type, sourceFor extras as local)
