@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld("emusync", {
     localIp: (): Promise<string | null> => ipcRenderer.invoke("server:local-ip"),
   },
   display: {
-    get: (): Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean; theme: string }> => ipcRenderer.invoke("display:get"),
+    get: (): Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean; theme: string; autoUpdateEnabled: boolean }> => ipcRenderer.invoke("display:get"),
     onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void): (() => void) => {
       const handler = (_e: unknown, d: { fullscreen: boolean; bigPicture: boolean }) => cb(d);
       ipcRenderer.on("display:changed", handler);
@@ -39,6 +39,18 @@ contextBridge.exposeInMainWorld("emusync", {
     cycleScale: (): Promise<number> => ipcRenderer.invoke("display:cycleScale"),
     toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke("display:toggleFullscreen"),
     setTheme: (theme: string): Promise<string> => ipcRenderer.invoke("display:setTheme", theme),
+  },
+  updater: {
+    check: (): Promise<{ available: boolean; error?: string }> => ipcRenderer.invoke("updater:check"),
+    download: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke("updater:download"),
+    install: (): Promise<{ ok: boolean }> => ipcRenderer.invoke("updater:install"),
+    getEnabled: (): Promise<boolean> => ipcRenderer.invoke("updater:getEnabled"),
+    setEnabled: (enabled: boolean): Promise<boolean> => ipcRenderer.invoke("updater:setEnabled", enabled),
+    onChange: (cb: (e: { type: string; releaseNotes?: string; releaseVersion?: string; message?: string }) => void): (() => void) => {
+      const handler = (_e: unknown, e: { type: string; releaseNotes?: string; releaseVersion?: string; message?: string }) => cb(e);
+      ipcRenderer.on("updater:change", handler);
+      return () => { ipcRenderer.removeListener("updater:change", handler); };
+    },
   },
   theme: {
     list: (): Promise<Array<{ id: string; name: string; author: string }>> => ipcRenderer.invoke("theme:list"),

@@ -55,6 +55,8 @@ For *why* something is the way it is, `git log`/`git blame` on the file in quest
 
 ## IPC bridge (full surface)
 
+Auto-update (#634): `gui/electron/updater.ts` wraps `electron-updater` (`registerUpdaterIpc()`; `updater:check/download/install/getEnabled/setEnabled`, lifecycle events forwarded as `updater:change`). Checks on launch and every 4 hours; `autoUpdateEnabled` in `display.json` gates checks. The renderer side is `UpdateBanner` + `useUpdater`.
+
 `preload.ts` exposes `window.emusync.*` via `contextBridge`. `main.ts` registers matching `ipcMain.handle` handlers. When adding a new channel: register the handler in the relevant `gui/electron/` module (via its `register*Ipc()`), add the bridge entry to `preload.ts`, AND add the typed signature to `EmusyncBridge` in `gui/renderer/src/emusync.d.ts` — `window.emusync` is globally typed from that `.d.ts`.
 
 ```typescript
