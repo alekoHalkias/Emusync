@@ -76,7 +76,7 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 
 **`store.add_game` is INSERT OR IGNORE**; rename with `update_game_name`.
 
-**`upsert_console_for_game` fills blanks only (#539)** so `ConsoleFoldersModal` edits stick; stale folders no longer self-correct. Identity is `(console_name, device_game_folder)` — editing the ROM folder makes the next import from the old folder create a second row.
+**`upsert_console_for_game` fills blanks only (#539)** so `ConsoleFoldersModal` edits stick; stale folders no longer self-correct. A console is one primary row; a game folder it does not cover is appended to `device_extra_folders` (#629) rather than creating a second row (never a folder inside `device_network_folder`, which `sourceFor` would misclassify as local). Older multi-row consoles keep their rows and show read-only in the modal.
 
 **`%ROM%` in `launch_command` (#518).** `emusync run` shlex-splits and runs it; `_resolve_launch_command` substitutes the ROM in use (local, network master, or offline copy). `GameConfig` converts legacy literal paths on load; literal-path rewrites remain only for legacy commands.
 

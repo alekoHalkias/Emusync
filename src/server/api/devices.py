@@ -1,6 +1,8 @@
 """Device listing, presence, removal, and per-device console/game-device views."""
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -60,6 +62,7 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
             "device_emulator": c.device_emulator,
             "device_network_folder": c.device_network_folder,
             "device_local_folder": c.device_local_folder,
+            "device_extra_folders": c.device_extra_folders,
         }
         for c in consoles
     ]
@@ -72,6 +75,7 @@ class ConsoleFoldersRequest(BaseModel):
     device_emulator: str = ""
     device_network_folder: str = ""
     device_local_folder: str = ""
+    device_extra_folders: Optional[list[str]] = None  # None = keep what is stored (#629)
 
 
 @router.put("/devices/{target_device_id}/consoles/{console_id}")
@@ -79,15 +83,22 @@ def update_device_console(
     target_device_id: str, console_id: str, req: ConsoleFoldersRequest,
     device_id: str = Depends(_auth),
 ) -> dict:
-    """Edit one of the caller's own console rows (#539). Replaces all six folder fields."""
+    """Edit one of the caller's own console rows (#539). Replaces all six folder fields;
+    ``device_extra_folders`` (#629) is replaced only when sent, and is cleaned up first."""
     if target_device_id != device_id:
         raise HTTPException(status_code=403, detail="Can only edit this device's consoles")
     store = _get_store()
     console = next((c for c in store.list_consoles(device_id) if c.id == console_id), None)
     if not console:
         raise HTTPException(status_code=404, detail="Console not found")
-    for field, value in req.model_dump().items():
+    for field, value in req.model_dump(exclude_none=True).items():
         setattr(console, field, value)
+    if req.device_extra_folders is not None:
+        seen = {console.device_game_folder}
+        console.device_extra_folders = [
+            f for f in (x.strip() for x in req.device_extra_folders)
+            if f and not (f in seen or seen.add(f))
+        ]
     store.set_console(console)
     return {"ok": True}
 

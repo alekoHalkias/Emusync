@@ -245,10 +245,10 @@ export const getGameIntegrity = (slug: string): Promise<GameIntegrity> =>
 export const rescanIntegrity = (): Promise<{ scanned: number; damaged: Array<{ slug: string; name: string; kind: string; reasons: IntegrityReason[]; last_good_version_id: string | null }> }> =>
   _fetch("POST", "/integrity/rescan");
 
-export type DeviceConsole = { id?: string; console_name: string; device_game_folder: string; device_save_folder: string; device_state_folder?: string; device_emulator: string; device_network_folder?: string; device_local_folder?: string };
+export type DeviceConsole = { id?: string; console_name: string; device_game_folder: string; device_save_folder: string; device_state_folder?: string; device_emulator: string; device_network_folder?: string; device_local_folder?: string; device_extra_folders?: string[] };
 export type DeviceGameDevice = { slug: string; name: string; console?: string; rom_path: string; save_path: string };
 
-/** Replace all six folder fields on one of this device's console rows (#539). */
+/** Replace all six folder fields on one of this device's console rows (#539); `device_extra_folders` (#629) is kept when omitted. */
 export const updateDeviceConsole = (deviceId: string, consoleId: string, c: Omit<DeviceConsole, "id" | "console_name">): Promise<{ ok: boolean }> =>
   _fetch("PUT", `/devices/${deviceId}/consoles/${consoleId}`, c);
 export const getDeviceConsoles = (deviceId: string): Promise<DeviceConsole[]> =>

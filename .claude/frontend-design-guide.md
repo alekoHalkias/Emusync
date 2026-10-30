@@ -51,3 +51,10 @@
 ## Types
 - GameRow: extends Game, adds `isLocal`, `lastPush`, `lastSave`, `locked`, `savePath`, `statePath`, `romSource`, `hasLocalCopy`, `offline`
 - Defined in `src/gui/renderer/src/components/game-list/types.ts`
+
+## Settings forms (modal editors, #629)
+- Fields are `input-group` blocks: `<label>` above, text input with a `btn btn-ghost` Browse beside it for folders
+- Conditional fields render only when their trigger value is set; helper text is muted 12px under the form
+- Choice fields use a plain `<select>` including a blank "Not set" option and the stored value when it is not in the list
+- List editors: one row per item (text + `btn btn-ghost` Remove), `Add` ghost button below, saved by the form's single Save
+
