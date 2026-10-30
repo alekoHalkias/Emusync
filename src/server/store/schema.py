@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 28
+_SCHEMA_VERSION = 29
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS consoles (
     device_emulator       TEXT NOT NULL DEFAULT '',
     device_network_folder TEXT NOT NULL DEFAULT '',
     device_local_folder   TEXT NOT NULL DEFAULT '',
+    device_extra_folders  TEXT NOT NULL DEFAULT '[]',
     UNIQUE(device_id, console_name, device_game_folder)
 );
 CREATE TABLE IF NOT EXISTS game_devices (
@@ -567,4 +568,7 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
     source       TEXT NOT NULL,
     fetched_at   TEXT NOT NULL
 )""")
+    if from_version < 29:
+        # Additional ROM folders per console, a JSON list (issue #629).
+        _try(conn, "ALTER TABLE consoles ADD COLUMN device_extra_folders TEXT NOT NULL DEFAULT '[]'")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

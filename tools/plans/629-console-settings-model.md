@@ -10,7 +10,7 @@ Fix attempts: 0
 Add a `device_extra_folders` list to each console row (storage, upsert routing, REST) and rewrite ConsoleFoldersModal on top of it: one block per console, a real emulator dropdown, a conditional copy-destination field, and an Other ROM folders section.
 
 ## Steps
-- [ ] 1. Schema + model: `consoles.device_extra_folders TEXT NOT NULL DEFAULT '[]'`, `_SCHEMA_VERSION` 28 -> 29, `if from_version < 29` ALTER block; `Console.device_extra_folders: list[str]` (default_factory list).
+- [x] 1. Schema + model: `consoles.device_extra_folders TEXT NOT NULL DEFAULT '[]'`, `_SCHEMA_VERSION` 28 -> 29, `if from_version < 29` ALTER block; `Console.device_extra_folders: list[str]` (default_factory list).
   - Files: src/server/store/schema.py, src/server/store/models.py
   - Reuses: schema.py `_try(conn, "ALTER TABLE consoles ADD COLUMN ...")` pattern at the < 27 block; keep trailing user_version stamp
   - New: none
