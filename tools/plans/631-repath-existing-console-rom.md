@@ -18,7 +18,7 @@ When "Move to console folder" finds a same-named file already in the console fol
   - Files: src/gui/electron/sync/rom.ts
   - Reuses: the handler's existing GET/PUT calls, `launchCommand` computation, `statSync`, `existsSync`
   - New: a small `adopted` boolean and one verification GET - nothing existing validates the stored config after a move
-- [ ] 2. IPC types: add `adopted?: boolean` to the `moveToConsoleFolder` result in both places.
+- [x] 2. IPC types: add `adopted?: boolean` to the `moveToConsoleFolder` result in both places.
   - Files: src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: the existing channel; no new channel
   - New: none

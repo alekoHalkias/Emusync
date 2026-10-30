@@ -130,7 +130,7 @@ contextBridge.exposeInMainWorld("emusync", {
     offLocalizeProgress: (listener: (event: unknown, p: { slug: string; copied: number; total: number }) => void): void => {
       ipcRenderer.removeListener("rom:localize-progress", listener as never);
     },
-    moveToConsoleFolder: (slug: string): Promise<{ ok: boolean; romPath?: string; launchCommand?: string; error?: string }> =>
+    moveToConsoleFolder: (slug: string): Promise<{ ok: boolean; romPath?: string; launchCommand?: string; adopted?: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:moveToConsoleFolder", slug),
     delocalize: (slug: string): Promise<{ ok: boolean; launchCommand?: string; error?: string }> =>
       ipcRenderer.invoke("rom:delocalize", slug),
