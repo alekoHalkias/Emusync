@@ -3,7 +3,7 @@
 Source plans: tools/plans/629-console-settings-model.md (bplan, steps 1-5 backend), tools/plans/629-console-settings-model-ui.md (fplan, steps 6-12 frontend)
 Branch: feature/629-console-settings-model
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal

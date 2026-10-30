@@ -4,7 +4,7 @@
 - Issue: #629
 - Branch: feature/629-console-settings-model
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-29
 - Fix attempts: 0
 
