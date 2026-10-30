@@ -4,7 +4,7 @@
 - Issue: #634
 - Branch: feature/634-auto-update
 - PR: none
-- Status: planned
+- Status: tplan done
 - Created: 2026-01-03
 - Fix attempts: 0
 
@@ -68,10 +68,10 @@ Users currently must manually check GitHub for new versions, download the AppIma
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: None — electron-updater's own test suite covers the library. IPC wiring is integration-level (requires running Electron app). Existing `src/tests/` suite focuses on Python server/CLI/SQLite, not Electron renderer.
-### Test Cases: Acceptance is manual: launch on each platform, verify update check, verify download prompt, verify restart.
-### Edge Cases: No network connectivity → check silently fails, no banner. Corrupt `latest.yml` → error forwarded via IPC, shown in UI. Already on latest version → no banner. Auto-update disabled → no check performed.
-### Integration Points: electron-updater ↔ GitHub releases API. IPC channels: renderer ↔ main process. Display settings ↔ `display.json`.
+### Test File: None — no JS test runner for Electron. Per `.claude/testing-guide.md` line 48-49: verified by `tsc` + `make lint` + manual script.
+### Test Cases: 1) Update check fires on startup. 2) Banner appears when `update-available` event fires (inject in devtools). 3) Banner shows "Restart now" on `update-downloaded`. 4) "Restart now" calls `quitAndInstall()`. 5) Auto-update disabled → no check. 6) `update-not-available` → no banner. 7) Error event → banner shows error text. 8) TypeScript compilation passes.
+### Edge Cases: No network → silent fail, no banner. Corrupt `latest.yml` → error in UI. Already downloaded update persists across relaunch. Toggle off mid-download → download continues (electron-updater behavior).
+### Integration Points: electron-updater ↔ GitHub releases API (external). IPC: renderer ↔ main process (additive). Display settings ↔ `display.json` (new key `autoUpdateEnabled`).
 
 ## 7. Test Design
 ### Test Scope: Manual acceptance only. No automated tests.
@@ -141,3 +141,4 @@ Users currently must manually check GitHub for new versions, download the AppIma
 - 2026-01-03 issue: workflow initialized
 - 2026-01-03 fplan: complete, frontend-only, 10 steps, 6/10 difficulty
 - 2026-01-03 merge: fplan-only, no conflicts, status: planned
+- 2026-01-03 tplan: test_file=none (manual), 8 test cases, 4 edge cases, tsc+lint+manual acceptance
