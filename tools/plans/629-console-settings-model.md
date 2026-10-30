@@ -22,7 +22,7 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - Files: src/server/store/consoles.py
   - Reuses: existing `existing_consoles` lookup and fill-only-blank block
   - New: none
-- [ ] 4. REST: `GET /devices/{id}/consoles` returns `device_extra_folders`; `ConsoleFoldersRequest.device_extra_folders: Optional[list[str]] = None`; PUT skips None fields, normalizes the list (strip, drop blanks, dedupe, drop the primary `device_game_folder`). Docstring updated ("replaces all six folder fields; extras preserved when omitted").
+- [x] 4. REST: `GET /devices/{id}/consoles` returns `device_extra_folders`; `ConsoleFoldersRequest.device_extra_folders: Optional[list[str]] = None`; PUT skips None fields, normalizes the list (strip, drop blanks, dedupe, drop the primary `device_game_folder`). Docstring updated ("replaces all six folder fields; extras preserved when omitted").
   - Files: src/server/api/devices.py
   - Reuses: the `model_dump()` setattr loop (add `exclude_none=True`)
   - New: none
