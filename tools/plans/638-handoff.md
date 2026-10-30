@@ -4,7 +4,7 @@
 - Issue: #638
 - Branch: feature/638-release-publish-fix
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -86,3 +86,4 @@ Build jobs run `electron-builder --publish never`; upload latest*.yml with the i
 - 2026-10-30 design: scope=ci, plan_target=bplan, difficulty=2/10, breaking=no
 - 2026-10-30 bplan: 4 steps written, backend_pattern=none (CI config)
 - 2026-10-30 tplan: test_file=none, 2 verification cases defined
+- 2026-10-30 implement: steps 1-4 done (publish never, latest*.yml artifacts, CLAUDE.md)

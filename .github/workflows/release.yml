@@ -69,7 +69,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: EmuSync-linux
-          path: src/gui/dist/*.AppImage
+          path: |
+            src/gui/dist/*.AppImage
+            src/gui/dist/latest-linux.yml
 
   build-windows:
     name: Build Windows Installer
@@ -102,7 +104,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: EmuSync-windows
-          path: src/gui/dist/*.exe
+          path: |
+            src/gui/dist/*.exe
+            src/gui/dist/latest.yml
 
   release:
     name: Publish GitHub Release
