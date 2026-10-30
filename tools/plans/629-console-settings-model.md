@@ -18,7 +18,7 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - Files: src/server/store/consoles.py
   - Reuses: console_defs.py json.dumps/json.loads usage
   - New: `_console_from_row` - two call sites now need the same JSON parse, one helper beats two copies
-- [ ] 3. Upsert routing: in `upsert_console_for_game`, select the row by `console_name` (prefer the row whose `device_game_folder == game_folder`, else the first row for that console). If a non-blank `game_folder` differs from that row's folder and is not already in `device_extra_folders` (and not another legacy row's folder), append it to extras instead of creating a row. Blank `game_folder` never creates a row when the console already has one. A `game_folder` equal to or inside the row's `device_network_folder` is never appended (a network-sourced game must not turn its NAS mount into a local extra, which `sourceFor` would then misclassify as local). Fill-only-blank for save/state/emulator stays as is. No row for the console: create as today.
+- [x] 3. Upsert routing: in `upsert_console_for_game`, select the row by `console_name` (prefer the row whose `device_game_folder == game_folder`, else the first row for that console). If a non-blank `game_folder` differs from that row's folder and is not already in `device_extra_folders` (and not another legacy row's folder), append it to extras instead of creating a row. Blank `game_folder` never creates a row when the console already has one. A `game_folder` equal to or inside the row's `device_network_folder` is never appended (a network-sourced game must not turn its NAS mount into a local extra, which `sourceFor` would then misclassify as local). Fill-only-blank for save/state/emulator stays as is. No row for the console: create as today.
   - Files: src/server/store/consoles.py
   - Reuses: existing `existing_consoles` lookup and fill-only-blank block
   - New: none
@@ -97,3 +97,4 @@ none
 - GameConfig.tsx, MoveLocalRomPanel, NetworkRomPanel, localToNetwork (read-through only).
 
 ## Log
+Step 3: also skips a folder nested inside an already-known folder (primary, legacy rows, network), and fills a blank primary folder instead of adding an extra, so save-only-then-ROM games do not leave the primary blank.

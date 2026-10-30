@@ -74,6 +74,14 @@ class ConsoleMixin:
         self._conn.commit()
 
 
+def _within(path: str, root: str) -> bool:
+    """True when ``path`` is ``root`` or sits inside it (forward-slash compare)."""
+    if not root:
+        return False
+    p, r = path.replace("\\", "/").rstrip("/"), root.replace("\\", "/").rstrip("/")
+    return p == r or p.startswith(r + "/")
+
+
 def upsert_console_for_game(
     store: "Store",
     device_id: str,
@@ -89,7 +97,8 @@ def upsert_console_for_game(
     Called identically from the API (set_game_device) and the CLI (game add) so the
     logic lives in one place. ``network_folder``/``local_folder`` (issue #255) are
     the per-console NAS mount + local-copy destination for a network import; they
-    are persisted when provided and preserved (never blanked) when empty.
+    are persisted when provided and preserved (never blanked) when empty. A game
+    folder the console does not cover yet is recorded in ``device_extra_folders`` (#629).
     """
     emulator = ""
     game_folder = ""
@@ -109,11 +118,22 @@ def upsert_console_for_game(
     if save_folder:
         state_folder = saves_path_to_states(save_folder)
 
-    existing_consoles = store.list_consoles(device_id)
-    existing = next(
-        (c for c in existing_consoles if c.console_name == console_name and c.device_game_folder == game_folder),
-        None,
-    )
+    rows = [c for c in store.list_consoles(device_id) if c.console_name == console_name]
+    # One console reads once (#629): a game folder the console doesn't know yet joins
+    # device_extra_folders instead of spawning a second row. Legacy multi-row consoles
+    # keep working: an exact folder match picks that row, else the first row.
+    existing = next((c for c in rows if c.device_game_folder == game_folder), None)
+    if not existing and rows:
+        existing = rows[0]
+        if not existing.device_game_folder:
+            existing.device_game_folder = game_folder
+        elif game_folder:
+            known = [r.device_game_folder for r in rows] + existing.device_extra_folders
+            # Network-sourced games must not turn the NAS mount into a local extra:
+            # the GUI's sourceFor would then classify them as local.
+            known.append(network_folder or existing.device_network_folder)
+            if not any(_within(game_folder, k) for k in known):
+                existing.device_extra_folders.append(game_folder)
 
     if existing:
         # Fill-only-blank: a folder already on the row (learned earlier or hand-edited
