@@ -20,6 +20,7 @@ type Props = { consoleKey: string; onClose: () => void };
 export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): React.ReactElement {
   const { currentDeviceId } = useDevices();
   const [row, setRow] = useState<DeviceConsole | null | undefined>(undefined);
+  const [origRom, setOrigRom] = useState("");
   const [legacy, setLegacy] = useState<string[]>([]);
   const [emulators, setEmulators] = useState<string[]>([]);
   const [abbr, setAbbr] = useState("");
@@ -35,6 +36,7 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
       const all = (await getDeviceConsoles(currentDeviceId).catch(() => [])).filter((c) => c.console_name.toLowerCase() === a.toLowerCase());
       const primary = all.find((c) => c.device_game_folder) ?? all[0] ?? null;
       setRow(primary);
+      setOrigRom(primary?.device_game_folder ?? "");
       setLegacy(all.filter((c) => c !== primary && c.device_game_folder).map((c) => c.device_game_folder));
       const det = await window.emusync.emulator.detect(consoleKey).catch(() => null);
       setEmulators([...new Set((det?.options ?? []).map((o: { label: string }) => o.label))]);
@@ -60,9 +62,11 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
     try {
       const { id: _id, console_name: _name, ...folders } = row;
       const body: Folders = { ...folders };
-      // The copy destination defaults to the ROM folder; store that so Move/Network panels see it.
-      if (body.device_network_folder && !body.device_local_folder) body.device_local_folder = body.device_game_folder;
+      // The copy destination defaults to the ROM folder; store that so Move/Network panels see it,
+      // and keep it following the ROM folder while it still equals the folder it was defaulted from.
+      if (body.device_network_folder && (!body.device_local_folder || body.device_local_folder === origRom)) body.device_local_folder = body.device_game_folder;
       await updateDeviceConsole(currentDeviceId, row.id, body);
+      setOrigRom(body.device_game_folder);
       setMsg("Saved");
     } catch {
       setMsg("Couldn't save — is the server reachable?");

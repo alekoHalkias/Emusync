@@ -113,9 +113,9 @@ User decisions (asked before design was finished):
 - F8. [done] frontend-design-guide.md, CLAUDE.md, ARCHITECTURE.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 2 (review of PR #630): docs-stale GOTCHAS #539 entry (fixed); correctness - copy folder pinned to ROM folder went stale on ROM folder change (fixed: follows while it equals the original ROM folder)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -143,3 +143,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 implement: steps 6-7 done (DeviceConsole type, sourceFor extras as local)
 - 2026-10-29 implement: steps 8-11 done (ConsoleFoldersModal rewrite: one block, emulator select, conditional copy field, other ROM folders)
 - 2026-10-29 implement: steps 12-13 done (lint, 159 tests pass, docs); all steps checked; manual GUI run not done
+- 2026-10-29 review: 2 findings, blocked=no (both fixed)
