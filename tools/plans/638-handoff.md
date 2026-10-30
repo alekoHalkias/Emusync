@@ -4,7 +4,7 @@
 - Issue: #638
 - Branch: feature/638-release-publish-fix
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-30
 - Fix attempts: 0
 
