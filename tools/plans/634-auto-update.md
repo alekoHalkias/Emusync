@@ -14,7 +14,7 @@ Add automatic update checks so the EmuSync GUI detects and installs new releases
 - **Recommendations**: Banner is dismissible (persists via state, not localStorage — it reappears on next launch if the update isn't installed). The "Restart now" button calls the `app.relaunch()` IPC. No modal — a compact inline banner at the top of the app body, below the header bar, consistent with how the existing server-status / activity elements sit in the page.
 
 ## Steps
-- [ ] 1. **Backend: add `electron-updater` dependency and configure GitHub publish.**
+- [x] 1. **Backend: add `electron-updater` dependency and configure GitHub publish.**
   - Files: `src/gui/package.json`
   - Reuses: existing `electron-builder` config (already present in package.json `build` field).
   - New: none — the `publish: "github"` entry tells electron-builder to upload artifacts and generate `latest.yml` for electron-updater at release time.

@@ -29,7 +29,7 @@ make install-service | uninstall-service   # systemd user unit (needs `sudo logi
 node src/scripts/scan-roms.mjs <folder> [--ext gba,sfc] [--depth 3] [--verbose]
 ```
 
-Stack: Python 3.10+/Click, FastAPI+uvicorn, SQLite, zeroconf, tomlkit, httpx; Electron 31, React 18, TS, electron-vite.
+Stack: Python 3.10+/Click, FastAPI+uvicorn, SQLite, zeroconf, tomlkit, httpx; Electron 31, React 18, TS, electron-vite, electron-updater.
 
 ## Testing
 
