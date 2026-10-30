@@ -265,7 +265,8 @@ export function registerRomIpc(): void {
         // A same-size file already in the console folder is adopted instead of copied over (#631):
         // the game is re-pathed to it and the original is left alone.
         const adopted = existsSync(dest);
-        if (adopted && statSync(dest).size !== statSync(src).size) {
+        // Folder ROMs (PS3 etc.) report a meaningless directory size, so only plain files are compared.
+        if (adopted && !(statSync(dest).isFile() && statSync(src).isFile() && statSync(dest).size === statSync(src).size)) {
           return { ok: false, error: "A different file with that name already exists in the console folder" };
         }
         if (!adopted) {

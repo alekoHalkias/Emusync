@@ -74,9 +74,9 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 - 5. CLAUDE.md (and ARCHITECTURE.md if applicable).
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 1 (correctness, fixed): same-size adoption could match two different directories (folder ROMs report equal directory sizes); adoption now requires both to be regular files
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -97,3 +97,4 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 - 2026-10-29 implement: step 1 done (adopt same-size existing file, verify stored path)
 - 2026-10-29 implement: step 2 done (adopted flag in IPC types)
 - 2026-10-29 implement: steps 3-5 done (panel message, tsc/lint, CLAUDE.md); manual check not run
+- 2026-10-29 review: 1 finding, blocked=no (fixed: directory ROMs not adopted by size)
