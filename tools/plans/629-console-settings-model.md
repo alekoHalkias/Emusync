@@ -18,7 +18,7 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - Files: src/server/store/consoles.py
   - Reuses: console_defs.py json.dumps/json.loads usage
   - New: `_console_from_row` - two call sites now need the same JSON parse, one helper beats two copies
-- [ ] 3. Upsert routing: in `upsert_console_for_game`, select the row by `console_name` (prefer the row whose `device_game_folder == game_folder`, else the first row for that console). If a non-blank `game_folder` differs from that row's folder and is not already in `device_extra_folders` (and not another legacy row's folder), append it to extras instead of creating a row. Blank `game_folder` never creates a row when the console already has one. Fill-only-blank for save/state/emulator stays as is. No row for the console: create as today.
+- [ ] 3. Upsert routing: in `upsert_console_for_game`, select the row by `console_name` (prefer the row whose `device_game_folder == game_folder`, else the first row for that console). If a non-blank `game_folder` differs from that row's folder and is not already in `device_extra_folders` (and not another legacy row's folder), append it to extras instead of creating a row. Blank `game_folder` never creates a row when the console already has one. A `game_folder` equal to or inside the row's `device_network_folder` is never appended (a network-sourced game must not turn its NAS mount into a local extra, which `sourceFor` would then misclassify as local). Fill-only-blank for save/state/emulator stays as is. No row for the console: create as today.
   - Files: src/server/store/consoles.py
   - Reuses: existing `existing_consoles` lookup and fill-only-blank block
   - New: none
@@ -28,7 +28,7 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - New: none
 - [ ] 5. Tests (real SQLite): see step list below.
   - Files: src/tests/test_devices.py (new cases near the #539 tests), src/tests/test_network_rom.py (migration case beside `test_v9_to_v10_migration`)
-  - Cases: (a) GET returns `device_extra_folders == []` for a fresh console; (b) PUT sets extras, GET round-trips them, normalization drops blanks/dupes/primary folder; (c) PUT omitting the field preserves existing extras (regression for old clients); (d) second `PUT /games/{slug}/device` with a rom in a different folder for the same console adds an extra and leaves one console row; (e) same-folder repeat does not duplicate extras; save-only game (blank folder) adds no row; (f) hand-chosen `device_emulator` survives a later game config save with a different save dir (AC 4); (g) legacy two-row console still lists both rows and a new game in either row's folder creates no extras; (h) v28 DB migrates and gains the column with `[]`; PUT 403/404 paths already covered.
+  - Cases: (a) GET returns `device_extra_folders == []` for a fresh console; (b) PUT sets extras, GET round-trips them, normalization drops blanks/dupes/primary folder; (c) PUT omitting the field preserves existing extras (regression for old clients); (d) second `PUT /games/{slug}/device` with a rom in a different folder for the same console adds an extra and leaves one console row; (e) same-folder repeat does not duplicate extras; save-only game (blank folder) adds no row; (f) hand-chosen `device_emulator` survives a later game config save with a different save dir (AC 4); (g) legacy two-row console still lists both rows and a new game in either row's folder creates no extras; (h) v28 DB migrates and gains the column with `[]`; (i) a network-sourced game whose `rom_folder_path` is inside the console's `device_network_folder` adds no extra; PUT 403/404 paths already covered.
 - [ ] 6. API types: `DeviceConsole` gains `device_extra_folders?: string[]`; `updateDeviceConsole` already takes the Omit type so the payload carries it. Doc comment updated.
   - Files: src/gui/renderer/src/api.ts
   - Reuses: existing `DeviceConsole` / `updateDeviceConsole`
@@ -55,6 +55,28 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
 - [ ] 13. Docs (merged): src/docs/ARCHITECTURE.md (consoles data model: new column, upsert routing; modal behavior if listed), CLAUDE.md (upsert rule line for extras; GUI rule line for ConsoleFoldersModal: one block per console, extras, label-only emulator, #629), .claude/frontend-design-guide.md (Settings forms entry).
   - Files: src/docs/ARCHITECTURE.md, CLAUDE.md, .claude/frontend-design-guide.md
   - Reuses: n/a; the two plans' docs steps (backend 6, frontend 8) touched the same CLAUDE.md and ARCHITECTURE.md, so they are one step
+
+## Testing
+- **Test File**: src/tests/test_devices.py (API + upsert cases, placed under a new "console extra folders (#629)" section after the #539 tests, reusing `_seed_console`, `AUTH`, `DEVICE_ID`, `_device_auth`); src/tests/test_network_rom.py (migration case beside `test_v9_to_v10_migration`, network-folder case beside the existing console-folder tests). No new files, no new fixtures.
+- **Test Cases**:
+  - extras default: `GET /devices/{id}/consoles` after `_seed_console` returns `device_extra_folders == []`.
+  - extras round-trip: PUT with `["/roms/snes2", "/roms/snes3"]`, GET returns them in order.
+  - normalization: PUT with blanks, duplicates, whitespace, and the primary `device_game_folder` returns a cleaned list.
+  - preserve on omit (regression): PUT body without `device_extra_folders` keeps existing extras; PUT with `[]` clears them.
+  - upsert routing: second `PUT /games/{slug}/device` for the same console with a ROM in a different folder yields one console row and the folder in extras.
+  - emulator survives (AC 4): PUT sets `device_emulator = "custom"`, then a game config save with a different save dir leaves it unchanged (extends the existing #539 regression to the new routing path).
+  - migration: minimal v28-shaped `consoles` table, `schema._migrate(conn, from_version=28)`, column exists with `'[]'`, existing row kept, `user_version` stamped.
+- **Edge Cases**:
+  - same-folder repeat adds no duplicate extra; second row never created.
+  - save-only game (blank game folder) on a console that already has a row adds no row and no extra.
+  - legacy two-row console (two rows with different `device_game_folder`): both still listed; a game in either folder creates no extra; a game in a third folder lands in the extras of the row chosen by `console_name` first-match.
+  - network-sourced game under `device_network_folder` adds no extra (misclassification guard).
+  - first-ever game for a console with no row still creates the row exactly as before (no extras).
+  - PUT 403/404 already covered by `test_update_device_console_errors`; the new field does not change them.
+- **Integration Points**:
+  - `PUT /games/{slug}/device` -> `upsert_console_for_game` -> `GET /devices/{id}/consoles` is the full path every case drives through the real FastAPI app and SQLite.
+  - Existing `test_game_config_save_does_not_overwrite_edited_console_folders` and `test_network_import_populates_and_preserves_console_folders` must still pass unchanged (they exercise the changed upsert).
+  - Frontend: no JS test runner; covered by `make lint` (tsc) and the manual check in step 12. `make test-changed` runs the two Python files.
 
 ## Checklist
 Schema bump: yes (28 -> 29). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no (DB column only).

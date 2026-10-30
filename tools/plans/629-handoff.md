@@ -82,10 +82,10 @@ User decisions (asked before design was finished):
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: src/tests/test_devices.py (API + upsert), src/tests/test_network_rom.py (migration, network guard). No new files or fixtures.
+### Test Cases: extras default [], round-trip, normalization, preserve-on-omit (regression), upsert routing to extras, emulator survives, v28 migration (7)
+### Edge Cases: same-folder repeat, save-only game, legacy two-row console, network-folder guard, first-ever game unchanged, PUT 403/404 unchanged (6)
+### Integration Points: PUT /games/{slug}/device -> upsert -> GET consoles; two existing regression tests must pass unchanged; GUI via make lint + manual run
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -98,9 +98,9 @@ User decisions (asked before design was finished):
 ### Steps (bplan)
 - 1. schema.py, models.py. Reuses `_try` ALTER pattern. New: none.
 - 2. consoles.py set/get/list SQL + JSON. Reuses console_defs json usage. New: `_console_from_row` (get and list both parse JSON).
-- 3. consoles.py `upsert_console_for_game` routing. Reuses existing lookup + fill-only-blank. New: none.
+- 3. consoles.py `upsert_console_for_game` routing (+ tplan: skip folders inside device_network_folder). Reuses existing lookup + fill-only-blank. New: none.
 - 4. devices.py GET + PUT. Reuses model_dump setattr loop (+exclude_none). New: none.
-- 5. test_devices.py, test_network_rom.py: 8 cases (see plan file). Reuses `_seed_console`, migration test pattern.
+- 5. test_devices.py, test_network_rom.py: 9 cases (tplan added network-folder guard) (see plan file). Reuses `_seed_console`, migration test pattern.
 - 6. ARCHITECTURE.md, CLAUDE.md. New: none.
 ### Steps (fplan)
 - F1. api.ts DeviceConsole + device_extra_folders. Reuses existing type/fn. New: none.
@@ -134,3 +134,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 bplan: 6 steps written, backend_pattern=JSON extras column + Optional-preserve PUT field + upsert routes differing folder to extras
 - 2026-10-29 fplan: 8 steps written, visual_pattern=single console block, conditional copy field, emulator select, extras list
 - 2026-10-29 merge: 4 conflicts resolved, 0 unresolved
+- 2026-10-29 tplan: test_file=src/tests/test_devices.py + test_network_rom.py, 7 test cases + 6 edge cases defined; plan step 3 amended with network-folder guard

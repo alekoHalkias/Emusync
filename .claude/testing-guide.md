@@ -41,3 +41,6 @@ def test_cli_command(live_server):
 
 ## Reuse Strategy
 Extend existing test files when the test touches code already covered there. Create new files only when the coverage area is distinct (e.g., scanner logic gets its own file since no existing test covers detect.py scanning).
+
+## Console rows (#629)
+Console/extra-folder API cases go in `test_devices.py` after the #539 tests and drive `PUT /games/{slug}/device` -> `GET /devices/{id}/consoles` via `_seed_console`. Migration cases build a minimal old-shaped table and call `schema._migrate(conn, from_version=N)` (see `test_v9_to_v10_migration`). GUI has no JS test runner: `make lint` plus a manual run.
