@@ -16,6 +16,7 @@ import { useLocalizeJob } from "./localizeJob";
 import { useGamepadNav } from "./useGamepadNav";
 import ControllerHints from "./components/ControllerHints";
 import SelectPicker from "./components/SelectPicker";
+import UpdateBanner from "./components/UpdateBanner";
 import { DotIcon, DownloadIcon, StopIcon } from "./components/icons";
 
 type Screen =
@@ -308,6 +309,7 @@ export default function App(): React.ReactElement {
     <DeviceProvider>
     <div className="layout">
       {display.bigPicture && <div className="bp-backdrop" />}
+      <UpdateBanner />
       <header className="topbar">
         {/* Left: back breadcrumb or app title */}
         {screen.name === "console" ? (
