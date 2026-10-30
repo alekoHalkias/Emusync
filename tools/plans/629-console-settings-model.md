@@ -26,7 +26,7 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - Files: src/server/api/devices.py
   - Reuses: the `model_dump()` setattr loop (add `exclude_none=True`)
   - New: none
-- [ ] 5. Tests (real SQLite): see step list below.
+- [x] 5. Tests (real SQLite): see step list below.
   - Files: src/tests/test_devices.py (new cases near the #539 tests), src/tests/test_network_rom.py (migration case beside `test_v9_to_v10_migration`)
   - Cases: (a) GET returns `device_extra_folders == []` for a fresh console; (b) PUT sets extras, GET round-trips them, normalization drops blanks/dupes/primary folder; (c) PUT omitting the field preserves existing extras (regression for old clients); (d) second `PUT /games/{slug}/device` with a rom in a different folder for the same console adds an extra and leaves one console row; (e) same-folder repeat does not duplicate extras; save-only game (blank folder) adds no row; (f) hand-chosen `device_emulator` survives a later game config save with a different save dir (AC 4); (g) legacy two-row console still lists both rows and a new game in either row's folder creates no extras; (h) v28 DB migrates and gains the column with `[]`; (i) a network-sourced game whose `rom_folder_path` is inside the console's `device_network_folder` adds no extra; PUT 403/404 paths already covered.
 - [ ] 6. API types: `DeviceConsole` gains `device_extra_folders?: string[]`; `updateDeviceConsole` already takes the Omit type so the payload carries it. Doc comment updated.

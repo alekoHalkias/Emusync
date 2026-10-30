@@ -100,7 +100,7 @@ User decisions (asked before design was finished):
 - 2. [done] consoles.py set/get/list SQL + JSON. Reuses console_defs json usage. New: `_console_from_row` (get and list both parse JSON).
 - 3. [done] consoles.py `upsert_console_for_game` routing (+ tplan: skip folders inside device_network_folder). Reuses existing lookup + fill-only-blank. New: none.
 - 4. [done] devices.py GET + PUT. Reuses model_dump setattr loop (+exclude_none). New: none.
-- 5. test_devices.py, test_network_rom.py: 9 cases (tplan added network-folder guard) (see plan file). Reuses `_seed_console`, migration test pattern.
+- 5. [done] test_devices.py, test_network_rom.py: 9 cases (tplan added network-folder guard) (see plan file). Reuses `_seed_console`, migration test pattern.
 - 6. ARCHITECTURE.md, CLAUDE.md. New: none.
 ### Steps (fplan)
 - F1. api.ts DeviceConsole + device_extra_folders. Reuses existing type/fn. New: none.
@@ -139,3 +139,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 implement: step 2 done (store reads/writes extras as JSON via _console_from_row)
 - 2026-10-29 implement: step 3 done (upsert routes unknown folders to extras; deviation: nested-folder skip, blank primary fill)
 - 2026-10-29 implement: step 4 done (GET returns extras; PUT Optional field, None preserves, cleaned list)
+- 2026-10-29 implement: step 5 done (8 API/upsert tests + v28 migration test, all passing)
