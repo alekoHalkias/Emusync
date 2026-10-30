@@ -4,7 +4,7 @@
 - Issue: #631
 - Branch: feature/631-repath-existing-console-rom
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -30,14 +30,14 @@ The user must fix the path by hand although the correct file is already in the c
 - [ ] Regression test or documented manual check.
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
-
+### Scope: Small. Electron main-process handler plus two message tweaks in the renderer; no server change.
+User decisions: (1) adopt the existing file only when its byte size equals the source's, otherwise keep the current error; (2) leave the original file untouched.
+### Backend Changes: none
+### UI Changes: `rom:moveToConsoleFolder` (src/gui/electron/sync/rom.ts) adopts a same-size existing destination: PUT rom_path + launch command, re-GET and verify file exists and rom_path matches, return `adopted: true`. `emusync.d.ts` and `preload.ts` types gain optional `adopted`. `MoveLocalRomPanel` and `LocalToNetworkModal` show that an existing file was used.
+### Plan Target: fplan
+### Sub-issues: none
+### Difficulty: 3/10
+### Backwards Compatibility: no breaking changes; optional field on an existing IPC result.
 ## 3. Frontend Plan
 ### Design Alignment: TBD
 ### Visual Pattern: TBD
@@ -86,3 +86,4 @@ The user must fix the path by hand although the correct file is already in the c
 
 ## 12. Log
 - 2026-10-29 issue: workflow initialized (issue #631 filed, handoff created; branched from main, independent of #629/PR #630)
+- 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
