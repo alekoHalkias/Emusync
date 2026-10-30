@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #638
 - Branch: feature/638-release-publish-fix
-- PR: none
-- Status: implemented
+- PR: #639
+- Status: shipped
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -66,15 +66,15 @@ Build jobs run `electron-builder --publish never`; upload latest*.yml with the i
 - Step 4: touches CLAUDE.md; docs only.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 0 (review of 3-line CI diff)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #639
+### Server Sync: done
+### Doc Sync: done (CLAUDE.md)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -87,3 +87,5 @@ Build jobs run `electron-builder --publish never`; upload latest*.yml with the i
 - 2026-10-30 bplan: 4 steps written, backend_pattern=none (CI config)
 - 2026-10-30 tplan: test_file=none, 2 verification cases defined
 - 2026-10-30 implement: steps 1-4 done (publish never, latest*.yml artifacts, CLAUDE.md)
+- 2026-10-30 review: 0 findings, blocked=no
+- 2026-10-30 ship: PR #639, server sync done, doc sync updated CLAUDE.md
