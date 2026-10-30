@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #634
 - Branch: feature/634-auto-update
-- PR: none
+- PR: #637
 - Status: shipped
 - Created: 2026-01-03
 - Fix attempts: 0
@@ -128,8 +128,8 @@ Users currently must manually check GitHub for new versions, download the AppIma
 
 ## 10. Ship
 ### Status: ready to merge
-### PR: none
-### Server Sync: pending
+### PR: #637
+### Server Sync: done
 ### Doc Sync: done
 
 ## 11. Fix Attempts
@@ -146,3 +146,4 @@ Users currently must manually check GitHub for new versions, download the AppIma
 - 2026-01-03 implement: steps 1-7 done, server synced, ready to ship
 - 2026-10-30 ship: tsc found undefined releaseNotes in UpdateBanner.tsx; fix step 11 added
 - 2026-10-30 review: 4 findings (1 correctness), fixed in step 12; re-shipping
+- 2026-10-30 ship: PR #637, server sync done, doc sync updated ARCHITECTURE.md
