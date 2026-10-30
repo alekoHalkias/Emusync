@@ -7,7 +7,7 @@
     "dev": "electron-vite dev -- --no-sandbox --ozone-platform-hint=auto",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder --publish never"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
