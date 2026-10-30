@@ -53,10 +53,10 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: none automated (Electron main + React; no JS runner, no mocks). Manual script in the plan's Testing section plus tsc, make lint, make test-changed.
+### Test Cases: adopt same-size existing file (path re-pointed, original kept), launch command rewritten, success only after verification re-read (3)
+### Edge Cases: different size errors with no change; normal move still works; already-in-folder message; server unreachable gives ok:false (4)
+### Integration Points: rom:moveToConsoleFolder -> PUT/GET /games/{slug}/device; MoveLocalRomPanel onMoved -> GameConfig; LocalToNetworkModal (#626) shares the channel
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -93,3 +93,4 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 - 2026-10-29 issue: workflow initialized (issue #631 filed, handoff created; branched from main, independent of #629/PR #630)
 - 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-10-29 fplan: 5 steps written, visual_pattern=reuse panel status line, no new UI
+- 2026-10-29 tplan: test_file=none (manual script + tsc/lint), 3 test cases + 4 edge cases defined

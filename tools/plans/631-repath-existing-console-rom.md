@@ -26,9 +26,25 @@ When "Move to console folder" finds a same-named file already in the console fol
   - Files: src/gui/renderer/src/components/game-config/MoveLocalRomPanel.tsx
   - Reuses: existing `setMsg` and `onMoved(r.romPath, r.launchCommand)`
   - New: none
-- [ ] 4. Verification: no JS test runner or Electron-main test harness exists, so run the tsc checks and `make lint`, then a manual check with a throwaway game: place a same-size file in the console folder, press Move, confirm the message, that the game's path in Settings is the console-folder file, and that the original is still there; repeat with a different-size file and confirm the error.
+- [ ] 4. Verification (see Testing): no JS test runner or Electron-main test harness exists, so run the tsc checks and `make lint`, then a manual check with a throwaway game: place a same-size file in the console folder, press Move, confirm the message, that the game's path in Settings is the console-folder file, and that the original is still there; repeat with a different-size file and confirm the error.
 - [ ] 5. Docs: CLAUDE.md GUI rules line for the #622 move panel gets "an existing same-size file in the console folder is adopted (game re-pathed, verified, original kept, #631)"; ARCHITECTURE.md only if it describes the move flow.
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md (if applicable)
+
+## Testing
+- **Test File**: none automated. The change lives in the Electron main process (`src/gui/electron/sync/rom.ts`) and a React panel; the repo has no JS test runner or main-process harness, and CLAUDE.md forbids mocks. Adding a runner for one handler is out of proportion, so verification is `tsc` (node + web), `make lint`, `make test-changed` (no Python file changes expected, so it should fall back to the full suite), and the manual script below.
+- **Test Cases** (manual, throwaway game in a temp console folder; the server can be a dev server via `make dev-server`):
+  - adopt: ROM outside the console folder and a same-size file with the same name inside it. Move shows the re-pathed message; the game's ROM path (Settings, or `GET /games/{slug}/device`) is the console-folder file; the original file still exists.
+  - launch command: a game whose `launch_command` embeds the old path now embeds the new path (and a `%ROM%` token launch command is unchanged).
+  - verification: the success message only appears after the re-read of the stored path matches.
+- **Edge Cases**:
+  - same name, different size: the error is returned, game unchanged, nothing written.
+  - normal move into an empty console folder still works and still reports "Moved.".
+  - source already in the console folder keeps "ROM is already in the console folder".
+  - server unreachable during the PUT or the verification GET: `ok: false` with an error, not a false success.
+- **Integration Points**:
+  - `rom:moveToConsoleFolder` -> `PUT /games/{slug}/device` -> `GET /games/{slug}/device`.
+  - `MoveLocalRomPanel` `onMoved` callback updates GameConfig's displayed path and launch command from `r.romPath` / `r.launchCommand`; confirm GameConfig shows the new path after an adopt.
+  - `LocalToNetworkModal` (#626, not yet on main) shares the channel; adopted results are `ok: true`.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no (existing channel gains an optional result field; d.ts and preload types updated). New CLI subcommand: no. Config/data file change: no.

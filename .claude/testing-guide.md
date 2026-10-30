@@ -41,3 +41,6 @@ def test_cli_command(live_server):
 
 ## Reuse Strategy
 Extend existing test files when the test touches code already covered there. Create new files only when the coverage area is distinct (e.g., scanner logic gets its own file since no existing test covers detect.py scanning).
+
+## Electron main / renderer-only changes
+No JS test runner and no main-process harness exist. Such changes are verified by both `tsc` projects, `make lint`, and a written manual script in the plan's Testing section (real files in a temp folder, a dev server, no mocks). Put server-visible behavior in a Python integration test whenever the logic can live server-side.
