@@ -3,7 +3,7 @@
 Issue: #631
 Branch: feature/631-repath-existing-console-rom
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
