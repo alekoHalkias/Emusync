@@ -68,9 +68,9 @@ User decisions (asked before design was finished):
 ### Backwards Compatibility: no breaking changes. Column and request field are additive with defaults; an old server ignores `device_extra_folders`. Legacy one-row-per-folder console rows stay in the DB and are surfaced in the "Other ROM folders" list, never rewritten or deleted, so `UNIQUE(device_id, console_name, device_game_folder)` is untouched. `device_local_folder` keeps its meaning and all consumers of it are untouched. No IPC channel added or changed.
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: Keeps the Modal/config-form/input-group pattern; plain select for the emulator; list rows with ghost Remove. Plan file: tools/plans/629-console-settings-model-ui.md
+### Visual Pattern: Single block per console, conditional copy-destination field, extras section at bottom, one Save/PUT.
+### Recommendations: Guide gained a Settings forms entry. Legacy extra console rows are read-only (no delete route).
 
 ## 4. Backend Plan
 ### Design Alignment: Fits the guide: additive JSON-TEXT column (dirs_json precedent), schema evolution steps 1-4, defaulted pydantic field, single shared inference function. Plan file: tools/plans/629-console-settings-model.md
@@ -102,6 +102,15 @@ User decisions (asked before design was finished):
 - 4. devices.py GET + PUT. Reuses model_dump setattr loop (+exclude_none). New: none.
 - 5. test_devices.py, test_network_rom.py: 8 cases (see plan file). Reuses `_seed_console`, migration test pattern.
 - 6. ARCHITECTURE.md, CLAUDE.md. New: none.
+### Steps (fplan)
+- F1. api.ts DeviceConsole + device_extra_folders. Reuses existing type/fn. New: none.
+- F2. useBrokenRoms.ts sourceFor adds extras as local candidates. Reuses candidates array. New: none.
+- F3. ConsoleFoldersModal.tsx group/fields/copy field. Reuses edit/browse/save, usesSharedSaveLayout. New: none.
+- F4. Same file: emulator select from emulator:detect. Reuses existing IPC, ConsoleStep markup. New: none.
+- F5. Same file: Other ROM folders section. Reuses browse + dialog.openFolder. New: none.
+- F6. Same file: replace stale helper text.
+- F7. make lint + run skill manual check (no JS test runner exists).
+- F8. frontend-design-guide.md, CLAUDE.md, ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -123,3 +132,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 issue: workflow initialized (issue #629 filed, handoff created)
 - 2026-10-29 issue: duplicate check found #628 and #629; user chose to continue under #629. #628 and feature/628-console-settings-model are now superseded, neither has code changes.
 - 2026-10-29 bplan: 6 steps written, backend_pattern=JSON extras column + Optional-preserve PUT field + upsert routes differing folder to extras
+- 2026-10-29 fplan: 8 steps written, visual_pattern=single console block, conditional copy field, emulator select, extras list
