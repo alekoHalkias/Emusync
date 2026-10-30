@@ -44,7 +44,7 @@ Add automatic update checks so the EmuSync GUI detects and installs new releases
     - emusync.d.ts: add `interface UpdaterApi { check(): Promise<...>; download(): Promise<...>; install(): Promise<void>; getEnabled(): Promise<boolean>; setEnabled(enabled: boolean): Promise<boolean>; }` and add it to the `EmuSyncApi` interface.
     - Also add the `updater:change` event shape to `ElectronAPI` in emusync.d.ts.
 
-- [ ] 5. **Settings toggle: auto-update switch in Display section.**
+- [x] 5. **Settings toggle: auto-update switch in Display section.**
   - Files: `src/gui/renderer/src/components/ServerStatusButton.tsx`
   - Reuses: existing `display` state pattern (loaded from `window.emusync.display`), checkbox toggle pattern (line 419: "Watch for save changes"), `window.emusync.display.*` IPC calls.
   - New: reads `autoUpdateEnabled` from the display settings via a new `display:getAutoUpdate` / `display:setAutoUpdate` IPC pair (or embeds it in the existing get/set). Actually, cleaner: add `autoUpdateEnabled` to the existing `display:get` return shape and `display:set` handler in `display.ts`. Then the toggle in ServerStatusButton reads/writes it alongside `scale`, `fullscreen`, `theme`.
