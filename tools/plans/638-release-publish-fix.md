@@ -3,7 +3,7 @@
 Issue: #638
 Branch: feature/638-release-publish-fix
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
