@@ -4,7 +4,7 @@
 - Issue: #629
 - Branch: feature/629-console-settings-model
 - PR: none
-- Status: shipped
+- Status: implementing
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -144,3 +144,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 implement: steps 8-11 done (ConsoleFoldersModal rewrite: one block, emulator select, conditional copy field, other ROM folders)
 - 2026-10-29 implement: steps 12-13 done (lint, 159 tests pass, docs); all steps checked; manual GUI run not done
 - 2026-10-29 review: 2 findings, blocked=no (both fixed)
+- 2026-10-29 implement: resolving merge conflicts with main (PR 630)
