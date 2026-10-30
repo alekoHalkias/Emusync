@@ -14,7 +14,7 @@ Add a `device_extra_folders` list to each console row (storage, upsert routing, 
   - Files: src/server/store/schema.py, src/server/store/models.py
   - Reuses: schema.py `_try(conn, "ALTER TABLE consoles ADD COLUMN ...")` pattern at the < 27 block; keep trailing user_version stamp
   - New: none
-- [ ] 2. Store boundary: add the column to `set_console` / `get_console` / `list_consoles` SQL; serialize with `json.dumps`, parse with `json.loads` into the dataclass (small private `_console_from_row` used by get and list, so `Console(**dict(row))` is not duplicated with JSON handling).
+- [x] 2. Store boundary: add the column to `set_console` / `get_console` / `list_consoles` SQL; serialize with `json.dumps`, parse with `json.loads` into the dataclass (small private `_console_from_row` used by get and list, so `Console(**dict(row))` is not duplicated with JSON handling).
   - Files: src/server/store/consoles.py
   - Reuses: console_defs.py json.dumps/json.loads usage
   - New: `_console_from_row` - two call sites now need the same JSON parse, one helper beats two copies

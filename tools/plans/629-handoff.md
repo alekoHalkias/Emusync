@@ -97,7 +97,7 @@ User decisions (asked before design was finished):
 ## 8. Implementation Steps
 ### Steps (bplan)
 - 1. [done] schema.py, models.py. Reuses `_try` ALTER pattern. New: none.
-- 2. consoles.py set/get/list SQL + JSON. Reuses console_defs json usage. New: `_console_from_row` (get and list both parse JSON).
+- 2. [done] consoles.py set/get/list SQL + JSON. Reuses console_defs json usage. New: `_console_from_row` (get and list both parse JSON).
 - 3. consoles.py `upsert_console_for_game` routing (+ tplan: skip folders inside device_network_folder). Reuses existing lookup + fill-only-blank. New: none.
 - 4. devices.py GET + PUT. Reuses model_dump setattr loop (+exclude_none). New: none.
 - 5. test_devices.py, test_network_rom.py: 9 cases (tplan added network-folder guard) (see plan file). Reuses `_seed_console`, migration test pattern.
@@ -136,3 +136,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 merge: 4 conflicts resolved, 0 unresolved
 - 2026-10-29 tplan: test_file=src/tests/test_devices.py + test_network_rom.py, 7 test cases + 6 edge cases defined; plan step 3 amended with network-folder guard
 - 2026-10-29 implement: step 1 done (schema v29 column + Console.device_extra_folders)
+- 2026-10-29 implement: step 2 done (store reads/writes extras as JSON via _console_from_row)
