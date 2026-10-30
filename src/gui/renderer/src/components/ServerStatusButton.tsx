@@ -11,7 +11,7 @@ import Modal from "./Modal";
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
 
-type DisplayState = { scale: number; fullscreen: boolean; theme: string };
+type DisplayState = { scale: number; fullscreen: boolean; theme: string; autoUpdateEnabled: boolean };
 
 export default function ServerStatusButton({ isServer, onRepaired, display, onDisplay }: {
   isServer: boolean;
@@ -461,6 +461,17 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                 {themes.map((t) => <option key={t.id} value={t.id}>{t.name}{t.author ? ` (${t.author})` : ""}</option>)}
               </select>
               {themes.length === 0 && <span>Put theme folders in the "themes" folder of the EmuSync config directory.</span>}
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={display.autoUpdateEnabled}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  window.emusync.updater.setEnabled(on).then(() => onDisplay({ autoUpdateEnabled: on }));
+                }}
+              />
+              Automatically check for and download updates
             </label>
 
             <details className="settings-collapse">

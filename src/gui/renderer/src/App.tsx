@@ -16,6 +16,7 @@ import { useLocalizeJob } from "./localizeJob";
 import { useGamepadNav } from "./useGamepadNav";
 import ControllerHints from "./components/ControllerHints";
 import SelectPicker from "./components/SelectPicker";
+import UpdateBanner from "./components/UpdateBanner";
 import { DotIcon, DownloadIcon, StopIcon } from "./components/icons";
 
 type Screen =
@@ -40,7 +41,7 @@ export default function App(): React.ReactElement {
   useGamepadNav();
 
   // Big Picture controls (#499): current UI scale + fullscreen state.
-  const [display, setDisplay] = useState({ scale: 1, fullscreen: false, bigPicture: false, theme: "default" });
+  const [display, setDisplay] = useState({ scale: 1, fullscreen: false, bigPicture: false, theme: "default", autoUpdateEnabled: true });
   useEffect(() => { window.emusync.display.get().then(setDisplay); }, []);
   // Main pushes this when fullscreen changes (F11/Alt+Enter/OS) — Big Picture follows it.
   useEffect(() => window.emusync.display.onChange((d) => setDisplay((prev) => ({ ...prev, ...d }))), []);
@@ -308,6 +309,7 @@ export default function App(): React.ReactElement {
     <DeviceProvider>
     <div className="layout">
       {display.bigPicture && <div className="bp-backdrop" />}
+      <UpdateBanner />
       <header className="topbar">
         {/* Left: back breadcrumb or app title */}
         {screen.name === "console" ? (
