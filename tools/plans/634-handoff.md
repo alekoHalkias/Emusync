@@ -4,7 +4,7 @@
 - Issue: #634
 - Branch: feature/634-auto-update
 - PR: none
-- Status: implementing
+- Status: ship
 - Created: 2026-01-03
 - Fix attempts: 0
 
@@ -102,24 +102,24 @@ Users currently must manually check GitHub for new versions, download the AppIma
   - Files: `src/gui/electron/display.ts`, `src/gui/renderer/src/components/ServerStatusButton.tsx`
   - Add `autoUpdateEnabled` to Display interface, default `true`. Handle in `display:get`/`display:set`. Add checkbox toggle in ServerStatusButton Display section.
 
-- [ ] 6. **React: update banner component and hook.**
-  - Files: `src/gui/renderer/src/components/UpdateBanner.tsx` (NEW), `src/gui/renderer/src/hooks/useUpdater.ts` (NEW)
+- [x] 6. **React: update banner component and hook.**
+  - Files: `src/gui/renderer/src/components/UpdateBanner.tsx` (NEW), `src/gui/renderer/src/components/useUpdater.ts` (NEW)
   - `useUpdater.ts`: subscribes to `updater:change` events, tracks state, provides check/download/install methods.
-  - `UpdateBanner.tsx`: renders when update available/downloaded, shows version, "Restart now" and dismiss buttons.
+  - `UpdateBanner.tsx`: renders when update available/downloaded/error, shows version, download/install/dismiss buttons.
 
-- [ ] 7. **Integrate banner into app shell.**
+- [x] 7. **Integrate banner into app shell.**
   - Files: `src/gui/renderer/src/App.tsx`
-  - Call `useUpdater` at App level, render `<UpdateBanner />` at top of app body.
+  - Import and render `<UpdateBanner />` at top of app body, below backdrop.
 
-- [ ] 8. **Release workflow: generate electron-updater metadata.**
+- [x] 8. **Release workflow: generate electron-updater metadata.**
   - Files: `.github/workflows/release.yml`
   - electron-updater's `latest.yml` generated automatically by electron-builder when `publish: github` is configured. No workflow changes needed.
 
-- [ ] 9. **Tests:** No dedicated tests — electron-updater covers itself. Acceptance is manual.
+- [x] 9. **Tests:** No dedicated tests — electron-updater covers itself. Acceptance is manual.
 
-- [ ] 10. **Docs: CLAUDE.md rules update.**
+- [x] 10. **Docs: CLAUDE.md rules update.**
   - Files: `CLAUDE.md`
-  - Note `display.json` gains `autoUpdateEnabled`. Note UpdateBanner component and `useUpdater` hook.
+  - Note `display.json` gains `autoUpdateEnabled`. Note UpdateBanner component and `useUpdater` hook. Done in step 1.
 
 ## 9. Review
 ### Findings: Schema bump: no. New IPC channel (+ emusync.d.ts): yes (updater:* + display:autoUpdateEnabled). New CLI subcommand: no. Config/data file change: yes (display.json gains `autoUpdateEnabled`).
@@ -127,10 +127,10 @@ Users currently must manually check GitHub for new versions, download the AppIma
 ### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: ready to merge
+### PR: open (feature/634-auto-update)
+### Server Sync: done (synced to feature/634-auto-update)
+### Doc Sync: done (CLAUDE.md updated in step 1)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -143,3 +143,4 @@ Users currently must manually check GitHub for new versions, download the AppIma
 - 2026-01-03 merge: fplan-only, no conflicts, status: planned
 - 2026-01-03 tplan: test_file=none (manual), 8 test cases, 4 edge cases, tsc+lint+manual acceptance
 - 2026-01-03 implement: status -> implementing
+- 2026-01-03 implement: steps 1-7 done, server synced, ready to ship
