@@ -4,7 +4,7 @@
 - Issue: #634
 - Branch: feature/634-auto-update
 - PR: none
-- Status: tplan done
+- Status: implementing
 - Created: 2026-01-03
 - Fix attempts: 0
 
@@ -142,3 +142,4 @@ Users currently must manually check GitHub for new versions, download the AppIma
 - 2026-01-03 fplan: complete, frontend-only, 10 steps, 6/10 difficulty
 - 2026-01-03 merge: fplan-only, no conflicts, status: planned
 - 2026-01-03 tplan: test_file=none (manual), 8 test cases, 4 edge cases, tsc+lint+manual acceptance
+- 2026-01-03 implement: status -> implementing
