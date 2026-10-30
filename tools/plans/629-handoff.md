@@ -4,7 +4,7 @@
 - Issue: #629
 - Branch: feature/629-console-settings-model
 - PR: none
-- Status: implementing
+- Status: shipped
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -145,3 +145,4 @@ User decisions (asked before design was finished):
 - 2026-10-29 implement: steps 12-13 done (lint, 159 tests pass, docs); all steps checked; manual GUI run not done
 - 2026-10-29 review: 2 findings, blocked=no (both fixed)
 - 2026-10-29 implement: resolving merge conflicts with main (PR 630)
+- 2026-10-29 implement: merged main into branch, kept 629 side of 4 conflicts; pytest ok
