@@ -79,21 +79,20 @@ export function registerUpdaterIpc(): void {
     return enabled;
   });
 
-  // Attach event listeners once the main window exists.
   const check = () => {
-    const win = rt.mainWindow;
-    if (win) {
-      attachListeners(win);
-      // Fire an initial check if auto-update is enabled.
-      const d = loadDisplay();
-      if (d.autoUpdateEnabled) {
-        autoUpdater.checkForUpdates().catch(() => {});
-      }
-    }
+    if (loadDisplay().autoUpdateEnabled) autoUpdater.checkForUpdates().catch(() => {});
   };
-  check(); // if window already created
-  rt.mainWindow ??= null; // ensure reference exists
-  // Re-check when the window is first set (createWindow assigns it).
-  // We poll once after a short delay to catch the assignment.
-  setTimeout(check, 1000);
+  // Listeners attach once, when the window first exists; then check now and every 4 hours.
+  let attached = false;
+  const attachWhenReady = () => {
+    const win = rt.mainWindow;
+    if (!win || attached) return;
+    attached = true;
+    attachListeners(win);
+    check();
+    setInterval(check, 4 * 60 * 60 * 1000);
+  };
+  attachWhenReady();
+  // createWindow assigns rt.mainWindow after IPC registration.
+  setTimeout(attachWhenReady, 1000);
 }

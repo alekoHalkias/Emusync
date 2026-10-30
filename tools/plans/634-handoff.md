@@ -6,7 +6,7 @@
 - PR: none
 - Status: shipped
 - Created: 2026-01-03
-- Fix attempts: 1
+- Fix attempts: 0
 
 ## 1. Issue
 ### Summary
@@ -130,7 +130,7 @@ Users currently must manually check GitHub for new versions, download the AppIma
 ### Status: ready to merge
 ### PR: none
 ### Server Sync: pending
-### Doc Sync: pending
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -145,3 +145,4 @@ Users currently must manually check GitHub for new versions, download the AppIma
 - 2026-01-03 implement: status -> implementing
 - 2026-01-03 implement: steps 1-7 done, server synced, ready to ship
 - 2026-10-30 ship: tsc found undefined releaseNotes in UpdateBanner.tsx; fix step 11 added
+- 2026-10-30 review: 4 findings (1 correctness), fixed in step 12; re-shipping

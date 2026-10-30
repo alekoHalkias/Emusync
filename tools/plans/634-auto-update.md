@@ -106,3 +106,5 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (updater:* + display:auto
 ## Log
 
 - [x] 11. **Fix (ship attempt 1):** `UpdateBanner.tsx` references undefined `releaseNotes` (tsc TS2304, runtime ReferenceError when an update is available) and imports unused `useCallback`. Destructure `releaseNotes` from `useUpdater()`, drop the unused import.
+
+- [x] 12. **Review fixes:** attach updater listeners once and add a 4-hour re-check interval in updater.ts; remove stray root `emusync` script; restore tsbuildinfo files to main; document updater IPC in ARCHITECTURE.md.
