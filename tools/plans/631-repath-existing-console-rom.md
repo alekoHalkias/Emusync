@@ -22,12 +22,12 @@ When "Move to console folder" finds a same-named file already in the console fol
   - Files: src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: the existing channel; no new channel
   - New: none
-- [ ] 3. Panel message: in `handleMove`, show "Game re-pathed to the existing file in the console folder." when `r.adopted`, else "Moved."
+- [x] 3. Panel message: in `handleMove`, show "Game re-pathed to the existing file in the console folder." when `r.adopted`, else "Moved."
   - Files: src/gui/renderer/src/components/game-config/MoveLocalRomPanel.tsx
   - Reuses: existing `setMsg` and `onMoved(r.romPath, r.launchCommand)`
   - New: none
-- [ ] 4. Verification (see Testing): no JS test runner or Electron-main test harness exists, so run the tsc checks and `make lint`, then a manual check with a throwaway game: place a same-size file in the console folder, press Move, confirm the message, that the game's path in Settings is the console-folder file, and that the original is still there; repeat with a different-size file and confirm the error.
-- [ ] 5. Docs: CLAUDE.md GUI rules line for the #622 move panel gets "an existing same-size file in the console folder is adopted (game re-pathed, verified, original kept, #631)"; ARCHITECTURE.md only if it describes the move flow.
+- [x] 4. Verification (see Testing): no JS test runner or Electron-main test harness exists, so run the tsc checks and `make lint`, then a manual check with a throwaway game: place a same-size file in the console folder, press Move, confirm the message, that the game's path in Settings is the console-folder file, and that the original is still there; repeat with a different-size file and confirm the error.
+- [x] 5. Docs: CLAUDE.md GUI rules line for the #622 move panel gets "an existing same-size file in the console folder is adopted (game re-pathed, verified, original kept, #631)"; ARCHITECTURE.md only if it describes the move flow.
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md (if applicable)
 
 ## Testing
@@ -55,3 +55,6 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no (existing channel gains an
 - Server/API changes.
 
 ## Log
+Step 2: CLAUDE.md line for the move panel was updated in the same commit because the pre-commit hook requires it when preload.ts changes (it is the plan's step 5 docs change).
+Step 4: tsc node/web show 3 errors each that are identical without these changes (files.ts, steam.ts, etc.), none in touched files; make lint passes. The manual adopt/different-size script was NOT run (needs the Electron app against the real config and server); needs a human check.
+Step 5: CLAUDE.md only; ARCHITECTURE.md does not describe the move flow.

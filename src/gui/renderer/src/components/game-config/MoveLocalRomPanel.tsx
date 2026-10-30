@@ -40,7 +40,7 @@ export function MoveLocalRomPanel({
     });
     try {
       const r = await window.emusync.rom.moveToConsoleFolder(slug!);
-      if (r.ok) { onMoved(r.romPath ?? "", r.launchCommand); setMsg("Moved."); }
+      if (r.ok) { onMoved(r.romPath ?? "", r.launchCommand); setMsg(r.adopted ? "Game re-pathed to the existing file in the console folder." : "Moved."); }
       else setMsg(r.error ?? "Move failed.");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Move failed.");

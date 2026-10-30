@@ -4,7 +4,7 @@
 - Issue: #631
 - Branch: feature/631-repath-existing-console-rom
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -96,3 +96,4 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 - 2026-10-29 tplan: test_file=none (manual script + tsc/lint), 3 test cases + 4 edge cases defined
 - 2026-10-29 implement: step 1 done (adopt same-size existing file, verify stored path)
 - 2026-10-29 implement: step 2 done (adopted flag in IPC types)
+- 2026-10-29 implement: steps 3-5 done (panel message, tsc/lint, CLAUDE.md); manual check not run
