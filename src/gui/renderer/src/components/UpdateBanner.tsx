@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useUpdater } from "./useUpdater";
 import { WarningIcon } from "./icons";
 
 export default function UpdateBanner(): React.ReactElement | null {
-  const { status, releaseVersion, errorMessage, checkForUpdate, downloadUpdate, installUpdate } =
+  const { status, releaseNotes, releaseVersion, errorMessage, checkForUpdate, downloadUpdate, installUpdate } =
     useUpdater();
   const [dismissed, setDismissed] = useState(false);
 

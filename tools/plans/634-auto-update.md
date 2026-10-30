@@ -51,7 +51,7 @@ Add automatic update checks so the EmuSync GUI detects and installs new releases
   - Changes to `display.ts` (electron): add `autoUpdateEnabled: boolean` to the `Display` interface, default `true`, include in `display:get` response, handle in `display:set`.
   - Changes to ServerStatusButton.tsx: load `autoUpdateEnabled` from display state, add a checkbox toggle in the Display section, call `window.emusync.display.set` on change.
 
-- [ ] 6. **React: update banner component and hook.**
+- [x] 6. **React: update banner component and hook.**
   - Files: `src/gui/renderer/src/components/UpdateBanner.tsx` (NEW), `src/gui/renderer/src/hooks/useUpdater.ts` (NEW)
   - Reuses: `btn` / `btn-ghost` / `btn-danger` classes, `RelTime` component for timestamps, existing IPC call patterns.
   - New:
@@ -59,20 +59,20 @@ Add automatic update checks so the EmuSync GUI detects and installs new releases
     - `UpdateBanner.tsx`: a compact banner component that renders when `updateAvailable` or `updateDownloaded` is true. Shows version number, "Restart now" button (calls `install()`), and a dismiss button. Uses green accent for "update available" and a more prominent style for "update downloaded".
   - Justification: hook encapsulates IPC event subscription and state; banner is a self-contained presentational component. Both follow existing patterns (useGamepadNav, useEscapeToClose for hooks; Modal, ServerStatusButton for components).
 
-- [ ] 7. **Integrate banner into app shell.**
+- [x] 7. **Integrate banner into app shell.**
   - Files: `src/gui/renderer/src/App.tsx` (or the component that wraps the main layout — likely `GameGrid.tsx` or the top-level router)
   - Reuses: existing layout structure.
   - New: render `<UpdateBanner />` at the top of the app body, below the header. The `useUpdater` hook is called at the App level so update state is available throughout.
   - Changes: import `UpdateBanner` and `useUpdater`, call hook at App level, conditionally render banner.
 
-- [ ] 8. **Release workflow: generate electron-updater metadata.**
+- [x] 8. **Release workflow: generate electron-updater metadata.**
   - Files: `.github/workflows/release.yml`
   - Reuses: existing release workflow (already builds AppImage + NSIS, uploads to GitHub releases).
   - Changes: ensure the workflow sets `GH_TOKEN` and that electron-builder's `publish: "github"` config generates `latest.yml` and attaches it to the release. The existing workflow already handles uploads; electron-builder adds `latest.yml` automatically when `publish: github` is configured. No workflow changes needed if the `build` config in package.json is correct.
 
-- [ ] 9. **Tests:** No dedicated tests for the updater module — electron-updater's own test suite covers the library. The IPC wiring is integration-level and would require a running Electron app; the existing test suite (`src/tests/`) focuses on Python server / CLI / SQLite, not Electron renderer. Acceptance is manual: launch on each platform, verify update check, verify download prompt, verify restart.
+- [x] 9. **Tests:** No dedicated tests for the updater module — electron-updater's own test suite covers the library. The IPC wiring is integration-level and would require a running Electron app; the existing test suite (`src/tests/`) focuses on Python server / CLI / SQLite, not Electron renderer. Acceptance is manual: launch on each platform, verify update check, verify download prompt, verify restart.
 
-- [ ] 10. **Docs: CLAUDE.md rules update.**
+- [x] 10. **Docs: CLAUDE.md rules update.**
   - Files: `CLAUDE.md`
   - Changes: add a note in the "Config / paths / DB" section about `display.json` gaining `autoUpdateEnabled`. Add a note in the "GUI" section about the UpdateBanner component and `useUpdater` hook. No ARCHITECTURE.md changes needed — the updater module is a new domain module, documented implicitly by the pattern.
 
@@ -104,3 +104,5 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (updater:* + display:auto
 - Beta / channel support (only checks `latest` release).
 
 ## Log
+
+- [x] 11. **Fix (ship attempt 1):** `UpdateBanner.tsx` references undefined `releaseNotes` (tsc TS2304, runtime ReferenceError when an update is available) and imports unused `useCallback`. Destructure `releaseNotes` from `useUpdater()`, drop the unused import.

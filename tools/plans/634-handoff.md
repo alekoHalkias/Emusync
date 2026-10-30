@@ -4,9 +4,9 @@
 - Issue: #634
 - Branch: feature/634-auto-update
 - PR: none
-- Status: ship
+- Status: shipped
 - Created: 2026-01-03
-- Fix attempts: 0
+- Fix attempts: 1
 
 ## 1. Issue
 ### Summary
@@ -128,9 +128,9 @@ Users currently must manually check GitHub for new versions, download the AppIma
 
 ## 10. Ship
 ### Status: ready to merge
-### PR: open (feature/634-auto-update)
-### Server Sync: done (synced to feature/634-auto-update)
-### Doc Sync: done (CLAUDE.md updated in step 1)
+### PR: none
+### Server Sync: pending
+### Doc Sync: pending
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -144,3 +144,4 @@ Users currently must manually check GitHub for new versions, download the AppIma
 - 2026-01-03 tplan: test_file=none (manual), 8 test cases, 4 edge cases, tsc+lint+manual acceptance
 - 2026-01-03 implement: status -> implementing
 - 2026-01-03 implement: steps 1-7 done, server synced, ready to ship
+- 2026-10-30 ship: tsc found undefined releaseNotes in UpdateBanner.tsx; fix step 11 added
