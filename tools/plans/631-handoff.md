@@ -4,7 +4,7 @@
 - Issue: #631
 - Branch: feature/631-repath-existing-console-rom
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -39,9 +39,9 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 ### Difficulty: 3/10
 ### Backwards Compatibility: no breaking changes; optional field on an existing IPC result.
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: Reuses the panel's inline status text; no new UI. Plan file: tools/plans/631-repath-existing-console-rom.md
+### Visual Pattern: Existing muted status line next to the Move button reports the adopted result.
+### Recommendations: none. LocalToNetworkModal (#626) is not on main yet; it needs no change.
 
 ## 4. Backend Plan
 ### Design Alignment: TBD
@@ -66,7 +66,12 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps (fplan)
+- 1. rom.ts adopt path + post-PUT verification. Reuses existing GET/PUT, launchCommand line. New: `adopted` flag + verification GET (nothing validates stored config after a move).
+- 2. preload.ts, emusync.d.ts: optional `adopted`. Reuses existing channel. New: none.
+- 3. MoveLocalRomPanel.tsx message. Reuses setMsg/onMoved. New: none.
+- 4. tsc + make lint + manual check (no JS test harness for Electron main).
+- 5. CLAUDE.md (and ARCHITECTURE.md if applicable).
 
 ## 9. Review
 ### Findings: TBD
@@ -87,3 +92,4 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 ## 12. Log
 - 2026-10-29 issue: workflow initialized (issue #631 filed, handoff created; branched from main, independent of #629/PR #630)
 - 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
+- 2026-10-29 fplan: 5 steps written, visual_pattern=reuse panel status line, no new UI
