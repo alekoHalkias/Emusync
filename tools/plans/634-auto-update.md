@@ -20,7 +20,7 @@ Add automatic update checks so the EmuSync GUI detects and installs new releases
   - New: none — the `publish: "github"` entry tells electron-builder to upload artifacts and generate `latest.yml` for electron-updater at release time.
   - Changes: add `"electron-updater": "^6.3.9"` to dependencies. Add `"publish": {"provider": "github", "repo": "alekoHalkias/Emusync"}` inside the `build` object.
 
-- [ ] 2. **Electron main process: updater module.**
+- [x] 2. **Electron main process: updater module.**
   - Files: `src/gui/electron/updater.ts` (NEW)
   - Reuses: `rt` from `./runtime` (for `mainWindow` reference), `ipcMain` pattern from `display.ts` / `config-store.ts`.
   - New: `src/gui/electron/updater.ts` — wraps `electron-updater`'s `autoUpdater`. Exposes `registerUpdaterIpc()` that registers:
@@ -31,12 +31,12 @@ Add automatic update checks so the EmuSync GUI detects and installs new releases
     - Listens to `autoUpdater` events (`update-available`, `update-downloaded`, `update-not-available`, `error`) and forwards them via `win.webContents.send("updater:change", payload)`.
   - Justification: no existing module handles background download/install lifecycle; must be a dedicated module.
 
-- [ ] 3. **Register updater IPC in main.ts.**
+- [x] 3. **Register updater IPC in main.ts.**
   - Files: `src/gui/electron/main.ts`
   - Reuses: the `register*Ipc()` import + call pattern already used by every domain module.
   - Changes: `import { registerUpdaterIpc } from "./updater";` + `registerUpdaterIpc();` after the other register calls.
 
-- [ ] 4. **Expose update IPC in preload.ts and types.**
+- [x] 4. **Expose update IPC in preload.ts and types.**
   - Files: `src/gui/electron/preload.ts`, `src/gui/renderer/src/emusync.d.ts`
   - Reuses: existing preload pattern (`window.emusync.<domain> = { ... }`) and type declaration pattern.
   - Changes:
