@@ -25,6 +25,16 @@ Build jobs produce artifacts without publishing, and the release job attaches in
 - [ ] 3. Tests: none needed - CI-only change, verified by pushing a tag. No Python code touched.
 - [ ] 4. Docs: CLAUDE.md "Releases" line: note that release assets include `latest*.yml` for electron-updater.
 
+## Testing
+- **Test File**: none; no Python or Electron logic changes, no JS test runner for build config.
+- **Test Cases**:
+  - Workflow/YAML validity: `python3 -c yaml.safe_load` on release.yml.
+  - Real check: push the tag and confirm the Release run succeeds and the release holds AppImage, exe, latest.yml, latest-linux.yml.
+- **Edge Cases**:
+  - `--publish never` still emits latest*.yml: verify by checking the Linux run's artifact contents.
+- **Integration Points**:
+  - electron-updater reads latest*.yml from the release assets.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
