@@ -44,3 +44,6 @@ Extend existing test files when the test touches code already covered there. Cre
 
 ## Console rows (#629)
 Console/extra-folder API cases go in `test_devices.py` after the #539 tests and drive `PUT /games/{slug}/device` -> `GET /devices/{id}/consoles` via `_seed_console`. Migration cases build a minimal old-shaped table and call `schema._migrate(conn, from_version=N)` (see `test_v9_to_v10_migration`). GUI has no JS test runner: `make lint` plus a manual run.
+
+## Electron main / renderer-only changes
+No JS test runner and no main-process harness exist. Such changes are verified by both `tsc` projects, `make lint`, and a written manual script in the plan's Testing section (real files in a temp folder, a dev server, no mocks). Put server-visible behavior in a Python integration test whenever the logic can live server-side.
