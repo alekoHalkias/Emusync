@@ -248,7 +248,7 @@ export function registerRomIpc(): void {
   // copy + verify + delete the original.
   ipcMain.handle(
     "rom:moveToConsoleFolder",
-    async (event, slug: string): Promise<{ ok: boolean; romPath?: string; launchCommand?: string; error?: string }> => {
+    async (event, slug: string): Promise<{ ok: boolean; romPath?: string; launchCommand?: string; adopted?: boolean; error?: string }> => {
       localizeCancelled = false;
       try {
         const { host, port, authHeaders } = loadServerCfg();
@@ -262,21 +262,28 @@ export function registerRomIpc(): void {
         if (!folder) return { ok: false, error: "No local folder set for this console" };
         const dest = join(folder, basename(src));
         if (resolvePath(dest) === resolvePath(src)) return { ok: false, error: "ROM is already in the console folder" };
-        if (existsSync(dest)) return { ok: false, error: "A file with that name already exists in the console folder" };
-        mkdirSync(folder, { recursive: true });
-        try {
-          renameSync(src, dest);
-        } catch (e: any) {
-          if (e.code !== "EXDEV") throw e;
-          const size = statSync(src).size;
-          const tmp = dest + ".part";
+        // A same-size file already in the console folder is adopted instead of copied over (#631):
+        // the game is re-pathed to it and the original is left alone.
+        const adopted = existsSync(dest);
+        if (adopted && statSync(dest).size !== statSync(src).size) {
+          return { ok: false, error: "A different file with that name already exists in the console folder" };
+        }
+        if (!adopted) {
+          mkdirSync(folder, { recursive: true });
           try {
-            if (!await copyWithProgress(src, tmp, size, slug, event.sender)) return { ok: false, error: "Move cancelled" };
-            if (statSync(tmp).size !== size) return { ok: false, error: "Copy verification failed" };
-            renameSync(tmp, dest);
-            unlinkSync(src);
-          } finally {
-            if (existsSync(tmp)) { try { unlinkSync(tmp); } catch { /* best effort */ } }
+            renameSync(src, dest);
+          } catch (e: any) {
+            if (e.code !== "EXDEV") throw e;
+            const size = statSync(src).size;
+            const tmp = dest + ".part";
+            try {
+              if (!await copyWithProgress(src, tmp, size, slug, event.sender)) return { ok: false, error: "Move cancelled" };
+              if (statSync(tmp).size !== size) return { ok: false, error: "Copy verification failed" };
+              renameSync(tmp, dest);
+              unlinkSync(src);
+            } finally {
+              if (existsSync(tmp)) { try { unlinkSync(tmp); } catch { /* best effort */ } }
+            }
           }
         }
         const launchCommand = gd.launch_command ? (gd.launch_command as string).split(src).join(dest) : gd.launch_command;
@@ -286,7 +293,11 @@ export function registerRomIpc(): void {
           body: JSON.stringify({ ...gd, rom_path: dest, launch_command: launchCommand }),
         });
         if (!putRes.ok) return { ok: false, error: "Moved, but failed to update server config" };
-        return { ok: true, romPath: dest, launchCommand };
+        // Confirm the stored config really points at the file in the console folder.
+        const checkRes = await fetch(`http://${host}:${port}/games/${slug}/device`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
+        const stored = checkRes.ok ? (await checkRes.json() as any).rom_path : "";
+        if (stored !== dest || !existsSync(dest)) return { ok: false, error: "Could not verify the game now points at the console folder" };
+        return { ok: true, romPath: dest, launchCommand, ...(adopted ? { adopted } : {}) };
       } catch (e: any) {
         return { ok: false, error: e.message || "Move failed" };
       }

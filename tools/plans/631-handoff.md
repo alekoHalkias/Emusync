@@ -67,7 +67,7 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 
 ## 8. Implementation Steps
 ### Steps (fplan)
-- 1. rom.ts adopt path + post-PUT verification. Reuses existing GET/PUT, launchCommand line. New: `adopted` flag + verification GET (nothing validates stored config after a move).
+- 1. [done] rom.ts adopt path + post-PUT verification. Reuses existing GET/PUT, launchCommand line. New: `adopted` flag + verification GET (nothing validates stored config after a move).
 - 2. preload.ts, emusync.d.ts: optional `adopted`. Reuses existing channel. New: none.
 - 3. MoveLocalRomPanel.tsx message. Reuses setMsg/onMoved. New: none.
 - 4. tsc + make lint + manual check (no JS test harness for Electron main).
@@ -94,3 +94,4 @@ User decisions: (1) adopt the existing file only when its byte size equals the s
 - 2026-10-29 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-10-29 fplan: 5 steps written, visual_pattern=reuse panel status line, no new UI
 - 2026-10-29 tplan: test_file=none (manual script + tsc/lint), 3 test cases + 4 edge cases defined
+- 2026-10-29 implement: step 1 done (adopt same-size existing file, verify stored path)
