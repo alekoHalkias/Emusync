@@ -4,7 +4,7 @@
 - Issue: #629
 - Branch: feature/629-console-settings-model
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-29
 - Fix attempts: 0
 
@@ -73,9 +73,9 @@ User decisions (asked before design was finished):
 ### Recommendations: TBD
 
 ## 4. Backend Plan
-### Design Alignment: TBD
-### Backend Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: Fits the guide: additive JSON-TEXT column (dirs_json precedent), schema evolution steps 1-4, defaulted pydantic field, single shared inference function. Plan file: tools/plans/629-console-settings-model.md
+### Backend Pattern: JSON list column at the Store boundary; PUT list field Optional/None = preserve; upsert routes a differing game folder into extras instead of a new row.
+### Recommendations: Guide updated with the Optional-means-preserve rule. device_emulator needs no backend change (already fill-only-blank); pinned by a regression test.
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
@@ -95,7 +95,13 @@ User decisions (asked before design was finished):
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps (bplan)
+- 1. schema.py, models.py. Reuses `_try` ALTER pattern. New: none.
+- 2. consoles.py set/get/list SQL + JSON. Reuses console_defs json usage. New: `_console_from_row` (get and list both parse JSON).
+- 3. consoles.py `upsert_console_for_game` routing. Reuses existing lookup + fill-only-blank. New: none.
+- 4. devices.py GET + PUT. Reuses model_dump setattr loop (+exclude_none). New: none.
+- 5. test_devices.py, test_network_rom.py: 8 cases (see plan file). Reuses `_seed_console`, migration test pattern.
+- 6. ARCHITECTURE.md, CLAUDE.md. New: none.
 
 ## 9. Review
 ### Findings: TBD
@@ -116,3 +122,4 @@ User decisions (asked before design was finished):
 ## 12. Log
 - 2026-10-29 issue: workflow initialized (issue #629 filed, handoff created)
 - 2026-10-29 issue: duplicate check found #628 and #629; user chose to continue under #629. #628 and feature/628-console-settings-model are now superseded, neither has code changes.
+- 2026-10-29 bplan: 6 steps written, backend_pattern=JSON extras column + Optional-preserve PUT field + upsert routes differing folder to extras
