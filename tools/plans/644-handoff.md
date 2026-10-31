@@ -4,7 +4,7 @@
 - Issue: #644
 - Branch: feature/644-console-import-share-matching
 - PR: #645
-- Status: shipped
+- Status: implementing
 - Created: 2026-10-30
 - Fix attempts: 0
 
