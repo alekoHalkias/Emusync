@@ -26,3 +26,6 @@ Additive is allowed (new column with default, new defaulted request field, new o
 
 ## Tests
 `src/tests/test_integration.py` style: real SQLite, no mocks, `client` fixture, `AUTH` headers (`Bearer <pin>`, `X-Device-ID`, `X-Device-Name`), `EMUSYNC_CONFIG_DIR` isolation, blank PIN means `init(Store(tmpdir), "")`. New API route gets happy path plus its main error; new Store method and every bug fix get a regression test.
+
+## Cross-device requests
+Device-to-device asks reuse `rom_pull_requests` (server-brokered, `kind` column picks the behavior, status `pending/fulfilled/failed`) instead of new tables. Fulfilment logic lives in one Python function called by the sync-daemon drain and by a CLI command for GUI-approved cases.
