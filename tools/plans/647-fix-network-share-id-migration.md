@@ -14,11 +14,11 @@ Make every database, whatever version it was stamped at, end up with `consoles.n
 - **Recommendations**: Add one line to `.claude/backend-design-guide.md`: never reuse a schema number that a deployed (even closed or unmerged) branch may have stamped; pick the next free number when a branch is rebased.
 
 ## Steps
-- [ ] 1. Move the `network_share_id` ALTER from `from_version < 30` to a new `from_version < 31` block, set `_SCHEMA_VERSION = 31`, and leave a comment where the v30 block was explaining that v30 was stamped by the closed #642 work.
+- [x] 1. Move the `network_share_id` ALTER from `from_version < 30` to a new `from_version < 31` block, set `_SCHEMA_VERSION = 31`, and leave a comment where the v30 block was explaining that v30 was stamped by the closed #642 work.
   - Files: src/server/store/schema.py
   - Reuses: the existing `_try(conn, "ALTER TABLE ...")` pattern and the `_SCHEMA` column already added for fresh databases
   - New: none
-- [ ] 2. Tests (real SQLite): a hand-built v30 consoles table without the column gains it with '' default, keeps its rows, and ends at `_SCHEMA_VERSION`; rename the existing v29 test so it no longer claims v30; add an end-to-end case where a `Store` over a v30-stamped database lacking the column can `list_consoles` after startup.
+- [x] 2. Tests (real SQLite): a hand-built v30 consoles table without the column gains it with '' default, keeps its rows, and ends at `_SCHEMA_VERSION`; rename the existing v29 test so it no longer claims v30; add an end-to-end case where a `Store` over a v30-stamped database lacking the column can `list_consoles` after startup.
   - Files: src/tests/test_network_rom.py
   - Reuses: `test_v29_to_v30_migration_adds_share_id` hand-built table pattern, `Store(tmpdir)`
   - New: none
@@ -26,7 +26,7 @@ Make every database, whatever version it was stamped at, end up with `consoles.n
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: the modal's existing `msg`-style muted text and `row` state
   - New: one `loadFailed` state flag - `row` null already means "no row", so a failure needs its own value
-- [ ] 4. Docs: CLAUDE.md schema rule gets the "do not reuse a stamped number" sentence; backend guide line from Recommendations.
+- [x] 4. Docs: CLAUDE.md schema rule gets the "do not reuse a stamped number" sentence; backend guide line from Recommendations.
   - Files: CLAUDE.md, .claude/backend-design-guide.md
 
 ## Testing

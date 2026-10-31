@@ -238,7 +238,7 @@ async def _set_share(client, headers, dev, row, share_id):
     return (await client.get(f"/devices/{dev}/consoles", headers=headers)).json()
 
 
-def test_v29_to_v30_migration_adds_share_id(tmp_path):
+def test_v29_migration_adds_share_id(tmp_path):
     """A v29 consoles table gains network_share_id as '' without losing rows (#644)."""
     from server.store import schema
 
@@ -257,6 +257,52 @@ def test_v29_to_v30_migration_adds_share_id(tmp_path):
     row = conn.execute("SELECT * FROM consoles").fetchone()
     assert row["device_game_folder"] == "/roms/gba"
     assert row["network_share_id"] == ""
+
+
+def _v30_db_without_share_id(path):
+    """A database the closed #642 branch stamped v30: consoles table, no network_share_id."""
+    conn = sqlite3.connect(str(path))
+    conn.row_factory = sqlite3.Row
+    conn.execute("""CREATE TABLE consoles (
+        id TEXT PRIMARY KEY, device_id TEXT NOT NULL, console_name TEXT NOT NULL,
+        shortform_name TEXT NOT NULL, device_game_folder TEXT NOT NULL DEFAULT '')""")
+    conn.execute("INSERT INTO consoles VALUES ('c1', 'd1', 'GBA', 'gba', '/roms/gba')")
+    conn.execute("PRAGMA user_version = 30")
+    conn.commit()
+    return conn
+
+
+def test_v30_stamped_db_gains_share_id(tmp_path):
+    """A v30 database lacking the column still gets it, and migrating twice is harmless (#647)."""
+    from server.store import schema
+
+    conn = _v30_db_without_share_id(tmp_path / "old.db")
+    schema._migrate(conn, from_version=30)
+    schema._migrate(conn, from_version=30)
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == schema._SCHEMA_VERSION
+    row = conn.execute("SELECT * FROM consoles").fetchone()
+    assert row["device_game_folder"] == "/roms/gba"
+    assert row["network_share_id"] == ""
+
+
+def test_store_on_v30_stamped_db_lists_consoles(tmp_path):
+    """A real database stamped v30 without the column heals on Store startup (#647)."""
+    from server.store import Store, schema
+    from server.store.models import Console
+
+    store = Store(str(tmp_path))
+    store.ensure_device("d1", "pc")
+    store.set_console(Console(id="c1", device_id="d1", console_name="GBA", shortform_name="gba"))
+    store._conn.execute("ALTER TABLE consoles DROP COLUMN network_share_id")
+    store._conn.execute("PRAGMA user_version = 30")
+    store._conn.commit()
+    store._conn.close()
+
+    reopened = Store(str(tmp_path))
+    consoles = reopened.list_consoles("d1")
+    assert consoles and consoles[0].network_share_id == ""
+    assert reopened._conn.execute("PRAGMA user_version").fetchone()[0] == schema._SCHEMA_VERSION
 
 
 @pytest.mark.asyncio

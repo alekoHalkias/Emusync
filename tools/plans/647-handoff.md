@@ -85,3 +85,6 @@ See issue #647.
 - 2026-10-31 bplan: 4 steps written, backend_pattern=idempotent v31 migration
 - 2026-10-31 tplan: test_file=src/tests/test_network_rom.py, 3 test cases defined (testing section written in the same plan)
 - 2026-10-31 implement: started
+- 2026-10-31 implement: step 1 done (network_share_id ALTER moved to v31, _SCHEMA_VERSION 31)
+- 2026-10-31 implement: step 2 done (3 migration tests; Store-on-v30 test heals a real DB via DROP COLUMN)
+- 2026-10-31 implement: step 4 done (CLAUDE.md schema rule; backend guide updated in bplan)

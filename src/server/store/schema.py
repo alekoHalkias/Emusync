@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 30
+_SCHEMA_VERSION = 31
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -572,7 +572,9 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
     if from_version < 29:
         # Additional ROM folders per console, a JSON list (issue #629).
         _try(conn, "ALTER TABLE consoles ADD COLUMN device_extra_folders TEXT NOT NULL DEFAULT '[]'")
-    if from_version < 30:
+    # v30 is intentionally empty: the closed #642 branch stamped some databases
+    # v30 with its own columns, so a v30 block here would be skipped for them (#647).
+    if from_version < 31:
         # Marker-file UUID of the share behind device_network_folder; equal IDs on
         # different devices mean the same remote location (#644).
         _try(conn, "ALTER TABLE consoles ADD COLUMN network_share_id TEXT NOT NULL DEFAULT ''")
