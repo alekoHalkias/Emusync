@@ -4,7 +4,7 @@
 - Issue: #666
 - Branch: feature/666-skip-duplicate-roms-on-import
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -22,13 +22,13 @@ console-import/helpers.ts dedupeAndLink; useConsoleImport.ts linkShareGames; sca
 - Genuinely other-device games still link.
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: ui (renderer only)
+### Backend Changes: none
+### UI Changes: dedupeAndLink skips cross-matches already configured on this device
+### Plan Target: fplan
+### Sub-issues: none
+### Difficulty: 2/10
+### Backwards Compatibility: no breaking changes
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -72,3 +72,4 @@ none
 
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
+- 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
