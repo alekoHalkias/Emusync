@@ -97,6 +97,28 @@ class TransferMixin:
         ).fetchone()
         return RomPullRequest(**dict(row)) if row else None
 
+    def find_pending_pull_request(self, slug: str, from_device_id: str, kind: str) -> Optional[RomPullRequest]:
+        """An existing pending request for the same game/source/kind, so repeat asks don't pile up (#660)."""
+        row = self._conn.execute(
+            """SELECT id, slug, from_device_id, to_device_id, destination_path,
+                      status, requested_at, fulfilled_at, kind
+               FROM rom_pull_requests WHERE slug = ? AND from_device_id = ? AND kind = ? AND status = 'pending'
+               ORDER BY requested_at LIMIT 1""",
+            (slug, from_device_id, kind),
+        ).fetchone()
+        return RomPullRequest(**dict(row)) if row else None
+
+    def list_pull_requests_by_requester(self, device_id: str) -> list[RomPullRequest]:
+        """Requests this device made (to_device_id), newest first, for status display (#660)."""
+        rows = self._conn.execute(
+            """SELECT id, slug, from_device_id, to_device_id, destination_path,
+                      status, requested_at, fulfilled_at, kind
+               FROM rom_pull_requests WHERE to_device_id = ?
+               ORDER BY requested_at DESC LIMIT 100""",
+            (device_id,),
+        ).fetchall()
+        return [RomPullRequest(**dict(r)) for r in rows]
+
     def list_pending_pull_requests_for_device(self, device_id: str) -> list[RomPullRequest]:
         """Return pending pull requests where this device is the source (from_device_id)."""
         rows = self._conn.execute(
