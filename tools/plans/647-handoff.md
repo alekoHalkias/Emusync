@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #647
 - Branch: feature/647-fix-network-share-id-migration
-- PR: #PENDING
+- PR: #648
 - Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
@@ -70,7 +70,7 @@ See issue #647.
 
 ## 10. Ship
 ### Status: shipped
-### PR: #PENDING
+### PR: #648
 ### Server Sync: pending
 ### Doc Sync: pending
 
