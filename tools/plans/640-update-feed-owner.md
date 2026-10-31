@@ -3,7 +3,7 @@
 Issue: #640
 Branch: feature/640-update-feed-owner
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
