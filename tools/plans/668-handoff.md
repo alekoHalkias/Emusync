@@ -4,7 +4,7 @@
 - Issue: #668
 - Branch: feature/668-stable-appimage-name
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
