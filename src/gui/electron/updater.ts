@@ -8,7 +8,7 @@
 // The auto-update toggle is persisted in display.json alongside other
 // display settings (scale, fullscreen, theme) — see display.ts.
 import { autoUpdater } from "electron-updater";
-import { ipcMain, BrowserWindow } from "electron";
+import { app, ipcMain, BrowserWindow } from "electron";
 import { rt } from "./runtime";
 import { load as loadDisplay, save as saveDisplay } from "./display";
 
@@ -67,6 +67,8 @@ export function registerUpdaterIpc(): void {
     autoUpdater.quitAndInstall(true, true);
     return { ok: true };
   });
+
+  ipcMain.handle("updater:getVersion", () => app.getVersion());
 
   ipcMain.handle("updater:getEnabled", () => {
     const d = loadDisplay();

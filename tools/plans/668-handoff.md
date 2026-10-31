@@ -4,7 +4,7 @@
 - Issue: #668
 - Branch: feature/668-stable-appimage-name
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -100,3 +100,4 @@ Docs
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
 - 2026-10-31 fplan: 6 steps written, visual_pattern=extra Details row
 - 2026-10-31 tplan: test_file=none, 2 test cases defined
+- 2026-10-31 implement: steps 1-6 done (stable AppImage name, updater:getVersion IPC, Version row, docs)

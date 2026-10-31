@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld("emusync", {
     check: (): Promise<{ available: boolean; error?: string }> => ipcRenderer.invoke("updater:check"),
     download: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke("updater:download"),
     install: (): Promise<{ ok: boolean }> => ipcRenderer.invoke("updater:install"),
+    getVersion: (): Promise<string> => ipcRenderer.invoke("updater:getVersion"),
     getEnabled: (): Promise<boolean> => ipcRenderer.invoke("updater:getEnabled"),
     setEnabled: (enabled: boolean): Promise<boolean> => ipcRenderer.invoke("updater:setEnabled", enabled),
     onChange: (cb: (e: { type: string; releaseNotes?: string; releaseVersion?: string; message?: string }) => void): (() => void) => {

@@ -22,6 +22,8 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
   const { devices } = useDevices();
   const [serverState, setServerState] = useState<ServerState>("checking");
   const [open, setOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
+  useEffect(() => { window.emusync.updater.getVersion().then(setAppVersion).catch(() => {}); }, []);
   const [startState, setStartState] = useState<StartState>("idle");
 
   // PIN management
@@ -463,6 +465,8 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
             <details className="settings-collapse">
               <summary className="settings-heading">Details</summary>
               <div style={{ fontSize: 12, color: "var(--text-muted)", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", marginBottom: 10 }}>
+                <span>Version</span>
+                <span style={{ fontFamily: "monospace" }}>{appVersion}</span>
                 <span>Device ID</span>
                 <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{deviceId}</span>
                 <span>Data folder</span>
