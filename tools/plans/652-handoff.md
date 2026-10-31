@@ -49,10 +49,10 @@ See issue #652.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: none (no renderer test infra)
+### Test Cases: tsc typecheck; manual wizard check
+### Edge Cases: no network folder; network source; zero ROMs
+### Integration Points: make test-changed unaffected
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -89,3 +89,4 @@ See issue #652.
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
 - 2026-10-31 fplan: 7 steps written, visual_pattern=wrapping flex rows
+- 2026-10-31 tplan: test_file=none, 2 checks defined

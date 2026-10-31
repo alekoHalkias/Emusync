@@ -34,6 +34,17 @@ Make the console import results step shorter by merging stacked control rows int
 - [ ] 6. Tests: none. Layout-only change in inline styles; repo has no renderer component tests (integration tests cover Python only).
 - [ ] 7. Docs: none needed - no behavior, IPC, or config change.
 
+## Testing
+- **Test File**: none (no renderer component test infra; Python integration tests unaffected)
+- **Test Cases**:
+  - typecheck: `npx tsc --noEmit` in src/gui passes
+  - manual: wizard at default and narrow width shows merged rows, all buttons still work
+- **Edge Cases**:
+  - network folder unset: no chip, row still aligned
+  - network source: note shown in action row instead of checkboxes
+  - zero ROMs: merged control row hidden as before
+- **Integration Points**: `make test-changed` still passes (no backend change)
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
