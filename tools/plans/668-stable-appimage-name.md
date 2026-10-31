@@ -3,7 +3,7 @@
 Issue: #668
 Branch: feature/668-stable-appimage-name
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
