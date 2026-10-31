@@ -62,3 +62,6 @@
 - Optional sources are rows in one block (label, path, `btn btn-ghost` Choose, clear), never a radio toggle; secondary lists collapse behind an "N items" disclosure.
 - Status chip: small inline span after the path; neutral muted, match uses the accent, mismatch `var(--color-danger, #e5484d)`. Outcome text uses the inline status line, not a modal.
 
+
+## Banners
+Actionable background events (updates, cross-device upload requests) render as a strip under the topbar: `var(--surface2)` background, 12px text, one row per item, a `btn` primary action plus `btn btn-ghost` secondary, inline muted/danger text for errors. Mount beside `<UpdateBanner />` in App.tsx.
