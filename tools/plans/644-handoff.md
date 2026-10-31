@@ -40,7 +40,7 @@ See issue #644.
 ### Recommendations: auto-link done client-side via existing scan linkedSlug + resolveImportPaths; server only registers/exposes share IDs
 
 ## 5. Merged Plan
-### Conflicts Resolved: none
+### Conflicts Resolved: docs overlap merged into one step; API shape aligned; backend-first ordering
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
@@ -91,3 +91,4 @@ See issue #644.
 - fplan 5: files ResultsStep.tsx; reuses folder list markup and vm handlers; inline chip + disclosure
 - fplan 6-8: design guide, manual verification, docs
 - 2026-10-30 fplan: 8 steps written, visual_pattern=Locations block + chip
+- 2026-10-30 merge: 3 conflicts resolved, 0 unresolved; merged plan tools/plans/644-merged.md (11 steps)
