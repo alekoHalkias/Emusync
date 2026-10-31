@@ -104,3 +104,4 @@ Network-drive games become playable on any device with the same share ID, and de
 - 2026-10-31 tplan: test_file=src/tests/test_network_upload_requests.py, 7 test cases defined
 - 2026-10-31 implement: step 1 done (network-source returns share_id)
 - 2026-10-31 implement: step 2 done (network-upload request validation and dedupe)
+- 2026-10-31 implement: step 3 done (outgoing pull-requests route)

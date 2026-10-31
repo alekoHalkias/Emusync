@@ -248,6 +248,21 @@ def list_pending_pull_requests(device_id: str = Depends(_auth)) -> list[dict]:
     return result
 
 
+@router.get("/rom-pull-requests/outgoing")
+def list_outgoing_pull_requests(device_id: str = Depends(_auth)) -> list[dict]:
+    """Requests the calling device made, with their status (#660)."""
+    store = _get_store()
+    result = []
+    for pr in store.list_pull_requests_by_requester(device_id):
+        game = store.get_game(pr.slug)
+        result.append({
+            "id": pr.id, "slug": pr.slug, "game_name": game.name if game else pr.slug,
+            "kind": pr.kind, "status": pr.status, "from_device_id": pr.from_device_id,
+            "requested_at": pr.requested_at,
+        })
+    return result
+
+
 @router.put("/rom-pull-requests/{pull_request_id}")
 def update_pull_request(pull_request_id: str, request_body: dict, device_id: str = Depends(_auth)) -> dict:
     """Mark a pull request as fulfilled or failed. Only the source device can update it."""
