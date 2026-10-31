@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #654
 - Branch: feature/654-remove-big-picture
-- PR: none
+- PR: #655
 - Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
