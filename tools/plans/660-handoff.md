@@ -30,9 +30,9 @@ See https://github.com/alekoHalkias/Emusync/issues/660
 ### Backwards Compatibility: non-breaking; additive schema v33, fallback resolution, new Config key declared in config.py
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: banner in UpdateBanner style for approvals; third option block in NetworkPlaySetup for requests; share-ID lookup in existing load effect.
+### Visual Pattern: surface2 strip + btn/btn-ghost; bordered option card.
+### Recommendations: Banners pattern added to frontend guide; GUI shells out to CLI. Plan: tools/plans/660-network-rom-sharing-ui.md
 
 ## 4. Backend Plan
 ### Design Alignment: reuse rom_pull_requests with kind=network-upload (no schema bump); #270 network-source gains share_id; fulfilment in one Python function shared by daemon and CLI.
@@ -40,7 +40,7 @@ See https://github.com/alekoHalkias/Emusync/issues/660
 ### Recommendations: declined stored as failed; oversize requests stay pending for GUI prompt; Switch folder ROMs out of scope.
 
 ## 5. Merged Plan
-### Conflicts Resolved: none
+### Conflicts Resolved: docs steps combined; outgoing-request response shape pinned for api.ts; IPC channel/CLI ownership split; backend-first ordering
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
@@ -57,16 +57,7 @@ See https://github.com/alekoHalkias/Emusync/issues/660
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: see tools/plans/660-network-rom-sharing.md (bplan steps 1-9)
-- 1: files store/games.py, api/games.py; reuses get_network_source_for_game; new none
-- 2: files api/transfers.py, store/transfers.py; reuses create_pull_request route; new find_pending_pull_request (no lookup by slug/kind)
-- 3: files api/transfers.py, store/transfers.py; reuses RomPullRequest mapping; new list_pull_requests_by_requester (existing keyed on source)
-- 4: files server/config.py; reuses Config handling; new field only
-- 5: files cli/netrom.py; reuses path_is_reachable and client methods; new upload_to_network (only TS impl exists)
-- 6: files cli/transfer.py; reuses _handle_pull_request; new none (branch)
-- 7: files cli/rom.py; reuses upload_to_network; new command (GUI must shell out to CLI)
-- 8: files tests/test_network_upload_requests.py, test_network_rom.py; reuses integration fixtures
-- 9: docs CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md
+### Steps: see tools/plans/660-merged.md (14 steps, backend 1-8, frontend 9-12, verify 13, docs 14)
 
 ## 9. Review
 ### Findings: TBD
@@ -88,3 +79,5 @@ See https://github.com/alekoHalkias/Emusync/issues/660
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=backend+ui, plan_target=both, difficulty=6/10, breaking=no
 - 2026-10-31 bplan: 9 steps written, backend_pattern=reuse rom_pull_requests kind=network-upload, python fulfilment shared by daemon and CLI
+- 2026-10-31 fplan: 7 steps written, visual_pattern=UpdateBanner-style strip + NetworkPlaySetup option block
+- 2026-10-31 merge: 4 conflicts resolved, 0 unresolved
