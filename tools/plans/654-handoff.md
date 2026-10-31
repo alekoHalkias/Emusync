@@ -71,15 +71,15 @@ Renderer: ConsoleWheel, ConsoleGrid, ServerStatusButton, App, styles.css, themes
 7. Docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md trimmed.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: none (0 findings)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
 ### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done (docs updated in steps 1 and 7)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -93,3 +93,5 @@ Renderer: ConsoleWheel, ConsoleGrid, ServerStatusButton, App, styles.css, themes
 - 2026-10-31 tplan: test_file=none, 2 test cases defined (build, suite) plus manual legacy-config check
 - 2026-10-31 implement: step 1 done (electron main: themes, getConsoleLogo, bigPicture/theme display removed; tsc errors in files.ts/steam.ts pre-exist)
 - 2026-10-31 implement: steps 2-7 done (d.ts, components, gamepad+css, index.tsx theme import, docs); build-gui and tests pass
+- 2026-10-31 review: 0 findings, blocked=no
+- 2026-10-31 ship: PR #655, server sync done, doc sync done
