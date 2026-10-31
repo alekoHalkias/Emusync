@@ -4,7 +4,7 @@
 - Issue: #650
 - Branch: feature/650-refresh-detect-new-games
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -21,13 +21,13 @@ GameGrid.tsx handleRefreshLocations, useBrokenRoms.refresh, console-import scan/
 See issue #650.
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: ui only
+### Backend Changes: none
+### UI Changes: Refresh resolves the console emulator, scans its folders, drops linked and ignored ROMs, reports N new games with a Review and import button opening the prefilled wizard (user decision: report count and open wizard)
+### Plan Target: fplan
+### Sub-issues: none
+### Difficulty: 4/10
+### Backwards Compatibility: non-breaking; frontend only; network scan cost on each click, show progress
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -77,3 +77,4 @@ See issue #650.
 
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
+- 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
