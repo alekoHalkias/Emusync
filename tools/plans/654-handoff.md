@@ -4,7 +4,7 @@
 - Issue: #654
 - Branch: feature/654-remove-big-picture
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -92,3 +92,4 @@ Renderer: ConsoleWheel, ConsoleGrid, ServerStatusButton, App, styles.css, themes
 - 2026-10-31 fplan: 7 steps written, visual_pattern=pure removal
 - 2026-10-31 tplan: test_file=none, 2 test cases defined (build, suite) plus manual legacy-config check
 - 2026-10-31 implement: step 1 done (electron main: themes, getConsoleLogo, bigPicture/theme display removed; tsc errors in files.ts/steam.ts pre-exist)
+- 2026-10-31 implement: steps 2-7 done (d.ts, components, gamepad+css, index.tsx theme import, docs); build-gui and tests pass

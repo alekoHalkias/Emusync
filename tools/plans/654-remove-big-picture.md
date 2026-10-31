@@ -18,25 +18,25 @@ Delete Big Picture mode (wheel, themes, colour logos, display toggle) so the GUI
   - Files: src/gui/electron/main.ts, display.ts, art.ts, preload.ts, themes.ts (delete), themes/bundled/ (delete)
   - Reuses: display.ts load()/save()/applyDisplay (remove `bigPicture`/`theme` fields, `selectedTheme`, `display:setTheme`; `sync` saves and sends `{ fullscreen }` only); main.ts drops `registerThemeScheme`, `ThemeEngine.registerIpc`; art.ts drops `themeFile`/`selectedTheme` imports, `art:getConsoleLogo` handler, `CARBON_FOLDER`, `ART_BOOK_LOGO`, `CARBON_BASE`, `ART_BOOK_BASE` and helpers only they use; preload.ts drops `theme` namespace, `setTheme`, `getConsoleLogo`, `bigPicture` in types
   - New: none
-- [ ] 2. Renderer types: drop the same members from emusync.d.ts.
+- [x] 2. Renderer types: drop the same members from emusync.d.ts.
   - Files: src/gui/renderer/src/emusync.d.ts
   - Reuses: existing declarations (delete lines only)
   - New: none
-- [ ] 3. Renderer components: remove wheel, theme import and theme settings.
+- [x] 3. Renderer components: remove wheel, theme import and theme settings.
   - Files: components/ConsoleWheel.tsx (delete), components/ThemeImportModal.tsx (delete), ConsoleGrid.tsx, ServerStatusButton.tsx, App.tsx
   - Reuses: ConsoleGrid desktop branch (drop `bigPicture`/`theme` props, `ConsoleLogo`, `ConsoleWheel` import, now-unused helpers); ServerStatusButton (drop `themes` state/effect, theme select label, `theme` in DisplayState); App.tsx (display state becomes `{ scale, fullscreen, autoUpdateEnabled }`, drop data-bigpicture and theme effects, `bp-backdrop`, Themes button, ThemeImportModal state and render, `bigPicture`/`theme` props)
   - New: none
-- [ ] 4. Gamepad nav and CSS: remove wheel handling and bp styles.
+- [x] 4. Gamepad nav and CSS: remove wheel handling and bp styles.
   - Files: src/gui/renderer/src/useGamepadNav.ts, styles.css
   - Reuses: useGamepadNav LB/RB handler becomes `if (inModal) cycleModalTab(+-1)`; delete `rotateWheel` and the `.console-wheel` branch in moveFocus; styles.css delete `.bp-backdrop`, `@keyframes bp-drift`, `.console-wheel*`, `.wheel-*`, reduced-motion wheel rules, and the Big Picture comment
   - New: none
-- [ ] 5. Verify: `make build-gui`; grep for `bigpicture|bigPicture|ConsoleWheel|wheel|theme:|emusync-theme|getConsoleLogo` in src/gui returns nothing relevant (Steam's own "Big Picture" comment in steam.ts stays).
+- [x] 5. Verify: `make build-gui`; grep for `bigpicture|bigPicture|ConsoleWheel|wheel|theme:|emusync-theme|getConsoleLogo` in src/gui returns nothing relevant (Steam's own "Big Picture" comment in steam.ts stays).
   - Files: none
   - Reuses: make build-gui
   - New: none
-- [ ] 6. Tests: no new tests. The Python suite has no coverage of this GUI code (no Big Picture tests exist); run `make test-changed` to confirm nothing regressed. Regression for old display.json is covered by load() reading only known keys; verify manually by launching with a display.json containing `bigPicture` and `theme`.
+- [x] 6. Tests: no new tests. The Python suite has no coverage of this GUI code (no Big Picture tests exist); run `make test-changed` to confirm nothing regressed. Regression for old display.json is covered by load() reading only known keys; verify manually by launching with a display.json containing `bigPicture` and `theme`.
   - Files: none
-- [ ] 7. Docs: CLAUDE.md (remove Big Picture themes bullet, `getConsoleLogo`/`ART_BOOK_LOGO`/`CARBON_FOLDER` rule, Big Picture mentions in the display.json rule), src/docs/ARCHITECTURE.md (ConsoleWheel and ConsoleGrid rows, `getConsoleLogo`, "Big Picture themes" section, theme IPC list, display fields), src/docs/GOTCHAS.md (display.json entry, console image sources entry).
+- [x] 7. Docs: CLAUDE.md (remove Big Picture themes bullet, `getConsoleLogo`/`ART_BOOK_LOGO`/`CARBON_FOLDER` rule, Big Picture mentions in the display.json rule), src/docs/ARCHITECTURE.md (ConsoleWheel and ConsoleGrid rows, `getConsoleLogo`, "Big Picture themes" section, theme IPC list, display fields), src/docs/GOTCHAS.md (display.json entry, console image sources entry).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md, src/docs/GOTCHAS.md
   - Reuses: existing sections (delete or trim)
   - New: none
@@ -62,3 +62,6 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no (removals only, d.ts updat
 - Steam shortcut art (steam.ts mentions Steam's own Big Picture).
 
 ## Log
+Step 3: also removed the `import ".../themes/bundled/default/theme.css"` line in renderer/src/index.tsx (build failed without it; every rule in that file was scoped to html[data-bigpicture]).
+Step 7: CLAUDE.md part was done with step 1 because the commit hook required it.
+Verification: make build-gui passes; make test-changed 50 passed; remaining tsc errors (files.ts, steam.ts, GameConfig, GameGrid, SyncConflictModal) exist on main.

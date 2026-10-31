@@ -11,7 +11,7 @@ import Modal from "./Modal";
 type ServerState = "checking" | "online" | "offline";
 type StartState = "idle" | "starting" | "running";
 
-type DisplayState = { scale: number; fullscreen: boolean; theme: string; autoUpdateEnabled: boolean };
+type DisplayState = { scale: number; fullscreen: boolean; autoUpdateEnabled: boolean };
 
 export default function ServerStatusButton({ isServer, onRepaired, display, onDisplay }: {
   isServer: boolean;
@@ -22,8 +22,6 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
   const { devices } = useDevices();
   const [serverState, setServerState] = useState<ServerState>("checking");
   const [open, setOpen] = useState(false);
-  const [themes, setThemes] = useState<Array<{ id: string; name: string; author: string }>>([]);
-  useEffect(() => { if (open) window.emusync.theme.list().then(setThemes).catch(() => setThemes([])); }, [open]);
   const [startState, setStartState] = useState<StartState>("idle");
 
   // PIN management
@@ -450,18 +448,6 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
                 Fullscreen: {display.fullscreen ? "on" : "off"}
               </button>
             </div>
-            <label style={{ display: "block", marginTop: 8, fontSize: 12, color: "var(--text-muted)" }}>
-              Big Picture theme
-              <select
-                style={{ display: "block", width: "100%", marginTop: 4, padding: 6, background: "var(--surface2)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}
-                value={display.theme}
-                onChange={(e) => window.emusync.display.setTheme(e.target.value).then((theme) => onDisplay({ theme }))}
-              >
-                <option value="default">Default</option>
-                {themes.map((t) => <option key={t.id} value={t.id}>{t.name}{t.author ? ` (${t.author})` : ""}</option>)}
-              </select>
-              {themes.length === 0 && <span>Put theme folders in the "themes" folder of the EmuSync config directory.</span>}
-            </label>
             <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 13, cursor: "pointer" }}>
               <input
                 type="checkbox"

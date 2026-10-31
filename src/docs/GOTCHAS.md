@@ -66,7 +66,7 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 
 **XDG dirs, never hardcode (#564).** Use `server/paths.py` / `gui/electron/paths.ts` (`tests/test_paths.py` checks they agree; `paths.ts` reads `data_dir` from TOML). `paths.migrate_legacy()` (via `emusync migrate`, `config.load()`, Electron `migrate.ts`, imported first in `main.ts`) moves `~/.emusync`: never overwrites, refuses if an old server is running or the target has `emusync.db`, leaves `MOVED_TO_XDG.txt`. **Any `EMUSYNC_*_DIR` override disables migration**; `tests/conftest.py` sets them so tests never touch real files. Update every device — an old build recreates an empty `~/.emusync`.
 
-**GUI-only settings → `display.json` (#499).** `config.save()` rebuilds TOML from the dataclass, dropping unknown keys. `display.ts` owns `{scale, fullscreen}`; `bigPicture` follows fullscreen (no separate toggle), sets `html[data-bigpicture]`, swaps `ConsoleGrid` → `ConsoleWheel`. Desktop styles must never depend on it.
+**GUI-only settings → `display.json` (#499).** `config.save()` rebuilds TOML from the dataclass, dropping unknown keys. `display.ts` owns `{scale, fullscreen, autoUpdateEnabled}`; leftover keys from older versions (`bigPicture`, `theme`) are ignored on load.
 
 **Config writes atomic + 0600; corrupt ≠ missing (#535).** A parse error used to look like "no config" → Setup re-ran and overwrote `device_id`/PIN. Corrupt file → renamed `emusync.toml.corrupt-<ms>`. All writers write `.tmp` 0600 + rename; never a bare `writeFileSync(CONFIG_PATH, …)`. `config:load` returns `null` for missing or corrupt.
 
@@ -98,7 +98,6 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 
 - **Offline modal data (#464):** `useGameList` falls back to `game_cache/`; `GameConfig` uses `game:offlineDeviceConfig`. Other per-game tabs doing live-only fetches (Devices/History/Artwork/Mods) have no fallback — wire one per tab if needed.
 - **Library import (#462)** reuses `ConsoleImport` verbatim per `{folder, consoleKey}` queue item (advances on `onClose`; no batch cancel). Folder matching depends on `console_folder_names` — a new console in `consoles_data.py` needs a realistic `folder_names` list (`ps1`, `megadrive`…; key/abbr/label already match).
-- **Two console-image sources (#505):** `getConsoleIcon` = RetroArch XMB mono glyphs (desktop grid); `getConsoleLogo` = es-theme-carbon colour SVGs via `CARBON_FOLDER` (Big Picture wheel); 3DS/Switch/PS3 from art-book-next-es-de `ART_BOOK_LOGO` (no license — fetch at runtime, never bundle). Fallback: mono icon → abbr text.
 - **Bulk Steam button (#516):** adds the not-yet-added ones; only an all-added selection flips to Remove (shortcut only; art/collection left inert).
 - **Timestamps are UTC;** a tz-less ISO string parses as local in JS → use `parseUtc()` in `time.tsx`.
 
