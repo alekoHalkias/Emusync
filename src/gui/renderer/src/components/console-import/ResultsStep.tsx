@@ -57,15 +57,15 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
 
       <LocationsBlock vm={vm} />
 
-      {/* Search + filter (issue #273) */}
+      {/* Search + filter (#273), title cleanup on the visible rows (#283) and bulk select, one wrapping row (#652) */}
       {roms.length > 0 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search ROMs…"
-            style={{ flex: 1, fontSize: 13, padding: "4px 8px" }}
+            style={{ flex: "1 1 140px", minWidth: 0, fontSize: 13, padding: "4px 8px" }}
           />
           <select
             value={statusFilter}
@@ -78,12 +78,6 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
             <option value="save">Has save</option>
             <option value="state">Has state</option>
           </select>
-        </div>
-      )}
-
-      {/* Title cleanup tools — act on the visible (filtered) rows (issue #283) */}
-      {roms.length > 0 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
           <button
             className="btn btn-ghost"
             style={{ fontSize: 12, padding: "2px 10px" }}
@@ -115,16 +109,14 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
           >
             Replace all
           </button>
-        </div>
-      )}
-
-      {/* ROM list header with bulk select — reflects the visible (filtered) set */}
-      {roms.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          <span
+            style={{ fontSize: 13, color: "var(--text-muted)", marginLeft: "auto", whiteSpace: "nowrap" }}
+            title={vm.ignoredCount > 0 ? `${vm.ignoredCount} ignored file${vm.ignoredCount !== 1 ? "s" : ""} hidden - manage them in the console's settings.` : undefined}
+          >
             {visibleSelectedCount} of {visibleRoms.length} selected
+            {vm.ignoredCount > 0 && ` (${vm.ignoredCount} ignored)`}
           </span>
-          <span style={{ display: "flex", gap: 8 }}>
+          <span style={{ display: "flex", gap: 6 }}>
             <button
               className="btn btn-ghost"
               style={{ fontSize: 12, padding: "2px 10px" }}
@@ -145,11 +137,6 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
           </span>
         </div>
       )}
-      {vm.ignoredCount > 0 && (
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
-          {vm.ignoredCount} ignored file{vm.ignoredCount !== 1 ? "s" : ""} hidden - manage them in the console's settings.
-        </div>
-      )}
 
       {/* ROM list */}
       <div style={{ flex: 1, overflowY: "auto", border: "2px solid var(--border)", borderRadius: 6 }}>
@@ -168,7 +155,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                   key={rom.romPath}
                   style={{
                     display: "flex", alignItems: "flex-start", gap: 10,
-                    padding: "10px 12px", borderBottom: "2px solid var(--border)",
+                    padding: "6px 12px", borderBottom: "2px solid var(--border)",
                     cursor: "pointer",
                   }}
                   onClick={() => vm.toggleRom(rom.romPath)}
@@ -180,7 +167,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                     onClick={e => e.stopPropagation()}
                     style={{ marginTop: 3, flexShrink: 0 }}
                   />
-                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                     <input
                       type="text"
                       value={names[rom.romPath] ?? rom.name}
@@ -236,23 +223,6 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
         ))}
       </div>
 
-      {romSource === "network" ? (
-        <div style={{ marginTop: 12, fontSize: 12, color: "var(--text-muted)" }}>
-          <GlobeIcon /> Network ROMs aren't copied to other devices — every device reads them from the share.
-        </div>
-      ) : (
-        <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 13 }}>
-          <label className="ci-check">
-            <input type="checkbox" checked={pushSaves} onChange={e => vm.setPushSaves(e.target.checked)} />
-            Push saves to other devices
-          </label>
-          <label className="ci-check">
-            <input type="checkbox" checked={pushStates} onChange={e => vm.setPushStates(e.target.checked)} />
-            Push states to other devices
-          </label>
-        </div>
-      )}
-
       {nameWarnings.length > 0 && (
         <div style={{
           marginTop: 12, padding: "10px 12px",
@@ -279,8 +249,24 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
         </div>
       )}
 
-      <div className="modal-actions" style={{ marginTop: 12 }}>
+      <div className="modal-actions" style={{ marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button className="btn btn-ghost" onClick={vm.backToEmulator}>← Back</button>
+        {romSource === "network" ? (
+          <span style={{ flex: 1, fontSize: 12, color: "var(--text-muted)" }} title="Network ROMs aren't copied to other devices — every device reads them from the share.">
+            <GlobeIcon /> Read from the share on every device
+          </span>
+        ) : (
+          <span style={{ flex: 1, display: "flex", gap: 12, fontSize: 13, justifyContent: "center", flexWrap: "wrap" }}>
+            <label className="ci-check">
+              <input type="checkbox" checked={pushSaves} onChange={e => vm.setPushSaves(e.target.checked)} />
+              Push saves
+            </label>
+            <label className="ci-check">
+              <input type="checkbox" checked={pushStates} onChange={e => vm.setPushStates(e.target.checked)} />
+              Push states
+            </label>
+          </span>
+        )}
         {selectedCount === 0 ? (
           // Nothing selected (e.g. every ROM here is already imported) — offer to
           // move on instead of just sitting disabled. In the bulk-library queue

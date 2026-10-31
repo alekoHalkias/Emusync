@@ -10,8 +10,8 @@ function Row({ label, path, empty, onPick, onClear, children }: {
   label: string; path: string; empty: string; onPick: () => void; onClear: () => void; children?: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, marginBottom: 4 }}>
-      <span style={{ width: 110, fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{label}</span>
+    <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, flex: "1 1 280px", minWidth: 0 }}>
+      <span style={{ fontWeight: 500, fontSize: 13, flexShrink: 0 }}>{label}</span>
       <button className="btn btn-ghost" style={btn} onClick={onPick}>Choose…</button>
       <span className="truncate" style={{ flex: 1, color: "var(--text-muted)" }} title={path}>{path || empty}</span>
       {children}
@@ -35,9 +35,10 @@ export function LocationsBlock({ vm }: { vm: ConsoleImportVM }) {
     share.status === "unverified" ? { text: "Unverified", color: "var(--text-muted)" } : null;
 
   return (
-    <div style={{ marginBottom: 12 }}>
-      <Row label="Local folder" path={localRomRoot} empty="Not set" onPick={vm.pickLocalRomRoot} onClear={vm.clearLocalRoot} />
-      <Row label="Network folder" path={networkRoot} empty="Not set (optional)" onPick={vm.pickNetworkRoot} onClear={vm.clearNetworkRoot}>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: "4px 16px", flexWrap: "wrap", alignItems: "center" }}>
+      <Row label="Local" path={localRomRoot} empty="Not set" onPick={vm.pickLocalRomRoot} onClear={vm.clearLocalRoot} />
+      <Row label="Network" path={networkRoot} empty="Not set (optional)" onPick={vm.pickNetworkRoot} onClear={vm.clearNetworkRoot}>
         {chip && (
           <span style={{ fontSize: 11, color: chip.color, whiteSpace: "nowrap" }}
             title={share.status === "unverified" ? "Could not read or write .emusync-share-id in this folder, so it cannot be matched with other devices" : undefined}>
@@ -45,15 +46,17 @@ export function LocationsBlock({ vm }: { vm: ConsoleImportVM }) {
           </span>
         )}
       </Row>
-      {linkedCount ? (
-        <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 4px" }}>
-          {linkedCount} game{linkedCount !== 1 ? "s" : ""} linked from {share.peer?.device_name ?? "another device"}
-        </div>
-      ) : null}
-
-      <button type="button" className="btn btn-ghost" style={{ ...btn, marginTop: 2 }} onClick={() => setShowFolders(v => !v)}>
-        {showFolders ? "▾" : "▸"} {allRomDirs.length} folder{allRomDirs.length !== 1 ? "s" : ""} scanned
-      </button>
+      </div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+        <button type="button" className="btn btn-ghost" style={btn} onClick={() => setShowFolders(v => !v)}>
+          {showFolders ? "▾" : "▸"} {allRomDirs.length} folder{allRomDirs.length !== 1 ? "s" : ""} scanned
+        </button>
+        {linkedCount ? (
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            {linkedCount} game{linkedCount !== 1 ? "s" : ""} linked from {share.peer?.device_name ?? "another device"}
+          </span>
+        ) : null}
+      </div>
       {showFolders && (
         <div style={{ marginTop: 6 }}>
           {allRomDirs.length === 0 && (
