@@ -74,7 +74,8 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 4. Wire into touch_device - devices.py; reuses throttled write path; _auth unchanged.
 5. Presence cleanup - devices.py, _core.py; reuses _print_activity and presence sets.
 6. Tests - test_device_mac.py new; reuses test_auth/test_events patterns.
-7. Docs - CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
+7. device_id backup in data dir - config.py; reuses paths.data_dir and save()'s atomic write; new _restore_device_id helper (no second ID source exists).
+8. Docs - CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -96,3 +97,4 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-10-31 bplan: 7 steps written, backend_pattern=server-side ARP MAC + merge_devices in touch_device
+- 2026-10-31 bplan: added step 7 (device_id backup in data dir) at user request

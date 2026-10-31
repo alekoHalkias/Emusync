@@ -38,11 +38,15 @@ Silently resolve each client's MAC from the server's ARP table and merge devices
   - Files: src/tests/test_device_mac.py (new)
   - Reuses: fixtures/pattern from src/tests/test_auth.py and test_events.py
   - New: test file - new behavior area
-- [ ] 7. Docs: add a short rule to CLAUDE.md (Config / paths / DB: devices merged by server-resolved ARP MAC, schema v32, #656) and a note in docs/ARCHITECTURE.md device/auth section; GOTCHAS entry for the ARP on-link limitation.
+- [ ] 7. Backup the device ID outside the config file: `save()` also writes `device_id` to `paths.data_dir()/device_id` (atomic, 0600, only when changed); `load()` uses that value instead of a fresh uuid4 when `emusync.toml` is missing, corrupt, or lacks `device_id` (validated with `uuid.UUID`, ignored if invalid). Covers lost/corrupt config where the data dir survives; a full wipe still relies on the MAC merge. On Windows config and data share one dir, so this only covers toml loss there.
+  - Files: src/server/config.py, src/tests/test_device_mac.py (cases: missing toml restores id, corrupt toml restores id, invalid backup ignored, save writes backup)
+  - Reuses: `paths.data_dir()`, existing atomic 0600 write helper used by `save()` (#535), `Config.device_id` default factory
+  - New: small `_restore_device_id()` helper - no existing code reads a second ID source.
+- [ ] 8. Docs: add a short rule to CLAUDE.md (Config / paths / DB: devices merged by server-resolved ARP MAC, schema v32, #656) and a note in docs/ARCHITECTURE.md device/auth section; GOTCHAS entry for the ARP on-link limitation and the device_id backup file.
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md, src/docs/GOTCHAS.md
 
 ## Checklist
-Schema bump: yes (v32). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
+Schema bump: yes (v32). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: yes (new `device_id` backup file in the data dir).
 
 ## Not in this plan
 Client-sent MAC header; showing the MAC in DevicesPanel; matching devices across subnets or by hostname; mDNS-based identity.
