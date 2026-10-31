@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #652
 - Branch: feature/652-compact-import-results
-- PR: none
-- Status: implemented
+- PR: #653
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -75,8 +75,8 @@ See issue #652.
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #653
 ### Server Sync: pending
 ### Doc Sync: pending
 
