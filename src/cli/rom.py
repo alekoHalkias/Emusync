@@ -203,3 +203,33 @@ def rom_delocalize(slug: str, console: str) -> None:
         removed += 1
 
     click.echo(f"\nDelocalized {removed} ROM(s).")
+
+
+@rom.command("fulfill-network-upload")
+@click.argument("request_id")
+@click.option("--decline", is_flag=True, help="Decline the request instead of uploading.")
+def fulfill_network_upload(request_id: str, decline: bool) -> None:
+    """Answer a pending network-upload request for a local ROM on this device (#660).
+
+    Used by the GUI after the user approves or declines a ROM too large for the
+    daemon to upload on its own. Exit 0 ok, 1 error.
+    """
+    cfg = cfg_module.load()
+    client = _require_client(cfg)
+    pr = next((p for p in client.list_pending_pull_requests()
+               if p["id"] == request_id and p.get("kind") == "network-upload"), None)
+    if not pr:
+        click.echo("No such pending network-upload request.", err=True)
+        sys.exit(1)
+    if decline:
+        client.complete_pull_request(request_id, status="failed")
+        click.echo("Declined.")
+        return
+    try:
+        master = netrom.upload_to_network(client, cfg.device_id, pr["slug"])
+    except Exception as exc:
+        client.complete_pull_request(request_id, status="failed")
+        click.echo(f"Upload failed: {exc}", err=True)
+        sys.exit(1)
+    client.complete_pull_request(request_id, status="fulfilled")
+    click.echo(f"Uploaded to {master}")
