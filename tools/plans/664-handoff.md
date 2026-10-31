@@ -4,7 +4,7 @@
 - Issue: #664
 - Branch: feature/664-refresh-locations-games-not-shown
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
