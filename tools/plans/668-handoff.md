@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #668
 - Branch: feature/668-stable-appimage-name
-- PR: none
-- Status: implemented
+- PR: #669
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
