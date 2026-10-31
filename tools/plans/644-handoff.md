@@ -102,3 +102,5 @@ See issue #644.
 - 2026-10-30 implement: step 5 done (files:ensure-share-marker IPC; tsc errors shown are pre-existing)
 - 2026-10-30 implement: step 6 done (getConsoleShares, getDeviceId, share id type)
 - 2026-10-30 implement: step 7 done (useNetworkShare hook, pure shareStatus)
+- 2026-10-30 implement: step 8 done (networkRoot state, derived romSource, linkShareGames, pickers)
+- 2026-10-30 implement: step 9 done (LocationsBlock.tsx, ResultsStep slimmed)

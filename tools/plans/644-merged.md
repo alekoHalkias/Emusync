@@ -38,11 +38,11 @@ Backend first, then IPC and API client, then UI.
   - Files: src/gui/renderer/src/components/console-import/useNetworkShare.ts (new), helpers.ts
   - Reuses: step 5 and 6 APIs
   - New: separate file because useConsoleImport.ts exceeds 300 lines
-- [ ] 8. `useConsoleImport`: replace `romSource` state with `networkRoot` (derived `romSource`), `pickNetworkRoot`/`clearNetworkRoot`, persist `import_network_folder` beside `import_rom_source`; extract `importOne(rom)` from `_runImport`; add `linkShareGames()` (rescan, import only entries with `linkedSlug`, drop them from `roms`, set `linkedCount`) triggered when status is `same`.
+- [x] 8. `useConsoleImport`: replace `romSource` state with `networkRoot` (derived `romSource`), `pickNetworkRoot`/`clearNetworkRoot`, persist `import_network_folder` beside `import_rom_source`; extract `importOne(rom)` from `_runImport`; add `linkShareGames()` (rescan, import only entries with `linkedSlug`, drop them from `roms`, set `linkedCount`) triggered when status is `same`.
   - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: scanRoms/dedupeAndLink `linkedSlug`, `resolveImportPaths`, `setGameDevice`, `classifyByRoot`
   - New: `linkShareGames` (~25 lines) - nothing links without entering the importing phase
-- [ ] 9. `ResultsStep`: Locations block (Local folder row, Network folder row with status chip, "N folders scanned" disclosure holding the folder list and `+ Add folder`), "N games linked" status line; split into `LocationsBlock.tsx` if the file nears 300 lines.
+- [x] 9. `ResultsStep`: Locations block (Local folder row, Network folder row with status chip, "N folders scanned" disclosure holding the folder list and `+ Add folder`), "N games linked" status line; split into `LocationsBlock.tsx` if the file nears 300 lines.
   - Files: src/gui/renderer/src/components/console-import/ResultsStep.tsx
   - Reuses: existing folder list markup, `vm.addExtraPath`, `vm.pickLocalRomRoot`, button classes
   - New: inline chip and disclosure
@@ -81,3 +81,5 @@ Schema bump: yes (29 -> 30). New IPC channel (+ emusync.d.ts): yes (`files:ensur
 LibraryImport.tsx bulk-import source radio (library-level; #643 closed). Server-side game linking. Dropping columns.
 
 ## Log
+Step 8: importOne was not extracted; linkShareGames sets the game device directly with no rename or file operations, because the share master was already named by the first device and renaming it would break that device's path. Scan paths now always include the local folder (previously network mode only), and the pickers rescan.
+Step 9: Locations block lives in LocationsBlock.tsx (ResultsStep stays under 300 lines); useConsoleImport.ts is 510 lines (was 436).

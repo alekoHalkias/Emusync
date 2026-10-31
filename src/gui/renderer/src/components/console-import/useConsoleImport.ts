@@ -1,6 +1,6 @@
 // State machine + async orchestration for the Add-Console wizard.
 // The presentational step components consume the object this hook returns.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addGame, setGameDevice, gamesOverview, type GameOverview } from "../../api";
 import {
   annotateRoms,
@@ -9,6 +9,7 @@ import {
   existingLocalGamesForConsole,
   getConsoleAbbreviation,
   groupByDir,
+  relPathUnder,
   sanitizeFilename,
   usesSharedSaveLayout,
   usesSharedStateLayout,
@@ -16,6 +17,7 @@ import {
 } from "./helpers";
 import { autoPush, backfillSwitchTitleIds, prefetchArt, pullFromServerIfNewer } from "./postImport";
 import { resolveImportPaths } from "./resolveRomPaths";
+import { useNetworkShare } from "./useNetworkShare";
 import type {
   ConsoleOption,
   EmulatorOption,
@@ -28,6 +30,13 @@ import type {
 
 // IPC bridge (typing deferred to the typed-bridge work in #228).
 const emusync = window.emusync;
+
+/** Last network folder for a console (#644); older configs only stored a source flag, where the first saved folder was the share. */
+function savedNetworkRoot(cfg: Record<string, any> | null, consoleKey: string, folders: string[]): string {
+  const saved = cfg?.import_network_folder?.[consoleKey];
+  if (saved !== undefined) return saved;
+  return cfg?.import_rom_source?.[consoleKey] === "network" ? (folders[0] ?? "") : "";
+}
 
 export function useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs }: Props) {
   const [phase, setPhase]         = useState<Phase>(initialConsole ? "detecting" : "console");
@@ -50,16 +59,30 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   const [artProgress, setArtProgress]   = useState({ done: 0, total: 0, failed: 0 });
   const [pushSaves, setPushSaves]       = useState(true);
   const [pushStates, setPushStates]     = useState(true);
-  // ROM source (issue #255): import from a local folder or a network share, and
-  // where local copies should land when a network ROM is localized later.
-  const [romSource, setRomSource]       = useState<"local" | "network">("local");
+  // Locations (issues #255, #644): an optional network share and the local folder
+  // (where copies of network ROMs land). The ROM source is derived: a network
+  // folder means network-sourced ROMs, otherwise local.
+  const [networkRoot, setNetworkRoot]   = useState("");
   const [localRomRoot, setLocalRomRoot] = useState("");
+  const romSource: "local" | "network" = networkRoot ? "network" : "local";
+  const [linkedCount, setLinkedCount]   = useState<number | null>(null);
+  const linkedFor = useRef("");
   const [existingGames, setExistingGames] = useState<GameOverview[]>([]);
   const [nameWarnings, setNameWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     emusync.emulator.consoles().then(setConsoles);
   }, []);
+
+  const { share, saveShareId } = useNetworkShare(getConsoleAbbreviation(consoleSel, consoles), networkRoot);
+
+  // A matching share (#644): games another device already put on it get this
+  // device's path with no file operations - the first device already named them.
+  useEffect(() => {
+    if (share.status !== "same" || phase !== "results" || linkedFor.current === networkRoot) return;
+    linkedFor.current = networkRoot;
+    void linkShareGames();
+  }, [share.status, phase, networkRoot]);
 
   // If initialConsole was provided, auto-detect emulators for it
   useEffect(() => {
@@ -79,8 +102,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
           const initial = initialRomDirs && initialRomDirs.length > 0 ? initialRomDirs : saved;
           setSavedFolders(initial);
           setExtraPaths(initial);
-          const lastSource = cfg?.import_rom_source?.[consoleSel];
-          setRomSource(lastSource === "network" ? "network" : "local");
+          setNetworkRoot(savedNetworkRoot(cfg, consoleSel, initial));
           setLocalRomRoot(cfg?.import_local_folder?.[consoleSel] ?? "");
           if (options.length === 1) setEmuSel(options[0]);
           setPhase("emulator");
@@ -104,9 +126,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
       setSuggestions(sugg);
       setSavedFolders(saved);
       setExtraPaths(saved);
-      // Remember the last source + local destination per console (issue #255).
-      const lastSource = cfg?.import_rom_source?.[consoleSel];
-      setRomSource(lastSource === "network" ? "network" : "local");
+      // Remember the last network + local folder per console (issues #255, #644).
+      setNetworkRoot(savedNetworkRoot(cfg, consoleSel, saved));
       setLocalRomRoot(cfg?.import_local_folder?.[consoleSel] ?? "");
       if (options.length === 1) setEmuSel(options[0]);
       setPhase("emulator");
@@ -116,24 +137,25 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     }
   }
 
-  async function scanRoms(paths: string[]): Promise<void> {
+  async function scanRoms(paths: string[], over: { networkRoot?: string; localRoot?: string } = {}): Promise<void> {
     if (!emuSel) return;
+    const net = over.networkRoot ?? networkRoot;
+    const loc = over.localRoot ?? localRomRoot;
     setPhase("scanning");
     setError("");
     try {
       // Network import (issue #270): also scan the console's local-copy folder so
       // ROMs already on local disk are detected — local-only ones get uploaded to
       // the share, ones present in both are treated as already localized.
-      const scanNetwork = romSource === "network";
-      const scanPaths = scanNetwork && localRomRoot && !paths.includes(localRomRoot)
-        ? [...paths, localRomRoot]
-        : paths;
+      const scanNetwork = !!net;
+      const withNet = net && !paths.includes(net) ? [net, ...paths] : paths;
+      const scanPaths = loc && !withNet.includes(loc) ? [...withNet, loc] : withNet;
       const result = await emusync.emulator.scan(consoleSel, emuSel, scanPaths);
       let annotated = annotateRoms(result.roms, scanPaths, result.romDirs ?? []);
 
       // Tag each ROM network/local/both and merge net+local duplicates into one row.
       if (scanNetwork) {
-        annotated = classifyByRoot(annotated, paths, localRomRoot);
+        annotated = classifyByRoot(annotated, withNet, loc);
       }
 
       // Dedup: filter already-imported ROMs; detect cross-device links.
@@ -297,11 +319,12 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     // Only PS2 also shares its STATES — the rest keep per-game state handling.
     const sharedLayout = usesSharedSaveLayout(consoleSel);
     const sharedStateLayout = usesSharedStateLayout(consoleSel);
-    const scanRoots = [...new Set([...romDirs, ...extraPaths])].map(p => p.replace(/\/$/, ""));
+    const scanRoots = [...new Set([networkRoot, ...romDirs, ...extraPaths].filter(Boolean))].map(p => p.replace(/\/$/, ""));
     // Persist the chosen source + local destination for next time (issue #255).
     try {
       const cfg = (await emusync.config.load()) ?? {};
       cfg.import_rom_source = { ...(cfg.import_rom_source ?? {}), [consoleSel]: romSource };
+      cfg.import_network_folder = { ...(cfg.import_network_folder ?? {}), [consoleSel]: networkRoot };
       if (localRomRoot) cfg.import_local_folder = { ...(cfg.import_local_folder ?? {}), [consoleSel]: localRomRoot };
       await emusync.config.save(cfg);
     } catch { /* non-fatal */ }
@@ -331,10 +354,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
           ...(romSha ? { rom_sha256: romSha } : {}),
           // Network root + chosen local-copy destination land on the console row
           // so `Copy for offline play` / `emusync rom localize` know where to put it.
-          ...(romSource === "network" ? {
-            device_network_folder: netRoot,
-            device_local_folder: localRomRoot,
-          } : {}),
+          ...(romSource === "network" ? { device_network_folder: netRoot } : {}),
+          ...(localRomRoot ? { device_local_folder: localRomRoot } : {}),
         });
         imported.push({ slug, name: displayName, savePath, statePath });
       } catch (e: unknown) {
@@ -344,6 +365,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
       setProgress({ done: i + 1, total: toImport.length });
     }
     setImportErrors(errs);
+    if (imported.length > 0 && networkRoot) void saveShareId();
     setPhase("done");
     // Network ROMs live on a share every device reaches, so there's nothing to
     // copy — cross-device config broadcast is tracked as a follow-up (#255).
@@ -392,9 +414,60 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     setNameWarnings([]);
   }
 
+  // Location pickers rescan so presence (network / local / both) is reclassified.
   async function pickLocalRomRoot(): Promise<void> {
     const folder = await emusync.dialog.openFolder();
-    if (folder) setLocalRomRoot(folder);
+    if (!folder) return;
+    setLocalRomRoot(folder);
+    void scanRoms(extraPaths, { localRoot: folder });
+  }
+
+  async function pickNetworkRoot(): Promise<void> {
+    const folder = await emusync.dialog.openFolder();
+    if (!folder) return;
+    setNetworkRoot(folder);
+    setLinkedCount(null);
+    void scanRoms(extraPaths, { networkRoot: folder });
+  }
+
+  function clearLocalRoot(): void {
+    setLocalRomRoot("");
+    void scanRoms(extraPaths, { localRoot: "" });
+  }
+
+  function clearNetworkRoot(): void {
+    setNetworkRoot("");
+    setLinkedCount(null);
+    void scanRoms(extraPaths, { networkRoot: "" });
+  }
+
+  async function linkShareGames(): Promise<void> {
+    const toLink = roms.filter(r => r.linkedSlug && !r.existingLocal);
+    let linked = 0;
+    const done = new Set<string>();
+    for (const rom of toLink) {
+      try {
+        await setGameDevice(rom.linkedSlug!, {
+          rom_path: rom.romPath,
+          save_path: rom.savePath,
+          launch_command: rom.launchCommand,
+          state_path: rom.statePath ?? "",
+          rom_folder_path: rom.romFolderPath,
+          rom_source: "network",
+          rom_rel_path: relPathUnder(rom.romPath, [networkRoot]),
+          local_rom_path: rom.presence === "both" ? (rom.localRomPath ?? "") : "",
+          device_network_folder: networkRoot,
+          ...(localRomRoot ? { device_local_folder: localRomRoot } : {}),
+        });
+        done.add(rom.romPath);
+        linked++;
+      } catch { /* left in the list to import manually */ }
+    }
+    if (done.size === 0) return;
+    setRoms(prev => prev.filter(r => !done.has(r.romPath)));
+    setSelected(prev => new Set([...prev].filter(p => !done.has(p))));
+    setLinkedCount(linked);
+    void saveShareId();
   }
 
   function backToConsole(): void {
@@ -412,7 +485,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   const currentStep   = stepIndex(phase);
   const showStepper   = phase !== "importing" && phase !== "done";
   // Merge auto-detected + extra dirs for display (no dupes), minus removed ones.
-  const allRomDirs = [...new Set([...romDirs, ...extraPaths])].filter(p => !removedDirs.has(p));
+  const allRomDirs = [...new Set([...romDirs, ...extraPaths])]
+    .filter(p => !removedDirs.has(p) && p !== networkRoot && p !== localRomRoot);
 
   return {
     onClose, onImported,
@@ -420,12 +494,12 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     phase, consoles, consoleSel, emulators, suggestions, emuSel,
     extraPaths, removedDirs, roms, selected, names, error, progress,
     importErrors, pushResults, pushSaves, pushStates, artProgress,
-    romSource, localRomRoot, nameWarnings,
+    romSource, networkRoot, localRomRoot, nameWarnings, share, linkedCount,
     // derived
     grouped, selectedCount, consoleLabel, currentStep, showStepper, allRomDirs,
     // setters used directly by steps
     setConsoleSel, setEmuSel, setPushSaves, setPushStates, setName,
-    setRomSource, pickLocalRomRoot,
+    pickLocalRomRoot, pickNetworkRoot, clearLocalRoot, clearNetworkRoot,
     // handlers
     detectEmulators, scanRoms, addExtraPath, removeExtraPath, removeRomDir,
     toggleRom, toggleAll, doImport, forceImport, dismissNameWarnings,
