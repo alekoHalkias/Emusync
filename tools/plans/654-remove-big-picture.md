@@ -14,7 +14,7 @@ Delete Big Picture mode (wheel, themes, colour logos, display toggle) so the GUI
 - **Recommendations**: none. Design guide needs no change (pure removal).
 
 ## Steps
-- [ ] 1. Electron main: drop theme engine and Big Picture display state. Old display.json keys are ignored because load() reads only known keys.
+- [x] 1. Electron main: drop theme engine and Big Picture display state. Old display.json keys are ignored because load() reads only known keys.
   - Files: src/gui/electron/main.ts, display.ts, art.ts, preload.ts, themes.ts (delete), themes/bundled/ (delete)
   - Reuses: display.ts load()/save()/applyDisplay (remove `bigPicture`/`theme` fields, `selectedTheme`, `display:setTheme`; `sync` saves and sends `{ fullscreen }` only); main.ts drops `registerThemeScheme`, `ThemeEngine.registerIpc`; art.ts drops `themeFile`/`selectedTheme` imports, `art:getConsoleLogo` handler, `CARBON_FOLDER`, `ART_BOOK_LOGO`, `CARBON_BASE`, `ART_BOOK_BASE` and helpers only they use; preload.ts drops `theme` namespace, `setTheme`, `getConsoleLogo`, `bigPicture` in types
   - New: none

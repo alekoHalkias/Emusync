@@ -91,3 +91,4 @@ Renderer: ConsoleWheel, ConsoleGrid, ServerStatusButton, App, styles.css, themes
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
 - 2026-10-31 fplan: 7 steps written, visual_pattern=pure removal
 - 2026-10-31 tplan: test_file=none, 2 test cases defined (build, suite) plus manual legacy-config check
+- 2026-10-31 implement: step 1 done (electron main: themes, getConsoleLogo, bigPicture/theme display removed; tsc errors in files.ts/steam.ts pre-exist)

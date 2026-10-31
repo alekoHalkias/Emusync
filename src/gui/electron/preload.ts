@@ -30,15 +30,14 @@ contextBridge.exposeInMainWorld("emusync", {
     localIp: (): Promise<string | null> => ipcRenderer.invoke("server:local-ip"),
   },
   display: {
-    get: (): Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean; theme: string; autoUpdateEnabled: boolean }> => ipcRenderer.invoke("display:get"),
-    onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void): (() => void) => {
-      const handler = (_e: unknown, d: { fullscreen: boolean; bigPicture: boolean }) => cb(d);
+    get: (): Promise<{ scale: number; fullscreen: boolean; autoUpdateEnabled: boolean }> => ipcRenderer.invoke("display:get"),
+    onChange: (cb: (d: { fullscreen: boolean }) => void): (() => void) => {
+      const handler = (_e: unknown, d: { fullscreen: boolean }) => cb(d);
       ipcRenderer.on("display:changed", handler);
       return () => { ipcRenderer.removeListener("display:changed", handler); };
     },
     cycleScale: (): Promise<number> => ipcRenderer.invoke("display:cycleScale"),
     toggleFullscreen: (): Promise<boolean> => ipcRenderer.invoke("display:toggleFullscreen"),
-    setTheme: (theme: string): Promise<string> => ipcRenderer.invoke("display:setTheme", theme),
   },
   updater: {
     check: (): Promise<{ available: boolean; error?: string }> => ipcRenderer.invoke("updater:check"),
@@ -51,11 +50,6 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.on("updater:change", handler);
       return () => { ipcRenderer.removeListener("updater:change", handler); };
     },
-  },
-  theme: {
-    list: (): Promise<Array<{ id: string; name: string; author: string }>> => ipcRenderer.invoke("theme:list"),
-    get: (id: string): Promise<{ css: string } | null> => ipcRenderer.invoke("theme:get", id),
-    import: (path: string): Promise<string> => ipcRenderer.invoke("theme:import", path),
   },
   launcher: {
     path: (): Promise<string> => ipcRenderer.invoke("launcher:path"),
@@ -184,8 +178,6 @@ contextBridge.exposeInMainWorld("emusync", {
   art: {
     get: (slug: string, gameName: string, consoleKey: string): Promise<string | null> =>
       ipcRenderer.invoke("art:get", slug, gameName, consoleKey),
-    getConsoleLogo: (consoleKey: string): Promise<string | null> =>
-      ipcRenderer.invoke("art:getConsoleLogo", consoleKey),
     getConsoleIcon: (consoleKey: string): Promise<string | null> =>
       ipcRenderer.invoke("art:getConsoleIcon", consoleKey),
   },
