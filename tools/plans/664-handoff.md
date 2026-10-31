@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #664
 - Branch: feature/664-refresh-locations-games-not-shown
-- PR: none
-- Status: implemented
+- PR: #665
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -62,13 +62,15 @@ TBD
 3. Docs: none.
 
 ## 9. Review
-TBD
+### Findings: none
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #665
+### Server Sync: done
+### Doc Sync: done (none needed)
 
 ## 11. Fix Attempts
 none
@@ -79,3 +81,5 @@ none
 - 2026-10-31 fplan: 3 steps written, visual_pattern=none
 - 2026-10-31 tplan: test_file=none, 1 manual case defined
 - 2026-10-31 implement: step 1 done (onImported after share links); lint/tests pass, pre-existing tsc errors elsewhere
+- 2026-10-31 review: 0 findings, blocked=no
+- 2026-10-31 ship: server sync done; doc sync none needed
