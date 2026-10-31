@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #646
 - Branch: feature/646-console-import-ignore-list
-- PR: none
-- Status: implementing
+- PR: #PENDING
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -72,8 +72,8 @@ See issue #646.
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #PENDING
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -96,3 +96,5 @@ See issue #646.
 - 2026-10-31 implement: step 5 done (IgnoredGamesPanel in ConsoleFoldersModal)
 - 2026-10-31 implement: step 6 done (reset clears import_ignored_roms)
 - 2026-10-31 implement: step 8 done (ARCHITECTURE.md section; CLAUDE.md rule added in step 1)
+- 2026-10-31 implement: step 7 done (GUI behavior confirmed by user)
+- 2026-10-31 ship: tests pass (566 passed, 3 skipped)

@@ -3,7 +3,7 @@
 Issue: #646
 Branch: feature/646-console-import-ignore-list
 PR: none
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal
@@ -37,7 +37,7 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
 - [x] 6. Reset: clear `import_ignored_roms` in the settings reset.
   - Files: src/gui/renderer/src/components/ServerStatusButton.tsx
   - Reuses: the existing reset line that clears `import_rom_source` / `import_local_folder`
-- [ ] 7. Verification (cases in the Testing section): Python round trip test for the new key (step 1); renderer has no JS test runner, so check manually via `make dev-gui`: ignore one row and a bulk selection, rescan, confirm they stay hidden, restart the app and confirm persistence, open console settings, unignore, rescan, confirm they return; ignoring never deletes files or imported games.
+- [x] 7. Verification (cases in the Testing section): Python round trip test for the new key (step 1); renderer has no JS test runner, so check manually via `make dev-gui`: ignore one row and a bulk selection, rescan, confirm they stay hidden, restart the app and confirm persistence, open console settings, unignore, rescan, confirm they return; ignoring never deletes files or imported games.
 - [x] 8. Docs: CLAUDE.md rule line and ARCHITECTURE.md (config field, ignoredRoms.ts, IgnoredGamesPanel).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md
 
