@@ -30,8 +30,18 @@ Linux AppImage has a stable filename (Steam shortcut survives updates) and the r
   - Files: .github/workflows/release.yml (only if release job lists names)
   - Reuses: existing globs
   - New: none
-- [ ] 5. Tests: no Python surface; typecheck/build only (no TS test harness in repo).
+- [ ] 5. Tests: no Python surface and no TS test harness; verify with `make test-changed` (falls back to full suite) plus `npm run build --prefix src/gui` (electron-vite build) and `npx electron-builder --linux --dir`-free check: confirm `artifactName` via `npm run dist --prefix src/gui` locally if feasible, else rely on CI release run.
 - [ ] 6. Docs: CLAUDE.md release artifact name line and IPC list (`updater:getVersion`); src/docs/ARCHITECTURE.md updater IPC list.
+
+## Testing
+- **Test File**: none (no TS test harness; Python suite unaffected)
+- **Test Cases**:
+  - Build: `npm run build --prefix src/gui` succeeds, so the new IPC and preload types compile
+  - Artifact: built AppImage is named `EmuSync-linux-x86_64.AppImage` and `latest-linux.yml` references it
+- **Edge Cases**:
+  - Existing versioned AppImage installs: auto-update replaces in place, path unchanged
+- **Integration Points**:
+  - Release job uploads `*.AppImage` and `latest-linux.yml` under the new name
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. Config/data file change: no.

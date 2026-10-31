@@ -48,12 +48,20 @@ src/gui/package.json (build.linux.artifactName), .github/workflows/release.yml, 
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: none (no TS harness; Python suite unaffected)
+### Test Cases: electron-vite build compiles; built artifact name is version-free and latest-linux.yml matches
+### Edge Cases: existing versioned installs update in place
+### Integration Points: release job asset upload
+### Outline:
+Frontend
+- package.json: linux artifactName without version
+- updater.ts/preload.ts/emusync.d.ts: updater:getVersion IPC
+- ServerStatusButton.tsx: Version row in Details grid
+Tests
+- electron-vite build, make test-changed, verify artifact and latest-linux.yml name
+Docs
+- CLAUDE.md, ARCHITECTURE.md
+### Summary: Linux AppImage gets a stable filename so Steam shortcuts survive updates, and the version is shown in the settings Details panel.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -91,3 +99,4 @@ src/gui/package.json (build.linux.artifactName), .github/workflows/release.yml, 
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
 - 2026-10-31 fplan: 6 steps written, visual_pattern=extra Details row
+- 2026-10-31 tplan: test_file=none, 2 test cases defined
