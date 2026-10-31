@@ -19,7 +19,7 @@ Backend first, then IPC and API client, then UI.
   - Files: src/server/store/consoles.py
   - Reuses: join pattern of `get_network_source_for_game`
   - New: one query - no cross-device console lookup exists
-- [ ] 3. API: `network_share_id` in `GET /devices/{id}/consoles`; `network_share_id: Optional[str] = None` on `ConsoleFoldersRequest` (None preserves); new `GET /consoles/{console_name}/shares` returning step 2's shape.
+- [x] 3. API: `network_share_id` in `GET /devices/{id}/consoles`; `network_share_id: Optional[str] = None` on `ConsoleFoldersRequest` (None preserves); new `GET /consoles/{console_name}/shares` returning step 2's shape.
   - Files: src/server/api/devices.py
   - Reuses: `update_device_console` `exclude_none` loop, `_auth`, `_get_store`
   - New: one route - nothing lists other devices' consoles
