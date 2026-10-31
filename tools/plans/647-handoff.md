@@ -4,7 +4,7 @@
 - Issue: #647
 - Branch: feature/647-fix-network-share-id-migration
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -21,13 +21,13 @@ schema.py migration, consoles.py, ConsoleFoldersModal.tsx, test_network_rom.py
 See issue #647.
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: backend (+ one small UI step)
+### Backend Changes: network_share_id ALTER moves to from_version < 31; _SCHEMA_VERSION = 31
+### UI Changes: ConsoleFoldersModal shows an error on fetch failure instead of the empty-row message
+### Plan Target: bplan
+### Sub-issues: none
+### Difficulty: 2/10
+### Backwards Compatibility: non-breaking, idempotent ALTER
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -77,3 +77,4 @@ See issue #647.
 
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
+- 2026-10-31 design: scope=backend+small ui, plan_target=bplan, difficulty=2/10, breaking=no
