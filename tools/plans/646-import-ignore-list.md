@@ -34,7 +34,7 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx, src/gui/renderer/src/components/IgnoredGamesPanel.tsx (new)
   - Reuses: ignoredRoms.ts, the modal's list-editor markup and `consoleKey` prop
   - New: small panel component - keeps the modal under 300 lines
-- [ ] 6. Reset: clear `import_ignored_roms` in the settings reset.
+- [x] 6. Reset: clear `import_ignored_roms` in the settings reset.
   - Files: src/gui/renderer/src/components/ServerStatusButton.tsx
   - Reuses: the existing reset line that clears `import_rom_source` / `import_local_folder`
 - [ ] 7. Verification (cases in the Testing section): Python round trip test for the new key (step 1); renderer has no JS test runner, so check manually via `make dev-gui`: ignore one row and a bulk selection, rescan, confirm they stay hidden, restart the app and confirm persistence, open console settings, unignore, rescan, confirm they return; ignoring never deletes files or imported games.

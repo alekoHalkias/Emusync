@@ -94,3 +94,4 @@ See issue #646.
 - 2026-10-31 implement: step 3 done (ignored set, scan filter, ignoreRoms)
 - 2026-10-31 implement: step 4 done (row Ignore, Ignore selected, ignored count line)
 - 2026-10-31 implement: step 5 done (IgnoredGamesPanel in ConsoleFoldersModal)
+- 2026-10-31 implement: step 6 done (reset clears import_ignored_roms)
