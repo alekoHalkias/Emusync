@@ -110,3 +110,5 @@ Network-drive games become playable on any device with the same share ID, and de
 - 2026-10-31 implement: step 5 done (netrom.upload_to_network)
 - 2026-10-31 implement: step 6 done (daemon handles network-upload, oversize stays pending)
 - 2026-10-31 implement: step 7 done (rom fulfill-network-upload CLI command)
+- 2026-10-31 implement: step 8 note: 409/400 check order swapped in the route (network check first) so an owner already flipped to network returns 409
+- 2026-10-31 implement: step 8 done (backend tests for network upload requests)

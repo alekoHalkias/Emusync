@@ -186,11 +186,11 @@ async def create_pull_request(
     kind = request_body.get("kind", "rom")
     if kind == "network-upload":
         # Ask the owner to copy its local-only ROM onto the console's network drive (#660).
+        if store.get_network_source_for_game(slug):
+            raise HTTPException(status_code=409, detail="This game is already on a network drive")
         gd = store.get_game_device(slug, from_device_id)
         if not gd or gd.rom_source != "local" or not gd.rom_path:
             raise HTTPException(status_code=400, detail="That device has no local ROM for this game")
-        if store.get_network_source_for_game(slug):
-            raise HTTPException(status_code=409, detail="This game is already on a network drive")
         existing = store.find_pending_pull_request(slug, from_device_id, kind)
         if existing:
             return {"pull_request_id": existing.id, "status": "pending",
