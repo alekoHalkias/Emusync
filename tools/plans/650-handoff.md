@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #650
 - Branch: feature/650-refresh-detect-new-games
-- PR: none
-- Status: implementing
+- PR: #PENDING
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -69,8 +69,8 @@ See issue #650.
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #PENDING
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -90,3 +90,5 @@ See issue #650.
 - 2026-10-31 implement: step 2 done (scanNewRoms module)
 - 2026-10-31 implement: step 3 done (Refresh scans for new ROMs, message + Review and import button)
 - 2026-10-31 implement: step 5 done (CLAUDE.md rule and ARCHITECTURE.md section)
+- 2026-10-31 implement: step 4 done (GUI behavior confirmed by user)
+- 2026-10-31 ship: tests pass (566 passed, 3 skipped)

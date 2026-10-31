@@ -3,7 +3,7 @@
 Issue: #650
 Branch: feature/650-refresh-detect-new-games
 PR: none
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal
@@ -26,7 +26,7 @@ Make Refresh locations also scan the console's local and network folders for ROM
   - Files: src/gui/renderer/src/components/GameGrid.tsx
   - Reuses: `handleRefreshLocations`, `bulkMsg`, `ConsoleImport`, `onChanged`
   - New: one `newRoms` state value and the button - nothing existing holds a follow-up action
-- [ ] 4. Verification: renderer has no JS test runner, so check manually via `make dev-gui`: add a ROM to the local folder and one to the network folder, click Refresh and see the count, open the wizard from the button and import them; confirm an ignored ROM and an already imported ROM are not counted; confirm a console with no folders or no detected emulator says so and the old refresh message still appears.
+- [x] 4. Verification: renderer has no JS test runner, so check manually via `make dev-gui`: add a ROM to the local folder and one to the network folder, click Refresh and see the count, open the wizard from the button and import them; confirm an ignored ROM and an already imported ROM are not counted; confirm a console with no folders or no detected emulator says so and the old refresh message still appears.
 - [x] 5. Docs: CLAUDE.md GUI rule and ARCHITECTURE.md (scanNewRoms, the two new wizard props).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md
 
