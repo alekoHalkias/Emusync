@@ -41,6 +41,18 @@ Delete Big Picture mode (wheel, themes, colour logos, display toggle) so the GUI
   - Reuses: existing sections (delete or trim)
   - New: none
 
+## Testing
+- **Test File**: none new. Python suite (src/tests) has no coverage of the Electron/renderer code being removed; existing test_paths.py is the only display.json-adjacent test and is unaffected. No mocks, real SQLite rule not engaged (no backend change).
+- **Test Cases**:
+  - Build: `make build-gui` compiles renderer and main with no dangling imports or type errors (the type check is the real test for a pure removal).
+  - Suite: `make test-changed` (falls back to `make test`) passes.
+- **Edge Cases**:
+  - Legacy display.json: launch with `{"scale":1,"fullscreen":false,"bigPicture":true,"theme":"solarized"}`; app loads desktop grid, no errors, fullscreen toggle still persists.
+  - Gamepad: LB/RB still cycle GameModal tabs; d-pad focus movement unchanged on the console grid.
+- **Integration Points**:
+  - IPC: preload.ts and emusync.d.ts stay in sync (build catches it).
+  - Grep: no remaining `bigpicture|bigPicture|ConsoleWheel|emusync-theme|theme:|getConsoleLogo` in src/gui.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no (removals only, d.ts updated in step 2). New CLI subcommand: no. Config/data file change: no (display.json loses two keys; old files still load).
 
