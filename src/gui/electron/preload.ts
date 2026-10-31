@@ -91,6 +91,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("files:get-save-time", savePath),
     exists: (p: string): Promise<boolean> =>
       ipcRenderer.invoke("files:exists", p),
+    ensureShareMarker: (folder: string): Promise<{ id: string | null; created: boolean }> =>
+      ipcRenderer.invoke("files:ensure-share-marker", folder),
     getFileHash: (filePath: string): Promise<string> =>
       ipcRenderer.invoke("files:get-file-hash", filePath),
     getLatestInFolder: (dirPath: string): Promise<{ path: string; time: string } | null> =>

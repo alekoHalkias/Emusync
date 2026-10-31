@@ -40,12 +40,12 @@ class ConsoleMixin:
             """INSERT OR REPLACE INTO consoles
                (id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
                 device_state_folder, device_emulator, device_network_folder, device_local_folder,
-                device_extra_folders)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                device_extra_folders, network_share_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (console.id, console.device_id, console.console_name, console.shortform_name,
              console.device_game_folder, console.device_save_folder, console.device_state_folder,
              console.device_emulator, console.device_network_folder, console.device_local_folder,
-             json.dumps(console.device_extra_folders)),
+             json.dumps(console.device_extra_folders), console.network_share_id),
         )
         self._conn.commit()
 
@@ -53,7 +53,7 @@ class ConsoleMixin:
         row = self._conn.execute(
             """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
                       device_state_folder, device_emulator, device_network_folder, device_local_folder,
-                      device_extra_folders
+                      device_extra_folders, network_share_id
                FROM consoles WHERE device_id = ? AND console_name = ?""",
             (device_id, console_name),
         ).fetchone()
@@ -63,11 +63,25 @@ class ConsoleMixin:
         rows = self._conn.execute(
             """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
                       device_state_folder, device_emulator, device_network_folder, device_local_folder,
-                      device_extra_folders
+                      device_extra_folders, network_share_id
                FROM consoles WHERE device_id = ?""",
             (device_id,),
         ).fetchall()
         return [_console_from_row(r) for r in rows]
+
+    def list_console_shares(self, console_name: str, exclude_device_id: str) -> list[dict]:
+        """Share IDs other devices registered for *console_name* (#644).
+
+        Equal IDs mean the same remote location even when the mount paths differ.
+        Blank IDs (no share registered) are omitted.
+        """
+        rows = self._conn.execute(
+            """SELECT c.device_id, d.name AS device_name, c.network_share_id AS share_id
+               FROM consoles c JOIN devices d ON d.id = c.device_id
+               WHERE c.console_name = ? AND c.device_id != ? AND c.network_share_id != ''""",
+            (console_name, exclude_device_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def remove_console(self, console_id: str) -> None:
         self._conn.execute("DELETE FROM consoles WHERE id = ?", (console_id,))

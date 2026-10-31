@@ -144,7 +144,7 @@ export default function ServerStatusButton({ isServer, onRepaired, display, onDi
 
   async function clearRememberedFolders(): Promise<void> {
     const cfg = (await window.emusync.config.load()) ?? {};
-    await window.emusync.config.save({ ...cfg, recent_import_folders: {}, import_rom_source: {}, import_local_folder: {} });
+    await window.emusync.config.save({ ...cfg, recent_import_folders: {}, import_rom_source: {}, import_local_folder: {}, import_network_folder: {} });
     setClearConfirm(false);
   }
 

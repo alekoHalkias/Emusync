@@ -63,9 +63,17 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
             "device_network_folder": c.device_network_folder,
             "device_local_folder": c.device_local_folder,
             "device_extra_folders": c.device_extra_folders,
+            "network_share_id": c.network_share_id,
         }
         for c in consoles
     ]
+
+
+@router.get("/consoles/{console_name}/shares")
+def get_console_shares(console_name: str, device_id: str = Depends(_auth)) -> list[dict]:
+    """Network-share IDs other devices registered for this console (#644).
+    The client compares its own marker-file ID against these."""
+    return _get_store().list_console_shares(console_name, device_id)
 
 
 class ConsoleFoldersRequest(BaseModel):
@@ -76,6 +84,7 @@ class ConsoleFoldersRequest(BaseModel):
     device_network_folder: str = ""
     device_local_folder: str = ""
     device_extra_folders: Optional[list[str]] = None  # None = keep what is stored (#629)
+    network_share_id: Optional[str] = None            # None = keep what is stored (#644)
 
 
 @router.put("/devices/{target_device_id}/consoles/{console_id}")

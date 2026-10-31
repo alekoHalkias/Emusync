@@ -47,3 +47,6 @@ Console/extra-folder API cases go in `test_devices.py` after the #539 tests and 
 
 ## Electron main / renderer-only changes
 No JS test runner and no main-process harness exist. Such changes are verified by both `tsc` projects, `make lint`, and a written manual script in the plan's Testing section (real files in a temp folder, a dev server, no mocks). Put server-visible behavior in a Python integration test whenever the logic can live server-side.
+
+### Multi-device API tests
+Use `_device_auth(device_id, name)` from conftest.py as a second paired identity against the same `client`; assert per-device views (e.g. cross-device lookups exclude the caller).
