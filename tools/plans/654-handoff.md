@@ -4,7 +4,7 @@
 - Issue: #654
 - Branch: feature/654-remove-big-picture
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
