@@ -23,8 +23,8 @@ Backend first, then IPC, then UI.
 - [x] 10. IPC `rom:fulfillNetworkUpload(requestId, approve)` shelling to step 7: export `runCliTransfer` from sync/save.ts, new sync/netupload.ts, register in main.ts, preload.ts, emusync.d.ts. Reuses: runCliTransfer.
 - [x] 11. `NetworkUploadPrompt` banner (UpdateBanner style) mounted in App.tsx; lists pending `network-upload` requests, Upload/Decline via step 10. Files: src/gui/renderer/src/components/NetworkUploadPrompt.tsx (new), App.tsx.
 - [x] 12. NetworkPlaySetup: share-ID mount resolution (console row `device_network_folder` when `network_share_id` equals `share_id`) and a third option block "Ask <device> to upload" with outgoing status. Files: src/gui/renderer/src/components/NetworkPlaySetup.tsx. Reuses: tryAutoImport, pullToDevice block, getDeviceConsoles.
-- [ ] 13. Verify: `make test-changed`, GUI typecheck/build, manual two-device round trip.
-- [ ] 14. Docs (single pass): CLAUDE.md rule line, ARCHITECTURE.md (route, CLI command, config key, IPC, kind), GOTCHAS.md (oversize stays pending), frontend guide Banners already added.
+- [x] 13. Verify: `make test-changed`, GUI typecheck/build, manual two-device round trip.
+- [x] 14. Docs (single pass): CLAUDE.md rule line, ARCHITECTURE.md (route, CLI command, config key, IPC, kind), GOTCHAS.md (oversize stays pending), frontend guide Banners already added.
 
 ## Testing
 - **Test File**: src/tests/test_network_upload_requests.py (new; pull-request tests in test_rom_transfer.py cover kind=rom only, so a separate file keeps both under 300 lines), plus a share_id case in src/tests/test_network_rom.py.
@@ -63,3 +63,4 @@ none
 - Switch folder ROMs; ROM size in prompt; SSE push to an open GUI.
 
 ## Log
+Step 13: GUI manual two-device run not possible in this environment; request/approve/decline round trip covered by live_server tests, full suite 589 passed, web typecheck error count unchanged (3 pre-existing).

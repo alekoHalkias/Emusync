@@ -115,3 +115,10 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - Only a device idle for 5+ minutes (`_MERGE_MIN_IDLE_SECONDS`) is merged away, so two live instances on one machine (e.g. a dev server with an isolated config) are not merged back and forth; the merge happens on the first touch after the old row goes idle.
 - Clients sharing one source MAC (Docker bridge, NAT) are merged into one device.
 - `device_id` backup (`<data_dir>/device_id`) is best-effort; on Windows config and data share a folder, so it only covers toml loss.
+
+## Network upload requests (#660)
+
+- Reuses `rom_pull_requests` with `kind="network-upload"`; a decline or failure is stored as `failed` (no new status). Repeat requests for the same game/owner return the existing pending id.
+- The daemon leaves a request `pending` when the ROM is over `network_upload_auto_max_mb`; only the GUI banner (or `rom fulfill-network-upload`) completes it. With no GUI ever opened on the owner, large requests stay pending.
+- `upload_to_network` refuses unless `<network folder>/.emusync-share-id` equals the console's registered `network_share_id`, and never overwrites an existing master (reuses `upload_to_master`). The route checks "already on a network drive" (409) before "owner has no local ROM" (400).
+- Requests are only picked up when the sync-daemon or GUI starts, not on every CLI command (e.g. `emusync run`). Switch whole-folder ROMs are not handled.
