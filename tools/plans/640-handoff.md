@@ -4,7 +4,7 @@
 - Issue: #640
 - Branch: feature/640-update-feed-owner
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -85,3 +85,4 @@ src/gui/package.json
 - 2026-10-31 design: scope=build-config, plan_target=bplan, difficulty=1/10, breaking=no
 - 2026-10-31 bplan: 3 steps written, backend_pattern=none (build config)
 - 2026-10-31 tplan: test_file=none, 1 verification case
+- 2026-10-31 implement: steps 1-3 done (publish owner/repo split; unpacked build app-update.yml verified)

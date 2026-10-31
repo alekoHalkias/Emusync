@@ -54,7 +54,7 @@ Every code change goes through `/issue` → `/design` → `/fplan` or `/bplan` �
 - No emojis in issues, plans, commits, or PRs. Never commit to `main`. PR body uses `Closes #N`.
 
 Stop and warn if: another branch edits the same key files; the issue is assigned/active elsewhere; branch has no issue number.
-Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version}-linux-x86_64.AppImage`, `EmuSync-{version}-windows-x64-setup.exe`, plus `latest.yml`/`latest-linux.yml` for electron-updater. Build jobs run `electron-builder --publish never`; only the release job publishes (#638).
+Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version}-linux-x86_64.AppImage`, `EmuSync-{version}-windows-x64-setup.exe`, plus `latest.yml`/`latest-linux.yml` for electron-updater. Build jobs run `electron-builder --publish never`; only the release job publishes (#638). `build.publish` needs `owner` and `repo` as separate fields, otherwise the update feed URL is malformed (#640).
 
 ## Rules (details in src/docs/GOTCHAS.md)
 

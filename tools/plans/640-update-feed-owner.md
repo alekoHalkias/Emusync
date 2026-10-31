@@ -3,7 +3,7 @@
 Issue: #640
 Branch: feature/640-update-feed-owner
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -14,12 +14,12 @@ Make the generated app-update.yml point at alekoHalkias/Emusync so the update ch
 - **Recommendations**: none
 
 ## Steps
-- [ ] 1. Split the publish target into owner and repo.
+- [x] 1. Split the publish target into owner and repo.
   - Files: src/gui/package.json
   - Reuses: existing `build.publish` block
   - New: none; add `"owner": "alekoHalkias"` and set `"repo": "Emusync"`.
-- [ ] 2. Tests: none needed - config only. Verify by building an unpacked app (`npx electron-builder --dir --publish never` in src/gui) and checking `dist/linux-unpacked/resources/app-update.yml` shows owner alekoHalkias, repo Emusync.
-- [ ] 3. Docs: none needed - CLAUDE.md already describes the updater; no rule changes.
+- [x] 2. Tests: none needed - config only. Verify by building an unpacked app (`npx electron-builder --dir --publish never` in src/gui) and checking `dist/linux-unpacked/resources/app-update.yml` shows owner alekoHalkias, repo Emusync.
+- [x] 3. Docs: none needed - CLAUDE.md already describes the updater; no rule changes.
 
 ## Testing
 - **Test File**: none
