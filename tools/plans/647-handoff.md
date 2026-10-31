@@ -4,7 +4,7 @@
 - Issue: #647
 - Branch: feature/647-fix-network-share-id-migration
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -88,3 +88,4 @@ See issue #647.
 - 2026-10-31 implement: step 1 done (network_share_id ALTER moved to v31, _SCHEMA_VERSION 31)
 - 2026-10-31 implement: step 2 done (3 migration tests; Store-on-v30 test heals a real DB via DROP COLUMN)
 - 2026-10-31 implement: step 4 done (CLAUDE.md schema rule; backend guide updated in bplan)
+- 2026-10-31 implement: step 3 done (modal shows load error instead of empty-row text); all steps complete

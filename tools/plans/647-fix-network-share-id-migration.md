@@ -22,7 +22,7 @@ Make every database, whatever version it was stamped at, end up with `consoles.n
   - Files: src/tests/test_network_rom.py
   - Reuses: `test_v29_to_v30_migration_adds_share_id` hand-built table pattern, `Store(tmpdir)`
   - New: none
-- [ ] 3. `ConsoleFoldersModal`: when the console fetch throws, show "Couldn't load this console's folders - is the server reachable?" instead of "No folders recorded for this console yet" (the genuine no-row case keeps its text); the Ignored games panel still renders.
+- [x] 3. `ConsoleFoldersModal`: when the console fetch throws, show "Couldn't load this console's folders - is the server reachable?" instead of "No folders recorded for this console yet" (the genuine no-row case keeps its text); the Ignored games panel still renders.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: the modal's existing `msg`-style muted text and `row` state
   - New: one `loadFailed` state flag - `row` null already means "no row", so a failure needs its own value
