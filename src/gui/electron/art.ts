@@ -11,8 +11,6 @@ import type SGDBImport from "steamgriddb";
 import { getSteamGridDbKey } from "./steamgriddb";
 import { CONFIG_PATH } from "./runtime";
 import { loadServerCfg } from "./config-store";
-import { selectedTheme } from "./display";
-import { themeFile } from "./themes";
 
 // steamgriddb is a pure-ESM package ("type": "module"); the Electron main
 // bundle is CJS, and CJS require() of an ESM module throws ERR_REQUIRE_ESM
@@ -236,20 +234,6 @@ const CONSOLE_LOGO: Record<string, string> = {
   wsc:       "Bandai - WonderSwan Color",
 };
 
-// EmuSync console key → es-theme-carbon folder, whose art/system.svg is the
-// system's colour wordmark logo (#505). Carbon has no 3DS/Switch/PS3 — those come
-// from art-book-next-es-de (below), then fall back to the XMB icon above.
-const CARBON_FOLDER: Record<string, string> = {
-  nes: "nes", snes: "snes", n64: "n64", nds: "nds", gb: "gb", gbc: "gbc", gba: "gba",
-  genesis: "genesis", sms: "mastersystem", pce: "pcengine", psx: "psx", ps2: "ps2", psp: "psp",
-  dc: "dreamcast", gamecube: "gc", wii: "wii", saturn: "saturn", gg: "gamegear", msx: "msx",
-  atari2600: "atari2600", lynx: "atarilynx", ws: "wonderswan", wsc: "wonderswancolor",
-};
-const CARBON_BASE = "https://raw.githubusercontent.com/RetroPie/es-theme-carbon/master";
-// Second source for what carbon lacks: console key → file under _inc/systems/logos/.
-const ART_BOOK_LOGO: Record<string, string> = { "3ds": "n3ds", switch: "switch", ps3: "ps3" };
-const ART_BOOK_BASE = "https://raw.githubusercontent.com/anthonycaccese/art-book-next-es-de/HEAD/_inc/systems/logos";
-
 const RETROARCH_ASSETS_BASE =
   "https://raw.githubusercontent.com/libretro/retroarch-assets/master/xmb/monochrome/png";
 
@@ -290,35 +274,6 @@ export function registerArtIpc(): void {
 
         await download(url, dest);
         return existsSync(dest) ? toDataUrl(dest) : null;
-      } catch {
-        return null;
-      }
-    },
-  );
-
-  // Full-colour wordmark logo (#505) — used by the Big Picture wheel; the
-  // desktop grid keeps the monochrome getConsoleIcon.
-  ipcMain.handle(
-    "art:getConsoleLogo",
-    async (_event, consoleKey: string): Promise<string | null> => {
-      try {
-        // Theme-supplied logo (#527) wins over the downloaded one.
-        const themed = themeFile(selectedTheme(), `logos/${consoleKey.toLowerCase()}.svg`);
-        if (themed && existsSync(themed)) return `data:image/svg+xml;base64,${readFileSync(themed).toString("base64")}`;
-
-        mkdirSync(CONSOLE_DIR, { recursive: true });
-        const dest = join(CONSOLE_DIR, `${consoleKey}-logo.svg`);
-        const toUrl = () => `data:image/svg+xml;base64,${readFileSync(dest).toString("base64")}`;
-        if (existsSync(dest)) return toUrl();
-
-        const key = consoleKey.toLowerCase();
-        const url = CARBON_FOLDER[key]
-          ? `${CARBON_BASE}/${CARBON_FOLDER[key]}/art/system.svg`
-          : ART_BOOK_LOGO[key] ? `${ART_BOOK_BASE}/${ART_BOOK_LOGO[key]}.svg` : null;
-        if (!url) return null;
-
-        await download(url, dest);
-        return existsSync(dest) ? toUrl() : null;
       } catch {
         return null;
       }

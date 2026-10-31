@@ -32,11 +32,10 @@ export interface EmusyncBridge {
     localIp: () => Promise<string | null>;
   };
   display: {
-    get: () => Promise<{ scale: number; fullscreen: boolean; bigPicture: boolean; theme: string; autoUpdateEnabled: boolean }>;
-    onChange: (cb: (d: { fullscreen: boolean; bigPicture: boolean }) => void) => () => void;
+    get: () => Promise<{ scale: number; fullscreen: boolean; autoUpdateEnabled: boolean }>;
+    onChange: (cb: (d: { fullscreen: boolean }) => void) => () => void;
     cycleScale: () => Promise<number>;
     toggleFullscreen: () => Promise<boolean>;
-    setTheme: (theme: string) => Promise<string>;
   };
   updater: {
     check: () => Promise<{ available: boolean; error?: string }>;
@@ -45,11 +44,6 @@ export interface EmusyncBridge {
     getEnabled: () => Promise<boolean>;
     setEnabled: (enabled: boolean) => Promise<boolean>;
     onChange: (cb: (e: { type: string; releaseNotes?: string; releaseVersion?: string; message?: string }) => void) => () => void;
-  };
-  theme: {
-    list: () => Promise<Array<{ id: string; name: string; author: string }>>;
-    get: (id: string) => Promise<{ css: string } | null>;
-    import: (path: string) => Promise<string>;
   };
   launcher: {
     path: () => Promise<string>;
@@ -123,7 +117,6 @@ export interface EmusyncBridge {
   };
   art: {
     get: (slug: string, gameName: string, consoleKey: string) => Promise<string | null>;
-    getConsoleLogo: (consoleKey: string) => Promise<string | null>;
     getConsoleIcon: (consoleKey: string) => Promise<string | null>;
   };
   artwork: {

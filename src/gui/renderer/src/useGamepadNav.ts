@@ -108,11 +108,6 @@ function findNextFocusable(current: HTMLElement, dir: Direction): HTMLElement | 
   return best;
 }
 
-// No-op unless the Big Picture console wheel (ConsoleWheel.tsx) is mounted.
-function rotateWheel(step: 1 | -1): void {
-  window.dispatchEvent(new CustomEvent("wheel-rotate", { detail: step }));
-}
-
 // Cycles the open GameModal's tabs; no-op unless one is listening.
 function cycleModalTab(step: 1 | -1): void {
   window.dispatchEvent(new CustomEvent("modal-tab", { detail: step }));
@@ -276,8 +271,8 @@ export function useGamepadNav(): void {
       prevY = yPressed;
       const lbPressed = !!gp.buttons[BTN_LB]?.pressed;
       const rbPressed = !!gp.buttons[BTN_RB]?.pressed;
-      if (lbPressed && !prevLB) (inModal ? cycleModalTab : rotateWheel)(-1);
-      if (rbPressed && !prevRB) (inModal ? cycleModalTab : rotateWheel)(1);
+      if (lbPressed && !prevLB && inModal) cycleModalTab(-1);
+      if (rbPressed && !prevRB && inModal) cycleModalTab(1);
       prevLB = lbPressed;
       prevRB = rbPressed;
       prevStart = startPressed;
@@ -285,11 +280,6 @@ export function useGamepadNav(): void {
 
     function moveFocus(dir: Direction): void {
       const active = document.activeElement as HTMLElement | null;
-      // Big Picture console wheel (#503): left/right rotate it instead of moving focus.
-      if ((dir === "left" || dir === "right") && active?.closest(".console-wheel")) {
-        rotateWheel(dir === "right" ? 1 : -1);
-        return;
-      }
       const scope = focusScope();
       const inScope = active && active !== document.body && scope.contains(active);
       if (inScope) {
