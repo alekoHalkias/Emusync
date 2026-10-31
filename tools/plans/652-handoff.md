@@ -4,7 +4,7 @@
 - Issue: #652
 - Branch: feature/652-compact-import-results
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
