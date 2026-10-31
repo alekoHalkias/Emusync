@@ -4,7 +4,7 @@
 - Issue: #661
 - Branch: feature/661-single-plan-approval
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -21,10 +21,10 @@ Three approval stops interrupt the flow and show partial plans; one review point
 ### Affected Area
 .claude/skills/{fplan,bplan,tplan,plan,design}/SKILL.md, SKILLS_OVERVIEW.md, handoff template.
 ### Acceptance Criteria
-- [ ] fplan, bplan, tplan contain no approval stop before handing off.
-- [ ] tplan ends by writing an outline of all plans plus a one-line change summary to the handoff file.
-- [ ] The outline is presented once for approval before /implement.
-- [ ] SKILLS_OVERVIEW.md reflects the new flow.
+- [x] fplan, bplan, tplan contain no approval stop before handing off.
+- [x] tplan ends by writing an outline of all plans plus a one-line change summary to the handoff file.
+- [x] The outline is presented once for approval before /implement.
+- [x] SKILLS_OVERVIEW.md reflects the new flow.
 
 ## 2. Design
 ### Scope: workflow skill files only (.claude/skills)
@@ -71,12 +71,12 @@ Planning skills no longer ask for approval at each stage; tplan ends with one ou
 
 ## 8. Implementation Steps
 ### Steps:
-- [ ] 1. bplan/fplan step 13: no approval stop, continue per design step 9. Files: bplan/SKILL.md, fplan/SKILL.md. Reuses: existing step 13 + design step 9. New: none.
-- [ ] 2. tplan step 13: write Outline + one-line Summary into handoff section 6, then single approval. Files: tplan/SKILL.md. Reuses: tplan steps 11-12 pattern. New: outline instruction (no existing cross-plan overview).
-- [ ] 3. merge: hand off to tplan without approval presentation. Files: merge/SKILL.md. Reuses: existing wording. New: none.
-- [ ] 4. issue skill handoff template: add Outline/Summary under section 6. Files: issue/SKILL.md. Reuses: template. New: none.
-- [ ] 5. SKILLS_OVERVIEW.md: update Next lines, tplan output, handoff structure, diagram. Files: SKILLS_OVERVIEW.md. Reuses: existing sections. New: none.
-- [ ] 6. Tests: none (markdown-only). 7. Docs: covered by step 5.
+- [x] 1. bplan/fplan step 13: no approval stop, continue per design step 9. Files: bplan/SKILL.md, fplan/SKILL.md. Reuses: existing step 13 + design step 9. New: none.
+- [x] 2. tplan step 13: write Outline + one-line Summary into handoff section 6, then single approval. Files: tplan/SKILL.md. Reuses: tplan steps 11-12 pattern. New: outline instruction (no existing cross-plan overview).
+- [x] 3. merge: hand off to tplan without approval presentation. Files: merge/SKILL.md. Reuses: existing wording. New: none.
+- [x] 4. issue skill handoff template: add Outline/Summary under section 6. Files: issue/SKILL.md. Reuses: template. New: none.
+- [x] 5. SKILLS_OVERVIEW.md: update Next lines, tplan output, handoff structure, diagram. Files: SKILLS_OVERVIEW.md. Reuses: existing sections. New: none.
+- [x] 6. Tests: none (markdown-only). 7. Docs: covered by step 5.
 
 ## 9. Review
 ### Findings: TBD
@@ -99,3 +99,4 @@ Planning skills no longer ask for approval at each stage; tplan ends with one ou
 - 2026-10-31 design: scope=workflow-docs, plan_target=bplan, difficulty=2/10, breaking=no
 - 2026-10-31 bplan: 5 steps written, backend_pattern=n/a (workflow markdown)
 - 2026-10-31 tplan: test_file=none, 0 test cases (grep verification); outline written
+- 2026-10-31 implement: steps 1-7 done (skills edited, overview updated, grep-verified)
