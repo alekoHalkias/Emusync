@@ -41,6 +41,7 @@ export interface EmusyncBridge {
     check: () => Promise<{ available: boolean; error?: string }>;
     download: () => Promise<{ ok: boolean; error?: string }>;
     install: () => Promise<{ ok: boolean }>;
+    getVersion: () => Promise<string>;
     getEnabled: () => Promise<boolean>;
     setEnabled: (enabled: boolean) => Promise<boolean>;
     onChange: (cb: (e: { type: string; releaseNotes?: string; releaseVersion?: string; message?: string }) => void) => () => void;
