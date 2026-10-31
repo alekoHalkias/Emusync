@@ -4,7 +4,7 @@
 - Issue: #646
 - Branch: feature/646-console-import-ignore-list
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -30,9 +30,9 @@ See issue #646.
 ### Backwards Compatibility: non-breaking, new optional config key. PR #645 touches the same console-import files; rebase after it merges.
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: row action + inline list-editor pattern, immediate apply
+### Visual Pattern: per-row Ignore, Ignore selected, inline Ignored games panel in ConsoleFoldersModal
+### Recommendations: store under import_ignored_roms in toml; requires a config.py field because unknown keys are dropped (#499); same defect exists for import_network_folder in PR #645
 
 ## 4. Backend Plan
 ### Design Alignment: TBD
@@ -57,7 +57,14 @@ See issue #646.
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/646-import-ignore-list.md
+- fplan 1: files config.py, test_config_roundtrip.py; reuses import_rom_source field pattern
+- fplan 2: files console-import/ignoredRoms.ts (new); reuses config.load/save read-modify-write; shared by wizard and modal
+- fplan 3: files useConsoleImport.ts; reuses scanRoms pipeline; ignoreRoms new (nothing persistently removes entries)
+- fplan 4: files ResultsStep.tsx; reuses row markup and selected set
+- fplan 5: files ConsoleFoldersModal.tsx, IgnoredGamesPanel.tsx (new); reuses list-editor markup; separate panel keeps modal under 300 lines
+- fplan 6: files ServerStatusButton.tsx; reuses existing reset line
+- fplan 7-8: manual verification, docs
 
 ## 9. Review
 ### Findings: TBD
@@ -78,3 +85,4 @@ See issue #646.
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
+- 2026-10-31 fplan: 8 steps written, visual_pattern=row action + inline unignore panel
