@@ -3,7 +3,7 @@
 Issue: #647
 Branch: feature/647-fix-network-share-id-migration
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal

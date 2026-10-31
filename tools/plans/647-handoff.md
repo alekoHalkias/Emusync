@@ -4,7 +4,7 @@
 - Issue: #647
 - Branch: feature/647-fix-network-share-id-migration
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -84,3 +84,4 @@ See issue #647.
 - 2026-10-31 design: scope=backend+small ui, plan_target=bplan, difficulty=2/10, breaking=no
 - 2026-10-31 bplan: 4 steps written, backend_pattern=idempotent v31 migration
 - 2026-10-31 tplan: test_file=src/tests/test_network_rom.py, 3 test cases defined (testing section written in the same plan)
+- 2026-10-31 implement: started
