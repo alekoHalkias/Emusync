@@ -442,7 +442,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   }
 
   async function linkShareGames(): Promise<void> {
-    const toLink = roms.filter(r => r.linkedSlug && !r.existingLocal);
+    // Only ROMs found on the share: a local-only file must not become a network master.
+    const toLink = roms.filter(r => r.linkedSlug && !r.existingLocal && (r.presence === "network" || r.presence === "both"));
     let linked = 0;
     const done = new Set<string>();
     for (const rom of toLink) {
