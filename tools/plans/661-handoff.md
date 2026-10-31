@@ -4,7 +4,7 @@
 - Issue: #661
 - Branch: feature/661-single-plan-approval
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
