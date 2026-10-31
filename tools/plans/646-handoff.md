@@ -44,10 +44,10 @@ See issue #646.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: src/tests/test_config_roundtrip.py
+### Test Cases: defaults empty; round trip; omitted when empty
+### Edge Cases: multiple consoles; spaces/backslashes; pre-existing config without key
+### Integration Points: renderer logic verified manually (step 7); filterIgnored kept pure for a future runner
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -86,3 +86,5 @@ See issue #646.
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-10-31 fplan: 8 steps written, visual_pattern=row action + inline unignore panel
+- tplan 1: files src/tests/test_config_roundtrip.py; reuses monkeypatch CONFIG_PATH + tmp_path pattern; no new fixtures
+- 2026-10-31 tplan: test_file=src/tests/test_config_roundtrip.py, 3 test cases defined

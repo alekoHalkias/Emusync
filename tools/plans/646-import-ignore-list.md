@@ -37,9 +37,24 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
 - [ ] 6. Reset: clear `import_ignored_roms` in the settings reset.
   - Files: src/gui/renderer/src/components/ServerStatusButton.tsx
   - Reuses: the existing reset line that clears `import_rom_source` / `import_local_folder`
-- [ ] 7. Verification: Python round trip test for the new key (step 1); renderer has no JS test runner, so check manually via `make dev-gui`: ignore one row and a bulk selection, rescan, confirm they stay hidden, restart the app and confirm persistence, open console settings, unignore, rescan, confirm they return; ignoring never deletes files or imported games.
+- [ ] 7. Verification (cases in the Testing section): Python round trip test for the new key (step 1); renderer has no JS test runner, so check manually via `make dev-gui`: ignore one row and a bulk selection, rescan, confirm they stay hidden, restart the app and confirm persistence, open console settings, unignore, rescan, confirm they return; ignoring never deletes files or imported games.
 - [ ] 8. Docs: CLAUDE.md rule line and ARCHITECTURE.md (config field, ignoredRoms.ts, IgnoredGamesPanel).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md
+
+## Testing
+- **Test File**: src/tests/test_config_roundtrip.py (extends the existing art_type_by_console round-trip tests; reuses `monkeypatch` on `cfg_module.CONFIG_PATH` and `tmp_path`, no new fixtures).
+- **Test Cases**:
+  - test_import_ignored_roms_defaults_to_empty_dict: a fresh Config has `{}`.
+  - test_import_ignored_roms_roundtrips_through_save_and_load: `{"gba": ["/roms/a.gba", "/roms/b.gba"]}` survives save then load, which guards against the key being dropped on rewrite (#499).
+  - test_import_ignored_roms_omitted_from_file_when_empty: an empty dict is not written to the TOML.
+- **Edge Cases**:
+  - Several consoles with separate lists keep their own entries.
+  - Paths with spaces and backslashes round-trip unchanged.
+  - A config written before this change (no key) loads with `{}`.
+- **Integration Points**:
+  - Renderer has no JS test runner, so the filter in `scanRoms`, `ignoreRoms`, the results UI and the settings panel are verified by the manual checks in step 7 (ignore row, ignore selected, rescan hides them, persists across restart, unignore restores, files and imported games untouched).
+  - Keep the filtering decision a small pure helper in ignoredRoms.ts (`filterIgnored(roms, ignoredSet)`) so a runner can cover it later.
+  - Run `make test-changed` after step 1; full `make test` in ship.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: yes (`import_ignored_roms` in emusync.toml, new Config field).
