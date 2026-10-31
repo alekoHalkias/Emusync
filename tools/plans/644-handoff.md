@@ -104,3 +104,4 @@ See issue #644.
 - 2026-10-30 implement: step 7 done (useNetworkShare hook, pure shareStatus)
 - 2026-10-30 implement: step 8 done (networkRoot state, derived romSource, linkShareGames, pickers)
 - 2026-10-30 implement: step 9 done (LocationsBlock.tsx, ResultsStep slimmed)
+- 2026-10-30 implement: step 11 done (ARCHITECTURE.md section, CLAUDE.md rule added during step 5)

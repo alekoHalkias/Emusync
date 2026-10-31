@@ -47,7 +47,7 @@ Backend first, then IPC and API client, then UI.
   - Reuses: existing folder list markup, `vm.addExtraPath`, `vm.pickLocalRomRoot`, button classes
   - New: inline chip and disclosure
 - [ ] 10. Manual verification via `make dev-gui` (renderer has no JS test runner): marker created on first folder; second device with same share shows Same share and links games; different share shows warning and links nothing; read-only folder shows Unverified.
-- [ ] 11. Docs and guide: ARCHITECTURE.md (consoles column, `/consoles/{name}/shares`, IPC `files:ensure-share-marker`, hook list), CLAUDE.md (share identity via marker file and `network_share_id`, Locations block, `import_network_folder`), `.claude/frontend-design-guide.md` Locations/chip entry.
+- [x] 11. Docs and guide: ARCHITECTURE.md (consoles column, `/consoles/{name}/shares`, IPC `files:ensure-share-marker`, hook list), CLAUDE.md (share identity via marker file and `network_share_id`, Locations block, `import_network_folder`), `.claude/frontend-design-guide.md` Locations/chip entry.
 
 ## Testing
 - **Test File**: src/tests/test_network_rom.py (migration test beside the v28->v29 one; console and share tests beside the existing consoles API tests). Reuse: `client` fixture, `AUTH`, `_device_auth(device_id, name)` from conftest.py for the second device, the v28->v29 hand-built-table migration pattern. New: no new fixtures - a second `_device_auth` identity is enough.
