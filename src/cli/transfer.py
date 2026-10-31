@@ -470,6 +470,32 @@ def _receive_transfer(
     return True
 
 
+def _handle_network_upload(client: "SyncClient", pull_request_id: str, slug: str, game_name: str, log=click.echo) -> bool:
+    """Fulfill a network-upload request (#660): copy this device's local ROM to its
+    console's network drive. ROMs over ``network_upload_auto_max_mb`` stay pending so
+    the GUI can ask the user (their prompt calls ``rom fulfill-network-upload``)."""
+    cfg = cfg_module.load()
+    try:
+        gd = client.get_game_device(slug)
+        if gd and gd.rom_path and os.path.getsize(gd.rom_path) > cfg.network_upload_auto_max_mb * 1024 * 1024:
+            log(f"  '{game_name}' is over {cfg.network_upload_auto_max_mb} MB; waiting for approval in the GUI")
+            return False
+        log(f"  Uploading '{game_name}' to the network drive...")
+        netrom.upload_to_network(client, cfg.device_id, slug)
+        client.complete_pull_request(pull_request_id, status="fulfilled")
+        return True
+    except netrom.ShareUnavailable as e:
+        log(f"  Network drive not available for '{game_name}' ({e}); will retry next start")
+        return False
+    except Exception as e:
+        log(f"  Failed to upload '{game_name}' to the network drive: {e}")
+        try:
+            client.complete_pull_request(pull_request_id, status="failed")
+        except Exception:
+            pass
+        return False
+
+
 def _handle_pull_request(
     client: "SyncClient",
     pull_request_id: str,
@@ -485,6 +511,8 @@ def _handle_pull_request(
     folder instead of uploading just the ROM file — symmetric with the
     push-side folder-sync in cli/transfer.py's push_rom."""
     tmp_tar_path: str | None = None
+    if kind == "network-upload":
+        return _handle_network_upload(client, pull_request_id, slug, game_name, log)
     try:
         my_games = client.list_my_game_devices()
         game_cfg = next((g for g in my_games if g["slug"] == slug and g.get("rom_path")), None)

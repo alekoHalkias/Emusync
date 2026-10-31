@@ -184,6 +184,17 @@ async def create_pull_request(
         raise HTTPException(status_code=404, detail="Source device not found")
 
     kind = request_body.get("kind", "rom")
+    if kind == "network-upload":
+        # Ask the owner to copy its local-only ROM onto the console's network drive (#660).
+        if store.get_network_source_for_game(slug):
+            raise HTTPException(status_code=409, detail="This game is already on a network drive")
+        gd = store.get_game_device(slug, from_device_id)
+        if not gd or gd.rom_source != "local" or not gd.rom_path:
+            raise HTTPException(status_code=400, detail="That device has no local ROM for this game")
+        existing = store.find_pending_pull_request(slug, from_device_id, kind)
+        if existing:
+            return {"pull_request_id": existing.id, "status": "pending",
+                    "source_online": from_device_id in _online_devices}
     pull_request_id = str(uuid.uuid4())
     store.create_pull_request(
         id=pull_request_id,
@@ -233,6 +244,21 @@ def list_pending_pull_requests(device_id: str = Depends(_auth)) -> list[dict]:
             "console": game.console if game else "",
             "game_name": game.name if game else pr.slug,
             "kind": pr.kind,
+        })
+    return result
+
+
+@router.get("/rom-pull-requests/outgoing")
+def list_outgoing_pull_requests(device_id: str = Depends(_auth)) -> list[dict]:
+    """Requests the calling device made, with their status (#660)."""
+    store = _get_store()
+    result = []
+    for pr in store.list_pull_requests_by_requester(device_id):
+        game = store.get_game(pr.slug)
+        result.append({
+            "id": pr.id, "slug": pr.slug, "game_name": game.name if game else pr.slug,
+            "kind": pr.kind, "status": pr.status, "from_device_id": pr.from_device_id,
+            "requested_at": pr.requested_at,
         })
     return result
 

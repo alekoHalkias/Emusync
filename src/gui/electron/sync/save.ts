@@ -11,7 +11,7 @@ import { SCRIPT, PYTHON } from "../runtime";
 
 // Exit codes from `emusync game push-save`/`pull-save`: 0 = success, 1 = real
 // error, 2 = pull found nothing on the server yet (not an error).
-function runCliTransfer(args: string[]): Promise<{ code: number | null; output: string }> {
+export function runCliTransfer(args: string[]): Promise<{ code: number | null; output: string }> {
   return new Promise((resolve) => {
     const proc = spawn(PYTHON, [SCRIPT, ...args]);
     let output = "";

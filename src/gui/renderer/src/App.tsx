@@ -16,6 +16,7 @@ import { useGamepadNav } from "./useGamepadNav";
 import ControllerHints from "./components/ControllerHints";
 import SelectPicker from "./components/SelectPicker";
 import UpdateBanner from "./components/UpdateBanner";
+import NetworkUploadPrompt from "./components/NetworkUploadPrompt";
 import { DotIcon, DownloadIcon, StopIcon } from "./components/icons";
 
 type Screen =
@@ -285,6 +286,7 @@ export default function App(): React.ReactElement {
     <DeviceProvider>
     <div className="layout">
       <UpdateBanner />
+      <NetworkUploadPrompt />
       <header className="topbar">
         {/* Left: back breadcrumb or app title */}
         {screen.name === "console" ? (

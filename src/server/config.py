@@ -55,6 +55,9 @@ class Config:
     watch_saves: bool = False
     # Auto-fetch game metadata (synopsis/release date) from Wikipedia (issue #578).
     auto_fetch_metadata: bool = True
+    # Local-only ROMs up to this size upload to the network drive automatically
+    # when another device asks; larger ones wait for GUI approval (issue #660).
+    network_upload_auto_max_mb: int = 512
     # Per-console remembered import ROM source + local-copy destination (issue #255).
     import_rom_source: dict = field(default_factory=dict)
     import_local_folder: dict = field(default_factory=dict)
@@ -104,6 +107,7 @@ def load() -> Config:
         import_local_folder=dict(data.get("import_local_folder", {})),
         art_type_by_console=dict(data.get("art_type_by_console", {})),
         auto_fetch_metadata=bool(data.get("auto_fetch_metadata", True)),
+        network_upload_auto_max_mb=int(data.get("network_upload_auto_max_mb", 512)),
     )
 
 
@@ -122,6 +126,8 @@ def save(cfg: Config) -> None:
         doc.add("watch_saves", cfg.watch_saves)
     if not cfg.auto_fetch_metadata:  # default True; only persist the opt-out
         doc.add("auto_fetch_metadata", False)
+    if cfg.network_upload_auto_max_mb != 512:  # default 512; only persist an override
+        doc.add("network_upload_auto_max_mb", cfg.network_upload_auto_max_mb)
     if cfg.recent_import_folders:
         doc.add("recent_import_folders", cfg.recent_import_folders)
     if cfg.import_rom_source:

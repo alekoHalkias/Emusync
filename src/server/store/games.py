@@ -130,12 +130,15 @@ class GameDeviceMixin:
         joins the returned ``rom_rel_path`` to its own mount root. Returns the
         most recently-updated network row's portable bits (rel-path, console,
         a launch-command template + the source device's rom/save/state paths so
-        the receiver can rewrite them), or None if no device has it on a share.
+        the receiver can rewrite them, and ``share_id``: the source console's
+        network share ID (#644, #660), blank when unregistered), or None if no device has it on a share.
         """
         row = self._conn.execute(
             """SELECT g.console, gd.device_id, d.name AS device_name,
                       gd.rom_path, gd.rom_rel_path, gd.launch_command,
-                      gd.save_path, gd.state_path, gd.rom_folder_path
+                      gd.save_path, gd.state_path, gd.rom_folder_path,
+                      COALESCE((SELECT MAX(c.network_share_id) FROM consoles c
+                                 WHERE c.device_id = gd.device_id AND c.console_name = g.console), '') AS share_id
                FROM game_devices gd
                JOIN games g   ON g.slug = gd.game_slug
                JOIN devices d ON d.id = gd.device_id

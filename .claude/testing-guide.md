@@ -53,3 +53,6 @@ Use `_device_auth(device_id, name)` from conftest.py as a second paired identity
 
 ### Network-dependent lookups (#656)
 Give the module a path constant for the OS source (e.g. `server.arp._ARP_PATH`) and monkeypatch it to a tmp file of real-format sample text; real parsing and real SQLite run, no mocks. Platform-specific subprocess fallbacks are noted in the PR, not tested.
+
+### Fake network share
+Share-dependent code (marker file, ROM copy) is tested against a `tmp_path` directory holding `.emusync-share-id`; no mount mocking. Daemon/CLI fulfilment functions run against `live_server` with a real `SyncClient`.

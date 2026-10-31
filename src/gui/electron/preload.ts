@@ -148,6 +148,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("rom:setupNetworkPlay", slug, mountRoot),
     deleteFile: (absolutePath: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:deleteFile", absolutePath),
+    fulfillNetworkUpload: (requestId: string, approve: boolean): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("rom:fulfillNetworkUpload", requestId, approve),
   },
   gameFolder: {
     reveal: (slug: string): Promise<{ ok: boolean; error?: string }> =>
