@@ -14,7 +14,7 @@ Silently resolve each client's MAC from the server's ARP table and merge devices
 - **Recommendations**: Merge direction is old UUID into the UUID making the current request (that is the one in the client's config, so the client keeps working with no config rewrite). MAC is a dedupe hint only; PIN auth is untouched. Known ceiling: DHCP/NAT/Docker-bridge setups where many clients share one source MAC; accepted (ARP resolves the bridge MAC for containers, which would merge containers on one bridge - acceptable, they share the host anyway).
 
 ## Steps
-- [ ] 1. Schema v32: add `devices.mac TEXT` to `_SCHEMA`, bump `_SCHEMA_VERSION` to 32, add `if from_version < 32` block with `_try(conn, "ALTER TABLE devices ADD COLUMN mac TEXT")`, keep trailing user_version stamp.
+- [x] 1. Schema v32: add `devices.mac TEXT` to `_SCHEMA`, bump `_SCHEMA_VERSION` to 32, add `if from_version < 32` block with `_try(conn, "ALTER TABLE devices ADD COLUMN mac TEXT")`, keep trailing user_version stamp.
   - Files: src/server/store/schema.py
   - Reuses: existing `_try` migration pattern (v31 block)
   - New: none

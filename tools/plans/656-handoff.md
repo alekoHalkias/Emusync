@@ -99,3 +99,4 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 bplan: 7 steps written, backend_pattern=server-side ARP MAC + merge_devices in touch_device
 - 2026-10-31 bplan: added step 7 (device_id backup in data dir) at user request
 - 2026-10-31 tplan: test_file=src/tests/test_devices.py + test_config_roundtrip.py, 9 test cases defined
+- 2026-10-31 implement: step 1 done (schema v32 devices.mac)

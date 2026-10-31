@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 31
+_SCHEMA_VERSION = 32
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS devices (
     id           TEXT PRIMARY KEY,
     name         TEXT NOT NULL,
     last_ip      TEXT,
-    last_seen_at TEXT
+    last_seen_at TEXT,
+    mac          TEXT
 );
 CREATE TABLE IF NOT EXISTS games (
     slug             TEXT PRIMARY KEY,
@@ -578,4 +579,8 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # Marker-file UUID of the share behind device_network_folder; equal IDs on
         # different devices mean the same remote location (#644).
         _try(conn, "ALTER TABLE consoles ADD COLUMN network_share_id TEXT NOT NULL DEFAULT ''")
+    if from_version < 32:
+        # Server-resolved (ARP) MAC of the device's NIC; devices sharing one are
+        # the same machine under a regenerated UUID and get merged (#656).
+        _try(conn, "ALTER TABLE devices ADD COLUMN mac TEXT")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
