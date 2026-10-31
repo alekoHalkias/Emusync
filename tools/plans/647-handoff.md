@@ -4,7 +4,7 @@
 - Issue: #647
 - Branch: feature/647-fix-network-share-id-migration
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -35,19 +35,19 @@ See issue #647.
 ### Recommendations: TBD
 
 ## 4. Backend Plan
-### Design Alignment: TBD
-### Backend Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: schema-evolution recipe, idempotent ALTER in a new v31 block
+### Backend Pattern: migration only; no Store or API change
+### Recommendations: never reuse a schema number a deployed branch may have stamped
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: src/tests/test_network_rom.py
+### Test Cases: v30-stamped db gains column; v29 test renamed; Store on v30-stamped db lists consoles
+### Edge Cases: migration twice; db already has column; fresh stamps 31
+### Integration Points: modal error state verified manually; restart server PC and check consoles endpoint
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -57,7 +57,11 @@ See issue #647.
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/647-fix-network-share-id-migration.md
+- bplan 1: files schema.py; reuses _try ALTER pattern; no new code
+- bplan 2: files test_network_rom.py; reuses v29 hand-built table pattern and Store(tmpdir)
+- bplan 3: files ConsoleFoldersModal.tsx; reuses msg-style muted text; new loadFailed flag because row null already means no row
+- bplan 4: files CLAUDE.md, backend-design-guide.md
 
 ## 9. Review
 ### Findings: TBD
@@ -78,3 +82,5 @@ See issue #647.
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=backend+small ui, plan_target=bplan, difficulty=2/10, breaking=no
+- 2026-10-31 bplan: 4 steps written, backend_pattern=idempotent v31 migration
+- 2026-10-31 tplan: test_file=src/tests/test_network_rom.py, 3 test cases defined (testing section written in the same plan)
