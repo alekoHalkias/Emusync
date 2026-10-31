@@ -3,7 +3,7 @@
 Issue: #666
 Branch: feature/666-skip-duplicate-roms-on-import
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -17,12 +17,12 @@ A ROM whose name matches a game that already has a ROM on this device counts as 
 - **Recommendations**: none
 
 ## Steps
-- [ ] 1. In `dedupeAndLink`, when `crossMatch` is found and its slug is in `thisDeviceConfigs`, return `{ ...rom, existingGameSlug: crossMatch.slug }` so the ROM is filtered out and counted in `skipCount`.
+- [x] 1. In `dedupeAndLink`, when `crossMatch` is found and its slug is in `thisDeviceConfigs`, return `{ ...rom, existingGameSlug: crossMatch.slug }` so the ROM is filtered out and counted in `skipCount`.
   - Files: src/gui/renderer/src/components/console-import/helpers.ts
   - Reuses: existing `existingGameSlug` skip path and `thisDeviceConfigs` argument
   - New: none
-- [ ] 2. Tests: no renderer test harness exists; verify with tsc on the touched file and a manual check (Review and import on the GBA share no longer reports 5 linked; Refresh count excludes them; a game configured only on another device still links).
-- [ ] 3. Docs: none needed - behavior fix, no rule/IPC/config change.
+- [x] 2. Tests: no renderer test harness exists; verify with tsc on the touched file and a manual check (Review and import on the GBA share no longer reports 5 linked; Refresh count excludes them; a game configured only on another device still links).
+- [x] 3. Docs: none needed - behavior fix, no rule/IPC/config change.
 
 ## Testing
 - **Test File**: none (no renderer harness)

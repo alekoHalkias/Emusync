@@ -4,7 +4,7 @@
 - Issue: #666
 - Branch: feature/666-skip-duplicate-roms-on-import
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -81,3 +81,4 @@ none
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
 - 2026-10-31 fplan: 3 steps written, visual_pattern=none
 - 2026-10-31 tplan: test_file=none, 1 manual case + 1 edge case defined
+- 2026-10-31 implement: step 1 done (skip name-matches already configured on this device)
