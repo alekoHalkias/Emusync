@@ -3,7 +3,7 @@
 Issue: #664
 Branch: feature/664-refresh-locations-games-not-shown
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -17,12 +17,12 @@ Games auto-linked from a matching network share during "Review and import" appea
 - **Recommendations**: none
 
 ## Steps
-- [ ] 1. In `linkShareGames`, call `onImported()` after the links succeed (when `done.size > 0`) so the grid reloads right away.
+- [x] 1. In `linkShareGames`, call `onImported()` after the links succeed (when `done.size > 0`) so the grid reloads right away.
   - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: existing `onImported` prop (GameGrid passes `onChanged`)
   - New: none
-- [ ] 2. Tests: no renderer test harness exists; verify with `npm run typecheck`/lint in src/gui and manual check (Refresh locations, Review and import on a matching share, close with X, confirm games show in grid).
-- [ ] 3. Docs: none needed - behavior fix only, no rule/IPC/config change.
+- [x] 2. Tests: no renderer test harness exists; verify with `npm run typecheck`/lint in src/gui and manual check (Refresh locations, Review and import on a matching share, close with X, confirm games show in grid).
+- [x] 3. Docs: none needed - behavior fix only, no rule/IPC/config change.
 
 ## Testing
 - **Test File**: none (no renderer test harness; Python suite unaffected)

@@ -4,7 +4,7 @@
 - Issue: #664
 - Branch: feature/664-refresh-locations-games-not-shown
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -78,3 +78,4 @@ none
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-10-31 fplan: 3 steps written, visual_pattern=none
 - 2026-10-31 tplan: test_file=none, 1 manual case defined
+- 2026-10-31 implement: step 1 done (onImported after share links); lint/tests pass, pre-existing tsc errors elsewhere
