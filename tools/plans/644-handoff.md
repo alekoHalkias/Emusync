@@ -4,7 +4,7 @@
 - Issue: #644
 - Branch: feature/644-console-import-share-matching
 - PR: #645
-- Status: implementing
+- Status: shipped
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -65,15 +65,15 @@ See issue #644.
 - bplan 5: files ARCHITECTURE.md, CLAUDE.md
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 2 correctness fixed (local-only ROM auto-link, config reset key); 1 test-gap noted (no JS runner)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: shipped
 ### PR: #645
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -106,3 +106,5 @@ See issue #644.
 - 2026-10-30 implement: step 9 done (LocationsBlock.tsx, ResultsStep slimmed)
 - 2026-10-30 implement: step 11 done (ARCHITECTURE.md section, CLAUDE.md rule added during step 5)
 - 2026-10-31 ship: tests pass (561 passed, 3 skipped); user confirmed GUI behavior
+- 2026-10-31 review: 3 findings, blocked=no
+- 2026-10-31 ship: server sync done; docs updated during implement
