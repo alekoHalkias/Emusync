@@ -94,6 +94,7 @@ export interface EmusyncBridge {
     uploadMaster: (localPath: string, networkPath: string) => Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }>;
     setupNetworkPlay: (slug: string, mountRoot: string) => Promise<{ ok: boolean; romPath?: string; error?: string }>;
     deleteFile: (absolutePath: string) => Promise<{ ok: boolean; error?: string }>;
+    fulfillNetworkUpload: (requestId: string, approve: boolean) => Promise<{ ok: boolean; error?: string }>;
     localizeSizes: (slugs: string[]) => Promise<Record<string, number>>;
     cancelLocalize: () => Promise<void>;
     onLocalizeProgress: (cb: (p: { slug: string; copied: number; total: number }) => void) => (event: unknown, p: { slug: string; copied: number; total: number }) => void;
