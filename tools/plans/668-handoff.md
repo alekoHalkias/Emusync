@@ -80,9 +80,9 @@ Docs
 6. docs: CLAUDE.md, ARCHITECTURE.md
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: none
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -101,3 +101,4 @@ Docs
 - 2026-10-31 fplan: 6 steps written, visual_pattern=extra Details row
 - 2026-10-31 tplan: test_file=none, 2 test cases defined
 - 2026-10-31 implement: steps 1-6 done (stable AppImage name, updater:getVersion IPC, Version row, docs)
+- 2026-10-31 review: 0 findings, blocked=no
