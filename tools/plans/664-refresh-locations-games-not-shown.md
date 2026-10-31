@@ -24,6 +24,17 @@ Games auto-linked from a matching network share during "Review and import" appea
 - [ ] 2. Tests: no renderer test harness exists; verify with `npm run typecheck`/lint in src/gui and manual check (Refresh locations, Review and import on a matching share, close with X, confirm games show in grid).
 - [ ] 3. Docs: none needed - behavior fix only, no rule/IPC/config change.
 
+## Testing
+- **Test File**: none (no renderer test harness; Python suite unaffected)
+- **Test Cases**:
+  - Manual: Review and import on a matching share, close with X, linked games appear in grid
+- **Edge Cases**:
+  - No links succeed (done.size == 0): no refresh call
+- **Integration Points**:
+  - GameGrid onChanged reload via onImported
+
+Verification: `make lint` and `make test-changed`.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

@@ -42,7 +42,16 @@ TBD
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-TBD
+### Test File: none (no renderer harness)
+### Test Cases: manual close-with-X check
+### Edge Cases: no successful links -> no refresh
+### Integration Points: GameGrid onChanged
+### Outline
+Frontend: useConsoleImport.linkShareGames calls onImported() after successful links.
+Tests: no renderer harness; make lint + make test-changed + manual check.
+Docs: none.
+### Summary
+Auto-linked share games now refresh the grid immediately instead of only on the wizard's Done button.
 
 ## 7. Test Design
 TBD
@@ -68,3 +77,4 @@ none
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-10-31 fplan: 3 steps written, visual_pattern=none
+- 2026-10-31 tplan: test_file=none, 1 manual case defined
