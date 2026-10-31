@@ -4,7 +4,7 @@
 - Issue: #656
 - Branch: feature/656-device-mac-dedupe
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
