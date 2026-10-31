@@ -159,7 +159,11 @@ export function dedupeAndLink(
       return g.slug === slugified || nameSlug === slugified ||
         g.name.toLowerCase() === rom.name.toLowerCase();
     });
-    if (crossMatch) return { ...rom, linkedSlug: crossMatch.slug, linkedName: crossMatch.name };
+    if (crossMatch) {
+      // Same game, different filename, already set up here: nothing to link (#666).
+      if (thisDeviceConfigs.some(cfg => cfg.slug === crossMatch.slug)) return { ...rom, existingGameSlug: crossMatch.slug };
+      return { ...rom, linkedSlug: crossMatch.slug, linkedName: crossMatch.name };
+    }
 
     return rom;
   });
