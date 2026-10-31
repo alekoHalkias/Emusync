@@ -4,7 +4,7 @@
 - Issue: #652
 - Branch: feature/652-compact-import-results
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -90,3 +90,4 @@ See issue #652.
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
 - 2026-10-31 fplan: 7 steps written, visual_pattern=wrapping flex rows
 - 2026-10-31 tplan: test_file=none, 2 checks defined
+- 2026-10-31 implement: steps 1-7 done (merged rows, tighter list, footer inline; tsc: 0 errors in console-import, 3 pre-existing elsewhere)
