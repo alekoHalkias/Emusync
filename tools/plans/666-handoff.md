@@ -4,7 +4,7 @@
 - Issue: #666
 - Branch: feature/666-skip-duplicate-roms-on-import
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
