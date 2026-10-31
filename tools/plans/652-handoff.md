@@ -70,15 +70,15 @@ See issue #652.
 - 5-7 typecheck, no tests (no renderer test infra), no docs
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: none (layout-only inline style changes)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: shipped
 ### PR: #653
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done (none needed, layout only)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -91,3 +91,5 @@ See issue #652.
 - 2026-10-31 fplan: 7 steps written, visual_pattern=wrapping flex rows
 - 2026-10-31 tplan: test_file=none, 2 checks defined
 - 2026-10-31 implement: steps 1-7 done (merged rows, tighter list, footer inline; tsc: 0 errors in console-import, 3 pre-existing elsewhere)
+- 2026-10-31 review: 0 findings, blocked=no
+- 2026-10-31 ship: server sync done; doc sync none needed; PR #653
