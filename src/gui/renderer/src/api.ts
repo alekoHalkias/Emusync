@@ -32,6 +32,8 @@ export function configure(host: string, port: number, pin: string): void {
   _pin = pin;
 }
 
+export const getDeviceId = (): string => _deviceId;
+
 export function configureDevice(deviceId: string, deviceName: string): void {
   _deviceId = deviceId;
   _deviceName = deviceName;
@@ -245,12 +247,16 @@ export const getGameIntegrity = (slug: string): Promise<GameIntegrity> =>
 export const rescanIntegrity = (): Promise<{ scanned: number; damaged: Array<{ slug: string; name: string; kind: string; reasons: IntegrityReason[]; last_good_version_id: string | null }> }> =>
   _fetch("POST", "/integrity/rescan");
 
-export type DeviceConsole = { id?: string; console_name: string; device_game_folder: string; device_save_folder: string; device_state_folder?: string; device_emulator: string; device_network_folder?: string; device_local_folder?: string; device_extra_folders?: string[] };
+export type DeviceConsole = { id?: string; console_name: string; device_game_folder: string; device_save_folder: string; device_state_folder?: string; device_emulator: string; device_network_folder?: string; device_local_folder?: string; device_extra_folders?: string[]; network_share_id?: string };
 export type DeviceGameDevice = { slug: string; name: string; console?: string; rom_path: string; save_path: string };
 
 /** Replace all six folder fields on one of this device's console rows (#539); `device_extra_folders` (#629) is kept when omitted. */
 export const updateDeviceConsole = (deviceId: string, consoleId: string, c: Omit<DeviceConsole, "id" | "console_name">): Promise<{ ok: boolean }> =>
   _fetch("PUT", `/devices/${deviceId}/consoles/${consoleId}`, c);
+/** Share IDs other devices registered for a console (#644); compare against this device's marker-file ID. */
+export type ConsoleShare = { device_id: string; device_name: string; share_id: string };
+export const getConsoleShares = (consoleName: string): Promise<ConsoleShare[]> =>
+  _fetch("GET", `/consoles/${encodeURIComponent(consoleName)}/shares`);
 export const getDeviceConsoles = (deviceId: string): Promise<DeviceConsole[]> =>
   _fetch("GET", `/devices/${deviceId}/consoles`);
 export const getDeviceGameDevices = (deviceId: string): Promise<DeviceGameDevice[]> =>

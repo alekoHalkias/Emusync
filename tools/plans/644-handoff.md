@@ -100,3 +100,4 @@ See issue #644.
 - 2026-10-30 implement: step 3 done (shares route, share id in console GET/PUT)
 - 2026-10-30 implement: step 4 done (5 backend tests)
 - 2026-10-30 implement: step 5 done (files:ensure-share-marker IPC; tsc errors shown are pre-existing)
+- 2026-10-30 implement: step 6 done (getConsoleShares, getDeviceId, share id type)

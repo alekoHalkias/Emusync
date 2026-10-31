@@ -30,7 +30,7 @@ Backend first, then IPC and API client, then UI.
   - Files: src/gui/electron/files.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: `files:exists` handler pattern
   - New: one handler - no marker code exists
-- [ ] 6. API client: `getConsoleShares(consoleName)` (typed to step 3's shape), `network_share_id?` on `DeviceConsole`, exported `getDeviceId()`.
+- [x] 6. API client: `getConsoleShares(consoleName)` (typed to step 3's shape), `network_share_id?` on `DeviceConsole`, exported `getDeviceId()`.
   - Files: src/gui/renderer/src/api.ts
   - Reuses: `_fetch`, `getDeviceConsoles`, `updateDeviceConsole`, `_deviceId`
   - New: one wrapper and one accessor
