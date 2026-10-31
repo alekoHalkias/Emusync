@@ -37,6 +37,8 @@ class Config:
     # Per-console remembered import ROM source + local-copy destination (issue #255).
     import_rom_source: dict = field(default_factory=dict)
     import_local_folder: dict = field(default_factory=dict)
+    # Per-console ROM paths hidden from the import wizard (issue #646).
+    import_ignored_roms: dict = field(default_factory=dict)
     # Per-console SteamGridDB artwork type to fetch/display: grid/hero/logo/icon (issue #324).
     art_type_by_console: dict = field(default_factory=dict)
 
@@ -77,6 +79,7 @@ def load() -> Config:
         recent_import_folders=recent_folders,
         watch_saves=bool(data.get("watch_saves", False)),
         import_rom_source=dict(data.get("import_rom_source", {})),
+        import_ignored_roms=dict(data.get("import_ignored_roms", {})),
         import_local_folder=dict(data.get("import_local_folder", {})),
         art_type_by_console=dict(data.get("art_type_by_console", {})),
         auto_fetch_metadata=bool(data.get("auto_fetch_metadata", True)),
@@ -104,6 +107,8 @@ def save(cfg: Config) -> None:
         doc.add("import_rom_source", cfg.import_rom_source)
     if cfg.import_local_folder:
         doc.add("import_local_folder", cfg.import_local_folder)
+    if cfg.import_ignored_roms:
+        doc.add("import_ignored_roms", cfg.import_ignored_roms)
     if cfg.art_type_by_console:
         doc.add("art_type_by_console", cfg.art_type_by_console)
     # Atomic + owner-only (server_pin is stored in plaintext).

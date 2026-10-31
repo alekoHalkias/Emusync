@@ -83,6 +83,8 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version
 
 - Network share identity (#644): a console's network folder holds `.emusync-share-id` (UUID, IPC `files:ensure-share-marker`, created if absent); it is stored per device as `consoles.network_share_id` (schema v30) and equal IDs on different devices mean the same share despite different mount paths. `GET /consoles/{name}/shares` lists other devices' IDs; the console import wizard compares them and auto-links existing games on a match (`useNetworkShare.ts`). Unwritable share = no ID ("Unverified", no auto-link).
 
+- Import ignore list (#646): per-device, per-console ROM paths hidden from the console import wizard, stored as `import_ignored_roms[consoleKey]` in emusync.toml (declared on `Config` in `server/config.py`, or Python drops it, #499). Read/written via `console-import/ignoredRoms.ts`; managed from the "Ignored games" panel in `ConsoleFoldersModal`. Ignoring never touches files or imported games; a ROM with a network + local copy ignores both paths.
+
 **Ops**
 - Orphaned server: `pkill -9 -f "src/emusync.py server start"`; SIGKILL leaves `.server_pid`/`.server_token`. WSL2 Electron needs `--no-sandbox`, `DISPLAY=:0`. Fresh `npm install` in `src/gui/`: if electron binary missing, `npm install-scripts approve electron esbuild && npm rebuild electron esbuild`. Duplicate-launch guard shows a popup (notify-send→zenity→kdialog→xmessage→tk). mDNS runs in a daemon thread.
 

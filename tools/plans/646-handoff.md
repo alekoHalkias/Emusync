@@ -89,3 +89,4 @@ See issue #646.
 - tplan 1: files src/tests/test_config_roundtrip.py; reuses monkeypatch CONFIG_PATH + tmp_path pattern; no new fixtures
 - 2026-10-31 tplan: test_file=src/tests/test_config_roundtrip.py, 3 test cases defined
 - 2026-10-31 implement: started
+- 2026-10-31 implement: step 1 done (Config.import_ignored_roms + 3 round-trip tests)

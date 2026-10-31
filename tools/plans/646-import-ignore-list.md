@@ -14,7 +14,7 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
 - **Recommendations**: Store the list under `import_ignored_roms` in emusync.toml, matching the per-console `import_rom_source` / `import_local_folder` / `recent_import_folders` keys. `config.py` declares these fields and drops unknown keys on rewrite (#499), so the field must be added there; a GUI-only `display.json` entry would need a new IPC and is global rather than per-console. Note for PR #645: its `import_network_folder` key has the same problem and needs the same `config.py` field.
 
 ## Steps
-- [ ] 1. Persist the key: add `import_ignored_roms: dict` to `Config`, load it in `load()` and write it in `save()` when non-empty.
+- [x] 1. Persist the key: add `import_ignored_roms: dict` to `Config`, load it in `load()` and write it in `save()` when non-empty.
   - Files: src/server/config.py, src/tests/test_config_roundtrip.py
   - Reuses: the `import_rom_source` field/load/save pattern; existing round-trip test style
   - New: none beyond the field
