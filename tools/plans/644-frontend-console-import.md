@@ -36,7 +36,7 @@ Replace the ROM source toggle and tall top section of the console import results
   - New: chip + disclosure markup (inline, no new component); if the file nears 300 lines, move the Locations block into `LocationsBlock.tsx`
 - [ ] 6. Design guide entry for the Locations block and status chip.
   - Files: .claude/frontend-design-guide.md
-- [ ] 7. Tests: no JS test runner exists for the renderer; verify manually per the checklist below and cover the pure logic: move the status decision into a pure function `shareStatus(localId, peers)` in helpers.ts and test it through a small Python-free check is not possible, so keep it covered by the backend integration tests and manual run (`make dev-gui`): set network folder -> marker created; second device with same share -> "Same share", games linked; different share -> warning chip, no link; read-only folder -> "Unverified".
+- [ ] 7. Verification: the renderer has no JS test runner, so the share-status decision stays a small pure function `shareStatus(localId, peers)` in helpers.ts and is checked manually via `make dev-gui` (marker created on first folder; second device with same share shows Same share and links games; different share shows warning and links nothing; read-only folder shows Unverified). Server-side behavior is covered by the backend plan's integration tests.
 - [ ] 8. Docs: ARCHITECTURE.md (IPC `files:ensure-share-marker`, hook list), CLAUDE.md GUI rule line (Locations block, marker file, `import_network_folder`).
 
 ## Checklist
