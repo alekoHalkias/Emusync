@@ -87,3 +87,4 @@ See issue #650.
 - 2026-10-31 tplan: test_file=none (manual), 5 test cases defined
 - 2026-10-31 implement: started
 - 2026-10-31 implement: step 1 done (initialNetworkRoot/initialLocalRoot wizard props)
+- 2026-10-31 implement: step 2 done (scanNewRoms module)
