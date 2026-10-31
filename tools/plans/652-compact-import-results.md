@@ -3,7 +3,7 @@
 Issue: #652
 Branch: feature/652-compact-import-results
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
