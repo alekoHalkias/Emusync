@@ -112,7 +112,10 @@ If invoked at the wrong stage, say so and invoke the right skill.
 
 12. Commit the plan file, test guide, and handoff file: `git add tools/plans/<N>-*.md .claude/testing-guide.md && git commit -m "Add testing plan for #<N> with test guidelines and guide update"`.
 
-13. Show the plan to the user and stop. On approval, invoke `implement` with the issue number. If they request changes, revise, recommit, re-present.
+13. Write the combined outline into the handoff file, section 6, as `### Outline` and `### Summary`:
+    - Outline: one line per step from sections 3, 4, 8 and the tests, grouped under Frontend / Backend / Tests (only groups that exist).
+    - Summary: one line stating what the change does.
+    Commit the handoff file, show both to the user, and stop. This is the only approval point in planning. On approval, invoke `implement` with the issue number. If they request changes, revise the affected plan, recommit, re-present.
 
 ## Fix-plan mode (called by ship)
 

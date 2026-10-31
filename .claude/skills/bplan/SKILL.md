@@ -100,7 +100,7 @@ If invoked at the wrong stage, say so and invoke the right skill.
 
 12. Commit the plan file, design guide, and handoff file: `git add tools/plans/<N>-*.md .claude/backend-design-guide.md && git commit -m "Add backend implementation plan for #<N> with design alignment and guide update"`.
 
-13. Show the plan to the user and stop. On approval, invoke `tplan` with the issue number. If they request changes, revise, recommit, re-present.
+13. Do not stop for approval. Continue to the next stage per the design skill's step 9 (`merge` when both plans exist, else `tplan`).
 
 ## Fix-plan mode (called by ship)
 

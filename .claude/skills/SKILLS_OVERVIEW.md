@@ -22,7 +22,7 @@ This file documents all workflow skills and their responsibilities.
 - **Design Guide**: `.claude/frontend-design-guide.md` (auto-created, auto-updated, auto-compressed at 100 lines)
 - **Focus**: React, Electron, IPC, CSS
 - **Output**: `tools/plans/<N>-<slug>.md` + rewrites `tools/plans/<N>-handoff.md` sections 3, 8
-- **Next**: Invoke `tplan` (or `bplan` if backend-only; `merge` if both ran)
+- **Next**: Continues without approval to `tplan` (or `merge` if both plans ran)
 
 ### 4. bplan (`./.claude/skills/bplan/SKILL.md`)
 - **Stage**: 2.2 of 4
@@ -30,13 +30,13 @@ This file documents all workflow skills and their responsibilities.
 - **Design Guide**: `.claude/backend-design-guide.md` (auto-created, auto-updated, auto-compressed at 100 lines)
 - **Focus**: Python, FastAPI, SQLite/Store, Click, mDNS
 - **Output**: `tools/plans/<N>-<slug>.md` + rewrites `tools/plans/<N>-handoff.md` sections 4, 8
-- **Next**: Invoke `tplan` (or `merge` if fplan also ran)
+- **Next**: Continues without approval to `tplan` (or `merge` if fplan also ran)
 
 ### 5. merge (`./.claude/skills/merge/SKILL.md`)
 - **Stage**: 2.15 of 4
 - **Purpose**: Reconcile two plan files (fplan + bplan) into one unified plan
 - **Output**: Merged plan file + rewrites `tools/plans/<N>-handoff.md` sections 5, 8
-- **Next**: Invoke `tplan`
+- **Next**: Invokes `tplan` without an approval stop
 
 ### 6. tplan (`./.claude/skills/tplan/SKILL.md`)
 - **Stage**: 2.3 of 4
@@ -44,8 +44,9 @@ This file documents all workflow skills and their responsibilities.
 - **Test Guide**: `.claude/testing-guide.md` (auto-created, auto-updated, auto-compressed at 100 lines)
 - **Focus**: Integration tests, SQLite usage, CLI testing, Electron IPC testing
 - **Input**: Reads plan from `fplan` or `bplan`
-- **Output**: Updated `tools/plans/<N>-<slug>.md` with `## Testing` section + rewrites `tools/plans/<N>-handoff.md` section 6
-- **Next**: Invoke `implement`
+- **Output**: Updated `tools/plans/<N>-<slug>.md` with `## Testing` section + rewrites `tools/plans/<N>-handoff.md` section 6, including `### Outline` (all plans, grouped Frontend/Backend/Tests) and a one-line `### Summary`
+- **Approval**: the single approval point in planning; fplan, bplan and merge do not stop
+- **Next**: Invoke `implement` after the user approves the outline
 
 ### 7. test-design (`./.claude/skills/test-design/SKILL.md`)
 - **Stage**: 2.5 of 4
@@ -91,7 +92,7 @@ A single workflow-wide state document that every skill reads, updates with its s
 ## 3. Frontend Plan  ← Written by /fplan: design alignment, visual pattern, recommendations
 ## 4. Backend Plan   ← Written by /bplan: design alignment, backend pattern, recommendations
 ## 5. Merged Plan    ← Written by /merge: conflicts resolved, unresolved
-## 6. Testing Plan   ← Written by /tplan: test file, cases, edge cases, integration points
+## 6. Testing Plan   ← Written by /tplan: test file, cases, edge cases, integration points, outline, one-line summary
 ## 7. Test Design    ← Written by /test-design: scope, types, cases, affected tests, checklist
 ## 8. Implementation Steps ← Written by /plan skills, updated by /implement: steps with files/reuses/new
 ## 9. Review         ← Written by /review: findings, blocked status, blockers
@@ -136,7 +137,8 @@ A single workflow-wide state document that every skill reads, updates with its s
 
        ▼
 ┌─────────────┐
-│   /tplan    │  Stage 2.3: Add testing guidelines and steps
+│   /tplan    │  Stage 2.3: Add testing steps, write outline + summary,
+│             │  the one approval stop before /implement
 └──────┬──────┘
        │
        └──► .claude/testing-guide.md (auto-created, auto-updated, auto-compressed)

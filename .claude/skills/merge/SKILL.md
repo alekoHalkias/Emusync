@@ -88,4 +88,4 @@ Two plan files on the same branch, both with `Status: planned` or `Status: imple
    git add tools/plans/<N>-*.md
    git commit -m "#<N>: merge reconciled plan from fplan and bplan"
    ```
-   Present the reconciled plan to the user, listing all conflicts resolved and any that need user input. This skill is invoked automatically by the design skill when both plan targets are needed — after presenting the reconciled plan, invoke `tplan` with the issue number.
+   Do not stop for approval. List the conflicts resolved in the handoff file, then invoke `tplan` with the issue number (`tplan` presents the single combined outline). Stop only for an ambiguous conflict that needs user input.

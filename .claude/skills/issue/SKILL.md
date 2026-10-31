@@ -97,6 +97,8 @@ If args are a number (`123`, `#123`, or `PR 45`) instead of a description, do no
    ### Test Cases: TBD
    ### Edge Cases: TBD
    ### Integration Points: TBD
+   ### Outline: TBD
+   ### Summary: TBD
 
    ## 7. Test Design
    ### Test Scope: TBD
