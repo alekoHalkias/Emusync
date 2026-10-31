@@ -70,6 +70,7 @@ export interface EmusyncBridge {
     ensureSave: (savePath: string) => Promise<{ created: boolean }>;
     getSaveTime: (savePath: string) => Promise<string | null>;
     exists: (path: string) => Promise<boolean>;
+    ensureShareMarker: (folder: string) => Promise<{ id: string | null; created: boolean }>;
     getFileHash: (filePath: string) => Promise<string>;
     getLatestInFolder: (dirPath: string) => Promise<{ path: string; time: string } | null>;
     getPs2LastPlayed: () => Promise<Record<string, string>>;

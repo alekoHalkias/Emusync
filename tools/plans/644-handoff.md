@@ -99,3 +99,4 @@ See issue #644.
 - 2026-10-30 implement: step 2 done (list_console_shares store method)
 - 2026-10-30 implement: step 3 done (shares route, share id in console GET/PUT)
 - 2026-10-30 implement: step 4 done (5 backend tests)
+- 2026-10-30 implement: step 5 done (files:ensure-share-marker IPC; tsc errors shown are pre-existing)

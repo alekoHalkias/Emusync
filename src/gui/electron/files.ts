@@ -3,6 +3,7 @@
 import { ipcMain, dialog } from "electron";
 import { existsSync, writeFileSync, readFileSync, mkdirSync, readdirSync, statSync, renameSync } from "fs";
 import { homedir } from "os";
+import { randomUUID } from "crypto";
 import { spawn } from "child_process";
 import { dataDir } from "./paths";
 import { join, dirname, basename, extname } from "path";
@@ -61,6 +62,21 @@ export function registerFilesIpc(): void {
 
   // Bare existence check, used by the Refresh locations scan (issue #616).
   ipcMain.handle("files:exists", (_event, p: string): boolean => existsSync(p));
+
+  // Network-share identity (issue #644): read the folder's .emusync-share-id marker,
+  // creating one when absent. id is null when there is no marker and it is not writable.
+  ipcMain.handle("files:ensure-share-marker", (_event, folder: string): { id: string | null; created: boolean } => {
+    const marker = join(folder, ".emusync-share-id");
+    try {
+      const existing = readFileSync(marker, "utf-8").trim();
+      if (existing) return { id: existing, created: false };
+    } catch { /* absent or unreadable - try to create */ }
+    try {
+      const id = randomUUID();
+      writeFileSync(marker, id + "\n");
+      return { id, created: true };
+    } catch { return { id: null, created: false }; }
+  });
 
   // Compute the SHA-256 hex digest of a file (issue #579).
   ipcMain.handle("files:get-file-hash", (_event, filePath: string): Promise<string> => {
