@@ -30,6 +30,23 @@ Make Refresh locations also scan the console's local and network folders for ROM
 - [ ] 5. Docs: CLAUDE.md GUI rule and ARCHITECTURE.md (scanNewRoms, the two new wizard props).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md
 
+## Testing
+- **Test File**: none automated. The change is renderer-only and the renderer has no JS test runner; adding one is out of scope. Python suite is unaffected (`make test` must still pass in ship).
+- **Test Cases** (manual, `make dev-gui`, covers plan step 4):
+  - New ROM in the local folder: Refresh reports "1 new game found", Review and import opens the wizard on the right console with the folders listed.
+  - New ROM on the network share: counted once, imports as network-sourced (wizard shows the network folder, from the seeded roots).
+  - Same new ROM in both folders: counted once (merged by `classifyByRoot`).
+  - ROM already imported on this device, and a ROM on the ignore list: not counted.
+  - Nothing new: message says no new games and shows no button.
+- **Edge Cases**:
+  - Console with no configured folders: message says there are no folders to scan; existing refresh results still shown.
+  - No detected emulator for the console: message says so, no crash.
+  - Network share unmounted or scan throws: existing refresh message still appears plus a short "couldn't scan for new games" note.
+  - Console has several detected emulators and `device_emulator` label matches none: first option is used, wizard still lets the user change it.
+- **Integration Points**:
+  - Keep `scanNewRoms` free of React state so a runner can cover it later.
+  - Wizard seeding: confirm the new `initialNetworkRoot` / `initialLocalRoot` props override saved config only when passed, so the Add console and bulk library entry points behave exactly as before.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

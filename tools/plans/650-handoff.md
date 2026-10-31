@@ -44,10 +44,10 @@ See issue #650.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: none automated (renderer-only, no JS runner); manual checklist in the plan
+### Test Cases: new ROM local; new ROM network; same ROM in both counted once; imported and ignored not counted; nothing new
+### Edge Cases: no folders; no emulator; scan failure; emulator label mismatch
+### Integration Points: scanNewRoms kept free of React state; wizard props override saved config only when passed
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -83,3 +83,5 @@ See issue #650.
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
 - 2026-10-31 fplan: 5 steps written, visual_pattern=status line + Review and import button
+- tplan: no automated test file (renderer only); manual cases defined in plan step 4 and Testing section
+- 2026-10-31 tplan: test_file=none (manual), 5 test cases defined
