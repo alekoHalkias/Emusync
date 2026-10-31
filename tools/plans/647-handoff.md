@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #647
 - Branch: feature/647-fix-network-share-id-migration
-- PR: none
-- Status: implemented
+- PR: #PENDING
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -69,8 +69,8 @@ See issue #647.
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #PENDING
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -89,3 +89,4 @@ See issue #647.
 - 2026-10-31 implement: step 2 done (3 migration tests; Store-on-v30 test heals a real DB via DROP COLUMN)
 - 2026-10-31 implement: step 4 done (CLAUDE.md schema rule; backend guide updated in bplan)
 - 2026-10-31 implement: step 3 done (modal shows load error instead of empty-row text); all steps complete
+- 2026-10-31 ship: tests pass (563 passed, 3 skipped)
