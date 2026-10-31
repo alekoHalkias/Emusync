@@ -4,7 +4,7 @@
 - Issue: #640
 - Branch: feature/640-update-feed-owner
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -23,13 +23,13 @@ src/gui/package.json
 - [ ] v0.7.1 published
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: CI/build config only
+### Backend Changes: None
+### UI Changes: None
+### Plan Target: bplan
+### Sub-issues: None
+### Difficulty: 1/10
+### Backwards Compatibility: No breaking changes; v0.7.0 installs need one manual upgrade
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -79,3 +79,4 @@ src/gui/package.json
 
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
+- 2026-10-31 design: scope=build-config, plan_target=bplan, difficulty=1/10, breaking=no
