@@ -267,6 +267,49 @@ def upload_to_master(
     return UploadResult(local_hash, skipped=False)
 
 
+SHARE_MARKER = ".emusync-share-id"
+
+
+def upload_to_network(client, device_id: str, slug: str) -> str:
+    """Put this device's local-only ROM for *slug* on its console's network drive (#660).
+
+    Refuses unless the share's marker file matches the console's registered
+    ``network_share_id`` (an unverified share could be a different NAS). Never
+    overwrites an existing master (:func:`upload_to_master`). On success the game
+    row becomes network-sourced and keeps the local file as ``local_rom_path``.
+    Returns the master path; raises :class:`LocalizeError` with a user-facing reason.
+    """
+    gd = client.get_game_device(slug)
+    game = next((g for g in client.list_my_game_devices() if g["slug"] == slug), None)
+    if not gd or not game or not gd.rom_path or gd.rom_source != "local":
+        raise LocalizeError("no local ROM for this game on this device")
+    consoles = client.get_device_consoles(device_id)
+    con = next((c for c in consoles if c["console_name"] == game.get("console")
+                and c.get("device_network_folder")), None)
+    if not con:
+        raise LocalizeError("this console has no network folder configured on this device")
+    root = con["device_network_folder"]
+    if not path_is_reachable(os.path.join(root, SHARE_MARKER)):
+        raise LocalizeError("network folder is unreachable or has no share marker")
+    with open(os.path.join(root, SHARE_MARKER), encoding="utf-8") as f:
+        marker = f.read().strip()
+    if not marker or marker != con.get("network_share_id"):
+        raise LocalizeError("network folder does not match the registered share")
+
+    rel = next((r for r in (compute_rel_path(con.get(k, ""), gd.rom_path)
+                            for k in ("device_local_folder", "device_game_folder")) if r), None)
+    rel = rel or normalize_rel_path(os.path.basename(gd.rom_path))
+    master = join_network(root, rel)
+    res = upload_to_master(gd.rom_path, master)
+    local = gd.rom_path
+    gd.rom_source, gd.rom_path, gd.local_rom_path = "network", master, local
+    gd.rom_rel_path, gd.rom_sha256 = rel, res.sha256
+    gd.rom_folder_path = os.path.dirname(master)
+    gd.launch_command = gd.launch_command.replace(local, master)
+    client.set_game_device(slug, gd)
+    return master
+
+
 def delocalize_rom(local_path: str, network_path: str) -> bool:
     """Delete a localized copy, refusing to touch the network master.
 
