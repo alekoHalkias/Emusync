@@ -26,7 +26,7 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
   - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: `scanRoms` pipeline, `setRoms`/`setSelected`, ignoredRoms.ts
   - New: `ignoreRoms` (~12 lines) - nothing existing removes entries persistently
-- [ ] 4. Results step UI: per-row Ignore button (stops propagation), "Ignore selected" button next to the existing bulk controls, and a muted "N ignored - manage in console settings" line when `ignoredCount > 0`.
+- [x] 4. Results step UI: per-row Ignore button (stops propagation), "Ignore selected" button next to the existing bulk controls, and a muted "N ignored - manage in console settings" line when `ignoredCount > 0`.
   - Files: src/gui/renderer/src/components/console-import/ResultsStep.tsx
   - Reuses: existing row markup, `selected`, button classes
   - New: inline buttons only

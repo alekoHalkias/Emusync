@@ -39,6 +39,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
   );
   const visibleGrouped = groupByDir(visibleRoms);
   const visiblePaths = visibleRoms.map(r => r.romPath);
+  const ignorableSelected = roms.filter(r => selected.has(r.romPath) && !r.existingLocal);
   const visibleSelectedCount = visibleRoms.filter(r => selected.has(r.romPath)).length;
   const allVisibleSelected = visibleRoms.length > 0 && visibleSelectedCount === visibleRoms.length;
 
@@ -123,14 +124,30 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
           <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
             {visibleSelectedCount} of {visibleRoms.length} selected
           </span>
-          <button
-            className="btn btn-ghost"
-            style={{ fontSize: 12, padding: "2px 10px" }}
-            disabled={visibleRoms.length === 0}
-            onClick={() => vm.toggleAll(visiblePaths)}
-          >
-            {allVisibleSelected ? "Deselect all" : "Select all"}
-          </button>
+          <span style={{ display: "flex", gap: 8 }}>
+            <button
+              className="btn btn-ghost"
+              style={{ fontSize: 12, padding: "2px 10px" }}
+              disabled={ignorableSelected.length === 0}
+              onClick={() => vm.ignoreRoms(ignorableSelected)}
+              title="Hide the selected ROMs from this and future scans (files are not touched)"
+            >
+              Ignore selected
+            </button>
+            <button
+              className="btn btn-ghost"
+              style={{ fontSize: 12, padding: "2px 10px" }}
+              disabled={visibleRoms.length === 0}
+              onClick={() => vm.toggleAll(visiblePaths)}
+            >
+              {allVisibleSelected ? "Deselect all" : "Select all"}
+            </button>
+          </span>
+        </div>
+      )}
+      {vm.ignoredCount > 0 && (
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+          {vm.ignoredCount} ignored file{vm.ignoredCount !== 1 ? "s" : ""} hidden - manage them in the console's settings.
         </div>
       )}
 
@@ -203,6 +220,16 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
                       )}
                     </div>
                   </div>
+                  {!rom.existingLocal && (
+                    <button
+                      className="btn btn-ghost"
+                      style={{ fontSize: 11, padding: "1px 8px", flexShrink: 0 }}
+                      title="Hide this ROM from future scans (the file is not touched)"
+                      onClick={e => { e.stopPropagation(); vm.ignoreRoms([rom]); }}
+                    >
+                      Ignore
+                    </button>
+                  )}
                 </div>
               ))}
               </Fragment>
