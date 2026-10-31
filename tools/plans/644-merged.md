@@ -3,7 +3,7 @@
 Source plans: tools/plans/644-frontend-console-import.md, tools/plans/644-console-import-share-matching.md
 Branch: feature/644-console-import-share-matching
 PR: none
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal
