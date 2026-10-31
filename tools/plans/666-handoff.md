@@ -45,12 +45,16 @@ console-import/helpers.ts dedupeAndLink; useConsoleImport.ts linkShareGames; sca
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: none (no renderer harness)
+### Test Cases: manual - GBA share with underscore duplicates reports no linked games
+### Edge Cases: game with no ROM on this device but present on another still links
+### Integration Points: wizard (useConsoleImport) and scanNewRoms both call dedupeAndLink
+### Outline
+Frontend: helpers.ts dedupeAndLink - crossMatch slug already in thisDeviceConfigs -> existingGameSlug (skipped).
+Tests: no renderer harness; tsc + manual check. Python suite unaffected.
+Docs: none.
+### Summary
+Name-duplicate ROMs of games already configured on this device are skipped instead of re-linked on every wizard open.
 
 ## 7. Test Design
 TBD
@@ -76,3 +80,4 @@ none
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
 - 2026-10-31 fplan: 3 steps written, visual_pattern=none
+- 2026-10-31 tplan: test_file=none, 1 manual case + 1 edge case defined
