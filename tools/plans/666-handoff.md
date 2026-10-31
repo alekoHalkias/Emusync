@@ -1,0 +1,74 @@
+# Handoff: #666 Skip name-duplicate ROMs of games already configured on this device when importing
+
+## Metadata
+- Issue: #666
+- Branch: feature/666-skip-duplicate-roms-on-import
+- PR: none
+- Status: created
+- Created: 2026-10-31
+- Fix attempts: 0
+
+## 1. Issue
+### Summary
+Name-duplicate ROMs of games already configured on this device are reported as "linked from another device" and re-linked on every open.
+### Motivation
+Wizard and Refresh counts are wrong; rom_path may be rewritten to duplicate files.
+### Proposed Behavior / Steps to Reproduce
+GBA share with Pokemon_Emerald_Crest.gba alongside Pokemon Emerald Crest.gba; open Review and import.
+### Affected Area
+console-import/helpers.ts dedupeAndLink; useConsoleImport.ts linkShareGames; scanNewRoms.ts.
+### Acceptance Criteria
+- Name match to a game with a ROM on this device is skipped.
+- Genuinely other-device games still link.
+
+## 2. Design
+### Scope: TBD
+### Backend Changes: TBD
+### UI Changes: TBD
+### Plan Target: TBD (bplan / fplan / both)
+### Sub-issues: TBD
+### Difficulty: TBD
+### Backwards Compatibility: TBD
+
+## 3. Frontend Plan
+### Design Alignment: TBD
+### Visual Pattern: TBD
+### Recommendations: TBD
+
+## 4. Backend Plan
+### Design Alignment: TBD
+### Backend Pattern: TBD
+### Recommendations: TBD
+
+## 5. Merged Plan
+### Conflicts Resolved: none
+### Unresolved Conflicts: none
+
+## 6. Testing Plan
+### Test File: TBD
+### Test Cases: TBD
+### Edge Cases: TBD
+### Integration Points: TBD
+### Outline: TBD
+### Summary: TBD
+
+## 7. Test Design
+TBD
+
+## 8. Implementation Steps
+### Steps: TBD
+
+## 9. Review
+TBD
+
+## 10. Ship
+### Status: pending
+### PR: none
+### Server Sync: pending
+### Doc Sync: pending
+
+## 11. Fix Attempts
+none
+
+## 12. Log
+- 2026-10-31 issue: workflow initialized
