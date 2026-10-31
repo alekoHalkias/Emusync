@@ -3,7 +3,7 @@
 Source plans: tools/plans/644-frontend-console-import.md, tools/plans/644-console-import-share-matching.md
 Branch: feature/644-console-import-share-matching
 PR: none
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal
@@ -46,7 +46,7 @@ Backend first, then IPC and API client, then UI.
   - Files: src/gui/renderer/src/components/console-import/ResultsStep.tsx
   - Reuses: existing folder list markup, `vm.addExtraPath`, `vm.pickLocalRomRoot`, button classes
   - New: inline chip and disclosure
-- [ ] 10. Manual verification via `make dev-gui` (renderer has no JS test runner): marker created on first folder; second device with same share shows Same share and links games; different share shows warning and links nothing; read-only folder shows Unverified.
+- [x] 10. Manual verification via `make dev-gui` (renderer has no JS test runner): marker created on first folder; second device with same share shows Same share and links games; different share shows warning and links nothing; read-only folder shows Unverified.
 - [x] 11. Docs and guide: ARCHITECTURE.md (consoles column, `/consoles/{name}/shares`, IPC `files:ensure-share-marker`, hook list), CLAUDE.md (share identity via marker file and `network_share_id`, Locations block, `import_network_folder`), `.claude/frontend-design-guide.md` Locations/chip entry.
 
 ## Testing

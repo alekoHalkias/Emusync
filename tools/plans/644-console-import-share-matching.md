@@ -3,7 +3,7 @@
 Issue: #644
 Branch: feature/644-console-import-share-matching
 PR: none
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal

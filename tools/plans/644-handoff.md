@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #644
 - Branch: feature/644-console-import-share-matching
-- PR: none
-- Status: implementing
+- PR: #PENDING
+- Status: shipped
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -70,8 +70,8 @@ See issue #644.
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #PENDING
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -105,3 +105,4 @@ See issue #644.
 - 2026-10-30 implement: step 8 done (networkRoot state, derived romSource, linkShareGames, pickers)
 - 2026-10-30 implement: step 9 done (LocationsBlock.tsx, ResultsStep slimmed)
 - 2026-10-30 implement: step 11 done (ARCHITECTURE.md section, CLAUDE.md rule added during step 5)
+- 2026-10-31 ship: tests pass (561 passed, 3 skipped); user confirmed GUI behavior
