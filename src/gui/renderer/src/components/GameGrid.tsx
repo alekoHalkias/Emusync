@@ -14,6 +14,8 @@ import Modal from "./Modal";
 import { useDevices } from "../DeviceContext";
 import LocationResolverModal from "./LocationResolverModal";
 import LocalToNetworkModal from "./LocalToNetworkModal";
+import ConsoleImport from "./ConsoleImport";
+import { scanNewRoms, type NewRomScan } from "./console-import/scanNewRoms";
 import type { LocalCandidate } from "./game-list/useBrokenRoms";
 import { isRomMissing, useBrokenRoms } from "./game-list/useBrokenRoms";
 import { CheckSquareIcon, DownloadIcon, GamepadIcon, GearIcon, RefreshIcon, SquareIcon, TrashIcon, WarningIcon } from "./icons";
@@ -79,6 +81,9 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   // remounts and re-fetches art (it may have just been edited in the
   // Artwork tab) without refetching every other card on the screen.
   const [localCandidates, setLocalCandidates] = useState<LocalCandidate[]>([]);
+  // New ROMs found by Refresh (#650); the button in the message bar opens the wizard on them.
+  const [newRoms, setNewRoms] = useState<NewRomScan | null>(null);
+  const [reviewNew, setReviewNew] = useState(false);
   const [artRefresh, setArtRefresh] = useState<Record<string, number>>({});
   // Lifted from each GameCard's own art:get fetch (issue #345) rather than a
   // duplicate lookup — undefined until that card resolves, so the "with/
@@ -425,9 +430,18 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
       n ? `${n} game${n !== 1 ? "s" : ""} with a missing ROM flagged.` : "All ROM locations are valid.",
       corrected ? `${corrected} ROM source${corrected !== 1 ? "s" : ""} corrected (local/network).` : "",
     ].filter(Boolean);
-    setBulkMsg({ text: parts.join(" "), isError: n > 0 });
+    setBulkMsg({ text: `${parts.join(" ")} Checking folders for new games...`, isError: n > 0 });
     if (corrected) onChanged();
     setLocalCandidates(candidates);
+    const scan = await scanNewRoms(consoleKey, currentDeviceId ?? "");
+    const found = scan.status === "ok" && scan.count > 0;
+    const note =
+      scan.status === "ok" ? (found ? `${scan.count} new game${scan.count !== 1 ? "s" : ""} found.` : "No new games found.") :
+      scan.status === "nofolders" ? "No folders configured to scan for new games." :
+      scan.status === "noemulator" ? "No emulator detected, so folders were not scanned for new games." :
+      "Couldn't scan for new games.";
+    setNewRoms(found ? scan : null);
+    setBulkMsg({ text: `${parts.join(" ")} ${note}`, isError: n > 0 });
   }
 
   async function handleLocated(newPath: string): Promise<void> {
@@ -533,7 +547,27 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
           title="Dismiss"
         >
           {bulkMsg.text}
+          {newRoms && (
+            <button
+              className="btn btn-ghost"
+              style={{ fontSize: 12, padding: "1px 8px", marginLeft: 8 }}
+              onClick={(e) => { e.stopPropagation(); setReviewNew(true); }}
+            >
+              Review and import
+            </button>
+          )}
         </div>
+      )}
+      {reviewNew && newRoms && (
+        <ConsoleImport
+          initialConsole={consoleKey}
+          initialRomDirs={newRoms.folders}
+          initialNetworkRoot={newRoms.networkRoot}
+          initialLocalRoot={newRoms.localRoot}
+          title="Import new games"
+          onClose={() => { setReviewNew(false); setNewRoms(null); }}
+          onImported={onChanged}
+        />
       )}
 
       {filtered.length === 0 ? (
