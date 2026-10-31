@@ -103,3 +103,4 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 implement: step 2 done (server/arp.py mac_for_ip)
 - 2026-10-31 implement: step 3 done (merge_devices + _DEVICE_REFS)
 - 2026-10-31 implement: step 4 done (touch_device resolves MAC and merges)
+- 2026-10-31 implement: step 5 done (_auth presence cleanup)

@@ -30,7 +30,7 @@ Silently resolve each client's MAC from the server's ARP table and merge devices
   - Files: src/server/store/devices.py
   - Reuses: `touch_device` throttle and write path; `_auth` in src/server/api/_core.py already calls ensure_device then touch_device, so no edit there
   - New: none
-- [ ] 5. Drop stale presence for merged ids: have `touch_device` return the list of merged old ids (default empty) and in `_auth` discard them from `_online_devices`/`_device_names`; print one activity line "<name> re-paired, merged duplicate" so it is visible but silent to the user flow.
+- [x] 5. Drop stale presence for merged ids: have `touch_device` return the list of merged old ids (default empty) and in `_auth` discard them from `_online_devices`/`_device_names`; print one activity line "<name> re-paired, merged duplicate" so it is visible but silent to the user flow.
   - Files: src/server/store/devices.py, src/server/api/_core.py
   - Reuses: `_print_activity`, `_presence_lock`, existing sets
   - New: none

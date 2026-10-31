@@ -229,10 +229,16 @@ def _auth(
     store = _get_store()
     device, is_new = store.ensure_device(x_device_id, x_device_name or x_device_id)
     ip = request.client.host if request.client else "unknown"
+    merged: list[str] = []
     if request.client:
-        store.touch_device(x_device_id, ip)
+        merged = store.touch_device(x_device_id, ip)
 
     with _presence_lock:
+        for old in merged:  # same machine under an older UUID (#656)
+            _online_devices.discard(old)
+            _device_names.pop(old, None)
+        if merged:
+            _print_activity(f"{device.name} re-paired, merged {len(merged)} duplicate device(s)")
         if is_new:
             _print_activity(f"new device paired called {device.name} at ip:{ip}")
         elif x_device_id not in _online_devices:
