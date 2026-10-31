@@ -22,7 +22,7 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
   - Files: src/gui/renderer/src/components/console-import/ignoredRoms.ts (new)
   - Reuses: the `config.load()` / `config.save()` read-modify-write used by `removeExtraPath` in useConsoleImport.ts
   - New: one small module - both the wizard and ConsoleFoldersModal need it and neither owns the other
-- [ ] 3. Wizard logic: load the ignored set when detection finishes; filter `result.roms` against it in `scanRoms` before annotate/classify; add `ignoreRoms(roms: RomEntry[])` which adds each entry's `romPath` and `localRomPath`, persists, and removes them from `roms` and `selected`; expose `ignoreRoms` and `ignoredCount`.
+- [x] 3. Wizard logic: load the ignored set when detection finishes; filter `result.roms` against it in `scanRoms` before annotate/classify; add `ignoreRoms(roms: RomEntry[])` which adds each entry's `romPath` and `localRomPath`, persists, and removes them from `roms` and `selected`; expose `ignoreRoms` and `ignoredCount`.
   - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: `scanRoms` pipeline, `setRoms`/`setSelected`, ignoredRoms.ts
   - New: `ignoreRoms` (~12 lines) - nothing existing removes entries persistently

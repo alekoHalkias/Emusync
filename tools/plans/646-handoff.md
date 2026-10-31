@@ -91,3 +91,4 @@ See issue #646.
 - 2026-10-31 implement: started
 - 2026-10-31 implement: step 1 done (Config.import_ignored_roms + 3 round-trip tests)
 - 2026-10-31 implement: step 2 done (ignoredRoms.ts accessor + filterIgnored)
+- 2026-10-31 implement: step 3 done (ignored set, scan filter, ignoreRoms)
