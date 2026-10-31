@@ -4,7 +4,7 @@
 - Issue: #644
 - Branch: feature/644-console-import-share-matching
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -94,3 +94,4 @@ See issue #644.
 - 2026-10-30 merge: 3 conflicts resolved, 0 unresolved; merged plan tools/plans/644-merged.md (11 steps)
 - tplan 4: files src/tests/test_network_rom.py; reuses client fixture, AUTH, _device_auth, v28->v29 migration pattern; no new test infra
 - 2026-10-30 tplan: test_file=src/tests/test_network_rom.py, 5 test cases defined
+- 2026-10-30 implement: started; Status set implementing in merged, bplan, fplan plans and handoff (hook reads first glob match)
