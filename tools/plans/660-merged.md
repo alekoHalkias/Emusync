@@ -14,7 +14,7 @@ Backend first, then IPC, then UI.
 - [x] 1. network-source returns `share_id` (source console's `network_share_id`). Files: src/server/store/games.py, src/server/api/games.py. Reuses: get_network_source_for_game. New: none.
 - [x] 2. Request creation for `kind="network-upload"` (validate local source, 409 if already on network, dedupe pending) plus store `find_pending_pull_request`. Files: src/server/api/transfers.py, src/server/store/transfers.py. Reuses: create_pull_request route. New: find_pending_pull_request (no lookup by slug/kind).
 - [x] 3. `GET /rom-pull-requests/outgoing` returning rows `{id, slug, game_name, kind, status, from_device_id, requested_at}` plus store `list_pull_requests_by_requester`. Files: src/server/api/transfers.py, src/server/store/transfers.py. Reuses: RomPullRequest mapping. New: requester-keyed list.
-- [ ] 4. Config `network_upload_auto_max_mb: int = 512`. Files: src/server/config.py. Reuses: Config handling.
+- [x] 4. Config `network_upload_auto_max_mb: int = 512`. Files: src/server/config.py. Reuses: Config handling.
 - [ ] 5. `netrom.upload_to_network(client, slug)` (marker check, temp+rename copy, no overwrite, flip row to network). Files: src/cli/netrom.py. Reuses: path_is_reachable, SyncClient methods. New: Python upload (only a TS version exists).
 - [ ] 6. Daemon branch for `network-upload` in `_handle_pull_request`: oversize stays pending, else upload and complete. Files: src/cli/transfer.py. Reuses: _handle_pull_request, drain loop.
 - [ ] 7. CLI `rom fulfill-network-upload <id> [--decline]`. Files: src/cli/rom.py. Reuses: upload_to_network, complete_pull_request.
