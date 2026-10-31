@@ -4,7 +4,7 @@
 - Issue: #646
 - Branch: feature/646-console-import-ignore-list
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -21,13 +21,13 @@ console-import/ (ResultsStep, useConsoleImport, helpers), ConsoleFoldersModal.ts
 See issue #646.
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: ui only
+### Backend Changes: none (per-device config key import_ignored_roms[console] = [paths], decided by user: per device, by path)
+### UI Changes: per-row Ignore + Ignore selected in results; scan filters ignored paths; Ignored games button/list in ConsoleFoldersModal with Unignore; reset in ServerStatusButton clears the key
+### Plan Target: fplan
+### Sub-issues: none
+### Difficulty: 3/10
+### Backwards Compatibility: non-breaking, new optional config key. PR #645 touches the same console-import files; rebase after it merges.
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -77,3 +77,4 @@ See issue #646.
 
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
+- 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
