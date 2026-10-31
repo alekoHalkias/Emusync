@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #661
 - Branch: feature/661-single-plan-approval
-- PR: none
+- PR: #662
 - Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
@@ -85,9 +85,9 @@ Planning skills no longer ask for approval at each stage; tplan ends with one ou
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### PR: #662
+### Server Sync: done
+### Doc Sync: done (SKILLS_OVERVIEW.md updated in-plan; no other docs affected)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -100,3 +100,4 @@ Planning skills no longer ask for approval at each stage; tplan ends with one ou
 - 2026-10-31 bplan: 5 steps written, backend_pattern=n/a (workflow markdown)
 - 2026-10-31 tplan: test_file=none, 0 test cases (grep verification); outline written
 - 2026-10-31 implement: steps 1-7 done (skills edited, overview updated, grep-verified)
+- 2026-10-31 ship: PR #662, server sync done, doc sync done
