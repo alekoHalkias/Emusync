@@ -3,7 +3,7 @@
 Source plans: tools/plans/660-network-rom-sharing-ui.md, tools/plans/660-network-rom-sharing.md
 Branch: feature/660-network-rom-sharing
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
