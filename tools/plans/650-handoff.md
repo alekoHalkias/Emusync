@@ -4,7 +4,7 @@
 - Issue: #650
 - Branch: feature/650-refresh-detect-new-games
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -30,9 +30,9 @@ See issue #650.
 ### Backwards Compatibility: non-breaking; frontend only; network scan cost on each click, show progress
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: bulkMsg status line plus inline button; review in the existing wizard
+### Visual Pattern: Refresh result message with a Review and import button
+### Recommendations: scan logic in its own module because GameGrid.tsx is 702 lines
 
 ## 4. Backend Plan
 ### Design Alignment: TBD
@@ -57,7 +57,11 @@ See issue #650.
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/650-refresh-detect-new-games.md
+- fplan 1: files types.ts, useConsoleImport.ts, ConsoleImport.tsx; reuses initialConsole/initialRomDirs seeding; two optional props because roots come only from saved config
+- fplan 2: files console-import/scanNewRoms.ts (new); reuses annotateRoms, classifyByRoot, dedupeAndLink, ignoredRoms, device console and overview APIs, emulator detect/scan; one function since the wizard logic is inline in hook state
+- fplan 3: files GameGrid.tsx; reuses handleRefreshLocations, bulkMsg, ConsoleImport; one state value and a button
+- fplan 4-5: manual verification, docs
 
 ## 9. Review
 ### Findings: TBD
@@ -78,3 +82,4 @@ See issue #650.
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
+- 2026-10-31 fplan: 5 steps written, visual_pattern=status line + Review and import button
