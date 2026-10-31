@@ -4,7 +4,7 @@
 - Issue: #644
 - Branch: feature/644-console-import-share-matching
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -35,9 +35,9 @@ See issue #644.
 ### Recommendations: TBD
 
 ## 4. Backend Plan
-### Design Alignment: TBD
-### Backend Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: additive consoles column per schema-evolution recipe; preserve-on-None PUT field; one thin read route
+### Backend Pattern: Store method + thin route
+### Recommendations: auto-link done client-side via existing scan linkedSlug + resolveImportPaths; server only registers/exposes share IDs
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
@@ -57,7 +57,12 @@ See issue #644.
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/644-console-import-share-matching.md
+- bplan 1: files models.py, schema.py, consoles.py; reuses _try pattern and consoles SQL literals; no new code
+- bplan 2: files consoles.py; reuses join pattern of get_network_source_for_game; new query because no cross-device console lookup exists
+- bplan 3: files api/devices.py; reuses update_device_console exclude_none loop; new route because nothing lists other devices' consoles
+- bplan 4: files tests; reuses client fixture and AUTH
+- bplan 5: files ARCHITECTURE.md, CLAUDE.md
 
 ## 9. Review
 ### Findings: TBD
@@ -78,3 +83,4 @@ See issue #644.
 ## 12. Log
 - 2026-10-30 issue: workflow initialized
 - 2026-10-30 design: scope=backend+ui, plan_target=both, difficulty=7/10, breaking=no; #643 closed as superseded
+- 2026-10-30 bplan: 5 steps written, backend_pattern=additive column + share-peer lookup; auto-link client-side
