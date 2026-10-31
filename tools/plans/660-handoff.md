@@ -108,3 +108,4 @@ Network-drive games become playable on any device with the same share ID, and de
 - 2026-10-31 implement: step 4 done (network_upload_auto_max_mb config key)
 - 2026-10-31 implement: step 4 done (network_upload_auto_max_mb config key)
 - 2026-10-31 implement: step 5 done (netrom.upload_to_network)
+- 2026-10-31 implement: step 6 done (daemon handles network-upload, oversize stays pending)

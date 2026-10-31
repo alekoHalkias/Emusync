@@ -16,7 +16,7 @@ Backend first, then IPC, then UI.
 - [x] 3. `GET /rom-pull-requests/outgoing` returning rows `{id, slug, game_name, kind, status, from_device_id, requested_at}` plus store `list_pull_requests_by_requester`. Files: src/server/api/transfers.py, src/server/store/transfers.py. Reuses: RomPullRequest mapping. New: requester-keyed list.
 - [x] 4. Config `network_upload_auto_max_mb: int = 512`. Files: src/server/config.py. Reuses: Config handling.
 - [x] 5. `netrom.upload_to_network(client, slug)` (marker check, temp+rename copy, no overwrite, flip row to network). Files: src/cli/netrom.py. Reuses: path_is_reachable, SyncClient methods. New: Python upload (only a TS version exists).
-- [ ] 6. Daemon branch for `network-upload` in `_handle_pull_request`: oversize stays pending, else upload and complete. Files: src/cli/transfer.py. Reuses: _handle_pull_request, drain loop.
+- [x] 6. Daemon branch for `network-upload` in `_handle_pull_request`: oversize stays pending, else upload and complete. Files: src/cli/transfer.py. Reuses: _handle_pull_request, drain loop.
 - [ ] 7. CLI `rom fulfill-network-upload <id> [--decline]`. Files: src/cli/rom.py. Reuses: upload_to_network, complete_pull_request.
 - [ ] 8. Backend tests (real SQLite): share_id; create/dedupe/reject cases; outgoing list; upload_to_network match/mismatch/no-overwrite; daemon leaves oversize pending. Files: src/tests/test_network_upload_requests.py (new), src/tests/test_network_rom.py.
 - [ ] 9. api.ts: `share_id` on GameNetworkSource, optional `kind` on createPullRequest, `listPendingPullRequests`, `listOutgoingPullRequests`, shared `PullRequestRow` type matching step 3. Files: src/gui/renderer/src/api.ts.
