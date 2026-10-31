@@ -18,6 +18,7 @@ import {
 import { autoPush, backfillSwitchTitleIds, prefetchArt, pullFromServerIfNewer } from "./postImport";
 import { resolveImportPaths } from "./resolveRomPaths";
 import { useNetworkShare } from "./useNetworkShare";
+import { filterIgnored, saveIgnoredRoms } from "./ignoredRoms";
 import type {
   ConsoleOption,
   EmulatorOption,
@@ -66,6 +67,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   const [localRomRoot, setLocalRomRoot] = useState("");
   const romSource: "local" | "network" = networkRoot ? "network" : "local";
   const [linkedCount, setLinkedCount]   = useState<number | null>(null);
+  // ROM paths hidden from scans (#646); loaded with the config when detection finishes.
+  const [ignored, setIgnored]           = useState<Set<string>>(new Set());
   const linkedFor = useRef("");
   const [existingGames, setExistingGames] = useState<GameOverview[]>([]);
   const [nameWarnings, setNameWarnings] = useState<string[]>([]);
@@ -103,6 +106,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
           setSavedFolders(initial);
           setExtraPaths(initial);
           setNetworkRoot(savedNetworkRoot(cfg, consoleSel, initial));
+          setIgnored(new Set(cfg?.import_ignored_roms?.[consoleSel] ?? []));
           setLocalRomRoot(cfg?.import_local_folder?.[consoleSel] ?? "");
           if (options.length === 1) setEmuSel(options[0]);
           setPhase("emulator");
@@ -128,6 +132,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
       setExtraPaths(saved);
       // Remember the last network + local folder per console (issues #255, #644).
       setNetworkRoot(savedNetworkRoot(cfg, consoleSel, saved));
+      setIgnored(new Set(cfg?.import_ignored_roms?.[consoleSel] ?? []));
       setLocalRomRoot(cfg?.import_local_folder?.[consoleSel] ?? "");
       if (options.length === 1) setEmuSel(options[0]);
       setPhase("emulator");
@@ -151,7 +156,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
       const withNet = net && !paths.includes(net) ? [net, ...paths] : paths;
       const scanPaths = loc && !withNet.includes(loc) ? [...withNet, loc] : withNet;
       const result = await emusync.emulator.scan(consoleSel, emuSel, scanPaths);
-      let annotated = annotateRoms(result.roms, scanPaths, result.romDirs ?? []);
+      let annotated = annotateRoms(filterIgnored(result.roms, ignored), scanPaths, result.romDirs ?? []);
 
       // Tag each ROM network/local/both and merge net+local duplicates into one row.
       if (scanNetwork) {
@@ -199,6 +204,16 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
       setError(e instanceof Error ? e.message : "Scan failed.");
       setPhase("results");
     }
+  }
+
+  /** Hide ROMs from this and later scans (#646). A network+local pair ignores both paths. */
+  function ignoreRoms(list: RomEntry[]): void {
+    const gone = new Set(list.map(r => r.romPath));
+    const next = new Set([...ignored, ...list.flatMap(r => [r.romPath, r.localRomPath ?? ""]).filter(Boolean)]);
+    setIgnored(next);
+    void saveIgnoredRoms(consoleSel, [...next]);
+    setRoms(prev => prev.filter(r => !gone.has(r.romPath)));
+    setSelected(prev => new Set([...prev].filter(p => !gone.has(p))));
   }
 
   async function addExtraPath(): Promise<void> {
@@ -495,14 +510,14 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     phase, consoles, consoleSel, emulators, suggestions, emuSel,
     extraPaths, removedDirs, roms, selected, names, error, progress,
     importErrors, pushResults, pushSaves, pushStates, artProgress,
-    romSource, networkRoot, localRomRoot, nameWarnings, share, linkedCount,
+    romSource, networkRoot, localRomRoot, nameWarnings, share, linkedCount, ignoredCount: ignored.size,
     // derived
     grouped, selectedCount, consoleLabel, currentStep, showStepper, allRomDirs,
     // setters used directly by steps
     setConsoleSel, setEmuSel, setPushSaves, setPushStates, setName,
     pickLocalRomRoot, pickNetworkRoot, clearLocalRoot, clearNetworkRoot,
     // handlers
-    detectEmulators, scanRoms, addExtraPath, removeExtraPath, removeRomDir,
+    detectEmulators, scanRoms, ignoreRoms, addExtraPath, removeExtraPath, removeRomDir,
     toggleRom, toggleAll, doImport, forceImport, dismissNameWarnings,
     backToConsole, backToEmulator,
   };

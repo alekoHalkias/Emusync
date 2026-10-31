@@ -24,6 +24,24 @@ def test_art_type_by_console_omitted_from_file_when_empty(tmp_path, monkeypatch)
     assert "art_type_by_console" not in (tmp_path / "emusync.toml").read_text()
 
 
+def test_import_ignored_roms_defaults_to_empty_dict():
+    assert cfg_module.Config().import_ignored_roms == {}
+
+
+def test_import_ignored_roms_roundtrips_through_save_and_load(tmp_path, monkeypatch):
+    """The ignore list must survive a Python config rewrite (#646, #499)."""
+    monkeypatch.setattr(cfg_module, "CONFIG_PATH", tmp_path / "emusync.toml")
+    ignored = {"gba": ["/roms/a b.gba", "C:\\roms\\c.gba"], "snes": ["/roms/s.sfc"]}
+    cfg_module.save(cfg_module.Config(import_ignored_roms=ignored))
+    assert cfg_module.load().import_ignored_roms == ignored
+
+
+def test_import_ignored_roms_omitted_from_file_when_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr(cfg_module, "CONFIG_PATH", tmp_path / "emusync.toml")
+    cfg_module.save(cfg_module.Config())
+    assert "import_ignored_roms" not in (tmp_path / "emusync.toml").read_text()
+
+
 # ── corruption / atomic write / permissions (#535) ───────────────────────────
 
 def test_corrupt_config_is_backed_up_not_overwritten(tmp_path, monkeypatch):
