@@ -95,3 +95,4 @@ See issue #646.
 - 2026-10-31 implement: step 4 done (row Ignore, Ignore selected, ignored count line)
 - 2026-10-31 implement: step 5 done (IgnoredGamesPanel in ConsoleFoldersModal)
 - 2026-10-31 implement: step 6 done (reset clears import_ignored_roms)
+- 2026-10-31 implement: step 8 done (ARCHITECTURE.md section; CLAUDE.md rule added in step 1)
