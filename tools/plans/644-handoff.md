@@ -4,7 +4,7 @@
 - Issue: #644
 - Branch: feature/644-console-import-share-matching
 - PR: #645
-- Status: shipped
+- Status: implementing
 - Created: 2026-10-30
 - Fix attempts: 0
 
@@ -108,3 +108,4 @@ See issue #644.
 - 2026-10-31 ship: tests pass (561 passed, 3 skipped); user confirmed GUI behavior
 - 2026-10-31 review: 3 findings, blocked=no
 - 2026-10-31 ship: server sync done; docs updated during implement
+- 2026-10-31 implement: import_network_folder declared in config.py (key was dropped on Python config rewrite, #499) with round-trip test

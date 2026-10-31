@@ -24,6 +24,13 @@ def test_art_type_by_console_omitted_from_file_when_empty(tmp_path, monkeypatch)
     assert "art_type_by_console" not in (tmp_path / "emusync.toml").read_text()
 
 
+def test_import_network_folder_roundtrips_through_save_and_load(tmp_path, monkeypatch):
+    """The wizard's remembered network folder must survive a Python config rewrite (#644, #499)."""
+    monkeypatch.setattr(cfg_module, "CONFIG_PATH", tmp_path / "emusync.toml")
+    cfg_module.save(cfg_module.Config(import_network_folder={"gba": "/mnt/nas/GBA"}))
+    assert cfg_module.load().import_network_folder == {"gba": "/mnt/nas/GBA"}
+
+
 # ── corruption / atomic write / permissions (#535) ───────────────────────────
 
 def test_corrupt_config_is_backed_up_not_overwritten(tmp_path, monkeypatch):
