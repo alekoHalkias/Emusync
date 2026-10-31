@@ -71,8 +71,8 @@ See issue #647.
 ## 10. Ship
 ### Status: shipped
 ### PR: #648
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -90,3 +90,4 @@ See issue #647.
 - 2026-10-31 implement: step 4 done (CLAUDE.md schema rule; backend guide updated in bplan)
 - 2026-10-31 implement: step 3 done (modal shows load error instead of empty-row text); all steps complete
 - 2026-10-31 ship: tests pass (563 passed, 3 skipped)
+- 2026-10-31 ship: server sync done (DB migrated to 31, consoles column present); docs updated during implement
