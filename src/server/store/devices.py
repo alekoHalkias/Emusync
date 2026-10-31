@@ -1,7 +1,7 @@
 """Device CRUD and presence (last_ip / last_seen_at)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from server import arp
 from server.store.models import Device
@@ -12,6 +12,10 @@ from server.store.models import Device
 # only write when something actually changed; last_seen_at is coarse-grained to
 # this many seconds, which is well under the 5-min offline threshold in api.py.
 _TOUCH_THROTTLE_SECONDS = 30
+# Only a device idle this long (the api offline threshold) is merged away, so two
+# live instances on one machine (e.g. a dev server with an isolated config) are
+# never merged back and forth (#656).
+_MERGE_MIN_IDLE_SECONDS = 5 * 60
 
 
 # Every (table, column) that holds a device id, for merge_devices (#656). Keep in
@@ -95,7 +99,8 @@ class DeviceMixin:
         commit on every request (see _TOUCH_THROTTLE_SECONDS).
 
         When the ARP table yields a MAC, any other device row with that MAC is the
-        same machine under an older UUID and is merged into this one (#656).
+        same machine under an older UUID and is merged into this one (#656), provided
+        it has been idle past _MERGE_MIN_IDLE_SECONDS.
         Returns the merged-away ids.
         """
         now = datetime.now(timezone.utc)
@@ -120,8 +125,10 @@ class DeviceMixin:
         self._conn.commit()
         if not mac:
             return []
+        cutoff = (now - timedelta(seconds=_MERGE_MIN_IDLE_SECONDS)).isoformat()
         dupes = [r["id"] for r in self._conn.execute(
-            "SELECT id FROM devices WHERE mac = ? AND id != ?", (mac, device_id)
+            "SELECT id FROM devices WHERE mac = ? AND id != ? "
+            "AND (last_seen_at IS NULL OR last_seen_at < ?)", (mac, device_id, cutoff)
         )]
         for old in dupes:
             self.merge_devices(old, device_id)

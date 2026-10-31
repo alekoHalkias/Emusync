@@ -78,9 +78,9 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 8. Docs - CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 1 medium (fixed): two live instances sharing a MAC (dev server with isolated config) would be merged back and forth every 30s, churning rows. Fix: only merge devices idle > 5 min (_MERGE_MIN_IDLE_SECONDS), test added. No other findings: schema bump + migration present, config write atomic 0600, tests real SQLite, docs updated.
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -107,3 +107,4 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 implement: step 7 done (device_id backup in data dir)
 - 2026-10-31 implement: step 6 done (tests in test_devices.py and test_config_roundtrip.py)
 - 2026-10-31 implement: step 8 done (docs)
+- 2026-10-31 review: 1 findings, blocked=no (fixed: idle threshold before merge)

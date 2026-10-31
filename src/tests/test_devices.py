@@ -552,6 +552,13 @@ def test_mac_for_ip_parses_arp_table(tmp_path, monkeypatch):
     assert arp.mac_for_ip("192.168.1.7") is None  # not listed
 
 
+def _age(store, dev):
+    """Backdate last_seen_at past the merge idle threshold."""
+    old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    store._conn.execute("UPDATE devices SET last_seen_at = ? WHERE id = ?", (old, dev))
+    store._conn.commit()
+
+
 def _seed(store, dev, slug="g"):
     from server.store import GameDevice
     store.ensure_device(dev, dev)
@@ -565,6 +572,7 @@ def test_new_uuid_with_known_mac_merges_into_it(tmp_path, monkeypatch):
     store = Store(str(tmp_path))
     _seed(store, "old")
     store.touch_device("old", "192.168.1.5")
+    _age(store, "old")
 
     store.ensure_device("new", "Deck")
     assert store.touch_device("new", "192.168.1.5") == ["old"]
@@ -605,14 +613,26 @@ def test_existing_same_mac_duplicates_collapse_on_touch(tmp_path, monkeypatch):
         store.ensure_device(dev, dev)
         store._conn.execute("UPDATE devices SET mac = 'aa:bb:cc:dd:ee:01' WHERE id = ?", (dev,))
     store._conn.commit()
+    _age(store, "b")
     assert store.touch_device("a", "192.168.1.5") == ["b"]
     assert [d.id for d in store.list_devices()] == ["a"]
+
+
+def test_recently_seen_same_mac_device_is_not_merged(tmp_path, monkeypatch):
+    """Two live instances on one machine must not be merged back and forth."""
+    _arp_file(tmp_path, monkeypatch, {"192.168.1.5": "aa:bb:cc:dd:ee:01"})
+    store = Store(str(tmp_path))
+    for dev in ("a", "b"):
+        store.ensure_device(dev, dev)
+        assert store.touch_device(dev, "192.168.1.5") == []
+    assert len(store.list_devices()) == 2
 
 
 @pytest.mark.asyncio
 async def test_auth_merges_regenerated_uuid_end_to_end(client, tmp_path, monkeypatch):
     _arp_file(tmp_path, monkeypatch, {"127.0.0.1": "aa:bb:cc:dd:ee:09"})
     await client.get("/whoami", headers=_device_auth("old-uuid", "Deck"))
+    _age(_core._get_store(), "old-uuid")
     await client.get("/whoami", headers=_device_auth("new-uuid", "Deck"))
     ids = [d["id"] for d in (await client.get("/devices", headers=_device_auth("new-uuid", "Deck"))).json()]
     assert "new-uuid" in ids and "old-uuid" not in ids
