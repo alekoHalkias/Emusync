@@ -85,6 +85,8 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version
 
 - Import ignore list (#646): per-device, per-console ROM paths hidden from the console import wizard, stored as `import_ignored_roms[consoleKey]` in emusync.toml (declared on `Config` in `server/config.py`, or Python drops it, #499). Read/written via `console-import/ignoredRoms.ts`; managed from the "Ignored games" panel in `ConsoleFoldersModal`. Ignoring never touches files or imported games; a ROM with a network + local copy ignores both paths.
 
+- Refresh finds new games (#650): `GameGrid`'s Refresh locations also calls `console-import/scanNewRoms.ts` (this console's ROM, extra, local and network folders; emulator picked by `device_emulator` label else first detected; ignore list and games already linked on this device are dropped; network+local copies merged), reports the count, and its "Review and import" button opens `ConsoleImport` with `initialConsole`/`initialRomDirs`/`initialNetworkRoot`/`initialLocalRoot` seeded from the console row. Nothing is imported without confirmation.
+
 **Ops**
 - Orphaned server: `pkill -9 -f "src/emusync.py server start"`; SIGKILL leaves `.server_pid`/`.server_token`. WSL2 Electron needs `--no-sandbox`, `DISPLAY=:0`. Fresh `npm install` in `src/gui/`: if electron binary missing, `npm install-scripts approve electron esbuild && npm rebuild electron esbuild`. Duplicate-launch guard shows a popup (notify-send→zenity→kdialog→xmessage→tk). mDNS runs in a daemon thread.
 
