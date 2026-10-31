@@ -484,6 +484,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     setSelected(prev => new Set([...prev].filter(p => !done.has(p))));
     setLinkedCount(linked);
     void saveShareId();
+    onImported(); // grid must reload now; Done is not the only way to close the wizard (#664)
   }
 
   function backToConsole(): void {
