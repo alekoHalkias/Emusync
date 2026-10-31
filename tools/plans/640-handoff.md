@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #640
 - Branch: feature/640-update-feed-owner
-- PR: none
-- Status: implemented
+- PR: #641
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -65,15 +65,15 @@ src/gui/package.json
 - Step 3: no docs needed.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 0 (one-line config diff)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #641
+### Server Sync: done
+### Doc Sync: done (CLAUDE.md)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -86,3 +86,5 @@ src/gui/package.json
 - 2026-10-31 bplan: 3 steps written, backend_pattern=none (build config)
 - 2026-10-31 tplan: test_file=none, 1 verification case
 - 2026-10-31 implement: steps 1-3 done (publish owner/repo split; unpacked build app-update.yml verified)
+- 2026-10-31 review: 0 findings, blocked=no
+- 2026-10-31 ship: PR #641, server sync done, doc sync updated CLAUDE.md
