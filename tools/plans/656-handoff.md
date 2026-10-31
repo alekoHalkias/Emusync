@@ -54,10 +54,10 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: src/tests/test_devices.py (MAC merge), src/tests/test_config_roundtrip.py (device_id backup); both existing, no new file.
+### Test Cases: arp parse; touch merges new UUID and moves rows; collision keeps existing row; different MAC untouched; no MAC unchanged; stored same-MAC duplicates collapse; end-to-end via _auth and GET /devices; v31->v32 migration; config restore from backup (missing, corrupt, invalid backup, save writes file).
+### Edge Cases: same-id no-op; lock row moves; arp -a fallback not tested (platform-specific, no mocks), noted in PR.
+### Integration Points: _auth -> ensure_device -> touch_device -> merge_devices; GET /devices; config.load/save.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -73,7 +73,7 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 3. merge_devices + _DEVICE_REFS - devices.py; reuses remove_device transaction style; remove_device deletes rather than re-keys.
 4. Wire into touch_device - devices.py; reuses throttled write path; _auth unchanged.
 5. Presence cleanup - devices.py, _core.py; reuses _print_activity and presence sets.
-6. Tests - test_device_mac.py new; reuses test_auth/test_events patterns.
+6. Tests - test_devices.py and test_config_roundtrip.py extended (no new file); reuses client, _device_auth, _ARP_PATH monkeypatch.
 7. device_id backup in data dir - config.py; reuses paths.data_dir and save()'s atomic write; new _restore_device_id helper (no second ID source exists).
 8. Docs - CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
 
@@ -98,3 +98,4 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-10-31 bplan: 7 steps written, backend_pattern=server-side ARP MAC + merge_devices in touch_device
 - 2026-10-31 bplan: added step 7 (device_id backup in data dir) at user request
+- 2026-10-31 tplan: test_file=src/tests/test_devices.py + test_config_roundtrip.py, 9 test cases defined
