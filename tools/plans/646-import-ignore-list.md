@@ -30,7 +30,7 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
   - Files: src/gui/renderer/src/components/console-import/ResultsStep.tsx
   - Reuses: existing row markup, `selected`, button classes
   - New: inline buttons only
-- [ ] 5. Console settings: "Ignored games" button in ConsoleFoldersModal toggling an inline panel with the list, per-row Unignore and Unignore all, writing through `saveIgnoredRoms` immediately; empty state text.
+- [x] 5. Console settings: "Ignored games" button in ConsoleFoldersModal toggling an inline panel with the list, per-row Unignore and Unignore all, writing through `saveIgnoredRoms` immediately; empty state text.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx, src/gui/renderer/src/components/IgnoredGamesPanel.tsx (new)
   - Reuses: ignoredRoms.ts, the modal's list-editor markup and `consoleKey` prop
   - New: small panel component - keeps the modal under 300 lines

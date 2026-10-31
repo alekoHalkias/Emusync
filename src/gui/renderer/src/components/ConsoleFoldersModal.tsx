@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { getDeviceConsoles, updateDeviceConsole, type DeviceConsole } from "../api";
 import { useDevices } from "../DeviceContext";
 import { usesSharedSaveLayout } from "./console-import/helpers";
+import IgnoredGamesPanel from "./IgnoredGamesPanel";
 import Modal from "./Modal";
 
 type Folders = Omit<DeviceConsole, "id" | "console_name">;
@@ -153,6 +154,7 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
             </div>
           </div>
         )}
+        <IgnoredGamesPanel consoleKey={consoleKey} />
         {msg && <p style={{ color: "var(--text-muted)", fontSize: 12 }}>{msg}</p>}
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
