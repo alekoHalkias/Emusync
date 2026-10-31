@@ -15,7 +15,7 @@ Patterns the Python side actually uses (server/, cli/, emusync.py). Compress pas
 - Only PS2/DC/GC/PSP/3DS use the shared memcard tables; that set is DB-backed `console_defs`, never hardcoded.
 
 ## Schema evolution
-1. add the table/column to `_SCHEMA` (fresh DB), 2. bump `_SCHEMA_VERSION`, 3. add an `if from_version < N:` block with `_try(conn, "ALTER TABLE ...")`, 4. keep the trailing `PRAGMA user_version = _SCHEMA_VERSION`. Never rename or drop a column; `no such column` means delete `emusync.db`.
+1. add the table/column to `_SCHEMA` (fresh DB), 2. bump `_SCHEMA_VERSION`, 3. add an `if from_version < N:` block with `_try(conn, "ALTER TABLE ...")`, 4. keep the trailing `PRAGMA user_version = _SCHEMA_VERSION`. Never rename or drop a column; `no such column` means delete `emusync.db`. Never reuse a schema number a deployed (even closed or unmerged) branch may have stamped: a database already at N skips an `if from_version < N` block, so rebase onto the next free number (#647).
 
 ## API conventions
 - Request bodies are pydantic `BaseModel`s with every field defaulted, so an old client still validates. A PUT that edits a record replaces the whole field set; fields that must survive a blank request are handled explicitly (preserve-if-empty), and the docstring says which behavior applies. New list fields on such a PUT are `Optional[list[str]] = None` and `None` means preserve (`model_dump(exclude_none=True)`), so an older client cannot blank them.

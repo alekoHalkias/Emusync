@@ -24,6 +24,7 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
   const [legacy, setLegacy] = useState<string[]>([]);
   const [emulators, setEmulators] = useState<string[]>([]);
   const [abbr, setAbbr] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -33,7 +34,9 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
       const defs = (await window.emusync.emulator.consoles().catch(() => [])) ?? [];
       const a = defs.find((d) => d.key === consoleKey)?.abbr ?? consoleKey;
       setAbbr(a);
-      const all = (await getDeviceConsoles(currentDeviceId).catch(() => [])).filter((c) => c.console_name.toLowerCase() === a.toLowerCase());
+      const fetched = await getDeviceConsoles(currentDeviceId).catch(() => null);
+      setLoadFailed(fetched === null);
+      const all = (fetched ?? []).filter((c) => c.console_name.toLowerCase() === a.toLowerCase());
       const primary = all.find((c) => c.device_game_folder) ?? all[0] ?? null;
       setRow(primary);
       setOrigRom(primary?.device_game_folder ?? "");
@@ -82,6 +85,8 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
         <h3>{abbr || consoleKey} settings on this device</h3>
         {row === undefined ? (
           <span className="spinner" />
+        ) : row === null && loadFailed ? (
+          <p>Couldn't load this console's folders — is the server reachable?</p>
         ) : row === null ? (
           <p>No folders recorded for this console yet. They are learned when you import or configure a game.</p>
         ) : (
