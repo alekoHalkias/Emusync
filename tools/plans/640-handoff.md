@@ -4,7 +4,7 @@
 - Issue: #640
 - Branch: feature/640-update-feed-owner
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -46,7 +46,7 @@ src/gui/package.json
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
+### Test File: none (verify app-update.yml in unpacked build)
 ### Test Cases: TBD
 ### Edge Cases: TBD
 ### Integration Points: TBD
@@ -59,7 +59,10 @@ src/gui/package.json
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/640-update-feed-owner.md (3 steps)
+- Step 1: touches package.json; reuses build.publish; no new code.
+- Step 2: verification only, no test file.
+- Step 3: no docs needed.
 
 ## 9. Review
 ### Findings: TBD
@@ -80,3 +83,5 @@ src/gui/package.json
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=build-config, plan_target=bplan, difficulty=1/10, breaking=no
+- 2026-10-31 bplan: 3 steps written, backend_pattern=none (build config)
+- 2026-10-31 tplan: test_file=none, 1 verification case
