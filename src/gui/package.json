@@ -33,7 +33,8 @@
     "productName": "EmuSync",
     "publish": {
       "provider": "github",
-      "repo": "alekoHalkias/Emusync"
+      "owner": "alekoHalkias",
+      "repo": "Emusync"
     },
     "linux": {
       "target": "AppImage",
