@@ -95,3 +95,4 @@ See issue #644.
 - tplan 4: files src/tests/test_network_rom.py; reuses client fixture, AUTH, _device_auth, v28->v29 migration pattern; no new test infra
 - 2026-10-30 tplan: test_file=src/tests/test_network_rom.py, 5 test cases defined
 - 2026-10-30 implement: started; Status set implementing in merged, bplan, fplan plans and handoff (hook reads first glob match)
+- 2026-10-30 implement: step 1 done (network_share_id column, v30 migration)

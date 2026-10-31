@@ -11,7 +11,7 @@ Store a per-device-console network share ID, expose other devices' share IDs, an
 
 ## Steps
 Backend first, then IPC and API client, then UI.
-- [ ] 1. Add `consoles.network_share_id` (TEXT NOT NULL DEFAULT ''): model, `_SCHEMA`, migration `from_version < 30`, `_SCHEMA_VERSION = 30`, every consoles SQL literal.
+- [x] 1. Add `consoles.network_share_id` (TEXT NOT NULL DEFAULT ''): model, `_SCHEMA`, migration `from_version < 30`, `_SCHEMA_VERSION = 30`, every consoles SQL literal.
   - Files: src/server/store/models.py, src/server/store/schema.py, src/server/store/consoles.py
   - Reuses: `_try` ALTER pattern, `_console_from_row`, existing set/get/list_console literals
   - New: none
