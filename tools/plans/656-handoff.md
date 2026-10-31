@@ -4,7 +4,7 @@
 - Issue: #656
 - Branch: feature/656-device-mac-dedupe
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -104,3 +104,6 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 implement: step 3 done (merge_devices + _DEVICE_REFS)
 - 2026-10-31 implement: step 4 done (touch_device resolves MAC and merges)
 - 2026-10-31 implement: step 5 done (_auth presence cleanup)
+- 2026-10-31 implement: step 7 done (device_id backup in data dir)
+- 2026-10-31 implement: step 6 done (tests in test_devices.py and test_config_roundtrip.py)
+- 2026-10-31 implement: step 8 done (docs)

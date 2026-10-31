@@ -34,15 +34,15 @@ Silently resolve each client's MAC from the server's ARP table and merge devices
   - Files: src/server/store/devices.py, src/server/api/_core.py
   - Reuses: `_print_activity`, `_presence_lock`, existing sets
   - New: none
-- [ ] 6. Tests for MAC merge: extend src/tests/test_devices.py (cases under Testing). `server.arp` exposes `_ARP_PATH`; tests monkeypatch it to a tmp file of sample `/proc/net/arp` text, so real parsing and real SQLite run, no mocks.
+- [x] 6. Tests for MAC merge: extend src/tests/test_devices.py (cases under Testing). `server.arp` exposes `_ARP_PATH`; tests monkeypatch it to a tmp file of sample `/proc/net/arp` text, so real parsing and real SQLite run, no mocks.
   - Files: src/tests/test_devices.py
   - Reuses: `client`, `_device_auth`, `Store`, the existing `test_touch_device_updates_last_seen` and `test_clear_devices_removes_all` setup style
   - New: none - same area as existing device tests (testing guide: extend, do not add files)
-- [ ] 7. Backup the device ID outside the config file: `save()` also writes `device_id` to `paths.data_dir()/device_id` (atomic, 0600, only when changed); `load()` uses that value instead of a fresh uuid4 when `emusync.toml` is missing, corrupt, or lacks `device_id` (validated with `uuid.UUID`, ignored if invalid). Covers lost/corrupt config where the data dir survives; a full wipe still relies on the MAC merge. On Windows config and data share one dir, so this only covers toml loss there.
+- [x] 7. Backup the device ID outside the config file: `save()` also writes `device_id` to `paths.data_dir()/device_id` (atomic, 0600, only when changed); `load()` uses that value instead of a fresh uuid4 when `emusync.toml` is missing, corrupt, or lacks `device_id` (validated with `uuid.UUID`, ignored if invalid). Covers lost/corrupt config where the data dir survives; a full wipe still relies on the MAC merge. On Windows config and data share one dir, so this only covers toml loss there.
   - Files: src/server/config.py, src/tests/test_config_roundtrip.py (cases under Testing)
   - Reuses: `paths.data_dir()`, existing atomic 0600 write helper used by `save()` (#535), `Config.device_id` default factory
   - New: small `_restore_device_id()` helper - no existing code reads a second ID source.
-- [ ] 8. Docs: add a short rule to CLAUDE.md (Config / paths / DB: devices merged by server-resolved ARP MAC, schema v32, #656) and a note in docs/ARCHITECTURE.md device/auth section; GOTCHAS entry for the ARP on-link limitation and the device_id backup file.
+- [x] 8. Docs: add a short rule to CLAUDE.md (Config / paths / DB: devices merged by server-resolved ARP MAC, schema v32, #656) and a note in docs/ARCHITECTURE.md device/auth section; GOTCHAS entry for the ARP on-link limitation and the device_id backup file.
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md, src/docs/GOTCHAS.md
 
 ## Testing

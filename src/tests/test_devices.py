@@ -523,3 +523,106 @@ def test_monitor_sweep_concurrent_with_presence_updates():
             and e["device_id"] == "stale-dev"
         ]
         assert len(stopped) == 1
+
+
+# ── MAC-based duplicate merge (#656) ──────────────────────────────────────────
+
+_ARP_HEADER = "IP address       HW type     Flags       HW address            Mask     Device\n"
+
+
+def _arp_file(tmp_path, monkeypatch, rows: dict[str, str]):
+    """Point server.arp at a /proc/net/arp-format file ip -> mac."""
+    from server import arp
+    f = tmp_path / "arp"
+    f.write_text(_ARP_HEADER + "".join(
+        f"{ip}  0x1  0x2  {mac}  *  eth0\n" for ip, mac in rows.items()))
+    monkeypatch.setattr(arp, "_ARP_PATH", f)
+
+
+def test_mac_for_ip_parses_arp_table(tmp_path, monkeypatch):
+    from server import arp
+    _arp_file(tmp_path, monkeypatch, {
+        "192.168.1.5": "AA:BB:CC:DD:EE:01",
+        "192.168.1.50": "aa:bb:cc:dd:ee:50",
+        "192.168.1.6": "00:00:00:00:00:00",
+    })
+    assert arp.mac_for_ip("192.168.1.5") == "aa:bb:cc:dd:ee:01"
+    assert arp.mac_for_ip("192.168.1.50") == "aa:bb:cc:dd:ee:50"
+    assert arp.mac_for_ip("192.168.1.6") is None  # incomplete entry
+    assert arp.mac_for_ip("192.168.1.7") is None  # not listed
+
+
+def _seed(store, dev, slug="g"):
+    from server.store import GameDevice
+    store.ensure_device(dev, dev)
+    store.add_game(slug, "Game")
+    store.set_game_device(GameDevice(game_slug=slug, device_id=dev, rom_path=f"/{dev}/g.gba", save_path="", launch_command=""))
+    store.push_save(slug, dev, b"save-" + dev.encode())
+
+
+def test_new_uuid_with_known_mac_merges_into_it(tmp_path, monkeypatch):
+    _arp_file(tmp_path, monkeypatch, {"192.168.1.5": "aa:bb:cc:dd:ee:01"})
+    store = Store(str(tmp_path))
+    _seed(store, "old")
+    store.touch_device("old", "192.168.1.5")
+
+    store.ensure_device("new", "Deck")
+    assert store.touch_device("new", "192.168.1.5") == ["old"]
+
+    assert [d.id for d in store.list_devices()] == ["new"]
+    assert store.get_game_device("g", "new").rom_path == "/old/g.gba"
+    assert store.get_save_meta("g").device_id == "new"
+    assert store._conn.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_merge_keeps_existing_row_on_collision(tmp_path):
+    store = Store(str(tmp_path))
+    _seed(store, "old")
+    _seed(store, "new")
+    store.acquire_lock("g", "old")
+    store.merge_devices("old", "new")
+    assert store.get_game_device("g", "new").rom_path == "/new/g.gba"
+    assert store._conn.execute("SELECT device_id FROM locks").fetchone()[0] == "new"
+    assert store._conn.execute("PRAGMA foreign_key_check").fetchall() == []
+    store.merge_devices("new", "new")  # same id: no-op
+    assert [d.id for d in store.list_devices()] == ["new"]
+
+
+def test_different_mac_or_no_mac_keeps_both(tmp_path, monkeypatch):
+    _arp_file(tmp_path, monkeypatch, {"192.168.1.5": "aa:bb:cc:dd:ee:01",
+                                      "192.168.1.6": "aa:bb:cc:dd:ee:02"})
+    store = Store(str(tmp_path))
+    for dev, ip in (("a", "192.168.1.5"), ("b", "192.168.1.6"), ("c", "10.0.0.9")):
+        store.ensure_device(dev, dev)
+        assert store.touch_device(dev, ip) == []
+    assert len(store.list_devices()) == 3
+
+
+def test_existing_same_mac_duplicates_collapse_on_touch(tmp_path, monkeypatch):
+    _arp_file(tmp_path, monkeypatch, {"192.168.1.5": "aa:bb:cc:dd:ee:01"})
+    store = Store(str(tmp_path))
+    for dev in ("a", "b"):
+        store.ensure_device(dev, dev)
+        store._conn.execute("UPDATE devices SET mac = 'aa:bb:cc:dd:ee:01' WHERE id = ?", (dev,))
+    store._conn.commit()
+    assert store.touch_device("a", "192.168.1.5") == ["b"]
+    assert [d.id for d in store.list_devices()] == ["a"]
+
+
+@pytest.mark.asyncio
+async def test_auth_merges_regenerated_uuid_end_to_end(client, tmp_path, monkeypatch):
+    _arp_file(tmp_path, monkeypatch, {"127.0.0.1": "aa:bb:cc:dd:ee:09"})
+    await client.get("/whoami", headers=_device_auth("old-uuid", "Deck"))
+    await client.get("/whoami", headers=_device_auth("new-uuid", "Deck"))
+    ids = [d["id"] for d in (await client.get("/devices", headers=_device_auth("new-uuid", "Deck"))).json()]
+    assert "new-uuid" in ids and "old-uuid" not in ids
+
+
+def test_v31_to_v32_migration_adds_mac(tmp_path):
+    import sqlite3
+    from server.store import schema
+    conn = sqlite3.connect(str(tmp_path / "old.db"))
+    conn.execute("CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL, last_ip TEXT, last_seen_at TEXT)")
+    conn.execute("INSERT INTO devices (id, name) VALUES ('d1', 'pc')")
+    schema._migrate(conn, from_version=31)
+    assert conn.execute("SELECT id, mac FROM devices").fetchone() == ("d1", None)

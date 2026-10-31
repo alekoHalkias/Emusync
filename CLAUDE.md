@@ -71,6 +71,7 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-{version
 
 **Config / paths / DB**
 - Never hardcode paths: use `src/server/paths.py` / `src/gui/electron/paths.ts` (XDG dirs; `EMUSYNC_*_DIR` disables migration; #564).
+- Device dedupe (#656): `touch_device` merges device rows sharing a server-resolved ARP MAC (`devices.mac`, schema v32, `server/arp.py`, `merge_devices` + `_DEVICE_REFS` in `store/devices.py`: add any new device-id column there). `device_id` is also backed up to `<data_dir>/device_id` and restored by `config.load()`. See GOTCHAS.
 - GUI-only settings go in `display.json`, not `emusync.toml` (Python drops unknown keys, #499). All config writes atomic + 0600; corrupt TOML renamed `.corrupt-<ms>` (#535).
 - Game metadata (`game_metadata`, #578): keyless Wikipedia fetch, gated by `auto_fetch_metadata` (toml, default true); `source=manual` rows are never overwritten by auto-fetch (src/docs/GOTCHAS.md).
 - Schema change: add `if from_version < N` in `_migrate()`, bump `_SCHEMA_VERSION`, add to `_SCHEMA`; keep the fresh-DB `user_version` stamp. Never reuse a schema number a deployed (even closed/unmerged) branch may have stamped: a DB already at N skips `from_version < N`, so take the next free number (#647; v30 is intentionally empty). One SQLite connection per thread. `no such column` → delete `emusync.db`.

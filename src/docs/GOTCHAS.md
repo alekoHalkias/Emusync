@@ -107,3 +107,10 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - Wikipedia is a fuzzy keyless match (`"<name> video game"`, first hit). It yields synopsis and thumbnail only; there is no release date, so that field is manual-only. Wrong match: PUT the right text.
 - Fetch never raises and retries once (1s) on 429/5xx. `WIKI_BASE` is a module constant so tests can point it at a local stub server.
 - `auto_fetch_metadata` is written to `emusync.toml` only when false (default true).
+
+## Device MAC dedupe (#656)
+
+- The MAC comes from the server's ARP table, so it only exists for clients on the server's subnet. VPN (Tailscale), routed and loopback clients yield none and keep UUID-only identity; duplicates can still occur for them.
+- Merge direction is old UUID into the requesting UUID (the one in the client's config). On collisions (`UPDATE OR IGNORE`) the surviving device's rows win. A new table with a device column must be added to `_DEVICE_REFS` in `store/devices.py` or its rows are orphaned on merge.
+- Clients sharing one source MAC (Docker bridge, NAT) are merged into one device.
+- `device_id` backup (`<data_dir>/device_id`) is best-effort; on Windows config and data share a folder, so it only covers toml loss.
