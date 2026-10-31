@@ -18,7 +18,7 @@ Silently resolve each client's MAC from the server's ARP table and merge devices
   - Files: src/server/store/schema.py
   - Reuses: existing `_try` migration pattern (v31 block)
   - New: none
-- [ ] 2. `mac_for_ip(ip) -> str | None`: parse `/proc/net/arp` when present, else run `arp -a` (timeout 2s) and regex the IP's line; lowercase, colon-normalized; reject `00:00:00:00:00:00`/incomplete; return None for unknown IP/any error. Module constant `_ARP_PATH = Path("/proc/net/arp")` is read first (tests point it at a tmp file); `arp -a` only when it does not exist.
+- [x] 2. `mac_for_ip(ip) -> str | None`: parse `/proc/net/arp` when present, else run `arp -a` (timeout 2s) and regex the IP's line; lowercase, colon-normalized; reject `00:00:00:00:00:00`/incomplete; return None for unknown IP/any error. Module constant `_ARP_PATH = Path("/proc/net/arp")` is read first (tests point it at a tmp file); `arp -a` only when it does not exist.
   - Files: src/server/arp.py (new)
   - Reuses: stdlib `subprocess`, `re`
   - New: arp.py - nothing in the codebase reads the neighbor table; one small function, kept out of the store; the `_ARP_PATH` constant is the test seam.
