@@ -22,7 +22,7 @@ Make Refresh locations also scan the console's local and network folders for ROM
   - Files: src/gui/renderer/src/components/console-import/scanNewRoms.ts (new)
   - Reuses: `annotateRoms`, `classifyByRoot`, `dedupeAndLink` (helpers.ts), `loadIgnoredRoms` / `filterIgnored` (ignoredRoms.ts), `getDeviceConsoles`, `gamesOverview`, `emulator.detect` / `emulator.scan`
   - New: one function - the wizard does the same steps inline across hook state, so there is nothing callable without opening the wizard
-- [ ] 3. Wire it into Refresh: after the existing checks, show "Checking folders for new games..." while scanning, then append "N new games found." (or nothing new / skipped reason) to the result message; when N > 0 render a "Review and import" button in the message bar that opens `ConsoleImport` with `initialConsole`, `initialRomDirs` = the scanned folders and the two roots; `onImported` calls `onChanged`. Scan failures do not break the existing result message.
+- [x] 3. Wire it into Refresh: after the existing checks, show "Checking folders for new games..." while scanning, then append "N new games found." (or nothing new / skipped reason) to the result message; when N > 0 render a "Review and import" button in the message bar that opens `ConsoleImport` with `initialConsole`, `initialRomDirs` = the scanned folders and the two roots; `onImported` calls `onChanged`. Scan failures do not break the existing result message.
   - Files: src/gui/renderer/src/components/GameGrid.tsx
   - Reuses: `handleRefreshLocations`, `bulkMsg`, `ConsoleImport`, `onChanged`
   - New: one `newRoms` state value and the button - nothing existing holds a follow-up action

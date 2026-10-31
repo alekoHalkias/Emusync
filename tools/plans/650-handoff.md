@@ -88,3 +88,4 @@ See issue #650.
 - 2026-10-31 implement: started
 - 2026-10-31 implement: step 1 done (initialNetworkRoot/initialLocalRoot wizard props)
 - 2026-10-31 implement: step 2 done (scanNewRoms module)
+- 2026-10-31 implement: step 3 done (Refresh scans for new ROMs, message + Review and import button)
