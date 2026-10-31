@@ -87,8 +87,8 @@ Network-drive games become playable on any device with the same share ID, and de
 ## 10. Ship
 ### Status: shipped
 ### PR: #663
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -118,3 +118,4 @@ Network-drive games become playable on any device with the same share ID, and de
 - 2026-10-31 implement: step 12 done (NetworkPlaySetup share-ID mount and upload request)
 - 2026-10-31 implement: step 14 done (docs for network upload requests)
 - 2026-10-31 review: 1 findings, blocked=no (fixed)
+- 2026-10-31 ship: server sync done; doc sync done (CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md in steps 14 and review fix); PR #663
