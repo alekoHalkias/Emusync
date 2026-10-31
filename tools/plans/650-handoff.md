@@ -86,3 +86,4 @@ See issue #650.
 - tplan: no automated test file (renderer only); manual cases defined in plan step 4 and Testing section
 - 2026-10-31 tplan: test_file=none (manual), 5 test cases defined
 - 2026-10-31 implement: started
+- 2026-10-31 implement: step 1 done (initialNetworkRoot/initialLocalRoot wizard props)

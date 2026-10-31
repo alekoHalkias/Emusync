@@ -62,6 +62,10 @@ export type Props = {
   // import folders" — the library wizard already knows exactly which folder
   // this console's ROMs live in and shouldn't scan unrelated leftovers.
   initialRomDirs?: string[];
+  // Refresh-found ROMs (#650): the caller knows the console's network and local
+  // folders, so they replace the remembered ones instead of guessing from config.
+  initialNetworkRoot?: string;
+  initialLocalRoot?: string;
   // Header override so the library wizard can show progress ("SNES — 2 of 7").
   title?: string;
 };

@@ -39,7 +39,7 @@ function savedNetworkRoot(cfg: Record<string, any> | null, consoleKey: string, f
   return cfg?.import_rom_source?.[consoleKey] === "network" ? (folders[0] ?? "") : "";
 }
 
-export function useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs }: Props) {
+export function useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs, initialNetworkRoot, initialLocalRoot }: Props) {
   const [phase, setPhase]         = useState<Phase>(initialConsole ? "detecting" : "console");
   const [consoles, setConsoles]   = useState<ConsoleOption[]>([]);
   const [consoleSel, setConsoleSel] = useState(initialConsole ?? "");
@@ -105,9 +105,9 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
           const initial = initialRomDirs && initialRomDirs.length > 0 ? initialRomDirs : saved;
           setSavedFolders(initial);
           setExtraPaths(initial);
-          setNetworkRoot(savedNetworkRoot(cfg, consoleSel, initial));
+          setNetworkRoot(initialNetworkRoot ?? savedNetworkRoot(cfg, consoleSel, initial));
           setIgnored(new Set(cfg?.import_ignored_roms?.[consoleSel] ?? []));
-          setLocalRomRoot(cfg?.import_local_folder?.[consoleSel] ?? "");
+          setLocalRomRoot(initialLocalRoot ?? cfg?.import_local_folder?.[consoleSel] ?? "");
           if (options.length === 1) setEmuSel(options[0]);
           setPhase("emulator");
         } catch {
@@ -116,7 +116,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
         }
       })();
     }
-  }, [initialConsole, consoleSel, phase, initialRomDirs]);
+  }, [initialConsole, consoleSel, phase, initialRomDirs, initialNetworkRoot, initialLocalRoot]);
 
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");

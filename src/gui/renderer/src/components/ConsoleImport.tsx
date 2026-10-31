@@ -14,8 +14,8 @@ import { DoneStep } from "./console-import/DoneStep";
 import { CloseIcon } from "./icons";
 import Modal from "./Modal";
 
-export default function ConsoleImport({ onClose, onImported, initialConsole, initialRomDirs, title }: Props): ReactElement {
-  const vm = useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs });
+export default function ConsoleImport({ onClose, onImported, initialConsole, initialRomDirs, initialNetworkRoot, initialLocalRoot, title }: Props): ReactElement {
+  const vm = useConsoleImport({ onClose, onImported, initialConsole, initialRomDirs, initialNetworkRoot, initialLocalRoot });
 
   return (
     <Modal size="wizard" onClose={onClose} busy={vm.phase === "importing"} style={{ maxHeight: "85vh", display: "flex", flexDirection: "column" }}>

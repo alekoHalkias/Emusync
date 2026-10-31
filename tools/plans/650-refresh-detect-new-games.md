@@ -14,7 +14,7 @@ Make Refresh locations also scan the console's local and network folders for ROM
 - **Recommendations**: none. GameGrid.tsx is already 702 lines, so the scan logic goes in its own module and GameGrid only gains a call, one state value and a button.
 
 ## Steps
-- [ ] 1. Let callers seed the wizard's roots: optional `initialNetworkRoot` and `initialLocalRoot` props, used in place of the saved config values in both detect paths of `useConsoleImport`, and passed through `ConsoleImport`. Without this a share found by Refresh would be imported as local-source when the config has no remembered network folder.
+- [x] 1. Let callers seed the wizard's roots: optional `initialNetworkRoot` and `initialLocalRoot` props, used in place of the saved config values in both detect paths of `useConsoleImport`, and passed through `ConsoleImport`. Without this a share found by Refresh would be imported as local-source when the config has no remembered network folder.
   - Files: src/gui/renderer/src/components/console-import/types.ts, useConsoleImport.ts, src/gui/renderer/src/components/ConsoleImport.tsx
   - Reuses: the existing `initialConsole` / `initialRomDirs` seeding and `setNetworkRoot` / `setLocalRomRoot`
   - New: two optional props - the wizard only reads roots from saved config today
@@ -54,3 +54,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 Auto-import without review; background or scheduled scans; scanning every console at once; naming the folders per result; a progress bar beyond the status text.
 
 ## Log
+Step 1: seeded in the initialConsole detect path only; the other detect path (console picked inside the wizard) has no caller-provided roots, so it keeps the saved-config behavior.
