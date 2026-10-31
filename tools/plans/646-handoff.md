@@ -4,7 +4,7 @@
 - Issue: #646
 - Branch: feature/646-console-import-ignore-list
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -88,3 +88,4 @@ See issue #646.
 - 2026-10-31 fplan: 8 steps written, visual_pattern=row action + inline unignore panel
 - tplan 1: files src/tests/test_config_roundtrip.py; reuses monkeypatch CONFIG_PATH + tmp_path pattern; no new fixtures
 - 2026-10-31 tplan: test_file=src/tests/test_config_roundtrip.py, 3 test cases defined
+- 2026-10-31 implement: started

@@ -3,7 +3,7 @@
 Issue: #646
 Branch: feature/646-console-import-ignore-list
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
