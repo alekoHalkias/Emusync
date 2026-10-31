@@ -44,10 +44,10 @@ See issue #644.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: src/tests/test_network_rom.py
+### Test Cases: v29->v30 migration; PUT stores share id; PUT omitting preserves; shares lists other devices only; match/mismatch data
+### Edge Cases: blank ids omitted; empty list; 403 on other device; fresh DB stamp
+### Integration Points: client logic covered by manual step 10; shareStatus kept pure
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -92,3 +92,5 @@ See issue #644.
 - fplan 6-8: design guide, manual verification, docs
 - 2026-10-30 fplan: 8 steps written, visual_pattern=Locations block + chip
 - 2026-10-30 merge: 3 conflicts resolved, 0 unresolved; merged plan tools/plans/644-merged.md (11 steps)
+- tplan 4: files src/tests/test_network_rom.py; reuses client fixture, AUTH, _device_auth, v28->v29 migration pattern; no new test infra
+- 2026-10-30 tplan: test_file=src/tests/test_network_rom.py, 5 test cases defined

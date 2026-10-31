@@ -23,7 +23,7 @@ Backend first, then IPC and API client, then UI.
   - Files: src/server/api/devices.py
   - Reuses: `update_device_console` `exclude_none` loop, `_auth`, `_get_store`
   - New: one route - nothing lists other devices' consoles
-- [ ] 4. Backend tests (real SQLite): v29 -> v30 migration keeps rows with '' default; PUT stores the ID and a PUT without it preserves it; `/consoles/{name}/shares` returns other devices only, skips blank IDs, mismatch case; 403 editing another device's console still holds.
+- [ ] 4. Backend tests (details in the Testing section; real SQLite, no mocks): v29 -> v30 migration keeps rows with '' default; PUT stores the ID and a PUT without it preserves it; `/consoles/{name}/shares` returns other devices only, skips blank IDs, mismatch case; 403 editing another device's console still holds.
   - Files: src/tests/test_integration.py
   - Reuses: `client` fixture, `AUTH` headers
 - [ ] 5. IPC `files:ensure-share-marker(folder)` -> `{ id: string | null, created: boolean }` (reads or creates `.emusync-share-id`; id null when absent and unwritable); preload and `emusync.d.ts`.
@@ -48,6 +48,23 @@ Backend first, then IPC and API client, then UI.
   - New: inline chip and disclosure
 - [ ] 10. Manual verification via `make dev-gui` (renderer has no JS test runner): marker created on first folder; second device with same share shows Same share and links games; different share shows warning and links nothing; read-only folder shows Unverified.
 - [ ] 11. Docs and guide: ARCHITECTURE.md (consoles column, `/consoles/{name}/shares`, IPC `files:ensure-share-marker`, hook list), CLAUDE.md (share identity via marker file and `network_share_id`, Locations block, `import_network_folder`), `.claude/frontend-design-guide.md` Locations/chip entry.
+
+## Testing
+- **Test File**: src/tests/test_network_rom.py (migration test beside the v28->v29 one; console and share tests beside the existing consoles API tests). Reuse: `client` fixture, `AUTH`, `_device_auth(device_id, name)` from conftest.py for the second device, the v28->v29 hand-built-table migration pattern. New: no new fixtures - a second `_device_auth` identity is enough.
+- **Test Cases**:
+  - test_v29_to_v30_migration_adds_share_id: hand-built v29 consoles table keeps its row, gains `network_share_id` = '' and `user_version` equals `_SCHEMA_VERSION`.
+  - test_console_put_stores_share_id: PUT with `network_share_id` is returned by `GET /devices/{id}/consoles`.
+  - test_console_put_without_share_id_preserves_it: a later PUT omitting the field keeps the stored ID.
+  - test_shares_returns_other_devices_only: device A and B both set an ID for GBA; A's `/consoles/GBA/shares` lists B (`device_id`, `device_name`, `share_id`) and not A.
+  - test_shares_match_and_mismatch: B with the same ID as A is a match, a different ID is listed with its own ID (client compares), data for the client `shareStatus` cases.
+- **Edge Cases**:
+  - Blank share IDs on other devices are omitted.
+  - Console name with no other device rows returns an empty list.
+  - Editing another device's console is still 403.
+  - Fresh DB stamps `_SCHEMA_VERSION` = 30 and includes the column.
+- **Integration Points**:
+  - Client-only logic (marker IPC, `shareStatus`, `linkShareGames`) has no JS runner: covered by step 10 manual checks. Keep `shareStatus` pure so a runner can cover it later.
+  - Run `make test-changed` before completing each backend step; full `make test` in ship.
 
 ## Checklist
 Schema bump: yes (29 -> 30). New IPC channel (+ emusync.d.ts): yes (`files:ensure-share-marker`). New CLI subcommand: no. Config/data file change: yes (`import_network_folder` key; `.emusync-share-id` marker on the share).
