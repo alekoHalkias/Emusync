@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #646
 - Branch: feature/646-console-import-ignore-list
-- PR: #PENDING
+- PR: #649
 - Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
@@ -73,7 +73,7 @@ See issue #646.
 
 ## 10. Ship
 ### Status: shipped
-### PR: #PENDING
+### PR: #649
 ### Server Sync: pending
 ### Doc Sync: pending
 
