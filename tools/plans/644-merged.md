@@ -34,7 +34,7 @@ Backend first, then IPC and API client, then UI.
   - Files: src/gui/renderer/src/api.ts
   - Reuses: `_fetch`, `getDeviceConsoles`, `updateDeviceConsole`, `_deviceId`
   - New: one wrapper and one accessor
-- [ ] 7. New hook `useNetworkShare(consoleLabel, networkRoot)` returning `{ status: none|checking|same|different|new|unverified, shareId, peer }`, using pure `shareStatus(localId, peers)` in helpers.ts; persists the share ID on this device's console row via get/update device console, passing existing fields back.
+- [x] 7. New hook `useNetworkShare(consoleLabel, networkRoot)` returning `{ status: none|checking|same|different|new|unverified, shareId, peer }`, using pure `shareStatus(localId, peers)` in helpers.ts; persists the share ID on this device's console row via get/update device console, passing existing fields back.
   - Files: src/gui/renderer/src/components/console-import/useNetworkShare.ts (new), helpers.ts
   - Reuses: step 5 and 6 APIs
   - New: separate file because useConsoleImport.ts exceeds 300 lines

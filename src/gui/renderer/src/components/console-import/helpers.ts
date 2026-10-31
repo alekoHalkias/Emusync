@@ -1,6 +1,6 @@
 // Pure helpers for the import wizard — no React, no IPC, no network.
 // Kept side-effect-free so they're trivially unit-testable.
-import type { Game, GameOverview } from "../../api";
+import type { ConsoleShare, Game, GameOverview } from "../../api";
 import type { ConsoleOption, Phase, RomEntry } from "./types";
 
 export const STEP_LABELS = ["Console", "Emulator", "ROMs"];
@@ -274,4 +274,21 @@ export function groupByDir(roms: RomEntry[]): Record<string, RomEntry[]> {
     (grouped[dir] = grouped[dir] ?? []).push(rom);
   }
   return grouped;
+}
+
+export type ShareStatus = "none" | "checking" | "same" | "different" | "new" | "unverified";
+
+/**
+ * Compare this device's marker-file share ID with the IDs other devices registered
+ * for the console (#644). `localId` null = marker unreadable and unwritable; `peers`
+ * null = server unreachable. Both mean the share can't be verified.
+ */
+export function shareStatus(
+  localId: string | null,
+  peers: ConsoleShare[] | null,
+): { status: ShareStatus; peer?: ConsoleShare } {
+  if (!localId || !peers) return { status: "unverified" };
+  if (peers.length === 0) return { status: "new" };
+  const match = peers.find(p => p.share_id === localId);
+  return match ? { status: "same", peer: match } : { status: "different", peer: peers[0] };
 }

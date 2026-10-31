@@ -101,3 +101,4 @@ See issue #644.
 - 2026-10-30 implement: step 4 done (5 backend tests)
 - 2026-10-30 implement: step 5 done (files:ensure-share-marker IPC; tsc errors shown are pre-existing)
 - 2026-10-30 implement: step 6 done (getConsoleShares, getDeviceId, share id type)
+- 2026-10-30 implement: step 7 done (useNetworkShare hook, pure shareStatus)
