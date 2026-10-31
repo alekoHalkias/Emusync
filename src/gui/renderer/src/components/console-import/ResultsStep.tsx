@@ -2,14 +2,15 @@ import { Fragment, useEffect, useState } from "react";
 import { findReplace, groupByDir, replaceUnderscores } from "./helpers";
 import type { RomEntry } from "./types";
 import type { ConsoleImportVM } from "./useConsoleImport";
-import { CheckIcon, CloseIcon, GlobeIcon, SaveIcon, UploadIcon } from "../icons";
+import { LocationsBlock } from "./LocationsBlock";
+import { CheckIcon, GlobeIcon, SaveIcon, UploadIcon } from "../icons";
 
 type StatusFilter = "all" | "new" | "linked" | "save" | "state";
 
 export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
   const {
-    error, allRomDirs, extraPaths, removedDirs, roms, selected,
-    names, selectedCount, pushSaves, pushStates, romSource, localRomRoot, nameWarnings,
+    error, roms, selected,
+    names, selectedCount, pushSaves, pushStates, romSource, nameWarnings,
   } = vm;
 
   // Search + filter are local to this step — they only narrow what's shown and
@@ -53,69 +54,7 @@ export function ResultsStep({ vm }: { vm: ConsoleImportVM }) {
     <>
       {error && <p role="alert" className="error-msg" style={{ marginBottom: 12 }}>{error}</p>}
 
-      {/* ROM source: local folder vs network share (issue #255) */}
-      <div style={{ marginBottom: 12, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13, fontWeight: 500 }}>ROM source</span>
-        <label className="ci-check">
-          <input type="radio" name="romsrc" checked={romSource === "local"} onChange={() => vm.setRomSource("local")} />
-          Local folder
-        </label>
-        <label className="ci-check">
-          <input type="radio" name="romsrc" checked={romSource === "network"} onChange={() => vm.setRomSource("network")} />
-          Network / shared drive
-        </label>
-      </div>
-      {romSource === "network" && (
-        <div style={{ marginBottom: 12, fontSize: 12 }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ color: "var(--text-muted)" }}>Local copy destination (for offline play):</span>
-            <button className="btn btn-ghost" style={{ fontSize: 12, padding: "2px 10px" }} onClick={vm.pickLocalRomRoot}>
-              Choose…
-            </button>
-          </div>
-          <div className="truncate" style={{ color: "var(--text-muted)", marginTop: 4 }}>
-            {localRomRoot || "Not set — you can still localize each game later from its settings."}
-          </div>
-        </div>
-      )}
-
-      {/* ROM folder list */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>ROM folders</span>
-          <button
-            className="btn btn-ghost"
-            style={{ fontSize: 12, padding: "2px 10px" }}
-            onClick={vm.addExtraPath}
-          >
-            + Add folder
-          </button>
-        </div>
-        {allRomDirs.length === 0 && (
-          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-            No ROM folder detected — add one above.
-          </p>
-        )}
-        {allRomDirs.map(p => (
-          <div key={p} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 4 }}>
-            <span className="truncate" style={{ flex: 1, color: "var(--text-muted)" }}>
-              {p}
-              {!extraPaths.includes(p) && !removedDirs.has(p) && (
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}> (detected)</span>
-              )}
-            </span>
-            {!removedDirs.has(p) && (
-              <button
-                className="btn btn-ghost"
-                style={{ fontSize: 11, padding: "1px 6px" }}
-                onClick={() => extraPaths.includes(p) ? vm.removeExtraPath(p) : vm.removeRomDir(p)}
-                title={extraPaths.includes(p) ? "Remove folder" : "Ignore this folder"}
-                aria-label={extraPaths.includes(p) ? "Remove folder" : "Ignore this folder"}
-              ><CloseIcon /></button>
-            )}
-          </div>
-        ))}
-      </div>
+      <LocationsBlock vm={vm} />
 
       {/* Search + filter (issue #273) */}
       {roms.length > 0 && (
