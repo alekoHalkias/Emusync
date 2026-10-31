@@ -70,3 +70,40 @@ def test_save_is_owner_only_and_leaves_no_tmp(tmp_path, monkeypatch):
     cfg_module.save(cfg_module.Config(server_pin="1234"))
     assert (path.stat().st_mode & 0o777) == 0o600
     assert not (tmp_path / "emusync.toml.tmp").exists()
+
+
+# ── device_id backup (#656) ───────────────────────────────────────────────────
+
+def _isolate(tmp_path, monkeypatch):
+    monkeypatch.setattr(cfg_module, "CONFIG_PATH", tmp_path / "emusync.toml")
+    monkeypatch.setenv("EMUSYNC_DATA_DIR", str(tmp_path / "data"))
+
+
+def test_save_writes_device_id_backup(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    cfg = cfg_module.Config()
+    cfg_module.save(cfg)
+    backup = tmp_path / "data" / "device_id"
+    assert backup.read_text() == cfg.device_id
+    assert (backup.stat().st_mode & 0o777) == 0o600
+    assert not (tmp_path / "data" / "device_id.tmp").exists()
+
+
+def test_missing_or_corrupt_toml_restores_device_id(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    cfg = cfg_module.Config()
+    cfg_module.save(cfg)
+
+    (tmp_path / "emusync.toml").unlink()
+    assert cfg_module.load().device_id == cfg.device_id
+
+    (tmp_path / "emusync.toml").write_text("server_port = [[[ not toml")
+    assert cfg_module.load().device_id == cfg.device_id
+
+
+def test_invalid_device_id_backup_is_ignored(tmp_path, monkeypatch):
+    _isolate(tmp_path, monkeypatch)
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "device_id").write_text("not-a-uuid")
+    import uuid
+    uuid.UUID(cfg_module.load().device_id)  # fresh, valid UUID

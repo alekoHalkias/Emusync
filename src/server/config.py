@@ -20,12 +20,33 @@ def _hostname() -> str:
     return platform.node() or "emusync-device"
 
 
+def _backup_path():
+    return paths.data_dir() / "device_id"
+
+
+def _restore_device_id() -> str:
+    """device_id from the data-dir backup, else a fresh UUID. Keeps a device's
+    identity when emusync.toml is lost or corrupt (#656)."""
+    try:
+        return str(uuid.UUID(_backup_path().read_text().strip()))
+    except (OSError, ValueError):
+        return str(uuid.uuid4())
+
+
+def _write_private(path, text: str) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
 @dataclass
 class Config:
     server_host: str = ""
     server_port: int = 8765
     data_dir: str = field(default_factory=lambda: str(paths.data_dir()))
-    device_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    device_id: str = field(default_factory=_restore_device_id)
     device_name: str = field(default_factory=_hostname)
     is_server: bool = False
     server_pin: str = ""
@@ -72,7 +93,7 @@ def load() -> Config:
         server_host=str(data.get("server_host", "")),
         server_port=_int(data.get("server_port"), 8765),
         data_dir=str(data.get("data_dir", str(paths.data_dir()))),
-        device_id=str(data.get("device_id", str(uuid.uuid4()))),
+        device_id=str(data.get("device_id") or _restore_device_id()),
         device_name=str(data.get("device_name", _hostname())),
         is_server=bool(data.get("is_server", False)),
         server_pin=str(data.get("server_pin", "")),
@@ -117,3 +138,10 @@ def save(cfg: Config) -> None:
     with os.fdopen(fd, "w") as f:
         tomlkit.dump(doc, f)
     os.replace(tmp, CONFIG_PATH)
+    try:
+        backup = _backup_path()
+        if not backup.exists() or backup.read_text().strip() != cfg.device_id:
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            _write_private(backup, cfg.device_id)
+    except OSError:
+        pass  # backup is best-effort; the toml is authoritative

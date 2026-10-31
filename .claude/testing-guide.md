@@ -50,3 +50,6 @@ No JS test runner and no main-process harness exist. Such changes are verified b
 
 ### Multi-device API tests
 Use `_device_auth(device_id, name)` from conftest.py as a second paired identity against the same `client`; assert per-device views (e.g. cross-device lookups exclude the caller).
+
+### Network-dependent lookups (#656)
+Give the module a path constant for the OS source (e.g. `server.arp._ARP_PATH`) and monkeypatch it to a tmp file of real-format sample text; real parsing and real SQLite run, no mocks. Platform-specific subprocess fallbacks are noted in the PR, not tested.

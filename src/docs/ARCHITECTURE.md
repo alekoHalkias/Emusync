@@ -228,6 +228,7 @@ The server prints real-time activity to stdout for operator visibility, every li
 
 - **Server PIN:** `server_pin` config field. All clients send `Authorization: Bearer {PIN}`.
 - **Device registration:** devices auto-register on first authenticated request via `X-Device-ID`/`X-Device-Name` headers. No explicit pair/token step.
+- **Device dedupe (#656):** `touch_device` resolves the client MAC from the server's ARP table (`server/arp.py:mac_for_ip`, on-link only), stores it in `devices.mac` (schema v32) and `merge_devices` re-keys any other device row with the same MAC into the requesting UUID (`_DEVICE_REFS` lists every device-id column). `Config` also backs `device_id` up to `<data_dir>/device_id` so a lost/corrupt `emusync.toml` keeps its identity.
 - **Blank PIN:** empty `server_pin` allows any request (open access — trusted LANs).
 - **Changing the PIN:** `server:change-pin` saves the new PIN and restarts the server; existing device records persist, they just need the new PIN to reconnect.
 - **Client connection:** on first launch the user enters host/port/PIN; renderer calls `configure(host, port, pin)` and `configureDevice(deviceId, deviceName)`. All API calls include PIN + device headers.
