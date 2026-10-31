@@ -18,7 +18,7 @@ Let users ignore ROMs in the console import results so they stop reappearing, an
   - Files: src/server/config.py, src/tests/test_config_roundtrip.py
   - Reuses: the `import_rom_source` field/load/save pattern; existing round-trip test style
   - New: none beyond the field
-- [ ] 2. Shared accessor `loadIgnoredRoms(consoleKey)` / `saveIgnoredRoms(consoleKey, paths)` over `window.emusync.config.load/save` (empty list removes the console's entry).
+- [x] 2. Shared accessor `loadIgnoredRoms(consoleKey)` / `saveIgnoredRoms(consoleKey, paths)` over `window.emusync.config.load/save` (empty list removes the console's entry).
   - Files: src/gui/renderer/src/components/console-import/ignoredRoms.ts (new)
   - Reuses: the `config.load()` / `config.save()` read-modify-write used by `removeExtraPath` in useConsoleImport.ts
   - New: one small module - both the wizard and ConsoleFoldersModal need it and neither owns the other
