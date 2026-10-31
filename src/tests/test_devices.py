@@ -523,3 +523,115 @@ def test_monitor_sweep_concurrent_with_presence_updates():
             and e["device_id"] == "stale-dev"
         ]
         assert len(stopped) == 1
+
+
+# ── import_remote_path cross-device validation (#642) ─────────────────────────
+
+@pytest.mark.asyncio
+async def test_put_console_import_remote_path_mismatch(client):
+    """Another device with a different import_remote_path must be rejected."""
+    from tests.conftest import _device_auth
+
+    # Seed device-2 with a different remote path for SNES
+    auth2 = _device_auth("device-xyz", "other-pc")
+    await client.post("/games", json={"name": "ActRaiser", "console": "SNES"}, headers=auth2)
+    r = await client.put(
+        "/games/actraiser/device",
+        json={"rom_path": "/roms/snes/actraiser.sfc", "save_path": "/saves/snes/actraiser.srm"},
+        headers=auth2,
+    )
+    assert r.status_code == 200
+    consoles2 = (await client.get(f"/devices/device-xyz/consoles", headers=auth2)).json()
+    c2 = consoles2[0]
+    body = {k: v for k, v in c2.items() if k not in ("id", "console_name")}
+    body["import_is_network"] = True
+    body["import_remote_path"] = "/mnt/nas/other"
+    r = await client.put(f"/devices/device-xyz/consoles/{c2['id']}", json=body, headers=auth2)
+    assert r.status_code == 200
+
+    # Now device-1 tries to set a different remote path for SNES
+    c = await _seed_console(client)
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name")}
+    body["import_is_network"] = True
+    body["import_remote_path"] = "/mnt/nas/different"
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    assert r.status_code == 400
+    assert "Remote path mismatch" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_put_console_import_remote_path_agree(client):
+    """Two devices setting the same import_remote_path must succeed."""
+    from tests.conftest import _device_auth
+
+    auth2 = _device_auth("device-xyz", "other-pc")
+    await client.post("/games", json={"name": "ActRaiser", "console": "SNES"}, headers=auth2)
+    r = await client.put(
+        "/games/actraiser/device",
+        json={"rom_path": "/roms/snes/actraiser.sfc", "save_path": "/saves/snes/actraiser.srm"},
+        headers=auth2,
+    )
+    assert r.status_code == 200
+    consoles2 = (await client.get(f"/devices/device-xyz/consoles", headers=auth2)).json()
+    c2 = consoles2[0]
+    body = {k: v for k, v in c2.items() if k not in ("id", "console_name")}
+    body["import_is_network"] = True
+    body["import_remote_path"] = "/mnt/nas/snes"
+    r = await client.put(f"/devices/device-xyz/consoles/{c2['id']}", json=body, headers=auth2)
+    assert r.status_code == 200
+
+    # Device-1 sets the same remote path
+    c = await _seed_console(client)
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name")}
+    body["import_is_network"] = True
+    body["import_remote_path"] = "/mnt/nas/snes"
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    assert r.status_code == 200
+    got = (await client.get(f"/devices/{DEVICE_ID}/consoles", headers=AUTH)).json()[0]
+    assert got["import_remote_path"] == "/mnt/nas/snes"
+
+
+@pytest.mark.asyncio
+async def test_put_console_empty_remote_path_skips_validation(client):
+    """Setting import_remote_path='' must bypass cross-device validation."""
+    from tests.conftest import _device_auth
+
+    # Device-2 sets a remote path
+    auth2 = _device_auth("device-xyz", "other-pc")
+    await client.post("/games", json={"name": "ActRaiser", "console": "SNES"}, headers=auth2)
+    r = await client.put(
+        "/games/actraiser/device",
+        json={"rom_path": "/roms/snes/actraiser.sfc", "save_path": "/saves/snes/actraiser.srm"},
+        headers=auth2,
+    )
+    assert r.status_code == 200
+    consoles2 = (await client.get(f"/devices/device-xyz/consoles", headers=auth2)).json()
+    c2 = consoles2[0]
+    body = {k: v for k, v in c2.items() if k not in ("id", "console_name")}
+    body["import_is_network"] = True
+    body["import_remote_path"] = "/mnt/nas/snes"
+    r = await client.put(f"/devices/device-xyz/consoles/{c2['id']}", json=body, headers=auth2)
+    assert r.status_code == 200
+
+    # Device-1 sets import_is_network=True but empty remote_path
+    c = await _seed_console(client)
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name")}
+    body["import_is_network"] = True
+    body["import_remote_path"] = ""
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_put_console_import_is_network_without_remote_path(client):
+    """Setting import_is_network=True with empty import_remote_path is valid."""
+    c = await _seed_console(client)
+    body = {k: v for k, v in c.items() if k not in ("id", "console_name")}
+    body["import_is_network"] = True
+    body["import_remote_path"] = ""
+    r = await client.put(f"/devices/{DEVICE_ID}/consoles/{c['id']}", json=body, headers=AUTH)
+    assert r.status_code == 200
+    got = (await client.get(f"/devices/{DEVICE_ID}/consoles", headers=AUTH)).json()[0]
+    assert got["import_is_network"] is True
+    assert got["import_remote_path"] == ""
+

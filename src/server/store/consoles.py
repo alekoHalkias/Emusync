@@ -29,6 +29,9 @@ def saves_path_to_states(path: str) -> str:
 def _console_from_row(row) -> Console:
     d = dict(row)
     d["device_extra_folders"] = json.loads(d["device_extra_folders"] or "[]")
+    # New fields added to Console in models.py (issue #642)
+    d["import_is_network"] = bool(d.get("import_is_network", False))
+    d["import_remote_path"] = str(d.get("import_remote_path", ""))
     return Console(**d)
 
 
@@ -40,12 +43,13 @@ class ConsoleMixin:
             """INSERT OR REPLACE INTO consoles
                (id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
                 device_state_folder, device_emulator, device_network_folder, device_local_folder,
-                device_extra_folders)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                device_extra_folders, import_is_network, import_remote_path)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (console.id, console.device_id, console.console_name, console.shortform_name,
              console.device_game_folder, console.device_save_folder, console.device_state_folder,
              console.device_emulator, console.device_network_folder, console.device_local_folder,
-             json.dumps(console.device_extra_folders)),
+             json.dumps(console.device_extra_folders), console.import_is_network,
+             console.import_remote_path),
         )
         self._conn.commit()
 
@@ -53,7 +57,7 @@ class ConsoleMixin:
         row = self._conn.execute(
             """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
                       device_state_folder, device_emulator, device_network_folder, device_local_folder,
-                      device_extra_folders
+                      device_extra_folders, import_is_network, import_remote_path
                FROM consoles WHERE device_id = ? AND console_name = ?""",
             (device_id, console_name),
         ).fetchone()
@@ -63,7 +67,7 @@ class ConsoleMixin:
         rows = self._conn.execute(
             """SELECT id, device_id, console_name, shortform_name, device_game_folder, device_save_folder,
                       device_state_folder, device_emulator, device_network_folder, device_local_folder,
-                      device_extra_folders
+                      device_extra_folders, import_is_network, import_remote_path
                FROM consoles WHERE device_id = ?""",
             (device_id,),
         ).fetchall()
@@ -91,6 +95,8 @@ def upsert_console_for_game(
     rom_folder_path: str,
     network_folder: str = "",
     local_folder: str = "",
+    import_is_network: bool = False,
+    import_remote_path: str = "",
 ) -> None:
     """Infer console folders/emulator from game paths and create-or-update the Console row.
 
@@ -99,6 +105,8 @@ def upsert_console_for_game(
     the per-console NAS mount + local-copy destination for a network import; they
     are persisted when provided and preserved (never blanked) when empty. A game
     folder the console does not cover yet is recorded in ``device_extra_folders`` (#629).
+    ``import_is_network``/``import_remote_path`` (issue #642) track whether this
+    console uses a network drive for imports and the canonical remote path.
     """
     emulator = ""
     game_folder = ""
@@ -147,6 +155,11 @@ def upsert_console_for_game(
             existing.device_network_folder = network_folder
         if local_folder:
             existing.device_local_folder = local_folder
+        # Issue #642: import flags
+        if import_is_network:
+            existing.import_is_network = True
+        if import_remote_path:
+            existing.import_remote_path = import_remote_path
         store.set_console(existing)
     else:
         store.set_console(Console(
@@ -160,4 +173,6 @@ def upsert_console_for_game(
             device_emulator=emulator,
             device_network_folder=network_folder,
             device_local_folder=local_folder,
+            import_is_network=import_is_network,
+            import_remote_path=import_remote_path,
         ))

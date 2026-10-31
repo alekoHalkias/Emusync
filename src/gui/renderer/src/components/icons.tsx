@@ -40,6 +40,14 @@ export function ChevronDownIcon({ size = 10, className }: IconProps): React.Reac
   );
 }
 
+export function ChevronRightIcon({ size = 10, className }: IconProps): React.ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 8 12" fill="none" className={className} aria-hidden="true">
+      <path d="M1.5 1L6.5 6L1.5 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // Replacements for the emoji / pictographic glyphs that used to stand in for
 // icons (#559). Stroke icons on a 16px grid that inherit currentColor and
 // default to 1em, so they occupy the same space as the glyph they replaced.

@@ -35,6 +35,8 @@ class Console:
     device_network_folder: str = ""  # this device's NAS mount for the console (issue #255)
     device_local_folder: str = ""    # this device's local copy destination (issue #255)
     device_extra_folders: list[str] = field(default_factory=list)  # additional ROM folders (issue #629)
+    import_is_network: bool = False        # library import from a network drive (#642)
+    import_remote_path: str = ""           # canonical remote path shared across devices (#642)
 
 
 @dataclass

@@ -63,6 +63,8 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
             "device_network_folder": c.device_network_folder,
             "device_local_folder": c.device_local_folder,
             "device_extra_folders": c.device_extra_folders,
+            "import_is_network": c.import_is_network,
+            "import_remote_path": c.import_remote_path,
         }
         for c in consoles
     ]
@@ -75,7 +77,9 @@ class ConsoleFoldersRequest(BaseModel):
     device_emulator: str = ""
     device_network_folder: str = ""
     device_local_folder: str = ""
-    device_extra_folders: Optional[list[str]] = None  # None = keep what is stored (#629)
+    device_extra_folders: Optional[list[str]] = None
+    import_is_network: bool = False
+    import_remote_path: str = ""
 
 
 @router.put("/devices/{target_device_id}/consoles/{console_id}")
@@ -83,14 +87,35 @@ def update_device_console(
     target_device_id: str, console_id: str, req: ConsoleFoldersRequest,
     device_id: str = Depends(_auth),
 ) -> dict:
-    """Edit one of the caller's own console rows (#539). Replaces all six folder fields;
-    ``device_extra_folders`` (#629) is replaced only when sent, and is cleaned up first."""
+    """Edit one of the caller's own console rows (#539, #642).
+
+    Cross-device validation: when ``import_remote_path`` is set, all other
+    devices must agree on the same remote path for the same console name.
+    """
     if target_device_id != device_id:
         raise HTTPException(status_code=403, detail="Can only edit this device's consoles")
     store = _get_store()
     console = next((c for c in store.list_consoles(device_id) if c.id == console_id), None)
     if not console:
         raise HTTPException(status_code=404, detail="Console not found")
+
+    # Cross-device validation for import_remote_path (#642).
+    if req.import_remote_path:
+        for other_device in store.list_devices():
+            if other_device.id == device_id:
+                continue
+            for other_console in store.list_consoles(other_device.id):
+                if (other_console.console_name == console.console_name
+                        and other_console.import_remote_path
+                        and other_console.import_remote_path != req.import_remote_path):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Remote path mismatch for {console.console_name}: "
+                            f"another device uses '{other_console.import_remote_path}'"
+                        ),
+                    )
+
     for field, value in req.model_dump(exclude_none=True).items():
         setattr(console, field, value)
     if req.device_extra_folders is not None:
