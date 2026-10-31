@@ -74,8 +74,8 @@ See issue #646.
 ## 10. Ship
 ### Status: shipped
 ### PR: #649
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -98,3 +98,4 @@ See issue #646.
 - 2026-10-31 implement: step 8 done (ARCHITECTURE.md section; CLAUDE.md rule added in step 1)
 - 2026-10-31 implement: step 7 done (GUI behavior confirmed by user)
 - 2026-10-31 ship: tests pass (566 passed, 3 skipped)
+- 2026-10-31 ship: server sync done; docs updated during implement
