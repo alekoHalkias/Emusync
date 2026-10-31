@@ -5,10 +5,12 @@ import {
   getGame,
   getGameNetworkSource,
   listGameDevices,
+  listOutgoingPullRequests,
   setGameDevice,
   whoami,
   type DeviceForGame,
   type GameNetworkSource,
+  type PullRequestRow,
 } from "../api";
 import ConsoleImport from "./ConsoleImport";
 import Modal from "./Modal";
@@ -46,6 +48,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
   const [consoleKey, setConsoleKey] = useState<string | null>(null);
   const [networkMount, setNetworkMount] = useState<string | null>(null);
   const [gameNetworkSource, setGameNetworkSource] = useState<GameNetworkSource | null>(null);
+  const [uploadRequest, setUploadRequest] = useState<PullRequestRow | null>(null);
   const autoAttempted = useRef(false);
 
   useEffect(() => {
@@ -58,6 +61,8 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
         ]);
         setSources(devs.filter(d => d.rom_path));
         if (netSource) setGameNetworkSource(netSource);
+        const outgoing = await listOutgoingPullRequests().catch(() => [] as PullRequestRow[]);
+        setUploadRequest(outgoing.find(r => r.slug === slug && r.kind === "network-upload") ?? null);
 
         let foundKey: string | null = null;
         let foundMount: string | null = null;
@@ -83,6 +88,17 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
                 setNetworkMount(recentFolders[0]);
               }
             } catch { /* no config */ }
+            // Same share ID as the game's source console (#660): use this device's own
+            // mount for it, no setup needed. Takes precedence over remembered folders.
+            if (netSource?.share_id) {
+              try {
+                const { device_id } = await whoami();
+                const mine = (await getDeviceConsoles(device_id)).find(
+                  c => c.console_name === game.console && c.network_share_id === netSource.share_id && c.device_network_folder,
+                );
+                if (mine) { foundMount = mine.device_network_folder ?? null; setNetworkMount(foundMount); }
+              } catch { /* fall back to remembered folder */ }
+            }
           }
         }
 
@@ -191,6 +207,23 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
     }
   }
 
+  async function requestUpload(): Promise<void> {
+    setError(null); setStatus(null);
+    setBusy(true);
+    try {
+      const source = sources[0];
+      if (!source) { setError("No device has this ROM."); return; }
+      await createPullRequest(slug, source.id, "", "network-upload");
+      const outgoing = await listOutgoingPullRequests().catch(() => [] as PullRequestRow[]);
+      setUploadRequest(outgoing.find(r => r.slug === slug && r.kind === "network-upload") ?? null);
+      setStatus(`Requested. ${source.name} will upload it to the network drive the next time EmuSync starts there.`);
+    } catch (e: any) {
+      setError(e.message || "Upload request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <Modal size="md" onClose={onClose}>
@@ -247,6 +280,28 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
                   : "Pull ROM here"}
               </button>
             </div>
+
+            {/* Option C — ask the owning device to put its local ROM on the network drive (#660) */}
+            {!gameNetworkSource && sources.length > 0 && (
+              <div style={{ border: "2px solid var(--border)", borderRadius: 8, padding: 12, marginTop: 8 }}>
+                <div style={{ fontWeight: 500, fontSize: 14 }}><GlobeIcon /> Ask {sources[0].name} to upload it</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 8px" }}>
+                  Put the ROM on this console's network drive so every device on it can play it. It happens the next time EmuSync starts on {sources[0].name}.
+                </div>
+                <button
+                  className="btn btn-ghost"
+                  disabled={busy || uploadRequest?.status === "pending"}
+                  onClick={requestUpload}
+                >
+                  {uploadRequest?.status === "pending" ? "Requested" : "Request upload"}
+                </button>
+                {uploadRequest?.status === "failed" && (
+                  <p style={{ color: "var(--red)", fontSize: 12, marginTop: 8 }}>
+                    The last request failed or was declined.
+                  </p>
+                )}
+              </div>
+            )}
 
             {error && <p style={{ color: "var(--red)", fontSize: 12, marginTop: 12 }}>{error}</p>}
             {status && <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 12 }}>{status}</p>}

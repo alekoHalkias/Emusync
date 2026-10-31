@@ -115,3 +115,4 @@ Network-drive games become playable on any device with the same share ID, and de
 - 2026-10-31 implement: step 9 done (api.ts helpers for upload requests)
 - 2026-10-31 implement: step 10 done (rom:fulfillNetworkUpload IPC)
 - 2026-10-31 implement: step 11 done (NetworkUploadPrompt banner)
+- 2026-10-31 implement: step 12 done (NetworkPlaySetup share-ID mount and upload request)
