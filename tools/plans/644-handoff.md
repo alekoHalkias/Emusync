@@ -30,9 +30,9 @@ See issue #644.
 ### Backwards Compatibility: non-breaking (additive column; import_remote_path ignored not dropped). PR #643 closed as superseded (user decision); main has no import_remote_path, migration is v30, LibraryImport.tsx needs no remote-path removal.
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: settings-form row pattern (#629), inline chip and status line
+### Visual Pattern: Locations block with collapsed folder list
+### Recommendations: derive romSource from networkRoot so downstream code is untouched; new hook useNetworkShare
 
 ## 4. Backend Plan
 ### Design Alignment: additive consoles column per schema-evolution recipe; preserve-on-None PUT field; one thin read route
@@ -84,3 +84,10 @@ See issue #644.
 - 2026-10-30 issue: workflow initialized
 - 2026-10-30 design: scope=backend+ui, plan_target=both, difficulty=7/10, breaking=no; #643 closed as superseded
 - 2026-10-30 bplan: 5 steps written, backend_pattern=additive column + share-peer lookup; auto-link client-side
+- fplan 1: files files.ts, preload.ts, emusync.d.ts; reuses files:exists handler pattern; new handler, no marker code exists
+- fplan 2: files api.ts; reuses _fetch, device console wrappers; new getConsoleShares + getDeviceId accessor
+- fplan 3: files useNetworkShare.ts (new); reuses api wrappers and window.emusync.files; separate file as useConsoleImport exceeds 300 lines
+- fplan 4: files useConsoleImport.ts; reuses scanRoots/dedupeAndLink linkedSlug, resolveImportPaths; importOne extracted, linkShareGames new
+- fplan 5: files ResultsStep.tsx; reuses folder list markup and vm handlers; inline chip + disclosure
+- fplan 6-8: design guide, manual verification, docs
+- 2026-10-30 fplan: 8 steps written, visual_pattern=Locations block + chip

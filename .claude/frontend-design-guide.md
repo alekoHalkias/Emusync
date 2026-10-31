@@ -58,3 +58,7 @@
 - Choice fields use a plain `<select>` including a blank "Not set" option and the stored value when it is not in the list
 - List editors: one row per item (text + `btn btn-ghost` Remove), `Add` ghost button below, saved by the form's single Save
 
+## Locations block and status chip (#644)
+- Optional sources are rows in one block (label, path, `btn btn-ghost` Choose, clear), never a radio toggle; secondary lists collapse behind an "N items" disclosure.
+- Status chip: small inline span after the path; neutral muted, match uses the accent, mismatch `var(--color-danger, #e5484d)`. Outcome text uses the inline status line, not a modal.
+
