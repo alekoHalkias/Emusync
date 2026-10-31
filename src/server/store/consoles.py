@@ -69,6 +69,20 @@ class ConsoleMixin:
         ).fetchall()
         return [_console_from_row(r) for r in rows]
 
+    def list_console_shares(self, console_name: str, exclude_device_id: str) -> list[dict]:
+        """Share IDs other devices registered for *console_name* (#644).
+
+        Equal IDs mean the same remote location even when the mount paths differ.
+        Blank IDs (no share registered) are omitted.
+        """
+        rows = self._conn.execute(
+            """SELECT c.device_id, d.name AS device_name, c.network_share_id AS share_id
+               FROM consoles c JOIN devices d ON d.id = c.device_id
+               WHERE c.console_name = ? AND c.device_id != ? AND c.network_share_id != ''""",
+            (console_name, exclude_device_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     def remove_console(self, console_id: str) -> None:
         self._conn.execute("DELETE FROM consoles WHERE id = ?", (console_id,))
         self._conn.commit()

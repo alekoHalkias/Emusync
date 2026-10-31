@@ -96,3 +96,4 @@ See issue #644.
 - 2026-10-30 tplan: test_file=src/tests/test_network_rom.py, 5 test cases defined
 - 2026-10-30 implement: started; Status set implementing in merged, bplan, fplan plans and handoff (hook reads first glob match)
 - 2026-10-30 implement: step 1 done (network_share_id column, v30 migration)
+- 2026-10-30 implement: step 2 done (list_console_shares store method)

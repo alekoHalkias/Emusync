@@ -15,7 +15,7 @@ Backend first, then IPC and API client, then UI.
   - Files: src/server/store/models.py, src/server/store/schema.py, src/server/store/consoles.py
   - Reuses: `_try` ALTER pattern, `_console_from_row`, existing set/get/list_console literals
   - New: none
-- [ ] 2. Store method `list_console_shares(console_name, exclude_device_id)` returning `[{device_id, device_name, share_id}]` (other devices, non-empty IDs only).
+- [x] 2. Store method `list_console_shares(console_name, exclude_device_id)` returning `[{device_id, device_name, share_id}]` (other devices, non-empty IDs only).
   - Files: src/server/store/consoles.py
   - Reuses: join pattern of `get_network_source_for_game`
   - New: one query - no cross-device console lookup exists
