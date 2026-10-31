@@ -4,7 +4,7 @@
 - Issue: #666
 - Branch: feature/666-skip-duplicate-roms-on-import
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -31,9 +31,9 @@ console-import/helpers.ts dedupeAndLink; useConsoleImport.ts linkShareGames; sca
 ### Backwards Compatibility: no breaking changes
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: no visual change
+### Visual Pattern: none
+### Recommendations: none
 
 ## 4. Backend Plan
 ### Design Alignment: TBD
@@ -56,7 +56,9 @@ console-import/helpers.ts dedupeAndLink; useConsoleImport.ts linkShareGames; sca
 TBD
 
 ## 8. Implementation Steps
-### Steps: TBD
+1. helpers.ts dedupeAndLink: crossMatch slug in thisDeviceConfigs -> existingGameSlug. Reuses existing skip path; no new code.
+2. Tests: no renderer harness; manual + tsc.
+3. Docs: none.
 
 ## 9. Review
 TBD
@@ -73,3 +75,4 @@ none
 ## 12. Log
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
+- 2026-10-31 fplan: 3 steps written, visual_pattern=none
