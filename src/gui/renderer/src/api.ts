@@ -130,6 +130,7 @@ export type GameNetworkSource = {
   save_path: string;
   state_path: string;
   rom_folder_path: string;
+  share_id: string;           // source console's network share ID (#644); '' when unregistered
 };
 export const getGameNetworkSource = (slug: string): Promise<GameNetworkSource> =>
   _fetch("GET", `/games/${slug}/network-source`);
@@ -261,8 +262,18 @@ export const getDeviceConsoles = (deviceId: string): Promise<DeviceConsole[]> =>
   _fetch("GET", `/devices/${deviceId}/consoles`);
 export const getDeviceGameDevices = (deviceId: string): Promise<DeviceGameDevice[]> =>
   _fetch("GET", `/devices/${deviceId}/game-devices`);
-export const createPullRequest = (slug: string, fromDeviceId: string, destinationPath: string): Promise<{ pull_request_id: string; status: string; source_online: boolean }> =>
-  _fetch("POST", `/games/${slug}/rom-pull-request`, { from_device_id: fromDeviceId, destination_path: destinationPath });
+export const createPullRequest = (slug: string, fromDeviceId: string, destinationPath: string, kind?: string): Promise<{ pull_request_id: string; status: string; source_online: boolean }> =>
+  _fetch("POST", `/games/${slug}/rom-pull-request`, { from_device_id: fromDeviceId, destination_path: destinationPath, ...(kind ? { kind } : {}) });
+
+/** A cross-device ROM request (#660). Pending = this device is the source; outgoing = this device asked. */
+export type PullRequestRow = {
+  id: string; slug: string; game_name: string; kind: string;
+  to_device_id?: string; from_device_id?: string; status?: string; requested_at: string;
+};
+export const listPendingPullRequests = (): Promise<PullRequestRow[]> =>
+  _fetch("GET", "/rom-pull-requests/pending");
+export const listOutgoingPullRequests = (): Promise<PullRequestRow[]> =>
+  _fetch("GET", "/rom-pull-requests/outgoing");
 
 // ── save conflicts (issue #243) ────────────────────────────────────────────────
 
