@@ -4,7 +4,7 @@
 - Issue: #650
 - Branch: feature/650-refresh-detect-new-games
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -85,3 +85,4 @@ See issue #650.
 - 2026-10-31 fplan: 5 steps written, visual_pattern=status line + Review and import button
 - tplan: no automated test file (renderer only); manual cases defined in plan step 4 and Testing section
 - 2026-10-31 tplan: test_file=none (manual), 5 test cases defined
+- 2026-10-31 implement: started

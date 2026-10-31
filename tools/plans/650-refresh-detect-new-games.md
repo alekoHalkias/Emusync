@@ -3,7 +3,7 @@
 Issue: #650
 Branch: feature/650-refresh-detect-new-games
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
