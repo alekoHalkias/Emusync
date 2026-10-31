@@ -484,6 +484,9 @@ def _handle_network_upload(client: "SyncClient", pull_request_id: str, slug: str
         netrom.upload_to_network(client, cfg.device_id, slug)
         client.complete_pull_request(pull_request_id, status="fulfilled")
         return True
+    except netrom.ShareUnavailable as e:
+        log(f"  Network drive not available for '{game_name}' ({e}); will retry next start")
+        return False
     except Exception as e:
         log(f"  Failed to upload '{game_name}' to the network drive: {e}")
         try:

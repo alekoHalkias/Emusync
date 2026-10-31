@@ -228,7 +228,8 @@ def fulfill_network_upload(request_id: str, decline: bool) -> None:
     try:
         master = netrom.upload_to_network(client, cfg.device_id, pr["slug"])
     except Exception as exc:
-        client.complete_pull_request(request_id, status="failed")
+        if not isinstance(exc, netrom.ShareUnavailable):  # unmounted share: leave pending to retry
+            client.complete_pull_request(request_id, status="failed")
         click.echo(f"Upload failed: {exc}", err=True)
         sys.exit(1)
     client.complete_pull_request(request_id, status="fulfilled")

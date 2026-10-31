@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #660
 - Branch: feature/660-network-rom-sharing
-- PR: none
-- Status: implemented
+- PR: #663
+- Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
 
@@ -80,13 +80,13 @@ Network-drive games become playable on any device with the same share ID, and de
 ### Steps: see tools/plans/660-merged.md (14 steps, backend 1-8, frontend 9-12, verify 13, docs 14)
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 1 correctness (medium): daemon marked a request failed permanently when the NAS was unmounted at start. Fixed: ShareUnavailable leaves it pending; regression test added.
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #663
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -117,3 +117,4 @@ Network-drive games become playable on any device with the same share ID, and de
 - 2026-10-31 implement: step 11 done (NetworkUploadPrompt banner)
 - 2026-10-31 implement: step 12 done (NetworkPlaySetup share-ID mount and upload request)
 - 2026-10-31 implement: step 14 done (docs for network upload requests)
+- 2026-10-31 review: 1 findings, blocked=no (fixed)

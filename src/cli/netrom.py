@@ -270,6 +270,10 @@ def upload_to_master(
 SHARE_MARKER = ".emusync-share-id"
 
 
+class ShareUnavailable(LocalizeError):
+    """The network folder is not reachable right now (unmounted NAS); worth retrying later."""
+
+
 def upload_to_network(client, device_id: str, slug: str) -> str:
     """Put this device's local-only ROM for *slug* on its console's network drive (#660).
 
@@ -290,7 +294,7 @@ def upload_to_network(client, device_id: str, slug: str) -> str:
         raise LocalizeError("this console has no network folder configured on this device")
     root = con["device_network_folder"]
     if not path_is_reachable(os.path.join(root, SHARE_MARKER)):
-        raise LocalizeError("network folder is unreachable or has no share marker")
+        raise ShareUnavailable("network folder is unreachable or has no share marker")
     with open(os.path.join(root, SHARE_MARKER), encoding="utf-8") as f:
         marker = f.read().strip()
     if not marker or marker != con.get("network_share_id"):

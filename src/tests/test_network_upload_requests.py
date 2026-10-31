@@ -144,6 +144,15 @@ def test_daemon_leaves_oversize_request_pending(monkeypatch, live_server, tmp_pa
     assert b._client.get(b._url("/rom-pull-requests/outgoing")).json()[0]["status"] == "pending"
 
 
+def test_daemon_leaves_request_pending_when_share_unmounted(monkeypatch, live_server, tmp_path):
+    a, _, share = _owner(live_server, tmp_path)
+    (share / netrom.SHARE_MARKER).unlink()
+    _cfg(monkeypatch, tmp_path, live_server, 512)
+    b, res = _request(live_server)
+    assert not _handle_network_upload(a, res["pull_request_id"], "metroid", "Metroid", log=lambda m: None)
+    assert b._client.get(b._url("/rom-pull-requests/outgoing")).json()[0]["status"] == "pending"
+
+
 def test_daemon_marks_failed_on_marker_mismatch(monkeypatch, live_server, tmp_path):
     a, _, _ = _owner(live_server, tmp_path, marker="other-share")
     _cfg(monkeypatch, tmp_path, live_server, 512)
