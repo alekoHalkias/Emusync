@@ -37,6 +37,16 @@ Remove the approval stop from fplan, bplan and tplan, and have tplan end with on
 - [ ] 6. Tests: none - markdown-only workflow change, no code path.
 - [ ] 7. Docs: SKILLS_OVERVIEW.md covered in step 5; CLAUDE.md and docs/ARCHITECTURE.md need no change - they do not describe per-stage approvals.
 
+## Testing
+- **Test File**: none - markdown-only change, no executable code path.
+- **Test Cases**:
+  - Verification (manual, after step 5): `grep -n "stop" .claude/skills/{fplan,bplan,tplan}/SKILL.md` shows the approval stop only in tplan step 13; `grep -n "Outline\|Summary" .claude/skills/{tplan,issue}/SKILL.md` finds the new fields.
+- **Edge Cases**:
+  - Fix-plan mode in all three skills still invokes `implement` without approval.
+  - Design step 9 routing (bplan, fplan, merge, tplan) still reads consistently with the new handoff lines.
+- **Integration Points**:
+  - `make test-changed` still passes (no code touched).
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

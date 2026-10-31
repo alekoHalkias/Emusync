@@ -50,10 +50,17 @@ Three approval stops interrupt the flow and show partial plans; one review point
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: none (markdown-only)
+### Test Cases: grep checks that only tplan step 13 retains an approval stop and that Outline/Summary fields exist in tplan and issue skills
+### Edge Cases: fix-plan mode unchanged in all three skills; design step 9 routing still consistent
+### Integration Points: make test-changed passes (no code touched)
+### Outline
+- Backend: n/a
+- Frontend: n/a
+- Workflow skills: (1) bplan/fplan step 13 continue without approval; (2) tplan step 13 writes outline + summary into this section, then asks once; (3) merge hands off to tplan without approval; (4) issue handoff template gains Outline/Summary; (5) SKILLS_OVERVIEW.md updated.
+- Tests: none; grep verification only.
+### Summary
+Planning skills no longer ask for approval at each stage; tplan ends with one outline and one-line summary for a single approval.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -91,3 +98,4 @@ Three approval stops interrupt the flow and show partial plans; one review point
 - 2026-10-31 issue: workflow initialized
 - 2026-10-31 design: scope=workflow-docs, plan_target=bplan, difficulty=2/10, breaking=no
 - 2026-10-31 bplan: 5 steps written, backend_pattern=n/a (workflow markdown)
+- 2026-10-31 tplan: test_file=none, 0 test cases (grep verification); outline written
