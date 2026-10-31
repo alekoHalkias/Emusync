@@ -211,3 +211,104 @@ def test_v28_to_v29_migration_adds_extra_folders(tmp_path):
     row = conn.execute("SELECT * FROM consoles").fetchone()
     assert row["device_game_folder"] == "/roms/gba"
     assert row["device_extra_folders"] == "[]"
+
+
+# ── network share identity (#644) ────────────────────────────────────────────
+
+async def _console_row(client, headers, slug):
+    """Create the caller's GBA console row via a game config, return (device_id, row)."""
+    await client.put(f"/games/{slug}/device", json={
+        "rom_path": "/mnt/nas/GBA/g.gba", "save_path": "/saves/g.srm",
+        "rom_folder_path": "/mnt/nas/GBA", "rom_source": "network",
+        "device_network_folder": "/mnt/nas/GBA",
+    }, headers=headers)
+    dev = (await client.get("/whoami", headers=headers)).json()["device_id"]
+    rows = (await client.get(f"/devices/{dev}/consoles", headers=headers)).json()
+    return dev, next(c for c in rows if c["console_name"] == "GBA")
+
+
+async def _set_share(client, headers, dev, row, share_id):
+    body = {k: row.get(k, "") for k in (
+        "device_game_folder", "device_save_folder", "device_state_folder",
+        "device_emulator", "device_network_folder", "device_local_folder")}
+    if share_id is not None:
+        body["network_share_id"] = share_id
+    r = await client.put(f"/devices/{dev}/consoles/{row['id']}", json=body, headers=headers)
+    assert r.status_code == 200
+    return (await client.get(f"/devices/{dev}/consoles", headers=headers)).json()
+
+
+def test_v29_to_v30_migration_adds_share_id(tmp_path):
+    """A v29 consoles table gains network_share_id as '' without losing rows (#644)."""
+    from server.store import schema
+
+    conn = sqlite3.connect(str(tmp_path / "old.db"))
+    conn.row_factory = sqlite3.Row
+    conn.execute("""CREATE TABLE consoles (
+        id TEXT PRIMARY KEY, device_id TEXT NOT NULL, console_name TEXT NOT NULL,
+        shortform_name TEXT NOT NULL, device_game_folder TEXT NOT NULL DEFAULT '')""")
+    conn.execute("INSERT INTO consoles VALUES ('c1', 'd1', 'GBA', 'gba', '/roms/gba')")
+    conn.execute("PRAGMA user_version = 29")
+    conn.commit()
+
+    schema._migrate(conn, from_version=29)
+
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == schema._SCHEMA_VERSION
+    row = conn.execute("SELECT * FROM consoles").fetchone()
+    assert row["device_game_folder"] == "/roms/gba"
+    assert row["network_share_id"] == ""
+
+
+@pytest.mark.asyncio
+async def test_console_put_stores_and_preserves_share_id(client):
+    slug = await _add_game(client)
+    dev, row = await _console_row(client, AUTH, slug)
+    assert row["network_share_id"] == ""
+    rows = await _set_share(client, AUTH, dev, row, "share-1")
+    assert rows[0]["network_share_id"] == "share-1"
+    # A PUT that omits the field keeps the stored ID.
+    rows = await _set_share(client, AUTH, dev, rows[0], None)
+    assert rows[0]["network_share_id"] == "share-1"
+
+
+@pytest.mark.asyncio
+async def test_console_shares_lists_other_devices_only(client):
+    slug = await _add_game(client)
+    other = _device_auth("dev-b", "steam-deck")
+    dev_a, row_a = await _console_row(client, AUTH, slug)
+    dev_b, row_b = await _console_row(client, other, slug)
+    await _set_share(client, AUTH, dev_a, row_a, "share-1")
+    await _set_share(client, other, dev_b, row_b, "share-1")
+
+    r = await client.get("/consoles/GBA/shares", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json() == [{"device_id": dev_b, "device_name": "steam-deck", "share_id": "share-1"}]
+
+
+@pytest.mark.asyncio
+async def test_console_shares_mismatch_and_blank(client):
+    slug = await _add_game(client)
+    other = _device_auth("dev-b", "steam-deck")
+    dev_a, row_a = await _console_row(client, AUTH, slug)
+    dev_b, row_b = await _console_row(client, other, slug)
+    await _set_share(client, AUTH, dev_a, row_a, "share-1")
+
+    # Device B has no share registered yet: omitted from A's view.
+    assert (await client.get("/consoles/GBA/shares", headers=AUTH)).json() == []
+
+    # B registers a different share: listed with its own ID so the client sees a mismatch.
+    await _set_share(client, other, dev_b, row_b, "share-2")
+    ids = [s["share_id"] for s in (await client.get("/consoles/GBA/shares", headers=AUTH)).json()]
+    assert ids == ["share-2"]
+    # Unknown console: empty list.
+    assert (await client.get("/consoles/NOPE/shares", headers=AUTH)).json() == []
+
+
+@pytest.mark.asyncio
+async def test_cannot_edit_other_devices_console_share_id(client):
+    slug = await _add_game(client)
+    other = _device_auth("dev-b", "steam-deck")
+    dev_b, row_b = await _console_row(client, other, slug)
+    r = await client.put(f"/devices/{dev_b}/consoles/{row_b['id']}",
+                         json={"network_share_id": "x"}, headers=AUTH)
+    assert r.status_code == 403

@@ -23,7 +23,7 @@ Backend first, then IPC and API client, then UI.
   - Files: src/server/api/devices.py
   - Reuses: `update_device_console` `exclude_none` loop, `_auth`, `_get_store`
   - New: one route - nothing lists other devices' consoles
-- [ ] 4. Backend tests (details in the Testing section; real SQLite, no mocks): v29 -> v30 migration keeps rows with '' default; PUT stores the ID and a PUT without it preserves it; `/consoles/{name}/shares` returns other devices only, skips blank IDs, mismatch case; 403 editing another device's console still holds.
+- [x] 4. Backend tests (details in the Testing section; real SQLite, no mocks): v29 -> v30 migration keeps rows with '' default; PUT stores the ID and a PUT without it preserves it; `/consoles/{name}/shares` returns other devices only, skips blank IDs, mismatch case; 403 editing another device's console still holds.
   - Files: src/tests/test_integration.py
   - Reuses: `client` fixture, `AUTH` headers
 - [ ] 5. IPC `files:ensure-share-marker(folder)` -> `{ id: string | null, created: boolean }` (reads or creates `.emusync-share-id`; id null when absent and unwritable); preload and `emusync.d.ts`.
