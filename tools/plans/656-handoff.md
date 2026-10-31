@@ -101,3 +101,5 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 tplan: test_file=src/tests/test_devices.py + test_config_roundtrip.py, 9 test cases defined
 - 2026-10-31 implement: step 1 done (schema v32 devices.mac)
 - 2026-10-31 implement: step 2 done (server/arp.py mac_for_ip)
+- 2026-10-31 implement: step 3 done (merge_devices + _DEVICE_REFS)
+- 2026-10-31 implement: step 4 done (touch_device resolves MAC and merges)

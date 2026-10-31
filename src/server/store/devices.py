@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from server import arp
 from server.store.models import Device
 
 # ensure_device / touch_device run on every authenticated request. Under WAL's
@@ -11,6 +12,21 @@ from server.store.models import Device
 # only write when something actually changed; last_seen_at is coarse-grained to
 # this many seconds, which is well under the 5-min offline threshold in api.py.
 _TOUCH_THROTTLE_SECONDS = 30
+
+
+# Every (table, column) that holds a device id, for merge_devices (#656). Keep in
+# sync with schema.py when a table gains a device column.
+_DEVICE_REFS = (
+    ("consoles", "device_id"), ("game_devices", "device_id"), ("saves", "device_id"),
+    ("states", "device_id"), ("locks", "device_id"), ("events", "device_id"),
+    ("rom_transfers", "from_device_id"), ("rom_transfers", "to_device_id"),
+    ("rom_pull_requests", "from_device_id"), ("rom_pull_requests", "to_device_id"),
+    ("switch_mods", "pushed_by"), ("save_sync_baseline", "device_id"),
+    ("console_saves", "device_id"), ("console_save_history", "device_id"),
+    ("console_save_sync_baseline", "device_id"),
+    ("save_conflicts", "winner_device_id"), ("save_conflicts", "loser_device_id"),
+    ("console_save_conflicts", "winner_device_id"), ("console_save_conflicts", "loser_device_id"),
+)
 
 
 class DeviceMixin:
@@ -58,9 +74,30 @@ class DeviceMixin:
         ).fetchall()
         return [Device(**dict(r)) for r in rows]
 
-    def touch_device(self, device_id: str, ip: str) -> None:
-        """Record last_ip / last_seen_at, throttled so a busy device doesn't
-        commit on every request (see _TOUCH_THROTTLE_SECONDS)."""
+    def merge_devices(self, old_id: str, new_id: str) -> None:
+        """Re-key every row of *old_id* to *new_id*, then drop *old_id*.
+
+        Rows that would collide with one *new_id* already has (UNIQUE/PK) are
+        dropped: the surviving device's data wins. *new_id* must already exist,
+        so FK checks pass without deferring.
+        """
+        if old_id == new_id:
+            return
+        c = self._conn
+        for table, col in _DEVICE_REFS:
+            c.execute(f"UPDATE OR IGNORE {table} SET {col} = ? WHERE {col} = ?", (new_id, old_id))
+            c.execute(f"DELETE FROM {table} WHERE {col} = ?", (old_id,))
+        c.execute("DELETE FROM devices WHERE id = ?", (old_id,))
+        c.commit()
+
+    def touch_device(self, device_id: str, ip: str) -> list[str]:
+        """Record last_ip / last_seen_at / mac, throttled so a busy device doesn't
+        commit on every request (see _TOUCH_THROTTLE_SECONDS).
+
+        When the ARP table yields a MAC, any other device row with that MAC is the
+        same machine under an older UUID and is merged into this one (#656).
+        Returns the merged-away ids.
+        """
         now = datetime.now(timezone.utc)
         row = self._conn.execute(
             "SELECT last_ip, last_seen_at FROM devices WHERE id = ?", (device_id,)
@@ -71,14 +108,24 @@ class DeviceMixin:
                 if last.tzinfo is None:
                     last = last.replace(tzinfo=timezone.utc)
                 if (now - last).total_seconds() < _TOUCH_THROTTLE_SECONDS:
-                    return
+                    return []
             except ValueError:
                 pass
+        # ponytail: `arp -a` subprocess on non-Linux runs on this throttled path; cache if it shows in profiles
+        mac = arp.mac_for_ip(ip)
         self._conn.execute(
-            "UPDATE devices SET last_ip = ?, last_seen_at = ? WHERE id = ?",
-            (ip, now.isoformat(), device_id),
+            "UPDATE devices SET last_ip = ?, last_seen_at = ?, mac = COALESCE(?, mac) WHERE id = ?",
+            (ip, now.isoformat(), mac, device_id),
         )
         self._conn.commit()
+        if not mac:
+            return []
+        dupes = [r["id"] for r in self._conn.execute(
+            "SELECT id FROM devices WHERE mac = ? AND id != ?", (mac, device_id)
+        )]
+        for old in dupes:
+            self.merge_devices(old, device_id)
+        return dupes
 
     def remove_device(self, device_id: str) -> None:
         """Remove a device and every row that references it.
