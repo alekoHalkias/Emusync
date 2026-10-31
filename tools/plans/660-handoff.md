@@ -44,10 +44,30 @@ See https://github.com/alekoHalkias/Emusync/issues/660
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
+### Test File: src/tests/test_network_upload_requests.py (new), src/tests/test_network_rom.py (share_id case)
+### Test Cases: share_id in network-source; create/pending/outgoing; dedupe; 409 already-network and 400 not-local; upload_to_network success; daemon small=fulfilled, oversize=pending; decline marks failed
+### Edge Cases: marker mismatch/missing; existing master not overwritten; ROM outside local folder; unreachable share; device merge keeps requests
+### Integration Points: live_server + SyncClient; make_client + _device_auth; GUI verified by typecheck and manual round trip (no GUI test framework)
+- tplan step: files tests/test_network_upload_requests.py (new), test_network_rom.py; reuses make_client, _device_auth, live_server; new file because test_rom_transfer.py only covers kind=rom
+
+### Outline
+Frontend:
+- api.ts: share_id, kind arg, pending/outgoing list helpers
+- IPC rom:fulfillNetworkUpload (netupload.ts, preload, d.ts, export runCliTransfer)
+- NetworkUploadPrompt banner in App.tsx (Upload/Decline)
+- NetworkPlaySetup: share-ID mount resolution and "Ask <device> to upload" block
+Backend:
+- network-source returns share_id
+- network-upload request creation (validate, 409, dedupe) and outgoing list route
+- config network_upload_auto_max_mb
+- netrom.upload_to_network (marker check, safe copy, flip to network)
+- daemon branch (oversize stays pending) and CLI rom fulfill-network-upload
+Tests:
+- test_network_upload_requests.py and share_id case in test_network_rom.py
+- Verify and docs step
+
+### Summary
+Network-drive games become playable on any device with the same share ID, and devices can request an upload of a local-only ROM, fulfilled by the owner's daemon (small) or GUI approval (large).
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -81,3 +101,4 @@ See https://github.com/alekoHalkias/Emusync/issues/660
 - 2026-10-31 bplan: 9 steps written, backend_pattern=reuse rom_pull_requests kind=network-upload, python fulfilment shared by daemon and CLI
 - 2026-10-31 fplan: 7 steps written, visual_pattern=UpdateBanner-style strip + NetworkPlaySetup option block
 - 2026-10-31 merge: 4 conflicts resolved, 0 unresolved
+- 2026-10-31 tplan: test_file=src/tests/test_network_upload_requests.py, 7 test cases defined

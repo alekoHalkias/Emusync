@@ -26,6 +26,26 @@ Backend first, then IPC, then UI.
 - [ ] 13. Verify: `make test-changed`, GUI typecheck/build, manual two-device round trip.
 - [ ] 14. Docs (single pass): CLAUDE.md rule line, ARCHITECTURE.md (route, CLI command, config key, IPC, kind), GOTCHAS.md (oversize stays pending), frontend guide Banners already added.
 
+## Testing
+- **Test File**: src/tests/test_network_upload_requests.py (new; pull-request tests in test_rom_transfer.py cover kind=rom only, so a separate file keeps both under 300 lines), plus a share_id case in src/tests/test_network_rom.py.
+- **Test Cases**:
+  - network-source share_id: returns the source console's share ID; blank when none registered.
+  - create network-upload request: happy path returns pending id; listed by `/rom-pull-requests/pending` for the owner with kind and by `/outgoing` for the requester.
+  - duplicate pending request for same slug/owner/kind returns the same id.
+  - rejected (409) when the game already has a network source; rejected (400) when the target device has no local ROM for it.
+  - `upload_to_network` with matching marker copies into the share, flips the row to network with rel path, local_rom_path and sha, and keeps the local file.
+  - daemon `_handle_pull_request` completes a small request as fulfilled and leaves an oversize one pending.
+  - `rom fulfill-network-upload --decline` marks the request failed.
+- **Edge Cases**:
+  - marker mismatch or missing marker: refuse, request marked failed, no file written.
+  - existing master at destination: not overwritten, row still flips to network.
+  - ROM outside `device_local_folder`: rel path falls back to basename.
+  - unreachable network folder: failed, not hung (path_is_reachable).
+  - request for a device merged by MAC dedupe (#656): `_DEVICE_REFS` already covers rom_pull_requests; assert the request follows the merge.
+- **Integration Points**:
+  - `live_server` fixture plus `SyncClient` for upload_to_network and the daemon handler (needs real HTTP), `make_client` + `_device_auth` for route tests.
+  - GUI has no test framework: step 13 verifies by typecheck/build and a manual two-device round trip.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes (rom:fulfillNetworkUpload). New CLI subcommand: yes (rom fulfill-network-upload; note in PR). Config/data file change: yes (network_upload_auto_max_mb).
 
