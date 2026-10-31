@@ -84,9 +84,9 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### PR: #657
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -108,3 +108,5 @@ Duplicate devices accumulate on one IP; per-device configs, locks, saves and bas
 - 2026-10-31 implement: step 6 done (tests in test_devices.py and test_config_roundtrip.py)
 - 2026-10-31 implement: step 8 done (docs)
 - 2026-10-31 review: 1 findings, blocked=no (fixed: idle threshold before merge)
+- 2026-10-31 ship: PR #657 opened, server sync done
+- 2026-10-31 ship: doc sync already in branch (CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md)
