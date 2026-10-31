@@ -4,7 +4,7 @@
 - Issue: #660
 - Branch: feature/660-network-rom-sharing
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-10-31
 - Fix attempts: 0
 
