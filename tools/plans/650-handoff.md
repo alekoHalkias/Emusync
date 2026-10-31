@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #650
 - Branch: feature/650-refresh-detect-new-games
-- PR: #PENDING
+- PR: #651
 - Status: shipped
 - Created: 2026-10-31
 - Fix attempts: 0
@@ -70,7 +70,7 @@ See issue #650.
 
 ## 10. Ship
 ### Status: shipped
-### PR: #PENDING
+### PR: #651
 ### Server Sync: pending
 ### Doc Sync: pending
 
