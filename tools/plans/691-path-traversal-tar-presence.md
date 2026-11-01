@@ -36,6 +36,23 @@ Make ROM transfer staging, server-side memcard tar extraction and the presence m
   - src/tests/test_devices.py (next to the #597 test, same one-shot monitor harness): two offline devices, first holds no locks, second holds a lock; after one monitor pass the second's lock is released and its `game_stopped` event exists (regression for the NameError); also a device with two locks logs both (capture via `capsys`/`_print_activity` output).
 - [ ] 6. Docs: none needed - internal hardening, no CLI/IPC/config/protocol change.
 
+## Testing
+- **Test File**: src/tests/test_rom_transfer.py, src/tests/test_console_memcard.py, src/tests/test_devices.py (extend existing files; fixtures `make_client`, `_device_auth`, the #597 one-shot monitor harness)
+- **Test Cases**:
+  - traversal_filename: `X-Filename: ../../x` stages as `rom_staging/<id>/x`, nothing outside data dir
+  - absolute_filename: `/etc/passwd` stages as `passwd` inside staging dir
+  - bad_filename: `..` and `/` -> 400, no staging dir created
+  - malicious_tar: `Store._extract_memcard_archive` with `../evil` member raises TarError, no file outside dest
+  - valid_tar: normal archive extracts into dest
+  - monitor_no_locks: offline device with no locks then offline device with lock -> second lock released, game_stopped logged
+  - monitor_two_locks: both released locks logged
+- **Edge Cases**:
+  - Backslash separators (`..\\x`) reduce to basename
+  - Blank/absent header keeps default `rom`
+  - Symlink/hardlink member in tar refused (already covered by helper)
+- **Integration Points**:
+  - Real SQLite Store via `api_module.init`; `pull_console_save_path` covered by existing memcard pull tests (must still pass after dead-branch removal)
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

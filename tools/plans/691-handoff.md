@@ -53,12 +53,14 @@ Security/robustness bugs found in a code audit.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_rom_transfer.py, test_console_memcard.py, test_devices.py
+### Test Cases: traversal_filename, absolute_filename, bad_filename (400), malicious_tar, valid_tar, monitor_no_locks, monitor_two_locks
+### Edge Cases: backslash separators, blank header default, existing memcard pull tests still pass
+### Integration Points: real SQLite Store via api_module.init; reuse make_client, _device_auth, #597 monitor harness
+### Outline:
+Backend: (1) basename check in transfers.py; (2) _safe_extract_tar in blobs._extract_memcard_archive; (3) delete dead suffix branch; (4) indent lock-released log in _monitor_presence.
+Tests: 3 files extended, 7 cases. Docs: none.
+### Summary: Sanitize ROM transfer filenames, route server tar extraction through the safe helper, and fix the presence monitor NameError.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -90,3 +92,5 @@ Plan file: tools/plans/691-path-traversal-tar-presence.md
 ## 11. Fix Attempts
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=2/10, breaking=no
 - 2026-11-01 bplan: 6 steps written, backend_pattern=reuse _safe_extract_tar, inline basename check
+- 2026-11-01 tplan: test_file=test_rom_transfer.py/test_console_memcard.py/test_devices.py, 7 test cases defined
+- tplan step note: reuses make_client/_device_auth/#597 harness; no new fixtures.
