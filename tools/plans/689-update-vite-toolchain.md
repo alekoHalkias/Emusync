@@ -14,20 +14,20 @@ Move vite, @vitejs/plugin-react and electron-vite to a mutually compatible curre
 - **Recommendations**: Target set is electron-vite 6.0.0, vite 8.3.5, plugin-react 6.1.2. Fallback if plugin-react 6 or Rolldown cause trouble: electron-vite 6 + vite 7 + plugin-react 5.x. New engines require Node ^20.19 or >=22.12; release.yml pins node "20", so bump it to "22".
 
 ## Steps
-- [ ] 1. Bump packages: `npm install -D electron-vite@^6 vite@^8 @vitejs/plugin-react@^6` in src/gui; run `make build-gui`; fix config/type errors in electron.vite.config.ts only as needed. If Vite 8 set fails, fall back to the Vite 7 set and note it in the Log.
+- [x] 1. Bump packages: `npm install -D electron-vite@^6 vite@^8 @vitejs/plugin-react@^6` in src/gui; run `make build-gui`; fix config/type errors in electron.vite.config.ts only as needed. If Vite 8 set fails, fall back to the Vite 7 set and note it in the Log.
   - Files: src/gui/package.json, src/gui/package-lock.json, src/gui/electron.vite.config.ts
   - Reuses: existing config structure
   - New: none
-- [ ] 2. Set node-version "22" in both setup-node steps of the release workflow (new packages require Node ^20.19 or >=22.12).
+- [x] 2. Set node-version "22" in both setup-node steps of the release workflow (new packages require Node ^20.19 or >=22.12).
   - Files: .github/workflows/release.yml
   - Reuses: existing steps
   - New: none
-- [ ] 3. Verify: `make lint`, `make build-gui`, `make test`, tsc for node and web configs (error count not above the existing 3), and an `npx electron-builder --dir` packaging check.
+- [x] 3. Verify: `make lint`, `make build-gui`, `make test`, tsc for node and web configs (error count not above the existing 3), and an `npx electron-builder --dir` packaging check.
   - Files: none
   - Reuses: Makefile targets
   - New: none
-- [ ] 4. Tests: no new tests; existing suite and test_bundle.py cover packaging.
-- [ ] 5. Docs: update the Dependencies line in CLAUDE.md (Vite toolchain done, nothing held back).
+- [x] 4. Tests: no new tests; existing suite and test_bundle.py cover packaging.
+- [x] 5. Docs: update the Dependencies line in CLAUDE.md (Vite toolchain done, nothing held back).
 
 ## Testing
 - **Test File**: none new; existing src/tests suite
