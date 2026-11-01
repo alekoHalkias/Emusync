@@ -4,7 +4,7 @@
 - Issue: #673
 - Branch: feature/673-steam-fullscreen
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
