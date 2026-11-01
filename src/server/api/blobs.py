@@ -144,6 +144,7 @@ async def _stage_upload(request: Request):
     needs the header to know the shape.
     """
     store = _get_store()
+    loop = asyncio.get_running_loop()
     tmp = store.new_upload_path()
     hasher = hashlib.sha256()
     size = 0
@@ -155,7 +156,7 @@ async def _stage_upload(request: Request):
                 size += len(chunk)
                 if size > _MAX_UPLOAD_BYTES:
                     raise HTTPException(status_code=413, detail="Upload too large")
-                f.write(chunk)
+                await loop.run_in_executor(None, f.write, chunk)  # keep disk I/O off the event loop (#715)
                 if not hashing_started:
                     header_buf += chunk
                     if len(header_buf) < _ENVELOPE_HEADER_LEN:
@@ -171,6 +172,8 @@ async def _stage_upload(request: Request):
                 # if it happens to be a (truncated) match.
                 payload_start = header_buf[_ENVELOPE_HEADER_LEN:] if header_buf[:4] == _ENVELOPE_MAGIC else header_buf
                 hasher.update(payload_start)
+        if size == 0:
+            raise HTTPException(status_code=400, detail="Empty upload")  # never store an empty generation (#715)
     except BaseException:
         tmp.unlink(missing_ok=True)  # don't leave a half-written .part behind
         raise

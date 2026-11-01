@@ -22,7 +22,7 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
   - Files: src/server/api/blobs.py
   - Reuses: `FileResponse`, `store.set_save_sync_baseline`, `store.set_console_save_sync_baseline`
   - New: none (Starlette built-in; no ack endpoint needed)
-- [ ] 3. Reject empty uploads: in `_stage_upload`, after streaming, if `size == 0` unlink tmp and raise HTTPException 400 ("Empty upload"). Covers save, state, and memcard pushes since all use it.
+- [x] 3. Reject empty uploads: in `_stage_upload`, after streaming, if `size == 0` unlink tmp and raise HTTPException 400 ("Empty upload"). Covers save, state, and memcard pushes since all use it.
   - Files: src/server/api/blobs.py
   - Reuses: `_stage_upload` existing cleanup-on-exception block
   - New: none
