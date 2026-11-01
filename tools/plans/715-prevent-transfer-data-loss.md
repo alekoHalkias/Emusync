@@ -41,6 +41,23 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
 - [ ] 7. Tests: new src/tests/test_transfer_dataloss_715.py. Cases: (a) hash mismatch and mid-stream failure leave an existing destination byte-identical and no `.part`; (b) extensionless destination downloads; (c) baseline absent after an aborted pull, present after a completed pull (save and memcard); (d) zero-byte POST to save, state, and memcard returns 400 and stores nothing; (e) `_is_stale` with a naive timestamp does not raise. Real SQLite, no mocks; follow test_rom_transfer.py and test_saves.py setup.
 - [ ] 8. Docs: add the BackgroundTask-baseline pattern to .claude/backend-design-guide.md; add a short #715 note to src/docs/GOTCHAS.md; one line in CLAUDE.md Saves/sync rules (baseline recorded after delivery, empty uploads rejected, ROM downloads via .part).
 
+## Testing
+- **Test File**: src/tests/test_transfer_dataloss_715.py (new; one file for the bug-fix regressions, per the existing test_hardening_NNN.py convention)
+- **Test Cases**:
+  - ROM hash mismatch: real stdlib `http.server` thread serves bytes with a wrong `X-Rom-Hash`; `SyncClient.download_transfer` raises, pre-existing destination is byte-identical, no `.part` left.
+  - ROM mid-stream failure: server closes the connection early; same assertions.
+  - ROM success: destination replaced with new bytes, no `.part` left.
+  - Extensionless destination downloads successfully; a directory destination still raises.
+  - Save baseline: call `_pull` directly with the shared real-SQLite store; baseline is `None` before `resp.background()` runs and equals the pulled hash after. Same for `pull_console_memcard`.
+  - Empty upload: zero-byte POST to `/games/{slug}/save`, `/games/{slug}/state`, and `/consoles/{key}/memcard` returns 400, stores nothing, and leaves no file in the upload staging dir.
+- **Edge Cases**:
+  - `_is_stale` with a naive timestamp returns a bool instead of raising; with garbage string returns False.
+  - Non-empty upload after a rejected empty one still works (no leaked state).
+  - A pull of a game with no save (204) records no baseline.
+- **Integration Points**:
+  - Starlette runs `FileResponse.background` after send; confirmed through the existing ASGI `client` fixture by checking `GET .../sync-baseline` after a full GET.
+  - files.ts hash snippet: no automated test (Electron IPC); verify manually with a file larger than 1 MiB that the digest equals `sha256sum`.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

@@ -48,12 +48,15 @@ src/server/sync_client.py, src/server/api/blobs.py, src/server/store/blobs.py, s
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_transfer_dataloss_715.py
+### Test Cases: ROM hash mismatch / mid-stream failure / success / extensionless via real http.server; baseline absent before background and present after for save and memcard; empty POST returns 400 for save, state, memcard
+### Edge Cases: naive and garbage timestamps in _is_stale; 204 pull records no baseline; valid upload after rejected empty one
+### Integration Points: FileResponse.background via ASGI client fixture; files.ts hash checked manually against sha256sum
+### Outline:
+Backend: 1 .part download + extensionless; 2 baseline via BackgroundTask (save + memcard); 3 reject empty uploads; 4 offload upload writes; 5 _is_stale naive handling; 6 chunked hash in files.ts
+Tests: test_transfer_dataloss_715.py (real SQLite, real http.server, no mocks)
+Docs: design guide, GOTCHAS, CLAUDE.md rule line
+### Summary: Failed, partial or empty transfers can no longer overwrite or hide ROMs, saves or states.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -93,3 +96,5 @@ src/server/sync_client.py, src/server/api/blobs.py, src/server/store/blobs.py, s
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-01 bplan: 8 steps written, backend_pattern=BackgroundTask baseline + .part download
+- 2026-11-01 tplan: test_file=src/tests/test_transfer_dataloss_715.py, 9 test cases defined
+- Step 7 (tests): tests/test_transfer_dataloss_715.py; reuses conftest make_client/AUTH and test_saves baseline pattern; new file justified by per-issue regression convention.
