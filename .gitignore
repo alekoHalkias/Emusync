@@ -21,3 +21,7 @@ src/tests/test_rom_folders/
 *.zip
 *.AppImage
 ~/
+
+# Local build artifacts
+*.tsbuildinfo
+/emusync

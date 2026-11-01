@@ -326,11 +326,14 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         nonlocal lock_released
         if lock_released:
             return
-        try:
-            client.release_lock(game_slug)
-        except Exception as exc:
-            click.echo(f"Warning: failed to release lock: {exc}", err=True)
-        lock_released = True
+        for attempt in (1, 2):
+            try:
+                client.release_lock(game_slug)
+                lock_released = True
+                return
+            except Exception as exc:
+                if attempt == 2:
+                    click.echo(f"Warning: failed to release lock: {exc}", err=True)
 
     exit_code = 0
     game_pid_file.write_text(str(os.getpid()))
