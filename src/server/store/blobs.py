@@ -385,21 +385,6 @@ class SaveStateMixin:
             f.write(buf.getvalue())
         return tmp, hashlib.sha256(buf.getvalue()).hexdigest(), len(buf.getvalue())
 
-    def _extract_memcard_archive(self, archive: Path, dest: Path) -> None:
-        """Extract a memcard tar archive to the destination folder."""
-        import tarfile
-        from server.sync_client import _safe_extract_tar
-        with tarfile.open(archive, "r:gz") as tf:
-            # Extract to a temp location first
-            tmp = dest.with_suffix(".tmp")
-            tmp.mkdir(parents=True, exist_ok=True)
-            _safe_extract_tar(tf, tmp)
-            # Move contents to destination
-            for item in tmp.iterdir():
-                if item.name != ".":
-                    shutil.move(item, dest / item.name)
-            tmp.rmdir()
-
     # ── console memcard push (file or folder) ───────────────────────────────────
 
     def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int,
