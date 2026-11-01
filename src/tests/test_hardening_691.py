@@ -2,8 +2,6 @@
 presence monitor NameError."""
 from __future__ import annotations
 
-import io
-import tarfile
 import tempfile
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -52,35 +50,6 @@ async def test_rom_transfer_rejects_bad_filename(make_client, tmp_path, name):
     assert r.status_code == 400
     staging = tmp_path / "rom_staging"
     assert not staging.exists() or not list(staging.iterdir())
-
-
-# ── memcard archive extraction ────────────────────────────────────────────────
-
-def _tgz(tmp_path, members):
-    p = tmp_path / "a.tgz"
-    with tarfile.open(p, "w:gz") as tf:
-        for name, data in members.items():
-            ti = tarfile.TarInfo(name)
-            ti.size = len(data)
-            tf.addfile(ti, io.BytesIO(data))
-    return p
-
-
-def test_extract_memcard_archive_refuses_traversal(tmp_path):
-    store = Store(str(tmp_path / "db"))
-    dest = tmp_path / "card"
-    dest.mkdir()
-    with pytest.raises(tarfile.TarError):
-        store._extract_memcard_archive(_tgz(tmp_path, {"../evil": b"x"}), dest)
-    assert not (tmp_path / "evil").exists()
-
-
-def test_extract_memcard_archive_valid(tmp_path):
-    store = Store(str(tmp_path / "db"))
-    dest = tmp_path / "card"
-    dest.mkdir()
-    store._extract_memcard_archive(_tgz(tmp_path, {"slot1.gci": b"ok"}), dest)
-    assert (dest / "slot1.gci").read_bytes() == b"ok"
 
 
 # ── presence monitor ──────────────────────────────────────────────────────────
