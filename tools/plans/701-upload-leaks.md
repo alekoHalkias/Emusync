@@ -31,6 +31,16 @@ Stop leaking upload temp files and stale ROM staging dirs, and reject save/state
   - Reuses: `src/tests/test_integration.py` client/AUTH pattern
 - [ ] 5. Docs: none needed - internal cleanup behavior, no new routes/config/IPC.
 
+## Testing
+- **Test File**: src/tests/test_upload_leaks.py (pattern: tests/test_hardening_691.py, fixtures `client`/`make_client` from conftest)
+- **Test Cases**:
+  - unknown slug save/state POST: 404, `store._blob_dir/.uploads` has no files
+  - store raises in push (monkeypatch `push_save_file` to raise via pytest monkeypatch of the real Store method): `.uploads` empty
+  - identical console memcard pushed twice: `.uploads` empty after second
+  - `init` sweep: pending transfer row with old `queued_at` -> dir removed, status `failed`; fresh pending -> dir kept
+- **Edge Cases**: existing game save push still 200 (regression guard)
+- **Integration Points**: `_core.init` -> `_sweep_stale_staging`; `_push` -> `Store.push_*_file`
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
