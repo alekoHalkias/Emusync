@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #702
 - Branch: feature/702-launch-command-quoting
-- PR: none
+- PR: #709
 - Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
@@ -72,9 +72,9 @@ src/cli/console.py, src/gui/electron/emulator/scan.ts, src/cli/run.py
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### PR: #709
+### Server Sync: done
+### Doc Sync: done (no doc changes needed)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -101,3 +101,4 @@ Spaced or Windows emulator paths and spaced ROM paths now yield correct argv; st
 - 2026-11-01 tplan: test_file=src/tests/test_launch_command_split.py, 6 test cases defined
 - 2026-11-01 implement: steps 1-5 done (helper, wiring, quoting, tests; 629 passed)
 - 2026-11-01 review: 1 finding (low), blocked=no
+- 2026-11-01 ship: PR #709, server sync done, doc sync none needed
