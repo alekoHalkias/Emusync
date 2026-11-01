@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #677
 - Branch: feature/677-appimage-steam-launcher
-- PR: none
-- Status: implemented
+- PR: #678
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -82,9 +82,9 @@ Tests: 6 test_bundle.py + manual build.
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### PR: #678
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -104,3 +104,4 @@ Tests: 6 test_bundle.py + manual build.
 - 2026-11-01 implement: steps 6-7 done (test_bundle.py 3 passing; release smoke step)
 - 2026-11-01 implement: step 8 done (CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md); electron-builder --dir confirmed resources/src layout
 - 2026-11-01 review: 1 findings (test-gap), blocked=no
+- 2026-11-01 ship: PR #678 opened, server sync done, docs updated in implement step 8
