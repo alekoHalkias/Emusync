@@ -24,16 +24,16 @@ src/gui/electron/runtime.ts, steam.ts, game.ts, server.ts, paths.ts; src/gui/pac
 - Dev checkout unchanged
 
 ## 2. Design
-### Scope: electron main only
-### Backend Changes: none
-### UI Changes: launcher resolution order EMUSYNC_SCRIPT > display.json repoPath > common checkout dirs; addGame opens folder picker when none found, validates src/emusync, persists
+### Scope: electron main + requirements split + CI smoke check + Python guard test
+### Backend Changes: none to Python code; requirements.txt split into runtime and dev
+### UI Changes: none visible; errors reuse Setup preflightError and addGame {ok,error}
 ### Plan Target: fplan
 ### Sub-issues: none
-### Difficulty: 4/10
-### Backwards Compatibility: not breaking
+### Difficulty: 7/10
+### Backwards Compatibility: not breaking; dev checkout and EMUSYNC_SCRIPT unchanged; stale /tmp/.mount_* shortcuts replaced on next add
 
 ## 3. Frontend Plan
-### Design Alignment: no new UI; native folder dialog pattern from files.ts
+### Design Alignment: no new UI; reuses preflightError and {ok,error}
 ### Visual Pattern: none
 ### Recommendations: none
 
@@ -47,14 +47,15 @@ src/gui/electron/runtime.ts, steam.ts, game.ts, server.ts, paths.ts; src/gui/pac
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: none (no TS harness; manual)
-### Test Cases: manual: picker on first add and persisted repoPath; no picker on second add; cancel leaves vdf unchanged
-### Edge Cases: invalid pick rejected; stale repoPath skipped; dev/EMUSYNC_SCRIPT unchanged; save({...load()}) preserves repoPath
-### Integration Points: tsc both configs; make test-changed
+### Test File: src/tests/test_bundle.py (Python); electron manual
+### Test Cases: bundle covers all src packages; requirements split; manual first launch, Add to Steam, version bump
+### Edge Cases: missing python3/venv/offline retry; cache wiped self-heals; concurrent callers share one run; dev/Windows no-op
+### Integration Points: make test-changed/test; electron-vite build; release smoke step
 ### Outline
-Frontend (electron): 1 display.ts repoPath; 2 launcher.ts findLauncher/pickLauncher; 3 steam.ts + game.ts use them; 5 CLAUDE.md.
-Tests: 4 manual + tsc.
-### Summary: Add-to-Steam from the AppImage finds or asks for a repo checkout and remembers it, so no env var is needed.
+Frontend (electron): 2 extraResources; 3 runtime.ts; 4 runtimeSetup.ts; 5 server.ts/steam.ts.
+Backend/CI: 1 requirements split; 7 release smoke check; 8 docs.
+Tests: 6 test_bundle.py + manual build.
+### Summary: Bundle the CLI in the AppImage and provision a stable runtime dir (same layout as a checkout) on first launch, so Steam, server and sync work with no repo.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -65,11 +66,14 @@ Tests: 4 manual + tsc.
 
 ## 8. Implementation Steps
 ### Steps
-1. display.ts: add optional repoPath (reuses load/save).
-2. launcher.ts (new; display.ts<->runtime.ts import cycle): findLauncher() and pickLauncher().
-3. steam.ts + game.ts: use findLauncher() ?? pickLauncher(); drop LAUNCHER_STABLE guard; readers fall back to LAUNCHER.
-4. Tests: manual + tsc.
-5. Docs: CLAUDE.md rule update.
+1. requirements split (runtime vs dev); install.sh/Makefile/CI point at dev file.
+2. package.json extraResources bundles the CLI to resources/src.
+3. runtime.ts: RUNTIME_DIR under cacheDir for packaged AppImage; delete LAUNCHER_STABLE.
+4. runtimeSetup.ts (new): ensureRuntime() copies src, builds venv, stamps by version and requirements hash, memoized, retry on failure.
+5. server.ts/steam.ts: await ensureRuntime(); drop #676 guard.
+6. test_bundle.py: bundle covers all src packages; requirements split.
+7. release.yml: AppImage smoke check for resources/src/emusync.py.
+8. Docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -92,3 +96,4 @@ Tests: 4 manual + tsc.
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
 - 2026-11-01 fplan: 5 steps written, visual_pattern=none
 - 2026-11-01 tplan: test_file=none, 3 manual cases defined
+- 2026-11-01 plan redone: bundle CLI via extraResources + cache runtime dir, 8 steps, difficulty 7/10
