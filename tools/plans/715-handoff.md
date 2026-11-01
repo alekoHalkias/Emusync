@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #715
 - Branch: feature/715-prevent-transfer-data-loss
-- PR: none
+- PR: #716
 - Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
@@ -77,15 +77,15 @@ Docs: design guide, GOTCHAS, CLAUDE.md rule line
 - Step 8: docs; design guide, GOTCHAS, CLAUDE.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
+### Findings: 2 non-blocking (stale .part after hard kill; files.ts hash snippet untested)
+### Blocked: no
 ### Blockers: TBD
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### PR: #716
+### Server Sync: done
+### Doc Sync: done (CLAUDE.md, GOTCHAS.md updated in implement; ARCHITECTURE.md unaffected)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -107,3 +107,5 @@ Docs: design guide, GOTCHAS, CLAUDE.md rule line
 - 2026-11-01 implement: step 6 done (chunked hash in files:get-file-hash)
 - 2026-11-01 implement: step 7 done (regression tests (fail on main, pass here))
 - 2026-11-01 implement: step 8 done (docs: GOTCHAS note (CLAUDE.md and design guide already updated))
+- 2026-11-01 review: 2 findings, blocked=no
+- 2026-11-01 ship: PR #716 opened, server sync done, doc sync done
