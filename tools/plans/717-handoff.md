@@ -4,7 +4,7 @@
 - Issue: #717
 - Branch: feature/717-save-meta-failure
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 - Related: #718 (separate issue, not yet branched)
