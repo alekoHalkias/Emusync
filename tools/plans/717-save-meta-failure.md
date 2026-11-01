@@ -3,7 +3,7 @@
 Issue: #717
 Branch: feature/717-save-meta-failure
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -26,7 +26,7 @@ A failed `get_save_meta` request must not be read as "server has no save"; the r
   - Files: src/tests/test_run_reconcile.py
   - Reuses: `_FakeClient`, `_write_save`, `live_server` fixture (conftest.py), real SyncClient
   - New: three test functions - no existing test covers a failing meta lookup
-- [ ] 4. Docs: add a one-line rule to CLAUDE.md Saves/sync ("failed save-meta lookup is never treated as no save; run falls back offline, #717").
+- [x] 4. Docs: add a one-line rule to CLAUDE.md Saves/sync ("failed save-meta lookup is never treated as no save; run falls back offline, #717").
 
 ## Testing
 - **Test File**: src/tests/test_run_reconcile.py
