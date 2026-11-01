@@ -105,3 +105,4 @@ Docs: design guide, GOTCHAS, CLAUDE.md rule line
 - 2026-11-01 implement: step 4 done (offload upload writes to executor (same edit as step 3))
 - 2026-11-01 implement: step 5 done (_is_stale treats naive timestamps as UTC)
 - 2026-11-01 implement: step 6 done (chunked hash in files:get-file-hash)
+- 2026-11-01 implement: step 7 done (regression tests (fail on main, pass here))
