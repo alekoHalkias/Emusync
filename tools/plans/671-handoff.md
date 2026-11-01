@@ -45,12 +45,15 @@ src/gui/electron/game.ts (game:launch), src/cli/run.py
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_run_reconcile.py
+### Test Cases: regression for reproduced launch failure
+### Edge Cases: network ROM live vs localized; %ROM% vs legacy path
+### Integration Points: _resolve_launch_command -> shlex.split -> _launch_and_wait
+### Outline
+Backend: 1 reproduce via CLI; 2 fix cause in run.py launch path
+Tests: 3 regression test in test_run_reconcile.py
+Docs: 4 none
+### Summary: Find and fix why emusync run no longer starts the emulator, with a regression test.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -86,3 +89,4 @@ src/gui/electron/game.ts (game:launch), src/cli/run.py
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-01 bplan: 4 steps written, backend_pattern=reproduce then fix in run.py launch path
+- 2026-11-01 tplan: test_file=src/tests/test_run_reconcile.py, 1 test case defined

@@ -22,8 +22,17 @@ Find why `emusync run <slug>` no longer starts the emulator and fix it at the so
   - Files: determined by step 1 (expected src/cli/run.py or src/server/store/*)
   - Reuses: `_resolve_launch_command`, `resolve_rom_path`
   - New: none expected
-- [ ] 3. Tests: regression test for the identified failure in src/tests/test_integration.py (or the module matching the cause). No mocks, real SQLite.
+- [ ] 3. Tests (extend test_run_reconcile.py, reuse its existing fixtures): regression test for the identified failure in src/tests/test_integration.py (or the module matching the cause). No mocks, real SQLite.
 - [ ] 4. Docs: none needed unless the cause reveals a rule worth adding to src/docs/GOTCHAS.md.
+
+## Testing
+- **Test File**: src/tests/test_run_reconcile.py (existing run/launch tests, real SQLite)
+- **Test Cases**:
+  - regression: the reproduced failing launch scenario launches the emulator command (shape fixed after step 1)
+- **Edge Cases**:
+  - network ROM with live master vs localized copy; `%ROM%` token and legacy baked-in path
+- **Integration Points**:
+  - `_resolve_launch_command` -> `shlex.split` -> `_launch_and_wait`
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
