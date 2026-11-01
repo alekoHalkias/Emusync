@@ -4,7 +4,7 @@
 - Issue: #692
 - Branch: feature/692-harden-cors-restore-safety
 - PR: none
-- Status: designed
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
