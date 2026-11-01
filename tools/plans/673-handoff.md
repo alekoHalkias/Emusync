@@ -4,7 +4,7 @@
 - Issue: #673
 - Branch: feature/673-steam-fullscreen
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -23,13 +23,13 @@ src/gui/electron/display.ts, optionally src/gui/electron/steam.ts
 - User can leave fullscreen
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: ui (Electron main only)
+### Backend Changes: none
+### UI Changes: display.ts load(): Steam env forces fullscreen for the session, not persisted
+### Plan Target: fplan
+### Sub-issues: none
+### Difficulty: 1/10
+### Backwards Compatibility: no breaking changes
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -81,3 +81,4 @@ src/gui/electron/display.ts, optionally src/gui/electron/steam.ts
 
 ## 12. Log
 - 2026-11-01 issue: workflow initialized
+- 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=1/10, breaking=no
