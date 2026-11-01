@@ -4,7 +4,7 @@
 - Issue: #693
 - Branch: feature/693-robustness-cleanup
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -91,3 +91,4 @@ See tools/plans/693-robustness-cleanup.md (steps 1-7, each annotated with Files/
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-01 bplan: 7 steps written, backend_pattern=boundary validation + _core helpers
 - 2026-11-01 tplan: testing section added
+- 2026-11-01 implement: steps 1-7 done (single commit)

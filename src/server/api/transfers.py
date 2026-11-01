@@ -27,6 +27,9 @@ from ._core import (
 
 router = APIRouter()
 
+# ponytail: fixed ceiling, make it a Config field if users hit it
+_MAX_UPLOAD_BYTES = 64 * 1024**3
+
 
 # ── rom transfers ─────────────────────────────────────────────────────────────
 
@@ -62,10 +65,18 @@ async def create_rom_transfer(
 
     loop = asyncio.get_running_loop()
     hasher = hashlib.sha256()
-    with open(staged_path, "wb") as f:
-        async for chunk in request.stream():
-            hasher.update(chunk)
-            await loop.run_in_executor(None, f.write, chunk)
+    size = 0
+    try:
+        with open(staged_path, "wb") as f:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > _MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Upload too large")
+                hasher.update(chunk)
+                await loop.run_in_executor(None, f.write, chunk)
+    except BaseException:
+        _remove_staging_dir(str(staged_path))
+        raise
     sha256 = hasher.hexdigest()
 
     store.create_rom_transfer(

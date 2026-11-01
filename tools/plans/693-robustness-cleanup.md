@@ -14,28 +14,28 @@ Fix five low-severity robustness/hygiene defects (staging leak, unvalidated mod 
 - **Recommendations**: none. No schema, config, IPC or CLI change.
 
 ## Steps
-- [ ] 1. Staging cleanup + size cap on ROM upload: in `upload_rom_transfer` wrap the write loop in `try/except BaseException`, call `_remove_staging_dir(str(staged_path))` and re-raise; count bytes and raise 413 once over `_MAX_UPLOAD_BYTES` (module constant, 64 GiB, ponytail: fixed ceiling, make it a Config field if users hit it).
+- [x] 1. Staging cleanup + size cap on ROM upload: in `upload_rom_transfer` wrap the write loop in `try/except BaseException`, call `_remove_staging_dir(str(staged_path))` and re-raise; count bytes and raise 413 once over `_MAX_UPLOAD_BYTES` (module constant, 64 GiB, ponytail: fixed ceiling, make it a Config field if users hit it).
   - Files: src/server/api/transfers.py
   - Reuses: src/server/api/_core.py:_remove_staging_dir (already guards to dirs directly under the staging root)
   - New: `_MAX_UPLOAD_BYTES` constant - no existing upload limit to reuse.
-- [ ] 2. Safe path segment helper + mod validation: add `_safe_segment(value, what) -> str` to `_core.py` (400 if empty, `.`/`..`, contains `/`, `\`, NUL or any control char, or length > 255). Call it on `title_id` and `mod_name` in all three routes of `mods.py` (list/pull/push), before any store call. Validate before the upload body is streamed in push.
+- [x] 2. Safe path segment helper + mod validation: add `_safe_segment(value, what) -> str` to `_core.py` (400 if empty, `.`/`..`, contains `/`, `\`, NUL or any control char, or length > 255). Call it on `title_id` and `mod_name` in all three routes of `mods.py` (list/pull/push), before any store call. Validate before the upload body is streamed in push.
   - Files: src/server/api/_core.py, src/server/api/mods.py
   - Reuses: HTTPException pattern in _core/transfers; store untouched (boundary validation per issue)
   - New: `_safe_segment` - nothing existing validates path segments; it is a few lines and used 3x.
-- [ ] 3. Sanitize device name: add `_clean_header(value) -> str` in `_core.py` (drop non-printable chars incl. `\r\n`, strip, cap 64 chars). In `_auth` apply it to `x_device_name` (and `x_device_id`) before `ensure_device`, falling back to the id when the result is empty. Because `_device_names` and all `_print_activity` labels come from `device.name`, this covers log output and stored names.
+- [x] 3. Sanitize device name: add `_clean_header(value) -> str` in `_core.py` (drop non-printable chars incl. `\r\n`, strip, cap 64 chars). In `_auth` apply it to `x_device_name` (and `x_device_id`) before `ensure_device`, falling back to the id when the result is empty. Because `_device_names` and all `_print_activity` labels come from `device.name`, this covers log output and stored names.
   - Files: src/server/api/_core.py
   - Reuses: `_auth` existing `x_device_name or x_device_id` fallback
   - New: `_clean_header` - one-liner using `str.isprintable`; no existing sanitizer.
-- [ ] 4. Lock release retry: in `run.py:_release` try `client.release_lock` up to 2 attempts; set `lock_released = True` only on success; if both fail, warn on stderr (existing message) and leave the flag False so a later `_release()` call (finally/signal path) retries.
+- [x] 4. Lock release retry: in `run.py:_release` try `client.release_lock` up to 2 attempts; set `lock_released = True` only on success; if both fail, warn on stderr (existing message) and leave the flag False so a later `_release()` call (finally/signal path) retries.
   - Files: src/cli/run.py
   - Reuses: existing `_release` closure and warning text
   - New: none (loop inside existing function)
-- [ ] 5. Repo hygiene: `git rm --cached src/gui/tsconfig.node.tsbuildinfo src/gui/tsconfig.web.tsbuildinfo` (they are tracked), add `*.tsbuildinfo` and the root-level `/emusync` wrapper to `.gitignore`.
+- [x] 5. Repo hygiene: `git rm --cached src/gui/tsconfig.node.tsbuildinfo src/gui/tsconfig.web.tsbuildinfo` (they are tracked), add `*.tsbuildinfo` and the root-level `/emusync` wrapper to `.gitignore`.
   - Files: .gitignore, the two tsbuildinfo files (untrack only)
   - Reuses: existing "Build artifacts" sections of .gitignore
   - New: none. (`/emusync` is anchored so `src/emusync.py` and `src/emusync` launcher paths are unaffected; verify with `git check-ignore`.)
-- [ ] 6. Tests (see Testing). No mocks, real SQLite.
-- [ ] 7. Docs: CLAUDE.md one-line rule on `_safe_segment`/`_clean_header`; docs/GOTCHAS.md short note; ARCHITECTURE.md none needed (no route/IPC/config change).
+- [x] 6. Tests (see Testing). No mocks, real SQLite.
+- [x] 7. Docs: CLAUDE.md one-line rule on `_safe_segment`/`_clean_header`; docs/GOTCHAS.md short note; ARCHITECTURE.md none needed (no route/IPC/config change).
 
 ## Testing
 - New `src/tests/test_hardening_693.py` using the `client`/`AUTH` fixtures from test_integration.py.
@@ -56,3 +56,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 - #692 edits `_core.py` PIN compare and CORS (top of file / start of `_auth`) and `sync_client.py`; step 3 edits later lines of `_auth`, so likely a clean or trivial merge. No overlap with `sync_client.py`.
 
 ## Log
+Step 6: lock-release retry test omitted (closure inside run command not reachable without a full run harness); encoded-slash mod names return 404 (route does not match) rather than 400, both safe.

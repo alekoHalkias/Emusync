@@ -207,6 +207,19 @@ def _game_label(slug: str) -> str:
     return slug
 
 
+def _safe_segment(value: str, what: str) -> str:
+    """Reject values unsafe to use as a single path segment (400)."""
+    if (not value or value in (".", "..") or len(value) > 255
+            or any(c in "/\\" or not c.isprintable() for c in value)):
+        raise HTTPException(status_code=400, detail=f"Invalid {what}")
+    return value
+
+
+def _clean_header(value: Optional[str]) -> str:
+    """Strip control characters (log forging) and cap length."""
+    return "".join(c for c in (value or "") if c.isprintable()).strip()[:64]
+
+
 def _auth(
     request: Request,
     authorization: str = Header(None),
@@ -224,10 +237,11 @@ def _auth(
     pin = (authorization or "").removeprefix("Bearer ")
     if _master_pin and pin != _master_pin:
         raise HTTPException(status_code=401, detail="Invalid PIN")
+    x_device_id = _clean_header(x_device_id)
     if not x_device_id:
         raise HTTPException(status_code=401, detail="Missing X-Device-ID header")
     store = _get_store()
-    device, is_new = store.ensure_device(x_device_id, x_device_name or x_device_id)
+    device, is_new = store.ensure_device(x_device_id, _clean_header(x_device_name) or x_device_id)
     ip = request.client.host if request.client else "unknown"
     merged: list[str] = []
     if request.client:
