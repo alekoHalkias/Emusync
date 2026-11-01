@@ -19,7 +19,7 @@ fi
 echo "==> Setting up Python virtual environment..."
 python3 -m venv "$VENV"
 "$VENV/bin/pip" install --upgrade pip -q
-"$VENV/bin/pip" install -r "$SCRIPT_DIR/src/requirements.txt" -q
+"$VENV/bin/pip" install -r "$SCRIPT_DIR/src/requirements-dev.txt" -q
 echo "    Python dependencies installed."
 
 echo "==> Creating launcher script..."

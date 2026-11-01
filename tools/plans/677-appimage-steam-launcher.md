@@ -21,7 +21,7 @@ Ship the Python CLI inside the AppImage and run it from a stable per-user runtim
 - **Recommendations**: none.
 
 ## Steps
-- [ ] 1. Split dependencies: `src/requirements.txt` keeps runtime packages only; new `src/requirements-dev.txt` is `-r requirements.txt` plus pytest, pytest-asyncio. Point `install.sh`, `Makefile` install, `.github/workflows/ci.yml` and the release.yml test job at requirements-dev.txt; check `.githooks/pre-commit` for a hard-coded reference.
+- [x] 1. Split dependencies: `src/requirements.txt` keeps runtime packages only; new `src/requirements-dev.txt` is `-r requirements.txt` plus pytest, pytest-asyncio. Point `install.sh`, `Makefile` install, `.github/workflows/ci.yml` and the release.yml test job at requirements-dev.txt; check `.githooks/pre-commit` for a hard-coded reference.
   - Files: src/requirements.txt, src/requirements-dev.txt, install.sh, Makefile, .github/workflows/ci.yml, .github/workflows/release.yml, .githooks/pre-commit (if needed)
   - Reuses: existing install paths
   - New: requirements-dev.txt - the test deps currently sit in the same file, and the runtime venv must not install them.
