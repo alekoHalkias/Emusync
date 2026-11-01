@@ -90,3 +90,4 @@ Docs: 4 none
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-01 bplan: 4 steps written, backend_pattern=reproduce then fix in run.py launch path
 - 2026-11-01 tplan: test_file=src/tests/test_run_reconcile.py, 1 test case defined
+- 2026-11-01 implement: steps 1-2 done (wrapper venv lookup, GUI launch.log)
