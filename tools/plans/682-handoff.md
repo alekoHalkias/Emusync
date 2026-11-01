@@ -4,7 +4,7 @@
 - Issue: #682
 - Branch: feature/682-update-vite
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
