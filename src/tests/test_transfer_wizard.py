@@ -14,7 +14,21 @@ from click.testing import CliRunner
 
 import server.config as cfg_module
 from cli.transfer import _handle_pull_request, _receive_transfer, pull_rom, push_rom
+import uuid
+
+from server.api import _core
+from server.store.models import Console
 from server.sync_client import GameDeviceConfig, SyncClient
+
+
+def _allow_folder(client: SyncClient, device_id: str, console: str, folder) -> None:
+    """Configure *folder* as the receiver's ROM folder for *console* (#705: transfers
+    are only accepted into configured folders)."""
+    client.list_devices()  # make sure the device row exists
+    _core._get_store().set_console(Console(
+        id=str(uuid.uuid4()), device_id=device_id, console_name=console,
+        shortform_name=console, device_game_folder=str(folder),
+    ))
 
 
 def _device_client(live_server, device_id: str, device_name: str) -> SyncClient:
@@ -109,6 +123,7 @@ def test_push_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
     assert pending[0]["destination_path"] == str(dest_folder / "pbd.nsp")
 
     # Simulate the target's sync-daemon receiving the queued transfer.
+    _allow_folder(target, "dev-target", "Switch", console_root)
     ok = _receive_transfer(
         target, pending[0]["id"], pending[0]["destination_path"],
         pending[0]["slug"], pending[0].get("console", ""), pending[0]["game_name"],
@@ -205,6 +220,7 @@ def test_pull_rom_switch_syncs_whole_folder(monkeypatch, tmp_path, live_server):
     transfers = target.list_pending_transfers()
     assert len(transfers) == 1
     assert transfers[0]["kind"] == "rom-folder"
+    _allow_folder(target, "dev-target", "Switch", console_root)
 
     ok = _receive_transfer(
         target, transfers[0]["id"], transfers[0]["destination_path"],
@@ -256,6 +272,7 @@ def test_receive_switch_folder_does_not_inherit_another_games_save_path(tmp_path
     assert len(transfers) == 1
 
     destination_path = str(tmp_path / "deck_roms" / "Pokemon Legends Arceus" / "arceus.nsp")
+    _allow_folder(target, "dev-target", "Switch", tmp_path / "deck_roms")
     ok = _receive_transfer(
         target, transfers[0]["id"], destination_path,
         "pokemon-legends-arceus", "Switch", "Pokemon Legends Arceus",

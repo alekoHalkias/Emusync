@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import os
 
-import server.config as cfg_module
 from cli.transfer import _destination_allowed, _receive_transfer
 
 
 class _Client:
     def __init__(self, consoles, games=()):
         self.consoles, self.games, self.completed, self.downloaded = consoles, list(games), [], []
+
+    _headers = {"X-Device-ID": "me"}
 
     def get_device_consoles(self, _id):
         return self.consoles
@@ -54,9 +55,7 @@ def test_symlink_escape_rejected(tmp_path):
     assert not _destination_allowed(str(root / "link" / "a.gba"), [(str(root), False)])
 
 
-def test_receive_rejects_outside_destination(monkeypatch, tmp_path):
-    monkeypatch.setattr(cfg_module, "CONFIG_PATH", tmp_path / "c.toml")
-    cfg_module.save(cfg_module.Config(device_id="me", device_name="Me"))
+def test_receive_rejects_outside_destination(tmp_path):
     root = tmp_path / "roms"
     root.mkdir()
     client = _Client([{"device_game_folder": str(root)}])

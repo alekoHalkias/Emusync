@@ -4,7 +4,7 @@
 - Issue: #705
 - Branch: feature/705-confine-rom-writes
 - PR: none
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 

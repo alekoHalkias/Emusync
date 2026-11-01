@@ -410,7 +410,7 @@ def _receive_transfer(
         log(f"  Receiving {game_name}...")
         # Never write where the sender says unless it is one of our ROM folders (#705).
         if not _destination_allowed(
-            destination_path, _allowed_roots(client, cfg_module.load().device_id), kind == "rom-folder"
+            destination_path, _allowed_roots(client, client._headers["X-Device-ID"]), kind == "rom-folder"
         ):
             raise ValueError(
                 f"destination {destination_path!r} is not inside a ROM folder configured on this device; "
