@@ -3,7 +3,7 @@
 Issue: #715
 Branch: feature/715-prevent-transfer-data-loss
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
