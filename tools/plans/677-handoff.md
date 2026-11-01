@@ -76,9 +76,9 @@ Tests: 6 test_bundle.py + manual build.
 8. Docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 1 low test-gap: runtimeSetup.ts has no automated test (no TS harness; manual AppImage check)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -103,3 +103,4 @@ Tests: 6 test_bundle.py + manual build.
 - 2026-11-01 implement: step 5 done (ensureRuntime awaited by server start, daemon start, preflight, addGame)
 - 2026-11-01 implement: steps 6-7 done (test_bundle.py 3 passing; release smoke step)
 - 2026-11-01 implement: step 8 done (CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md); electron-builder --dir confirmed resources/src layout
+- 2026-11-01 review: 1 findings (test-gap), blocked=no
