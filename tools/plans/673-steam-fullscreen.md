@@ -21,6 +21,16 @@ Open the EmuSync window fullscreen whenever the process was launched by Steam.
 - [ ] 2. Tests: none automated - Electron main has no test harness; verify by `SteamGameId=1 make dev-gui` (fullscreen) vs plain `make dev-gui` (saved preference), plus tsc.
 - [ ] 3. Docs: none needed - the display.ts behavior is not documented per-variable; add one clause to CLAUDE.md only if a Steam/fullscreen rule exists there.
 
+## Testing
+- **Test File**: none (Electron main has no test harness; no mocks policy rules out faking Electron)
+- **Test Cases**:
+  - manual: `SteamGameId=1 make dev-gui` opens fullscreen
+  - manual: plain `make dev-gui` follows the saved preference
+- **Edge Cases**:
+  - saved fullscreen=false plus Steam env: fullscreen this session; leaving fullscreen persists false, and the next Steam launch is fullscreen again
+- **Integration Points**:
+  - `display.ts:load()` -> `applyDisplay` -> `win.setFullScreen`; tsc node config must stay at the baseline error count
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

@@ -46,12 +46,15 @@ src/gui/electron/display.ts, optionally src/gui/electron/steam.ts
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: none (manual; no Electron harness)
+### Test Cases: manual Steam env vs plain launch
+### Edge Cases: saved fullscreen=false with Steam env
+### Integration Points: display.ts load -> applyDisplay -> setFullScreen
+### Outline
+Frontend: 1 force fullscreen on SteamGameId/SteamAppId in display.ts load()
+Tests: 2 manual verification + tsc
+Docs: 3 none
+### Summary: Open the GUI fullscreen when launched from Steam, for that session only.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -86,3 +89,4 @@ src/gui/electron/display.ts, optionally src/gui/electron/steam.ts
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=1/10, breaking=no
 - 2026-11-01 fplan: 3 steps written, visual_pattern=none
+- 2026-11-01 tplan: test_file=none (manual), 2 test cases defined
