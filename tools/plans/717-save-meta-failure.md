@@ -22,7 +22,7 @@ A failed `get_save_meta` request must not be read as "server has no save"; the r
   - Files: src/cli/run.py
   - Reuses: cli/run_offline.py `_run_offline`, `_release`, existing offline warning text
   - New: none - one try/except around an existing call
-- [ ] 3. Tests: extend `_FakeClient` in src/tests/test_run_reconcile.py so a `meta` that is an Exception instance is raised from `get_save_meta`; add the cases listed under Testing. Update any existing test relying on the swallow.
+- [x] 3. Tests: extend `_FakeClient` in src/tests/test_run_reconcile.py so a `meta` that is an Exception instance is raised from `get_save_meta`; add the cases listed under Testing. Update any existing test relying on the swallow.
   - Files: src/tests/test_run_reconcile.py
   - Reuses: `_FakeClient`, `_write_save`, `live_server` fixture (conftest.py), real SyncClient
   - New: three test functions - no existing test covers a failing meta lookup
