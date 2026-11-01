@@ -140,3 +140,8 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - The PIN is compared with `hmac.compare_digest` on encoded bytes.
 - Archive restores (`_write_memcard_tar_bytes`, `_extract_state_folder`, `_merge_extract_state_folder`) extract into a `.emusync-*` temp dir next to the target via `_extract_tar_to_tmp` and only then back up and `os.replace` into place; a bad archive leaves the target untouched. Merge backs up `folder/<member relative path>`, matching where the member is written.
 - `window.ts` only passes http(s) URLs to `shell.openExternal` and cancels `will-navigate` away from the app page.
+
+## Trust boundaries (#705)
+
+- Receiving a ROM transfer: `cli/transfer.py:_receive_transfer` only writes to a `destination_path` inside this device's configured folders (console game/local/network/extra folders, plus known game `rom_folder_path`s), checked with `_destination_allowed` (realpath, so `..` and symlinks cannot escape). `rom-folder` transfers must land strictly inside a console root, never on it (extraction backs up and replaces the target folder). A transfer for a console not set up on the receiver fails with a log line and is marked failed; set up the console folders first. The interactive `push`/`pull` prompts can still offer an arbitrary folder, but the receiver will refuse it.
+- CORS keeps Origin `null` (`server/api/_core.py`): the packaged Electron renderer loads from `file://`, which sends `null`, and moving it to a custom protocol would break the `file://` artwork URLs in `gui/electron/art.ts`. Consequence: with a blank PIN, any sandboxed iframe or `data:` page on the same machine can read the local API. Set a PIN if that matters; the blank-PIN-means-open design is unchanged.
