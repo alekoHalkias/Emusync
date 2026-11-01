@@ -34,7 +34,7 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
   - Files: src/server/api/_core.py
   - Reuses: naive-to-UTC handling already in `_presence_tick`
   - New: none
-- [ ] 6. `files:get-file-hash`: hash in 1 MiB chunks in the inline Python snippet.
+- [x] 6. `files:get-file-hash`: hash in 1 MiB chunks in the inline Python snippet.
   - Files: src/gui/electron/files.ts
   - Reuses: existing spawn of `rt.PYTHON -c`
   - New: none (snippet edit only; IPC signature unchanged)
