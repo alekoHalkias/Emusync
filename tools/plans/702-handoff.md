@@ -66,9 +66,9 @@ src/cli/console.py, src/gui/electron/emulator/scan.ts, src/cli/run.py
 ### Steps: TBD (written by /plan skills)
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 1 low (legacy unquoted literal rom_path with spaces, not addressed; generated commands are quoted)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -100,3 +100,4 @@ Tests: test_launch_command_split.py (new, real files), extend test_launch_comman
 Spaced or Windows emulator paths and spaced ROM paths now yield correct argv; stored unquoted commands still work.
 - 2026-11-01 tplan: test_file=src/tests/test_launch_command_split.py, 6 test cases defined
 - 2026-11-01 implement: steps 1-5 done (helper, wiring, quoting, tests; 629 passed)
+- 2026-11-01 review: 1 finding (low), blocked=no
