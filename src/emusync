@@ -1,3 +1,7 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/emusync.py" "$@"
+# venv lives at the repo root (install.sh: .venv, Makefile: .cache/.venv) since #611
+for v in "$SCRIPT_DIR/../.cache/.venv" "$SCRIPT_DIR/../.venv" "$SCRIPT_DIR/.venv"; do
+    [ -x "$v/bin/python" ] && exec "$v/bin/python" "$SCRIPT_DIR/emusync.py" "$@"
+done
+exec python3 "$SCRIPT_DIR/emusync.py" "$@"

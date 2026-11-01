@@ -1,7 +1,7 @@
 // Game launch / stop / status IPC.
 import { ipcMain } from "electron";
 import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, openSync, closeSync } from "fs";
 import { join, dirname } from "path";
 import { dataDir } from "./paths";
 import { SCRIPT, PYTHON, rt } from "./runtime";
@@ -13,12 +13,16 @@ export function registerGameIpc(): void {
     if (rt.gameProcess) return { ok: false };
     // The emulator command is derived server-side from the game config, so the
     // launcher only needs the slug.
+    // Output goes to launch.log so a failed launch leaves a visible error.
+    let log: number | "ignore" = "ignore";
+    try { log = openSync(join(dataDir(), "launch.log"), "w"); } catch {}
     const proc = spawn(PYTHON, [SCRIPT, "run", slug], {
-      stdio: "ignore",
+      stdio: ["ignore", log, log],
       detached: true,
       env: { ...process.env, DISPLAY: process.env.DISPLAY || ":0", WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY || "wayland-0" },
     });
     rt.gameProcess = proc;
+    if (typeof log === "number") closeSync(log); // child holds its own copy
     proc.on("exit", () => {
       rt.gameProcess = null;
       rt.mainWindow?.webContents.send("game:exited");

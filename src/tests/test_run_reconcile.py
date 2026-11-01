@@ -972,3 +972,12 @@ def test_sigterm_handler_kills_child_without_exiting(monkeypatch):
     run_mod._sigterm_handler()  # must not raise SystemExit
 
     assert fake_child.killed
+
+
+def test_launcher_wrapper_finds_a_python():
+    """Regression (#671): Steam runs src/emusync, which must locate the venv."""
+    import subprocess
+    from pathlib import Path
+    wrapper = Path(__file__).resolve().parent.parent / "emusync"
+    r = subprocess.run([str(wrapper), "run", "--help"], capture_output=True, text=True)
+    assert r.returncode == 0 and "GAME_SLUG" in r.stdout, r.stderr
