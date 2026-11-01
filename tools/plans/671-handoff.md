@@ -4,7 +4,7 @@
 - Issue: #671
 - Branch: feature/671-fix-game-launch
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -91,3 +91,4 @@ Docs: 4 none
 - 2026-11-01 bplan: 4 steps written, backend_pattern=reproduce then fix in run.py launch path
 - 2026-11-01 tplan: test_file=src/tests/test_run_reconcile.py, 1 test case defined
 - 2026-11-01 implement: steps 1-2 done (wrapper venv lookup, GUI launch.log)
+- 2026-11-01 implement: steps 3-4 done (wrapper regression test; docs none needed)
