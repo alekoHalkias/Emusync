@@ -22,11 +22,11 @@ Never write a `/tmp/.mount_*` launcher path into shortcuts.vdf; use the repo-che
   - Files: src/gui/electron/steam.ts, src/gui/electron/game.ts
   - Reuses: steam.ts:ourSlug/isOurShortcut, existing `{ok,error}` return shape
   - New: none
-- [ ] 3. Tests: no TS test harness exists and the repo tests are Python/real SQLite; add no new harness. Manual check in the plan log: run with EMUSYNC_SCRIPT unset from an AppImage (expect the error, shortcuts.vdf untouched) and set (expect repo path). Python regression `test_launcher_wrapper_finds_a_python` already covers the wrapper.
+- [x] 3. Tests: no TS test harness exists and the repo tests are Python/real SQLite; add no new harness. Manual check in the plan log: run with EMUSYNC_SCRIPT unset from an AppImage (expect the error, shortcuts.vdf untouched) and set (expect repo path). Python regression `test_launcher_wrapper_finds_a_python` already covers the wrapper.
   - Files: none
   - Reuses: src/tests (existing wrapper test)
   - New: none - a TS harness for a 5-line path guard is not worth adding
-- [ ] 4. Docs: CLAUDE.md Steam/Ops rule noting that the AppImage requires EMUSYNC_SCRIPT for Steam shortcuts and never writes a `/tmp/.mount_*` path (#675).
+- [x] 4. Docs: CLAUDE.md Steam/Ops rule noting that the AppImage requires EMUSYNC_SCRIPT for Steam shortcuts and never writes a `/tmp/.mount_*` path (#675).
   - Files: CLAUDE.md
 
 ## Testing
