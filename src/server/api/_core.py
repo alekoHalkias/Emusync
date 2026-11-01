@@ -8,6 +8,7 @@ re-importing the reassigned globals directly.
 """
 from __future__ import annotations
 
+import hmac
 import logging
 import shutil
 import sys
@@ -28,7 +29,8 @@ app = FastAPI(title="EmuSync")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    # Electron renderer (file:// -> Origin "null") and the local dev server only (#692).
+    allow_origin_regex=r"null|https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -235,7 +237,7 @@ def _auth(
     The device is auto-registered on first request; no explicit /pair step needed.
     """
     pin = (authorization or "").removeprefix("Bearer ")
-    if _master_pin and pin != _master_pin:
+    if _master_pin and not hmac.compare_digest(pin.encode(), _master_pin.encode()):
         raise HTTPException(status_code=401, detail="Invalid PIN")
     x_device_id = _clean_header(x_device_id)
     if not x_device_id:

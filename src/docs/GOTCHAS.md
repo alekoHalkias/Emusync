@@ -133,3 +133,10 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - `requirements.txt` is what the packaged app installs: keep test packages in `requirements-dev.txt`.
 - Not covered: Windows (system python, no bootstrap) and a bundled interpreter. Swap the interpreter in `runtimeSetup.ts` (venv creation) and `runtime.ts` (`PYTHON`) if that is added.
 
+
+## Hardening and restore safety (#692)
+
+- CORS uses `allow_origin_regex` (Origin `null` for the Electron `file://` renderer, plus `localhost`/`127.0.0.1` for the dev server), not `*`. A mandatory PIN was rejected because a blank PIN is the supported default. Residual: sandboxed iframes also send `null`, so the PIN stays the real control on exposed servers. Non-browser clients ignore CORS.
+- The PIN is compared with `hmac.compare_digest` on encoded bytes.
+- Archive restores (`_write_memcard_tar_bytes`, `_extract_state_folder`, `_merge_extract_state_folder`) extract into a `.emusync-*` temp dir next to the target via `_extract_tar_to_tmp` and only then back up and `os.replace` into place; a bad archive leaves the target untouched. Merge backs up `folder/<member relative path>`, matching where the member is written.
+- `window.ts` only passes http(s) URLs to `shell.openExternal` and cancels `will-navigate` away from the app page.
