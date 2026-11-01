@@ -87,6 +87,9 @@ Backend (plan file tools/plans/692-harden-cors-restore-safety.md steps 1-6, 9):
 8. Tests: src/tests/test_restore_safety.py (reuses conftest client/AUTH and memcard test patterns).
 9. Docs: GOTCHAS.md entry + CLAUDE.md rule line.
 ## 9. Review
+### Findings: 1 fixed (state extract moved dirs with os.replace; now file-wise). Residual: window.ts not type-checked locally (no node_modules)
+### Blocked: no
+### Blockers: none
 TBD
 ## 10. Ship
 TBD
@@ -99,3 +102,4 @@ none
 - 2026-11-01 fplan: 1 step written, visual_pattern=none
 - 2026-11-01 tplan: test_file=src/tests/test_restore_safety.py, 9 test cases defined
 - 2026-11-01 implement: steps 1-9 done (CORS regex, hmac, temp-extract restores, window.ts guards, tests, docs); full suite 606 passed. Deviation: single commit for all steps; tsc not run (no node_modules)
+- 2026-11-01 review: 1 finding (fixed), blocked=no

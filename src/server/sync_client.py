@@ -101,8 +101,11 @@ def _extract_state_folder(content: bytes, folder: Path) -> None:
             return
     try:
         _backup_state_files(folder)
-        for item in tmp.iterdir():
-            os.replace(str(item), str(folder / item.name))
+        for src in tmp.rglob("*"):  # file-wise: a subdir may already exist in folder
+            if src.is_file():
+                dest = folder / src.relative_to(tmp)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(str(src), str(dest))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
