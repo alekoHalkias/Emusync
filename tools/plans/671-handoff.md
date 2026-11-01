@@ -4,7 +4,7 @@
 - Issue: #671
 - Branch: feature/671-fix-game-launch
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
