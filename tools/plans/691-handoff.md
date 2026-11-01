@@ -4,7 +4,7 @@
 - Issue: #691
 - Branch: feature/691-path-traversal-tar-presence
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
