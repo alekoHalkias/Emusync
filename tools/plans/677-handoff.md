@@ -4,7 +4,7 @@
 - Issue: #677
 - Branch: feature/677-appimage-steam-launcher
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
