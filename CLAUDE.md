@@ -29,7 +29,9 @@ make install-service | uninstall-service   # systemd user unit (needs `sudo logi
 node src/scripts/scan-roms.mjs <folder> [--ext gba,sfc] [--depth 3] [--verbose]
 ```
 
-Stack: Python 3.10+/Click, FastAPI+uvicorn, SQLite, zeroconf, tomlkit, httpx; Electron 31, React 18, TS, electron-vite, electron-updater.
+Stack: Python 3.10+/Click, FastAPI+uvicorn, SQLite, zeroconf, tomlkit, httpx; Electron 45, electron-builder 26, React 18, TS, electron-vite, electron-updater.
+
+Build toolchain pin (#682): electron-vite 2.x peers Vite 4/5 only, so Vite stays on 5.x and `@vitejs/plugin-react` on 5.x until electron-vite is bumped (#681); Vite 6+/plugin-react 6 follow that.
 
 ## Testing
 
@@ -91,7 +93,7 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-linux-x8
 
 **Ops**
 - AppImage runtime (#677): the AppImage bundles the CLI (`build.extraResources` in `src/gui/package.json`; `test_bundle.py` fails if a `src/` package is missing) and `runtimeSetup.ts:ensureRuntime()` copies it to `<cacheDir>/runtime/src` and builds `<cacheDir>/runtime/.cache/.venv` from system python3 (same layout as a checkout, stamped by app version and requirements hash, retries after failure). `runtime.ts` `RUNTIME_DIR`/`USE_RUNTIME_DIR` (packaged AppImage, no `EMUSYNC_SCRIPT`) point `SCRIPT`/`PYTHON`/`LAUNCHER` into it; server start, sync daemon, `server:preflight` and `steam:addGame` await `ensureRuntime()` first, so Steam shortcuts target `<cacheDir>/runtime/src/emusync`, never the AppImage mount. `src/requirements.txt` is runtime-only; tests/CI/`install.sh` use `requirements-dev.txt`. See GOTCHAS.
-- Dependencies (#679): audited against all code; `adm-zip` removed (unused). Python floors in `src/requirements*.txt` track the versions CI/tests verify. `uvicorn[standard]` is kept for uvloop/httptools speed (websockets/watchfiles unused). React is on 19 (#683). Electron/electron-builder/electron-vite/Vite/TypeScript majors are intentionally held back for separate issues.
+- Dependencies (#679): audited against all code; `adm-zip` removed (unused). Python floors in `src/requirements*.txt` track the versions CI/tests verify. `uvicorn[standard]` is kept for uvloop/httptools speed (websockets/watchfiles unused). Electron 45 and electron-builder 26 done (#681); electron-vite stays on 2.x because 3+ types need Vite 6+ (bump with #682); Vite/TypeScript majors are held back for separate issues. React is on 19 (#683).
 - Orphaned server: `pkill -9 -f "src/emusync.py server start"`; SIGKILL leaves `.server_pid`/`.server_token`. WSL2 Electron needs `--no-sandbox`, `DISPLAY=:0`. Fresh `npm install` in `src/gui/`: if electron binary missing, `npm install-scripts approve electron esbuild && npm rebuild electron esbuild`. Duplicate-launch guard shows a popup (notify-send→zenity→kdialog→xmessage→tk). mDNS runs in a daemon thread.
 
 ## Keeping docs updated
