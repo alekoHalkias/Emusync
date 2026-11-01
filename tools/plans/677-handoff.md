@@ -47,12 +47,14 @@ src/gui/electron/runtime.ts, steam.ts, game.ts, server.ts, paths.ts; src/gui/pac
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: none (no TS harness; manual)
+### Test Cases: manual: picker on first add and persisted repoPath; no picker on second add; cancel leaves vdf unchanged
+### Edge Cases: invalid pick rejected; stale repoPath skipped; dev/EMUSYNC_SCRIPT unchanged; save({...load()}) preserves repoPath
+### Integration Points: tsc both configs; make test-changed
+### Outline
+Frontend (electron): 1 display.ts repoPath; 2 launcher.ts findLauncher/pickLauncher; 3 steam.ts + game.ts use them; 5 CLAUDE.md.
+Tests: 4 manual + tsc.
+### Summary: Add-to-Steam from the AppImage finds or asks for a repo checkout and remembers it, so no env var is needed.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -89,3 +91,4 @@ src/gui/electron/runtime.ts, steam.ts, game.ts, server.ts, paths.ts; src/gui/pac
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
 - 2026-11-01 fplan: 5 steps written, visual_pattern=none
+- 2026-11-01 tplan: test_file=none, 3 manual cases defined

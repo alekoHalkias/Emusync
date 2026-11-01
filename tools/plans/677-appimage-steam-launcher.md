@@ -30,6 +30,19 @@ When EmuSync runs from an AppImage, find (or ask for) a repo checkout and use it
 - [ ] 5. Docs: update the CLAUDE.md Steam shortcut rule (#675) to describe the lookup order and picker, `repoPath` in display.json (#677).
   - Files: CLAUDE.md
 
+## Testing
+- **Test File**: none (no TS harness in repo; tests are Python against real SQLite).
+- **Test Cases**:
+  - Manual, AppImage with no env and no checkout in a common dir: Add to Steam opens the folder picker; picking a repo creates the shortcut with `<repo>/src/emusync` and writes `repoPath` to display.json.
+  - Manual, second add: no picker (repoPath reused).
+  - Manual, cancel picker: error message, `shortcuts.vdf` unchanged.
+- **Edge Cases**:
+  - Picked folder lacks `src/emusync`: rejected, nothing persisted.
+  - Stale `repoPath` (folder deleted): findLauncher skips it and falls through.
+  - Dev checkout / EMUSYNC_SCRIPT: no picker, unchanged.
+  - display.json written by `save({...load()})` elsewhere keeps `repoPath`.
+- **Integration Points**: tsc type-check of both tsconfigs (ignore pre-existing errors); `make test-changed`.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: yes (display.json `repoPath`, optional).
 
