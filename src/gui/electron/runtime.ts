@@ -13,6 +13,9 @@ import { CONFIG_PATH } from "./paths";
 
 export { CONFIG_PATH };
 export const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../../../emusync.py");
+export const LAUNCHER = join(dirname(SCRIPT), "emusync");
+// A launcher inside an AppImage mount vanishes on exit; never hand it to Steam (#675).
+export const LAUNCHER_STABLE = !LAUNCHER.startsWith("/tmp/.mount_");
 export const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
   const win = process.platform === "win32";
   const venv = join(dirname(SCRIPT), "../.cache/.venv", win ? "Scripts" : "bin", win ? "python.exe" : "python");
