@@ -14,20 +14,20 @@ Launch commands built with a spaced or backslashed emulator path, and previously
 - **Recommendations**: none
 
 ## Steps
-- [ ] 1. Add `split_launch_command(cmd)` to cli/common.py: tokenize with `shlex.split(posix=False)` on Windows (quotes stripped) else POSIX; if argv[0] is not an existing file or on PATH, join the shortest run of leading tokens that is an existing file (handles stored unquoted `/opt/My Emu/emu` and `C:\Program Files\...`).
+- [x] 1. Add `split_launch_command(cmd)` to cli/common.py: tokenize with `shlex.split(posix=False)` on Windows (quotes stripped) else POSIX; if argv[0] is not an existing file or on PATH, join the shortest run of leading tokens that is an existing file (handles stored unquoted `/opt/My Emu/emu` and `C:\Program Files\...`).
   - Files: src/cli/common.py
   - Reuses: stdlib shlex, shutil.which, os.path
   - New: helper - no existing splitter handles Windows or legacy unquoted exec paths
-- [ ] 2. Use it in both launch sites, and quote the bare/single-quoted `%ROM%` substitution in `_resolve_launch_command` so a ROM path with spaces stays one argument.
+- [x] 2. Use it in both launch sites, and quote the bare/single-quoted `%ROM%` substitution in `_resolve_launch_command` so a ROM path with spaces stays one argument.
   - Files: src/cli/run.py (line ~102, ~253), src/cli/run_offline.py (line ~150)
   - Reuses: existing `_resolve_launch_command`, `ROM_TOKEN`
   - New: none
-- [ ] 3. Quote exec_path where commands are built.
+- [x] 3. Quote exec_path where commands are built.
   - Files: src/cli/console.py (364-366), src/gui/electron/emulator/scan.ts (303-304)
   - Reuses: existing f-strings; only add quotes
   - New: none
-- [ ] 4. Tests: src/tests/test_launch_command_split.py - spaced exec path (quoted and legacy unquoted using a real temp file), Windows-style tokenization (call internal split with nt mode), bare `%ROM%` with spaces yields one arg, plain commands unchanged; extend test_launch_command_token.py for the bare-token case. No mocks, real files.
-- [ ] 5. Docs: none needed - internal parsing fix, no CLI/IPC/config change; one line in src/docs/GOTCHAS.md only if review asks.
+- [x] 4. Tests: src/tests/test_launch_command_split.py - spaced exec path (quoted and legacy unquoted using a real temp file), Windows-style tokenization (call internal split with nt mode), bare `%ROM%` with spaces yields one arg, plain commands unchanged; extend test_launch_command_token.py for the bare-token case. No mocks, real files.
+- [x] 5. Docs: none needed - internal parsing fix, no CLI/IPC/config change; one line in src/docs/GOTCHAS.md only if review asks.
 
 ## Testing
 - **Test File**: src/tests/test_launch_command_split.py (new, plain pytest, real temp files); extend src/tests/test_launch_command_token.py

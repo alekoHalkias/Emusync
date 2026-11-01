@@ -4,7 +4,7 @@
 - Issue: #702
 - Branch: feature/702-launch-command-quoting
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -99,3 +99,4 @@ Tests: test_launch_command_split.py (new, real files), extend test_launch_comman
 ### Summary
 Spaced or Windows emulator paths and spaced ROM paths now yield correct argv; stored unquoted commands still work.
 - 2026-11-01 tplan: test_file=src/tests/test_launch_command_split.py, 6 test cases defined
+- 2026-11-01 implement: steps 1-5 done (helper, wiring, quoting, tests; 629 passed)
