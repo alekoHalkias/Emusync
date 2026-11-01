@@ -122,3 +122,14 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - The daemon leaves a request `pending` when the ROM is over `network_upload_auto_max_mb`; only the GUI banner (or `rom fulfill-network-upload`) completes it. With no GUI ever opened on the owner, large requests stay pending.
 - `upload_to_network` refuses unless `<network folder>/.emusync-share-id` equals the console's registered `network_share_id`, and never overwrites an existing master (reuses `upload_to_master`). An unreachable share or missing marker raises `ShareUnavailable` and leaves the request pending (retried next start); a marker that exists but mismatches marks it `failed`. The route checks "already on a network drive" (409) before "owner has no local ROM" (400).
 - Requests are only picked up when the sync-daemon or GUI starts, not on every CLI command (e.g. `emusync run`). Switch whole-folder ROMs are not handled.
+
+## AppImage runtime (#677)
+
+- The AppImage mounts read-only at a random `/tmp/.mount_*` path that vanishes on exit, so nothing persistent (Steam shortcuts, systemd units) may reference it. #675/#676 first stopped writing that path; #677 provisions a stable copy.
+- The runtime dir has the same layout as a checkout (`src/` + `.cache/.venv`) on purpose: the `src/emusync` wrapper, the `PYTHON` venv lookup and the `pkill -f "src/emusync.py server start"` pattern work unchanged. Do not add a second layout.
+- It lives in `cacheDir()`, so a cache cleaner can remove it; the next app launch re-provisions (a Steam shortcut fails until then).
+- First run needs system python3 with the venv module and network access for pip. Failures write no stamp, so the next call retries; errors surface through Setup `preflightError` and the `steam:addGame` result.
+- Adding a new top-level Python package under `src/` requires listing it in `build.extraResources`; `test_bundle.py` enforces this.
+- `requirements.txt` is what the packaged app installs: keep test packages in `requirements-dev.txt`.
+- Not covered: Windows (system python, no bootstrap) and a bundled interpreter. Swap the interpreter in `runtimeSetup.ts` (venv creation) and `runtime.ts` (`PYTHON`) if that is added.
+

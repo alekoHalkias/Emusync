@@ -49,7 +49,7 @@ Ship the Python CLI inside the AppImage and run it from a stable per-user runtim
   - Files: .github/workflows/release.yml
   - Reuses: existing build step
   - New: one workflow step - the only place the packaged layout is observable.
-- [ ] 8. Docs: CLAUDE.md (replace the #675 Steam rule with the runtime-dir design, deps split, no EMUSYNC_SCRIPT needed), src/docs/ARCHITECTURE.md (runtime dir, bootstrap lifecycle, data paths), GOTCHAS.md (read-only mount, cacheDir wipe self-heals on next launch, first-run needs system python3 + venv + network).
+- [x] 8. Docs: CLAUDE.md (replace the #675 Steam rule with the runtime-dir design, deps split, no EMUSYNC_SCRIPT needed), src/docs/ARCHITECTURE.md (runtime dir, bootstrap lifecycle, data paths), GOTCHAS.md (read-only mount, cacheDir wipe self-heals on next launch, first-run needs system python3 + venv + network).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md, src/docs/GOTCHAS.md
 
 ## Testing

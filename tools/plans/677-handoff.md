@@ -4,7 +4,7 @@
 - Issue: #677
 - Branch: feature/677-appimage-steam-launcher
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -102,3 +102,4 @@ Tests: 6 test_bundle.py + manual build.
 - 2026-11-01 implement: step 4 done (runtimeSetup.ts ensureRuntime)
 - 2026-11-01 implement: step 5 done (ensureRuntime awaited by server start, daemon start, preflight, addGame)
 - 2026-11-01 implement: steps 6-7 done (test_bundle.py 3 passing; release smoke step)
+- 2026-11-01 implement: step 8 done (CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md); electron-builder --dir confirmed resources/src layout
