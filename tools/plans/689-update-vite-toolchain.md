@@ -3,7 +3,7 @@
 Issue: #689
 Branch: feature/689-update-vite-toolchain
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
