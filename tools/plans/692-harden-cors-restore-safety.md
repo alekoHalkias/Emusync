@@ -42,8 +42,31 @@ Close the CORS/PIN/openExternal holes and make memcard and state restores failur
   - Files: src/gui/electron/window.ts
   - Reuses: existing `setWindowOpenHandler`
   - New: tiny inline `openSafe` - the same check is needed in two handlers.
-- [ ] 8. Tests: new `src/tests/test_restore_safety.py` (real FS, real SQLite where API is hit). See Test Plan in handoff section 6.
+- [ ] 8. Tests: new `src/tests/test_restore_safety.py` (real FS; API cases use conftest `client`/`AUTH`/`make_client`). Cases listed in ## Testing.
+  - Reuses: conftest.py client fixtures, test_memcard_folder_sync.py `_make_folder_card`/`memcard_bytes` pattern
+  - New: one test file - restore helpers have no dedicated safety tests; kept separate from the memcard pack tests to stay small
 - [ ] 9. Docs: add a GOTCHAS.md entry (CORS decision, temp-extract-then-swap restores, merge backup by relative path) and one line in CLAUDE.md Rules (Saves / sync).
+
+## Testing
+- **Test File**: src/tests/test_restore_safety.py
+- **Test Cases**:
+  - cors_allowed_origin: async `client` OPTIONS `/health` (or any route) with `Origin: null` and `Origin: http://localhost:5173` + `Access-Control-Request-Method: GET` returns `access-control-allow-origin` echoing the origin.
+  - cors_foreign_origin: `Origin: https://evil.example` preflight has no `access-control-allow-origin` header.
+  - pin_constant_time: correct PIN accepted, wrong PIN 401/403 via existing `AUTH`; non-ASCII PIN header does not 500.
+  - memcard_restore_failure_keeps_card: `_write_memcard_tar_bytes(card, corrupt_tar)` raises `tarfile.TarError`, card folder content unchanged, no `.emusync-*` temp dirs left, no empty card.
+  - memcard_restore_success_backs_up: valid tar replaces folder, `<card>.bak` holds old tree (covered by existing test; add file-card to folder-card case).
+  - state_extract_failure_no_rename: `_extract_state_folder` with an enveloped corrupt tar.gz leaves existing state files and creates no `.bak`.
+  - state_extract_success: files replaced, previous ones in `.bak`.
+  - merge_backup_subfolder: shared folder with `sub/a.state`; merging an archive containing `sub/a.state` leaves `sub/a.state.bak` with old content, new content in place; untouched siblings unchanged.
+  - merge_traversal_rejected: archive with `../x` raises/ignores before any `.bak` is made.
+- **Edge Cases**:
+  - Legacy (un-enveloped) raw state blob still written as `<Folder>.state`.
+  - Legacy raw-file memcard fallback (`_write_memcard` with non-tar bytes) still works (existing test must keep passing).
+  - Existing `.bak` is overwritten, not accumulated.
+- **Integration Points**:
+  - `_write_memcard` TarError fallback to `_write_memcard_raw_bytes` depends on step 4 still raising TarError.
+  - `run`/pull-state callers of these helpers unchanged in signature.
+  - window.ts: no automated harness; manual check (external https link opens, `javascript:`/`file:` ignored, in-app navigation blocked), tsc.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.

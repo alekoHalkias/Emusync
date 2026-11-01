@@ -35,15 +35,44 @@ src/server/api/_core.py, src/server/sync_client.py, src/gui/electron/window.ts.
 ### Backwards Compatibility: no breaking changes (CORS only narrows browser origins; Electron renderer origin and dev server stay allowed)
 
 ## 3. Frontend Plan
-TBD
+### Design Alignment: no visual change; Electron main process only
+### Visual Pattern: none
+### Recommendations: none
+Step 7 of plan file: window.ts - src/gui/electron/window.ts, reuses setWindowOpenHandler; new inline openSafe (same http/https check needed in two handlers). No IPC, no emusync.d.ts change.
 ## 4. Backend Plan
 ### Design Alignment: fits existing helpers (_safe_extract_tar, .bak convention); backend-design-guide.md unchanged
 ### Backend Pattern: extract archive to a sibling temp dir first, then swap/move with os.replace; CORS allowlist via allow_origin_regex
 ### Recommendations: CORS allowlist (null, localhost, 127.0.0.1) rather than mandatory PIN; document in GOTCHAS.md
 ## 5. Merged Plan
-TBD
+### Conflicts Resolved: none (bplan and fplan share one plan file tools/plans/692-harden-cors-restore-safety.md; disjoint files)
+### Unresolved Conflicts: none
 ## 6. Testing Plan
-TBD
+- **Test File**: src/tests/test_restore_safety.py
+- **Test Cases**:
+  - cors_allowed_origin: async `client` OPTIONS `/health` (or any route) with `Origin: null` and `Origin: http://localhost:5173` + `Access-Control-Request-Method: GET` returns `access-control-allow-origin` echoing the origin.
+  - cors_foreign_origin: `Origin: https://evil.example` preflight has no `access-control-allow-origin` header.
+  - pin_constant_time: correct PIN accepted, wrong PIN 401/403 via existing `AUTH`; non-ASCII PIN header does not 500.
+  - memcard_restore_failure_keeps_card: `_write_memcard_tar_bytes(card, corrupt_tar)` raises `tarfile.TarError`, card folder content unchanged, no `.emusync-*` temp dirs left, no empty card.
+  - memcard_restore_success_backs_up: valid tar replaces folder, `<card>.bak` holds old tree (covered by existing test; add file-card to folder-card case).
+  - state_extract_failure_no_rename: `_extract_state_folder` with an enveloped corrupt tar.gz leaves existing state files and creates no `.bak`.
+  - state_extract_success: files replaced, previous ones in `.bak`.
+  - merge_backup_subfolder: shared folder with `sub/a.state`; merging an archive containing `sub/a.state` leaves `sub/a.state.bak` with old content, new content in place; untouched siblings unchanged.
+  - merge_traversal_rejected: archive with `../x` raises/ignores before any `.bak` is made.
+- **Edge Cases**:
+  - Legacy (un-enveloped) raw state blob still written as `<Folder>.state`.
+  - Legacy raw-file memcard fallback (`_write_memcard` with non-tar bytes) still works (existing test must keep passing).
+  - Existing `.bak` is overwritten, not accumulated.
+- **Integration Points**:
+  - `_write_memcard` TarError fallback to `_write_memcard_raw_bytes` depends on step 4 still raising TarError.
+  - `run`/pull-state callers of these helpers unchanged in signature.
+  - window.ts: no automated harness; manual check (external https link opens, `javascript:`/`file:` ignored, in-app navigation blocked), tsc.
+
+### Outline
+Frontend: window.ts - openSafe http/https guard for setWindowOpenHandler plus will-navigate guard.
+Backend: _core.py CORS allow_origin_regex; hmac.compare_digest; sync_client.py _extract_tar_to_tmp helper; memcard, state and merge restores extract to temp then swap; merge backup by relative path; docs.
+Tests: test_restore_safety.py (CORS, PIN, memcard/state failure rollback, merge subfolder backup); manual check for window.ts.
+### Summary
+Narrow CORS, constant-time PIN, http(s)-only external links, and make archive restores atomic-ish with correct merge backups.
 ## 7. Test Design
 TBD
 ## 8. Implementation Steps
@@ -54,7 +83,9 @@ Backend (plan file tools/plans/692-harden-cors-restore-safety.md steps 1-6, 9):
 4. _write_memcard_tar_bytes extract-then-swap - reuses helper.
 5. _extract_state_folder extract-then-swap - reuses helper.
 6. _merge_extract_state_folder temp extract + per-file relative backup - reuses helper.
-9. Docs.
+7. window.ts: openSafe + will-navigate (reuses setWindowOpenHandler; inline helper because two handlers need the check).
+8. Tests: src/tests/test_restore_safety.py (reuses conftest client/AUTH and memcard test patterns).
+9. Docs: GOTCHAS.md entry + CLAUDE.md rule line.
 ## 9. Review
 TBD
 ## 10. Ship
@@ -65,3 +96,5 @@ none
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend+electron-main, plan_target=both, difficulty=4/10, breaking=no
 - 2026-11-01 bplan: 9 steps written, backend_pattern=extract-to-temp-then-swap
+- 2026-11-01 fplan: 1 step written, visual_pattern=none
+- 2026-11-01 tplan: test_file=src/tests/test_restore_safety.py, 9 test cases defined
