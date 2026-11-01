@@ -29,6 +29,16 @@ Never write a `/tmp/.mount_*` launcher path into shortcuts.vdf; use the repo-che
 - [ ] 4. Docs: CLAUDE.md Steam/Ops rule noting that the AppImage requires EMUSYNC_SCRIPT for Steam shortcuts and never writes a `/tmp/.mount_*` path (#675).
   - Files: CLAUDE.md
 
+## Testing
+- **Test File**: none (no TS harness in repo; tests are Python against real SQLite). Existing src/tests wrapper test is unchanged.
+- **Test Cases**:
+  - Manual, AppImage with EMUSYNC_SCRIPT unset: Add to Steam returns the error; shortcuts.vdf is not modified.
+  - Manual, EMUSYNC_SCRIPT=<repo>/src/emusync.py: shortcut exe is <repo>/src/emusync.
+- **Edge Cases**:
+  - Stale `/tmp/.mount_*` entry already in shortcuts.vdf: isAdded/removeGame still match it by basename; a successful add replaces it.
+  - Dev checkout and Windows: launcherPath unchanged.
+- **Integration Points**: `make test-changed` still passes (no Python changes); `npm run build` in src/gui type-checks the edit.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

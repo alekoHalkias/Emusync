@@ -47,12 +47,14 @@ src/gui/electron/steam.ts, runtime.ts, paths.ts
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: none (no TS harness; manual check)
+### Test Cases: manual: AppImage w/o EMUSYNC_SCRIPT errors and leaves vdf untouched; with it, exe = repo launcher
+### Edge Cases: stale /tmp/.mount_* entry still matched by basename and replaced on add; dev/Windows unchanged
+### Integration Points: make test-changed; npm run build type-check
+### Outline
+Frontend (electron): 1 launcherPath() in runtime.ts; 2 use it in steam.ts/game.ts, addGame errors when null; 4 CLAUDE.md note.
+Tests: 3 manual check, no TS harness.
+### Summary: Steam shortcuts never use the AppImage temp mount path; AppImage needs EMUSYNC_SCRIPT or add-to-Steam errors clearly.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -88,3 +90,4 @@ src/gui/electron/steam.ts, runtime.ts, paths.ts
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=5/10, breaking=no
 - 2026-11-01 fplan: 4 steps written, visual_pattern=none
+- 2026-11-01 tplan: test_file=none, 2 manual cases defined
