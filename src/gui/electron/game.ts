@@ -2,12 +2,12 @@
 import { ipcMain } from "electron";
 import { spawn } from "child_process";
 import { existsSync, readFileSync, openSync, closeSync } from "fs";
-import { join, dirname } from "path";
+import { join } from "path";
 import { dataDir } from "./paths";
-import { SCRIPT, PYTHON, rt } from "./runtime";
+import { SCRIPT, LAUNCHER, PYTHON, rt } from "./runtime";
 
 export function registerGameIpc(): void {
-  ipcMain.handle("launcher:path", () => join(dirname(SCRIPT), "emusync"));
+  ipcMain.handle("launcher:path", () => LAUNCHER);
 
   ipcMain.handle("game:launch", (_event, slug: string) => {
     if (rt.gameProcess) return { ok: false };

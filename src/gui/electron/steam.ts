@@ -23,7 +23,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSy
 import { join, dirname, basename } from "path";
 import { homedir, platform } from "os";
 import shortcutEditor from "steam-shortcut-editor";
-import { SCRIPT } from "./runtime";
+import { LAUNCHER, LAUNCHER_STABLE } from "./runtime";
 import { ART_DIR } from "./art";
 
 type SteamShortcut = {
@@ -352,7 +352,7 @@ export function registerSteamIpc(): void {
       const userdataDir = findActiveUserdataDir(steamDir);
       if (!userdataDir) return false;
       const parsed = await parseShortcutsFile(join(userdataDir, "config", "shortcuts.vdf"));
-      const launcherExe = join(dirname(SCRIPT), "emusync");
+      const launcherExe = LAUNCHER;
       return parsed.shortcuts.some((s) => isOurShortcut(s, launcherExe, `run ${slug}`));
     } catch {
       return false;
@@ -369,7 +369,7 @@ export function registerSteamIpc(): void {
       const userdataDir = findActiveUserdataDir(steamDir);
       if (!userdataDir) return [];
       const parsed = await parseShortcutsFile(join(userdataDir, "config", "shortcuts.vdf"));
-      const launcherExe = join(dirname(SCRIPT), "emusync");
+      const launcherExe = LAUNCHER;
       return parsed.shortcuts
         .map((s) => ourSlug(s, launcherExe))
         .filter((slug): slug is string => slug !== null);
@@ -388,7 +388,7 @@ export function registerSteamIpc(): void {
     const path = join(userdataDir, "config", "shortcuts.vdf");
     try {
       const parsed = await parseShortcutsFile(path);
-      const launcherExe = join(dirname(SCRIPT), "emusync");
+      const launcherExe = LAUNCHER;
       const kept = parsed.shortcuts.filter((s) => !isOurShortcut(s, launcherExe, `run ${slug}`));
       if (kept.length !== parsed.shortcuts.length) await writeShortcutsFile(path, { shortcuts: kept });
       return { ok: true };
@@ -414,7 +414,10 @@ export function registerSteamIpc(): void {
         return { ok: false, error: "Steam appears to be running. Close Steam first, then try again." };
       }
 
-      const launcherExe = join(dirname(SCRIPT), "emusync");
+      if (!LAUNCHER_STABLE) {
+        return { ok: false, error: "EmuSync is running from an AppImage with no repo checkout. Set EMUSYNC_SCRIPT to <repo>/src/emusync.py and restart." };
+      }
+      const launcherExe = LAUNCHER;
       const exe = `"${launcherExe}"`;
       const startDir = `"${dirname(launcherExe)}"`;
       const launchOptions = `run ${slug}`;

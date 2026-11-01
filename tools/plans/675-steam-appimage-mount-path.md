@@ -14,11 +14,11 @@ Never write a `/tmp/.mount_*` launcher path into shortcuts.vdf; use the repo-che
 - **Recommendations**: none. Decision (user): the AppImage runs against a repo checkout via EMUSYNC_SCRIPT; no bundling, no persisted path.
 
 ## Steps
-- [ ] 1. Add `launcherPath(): string | null` to runtime.ts: `join(dirname(SCRIPT), "emusync")`, or null when that path is inside an AppImage mount (`/tmp/.mount_` prefix, or `process.env.APPIMAGE` set while EMUSYNC_SCRIPT is unset).
+- [x] 1. Add `launcherPath(): string | null` to runtime.ts: `join(dirname(SCRIPT), "emusync")`, or null when that path is inside an AppImage mount (`/tmp/.mount_` prefix, or `process.env.APPIMAGE` set while EMUSYNC_SCRIPT is unset).
   - Files: src/gui/electron/runtime.ts
   - Reuses: runtime.ts:SCRIPT
   - New: launcherPath - the same join is repeated at 5 call sites, so one helper is the smaller diff than patching each.
-- [ ] 2. Replace the 4 `join(dirname(SCRIPT), "emusync")` sites in steam.ts and the one in game.ts (`launcher:path`) with `launcherPath()`. Read-only handlers (isAdded, addedSlugs, removeGame) fall back to the old join when null so stale `/tmp/.mount_*` shortcuts are still matched (ourSlug compares by basename). `steam:addGame` returns `{ ok:false, error: "EmuSync is running from an AppImage with no repo checkout. Set EMUSYNC_SCRIPT to <repo>/src/emusync.py and restart." }` when null, before touching shortcuts.vdf. An existing stale entry is rewritten by the existing filter+push path on the next successful add.
+- [x] 2. Replace the 4 `join(dirname(SCRIPT), "emusync")` sites in steam.ts and the one in game.ts (`launcher:path`) with `launcherPath()`. Read-only handlers (isAdded, addedSlugs, removeGame) fall back to the old join when null so stale `/tmp/.mount_*` shortcuts are still matched (ourSlug compares by basename). `steam:addGame` returns `{ ok:false, error: "EmuSync is running from an AppImage with no repo checkout. Set EMUSYNC_SCRIPT to <repo>/src/emusync.py and restart." }` when null, before touching shortcuts.vdf. An existing stale entry is rewritten by the existing filter+push path on the next successful add.
   - Files: src/gui/electron/steam.ts, src/gui/electron/game.ts
   - Reuses: steam.ts:ourSlug/isOurShortcut, existing `{ok,error}` return shape
   - New: none
@@ -46,3 +46,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 Bundling the CLI into the AppImage; persisting a repo path in display.json; targeting the AppImage itself as the shortcut exe.
 
 ## Log
+Steps 1-2: exported constants LAUNCHER and LAUNCHER_STABLE instead of a launcherPath() function returning null; read-only handlers use LAUNCHER directly, so no fallback code is needed.

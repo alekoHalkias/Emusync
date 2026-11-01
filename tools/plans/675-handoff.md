@@ -91,3 +91,4 @@ Tests: 3 manual check, no TS harness.
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=5/10, breaking=no
 - 2026-11-01 fplan: 4 steps written, visual_pattern=none
 - 2026-11-01 tplan: test_file=none, 2 manual cases defined
+- 2026-11-01 implement: steps 1-2 done (LAUNCHER/LAUNCHER_STABLE in runtime.ts, used in steam.ts/game.ts)
