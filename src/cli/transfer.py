@@ -353,6 +353,41 @@ def push_rom() -> None:
             click.echo(f"  Warning: {target['name']} is offline — {game_name} will be delivered when it comes online.")
 
 
+def _allowed_roots(client: "SyncClient", device_id: str) -> list[tuple[str, bool]]:
+    """ROM folders this device accepts incoming transfers into (#705).
+
+    Each entry is (path, is_game_folder): console-level folders (game/local/
+    network/extra) are shared roots a transfer must land strictly inside;
+    a game's own rom_folder_path may itself be the target of a folder re-sync."""
+    roots: list[tuple[str, bool]] = []
+    for c in client.get_device_consoles(device_id):
+        for key in ("device_game_folder", "device_local_folder", "device_network_folder"):
+            if c.get(key):
+                roots.append((c[key], False))
+        roots += [(f, False) for f in c.get("device_extra_folders") or [] if f]
+    roots += [(g["rom_folder_path"], True) for g in client.list_my_game_devices() if g.get("rom_folder_path")]
+    return roots
+
+
+def _destination_allowed(dest: str, roots: list[tuple[str, bool]], folder: bool = False) -> bool:
+    """True if *dest* (a ROM file, or for ``folder`` the directory holding it) is
+    inside one of *roots* after resolving ``..`` and symlinks. A console root itself
+    never qualifies, and the basename must be a plain filename."""
+    if not dest or not os.path.isabs(dest) or os.path.basename(dest) in ("", ".", ".."):
+        return False
+    target = os.path.realpath(os.path.dirname(dest) if folder else dest)
+    for root, is_game in roots:
+        r = os.path.realpath(root)
+        try:
+            if os.path.commonpath([os.path.normcase(r), os.path.normcase(target)]) != os.path.normcase(r):
+                continue
+        except ValueError:  # different drives
+            continue
+        if target != r or (folder and is_game):
+            return True
+    return False
+
+
 def _receive_transfer(
     client: "SyncClient",
     transfer_id: str,
@@ -373,6 +408,14 @@ def _receive_transfer(
     used for Wii/PS2 folder saves."""
     try:
         log(f"  Receiving {game_name}...")
+        # Never write where the sender says unless it is one of our ROM folders (#705).
+        if not _destination_allowed(
+            destination_path, _allowed_roots(client, client._headers["X-Device-ID"]), kind == "rom-folder"
+        ):
+            raise ValueError(
+                f"destination {destination_path!r} is not inside a ROM folder configured on this device; "
+                "set up the console's folders in EmuSync first"
+            )
         if kind == "rom-folder":
             folder = os.path.dirname(destination_path)
             # Only the PARENT (the shared console root) needs to exist ahead
