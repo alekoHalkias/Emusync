@@ -63,6 +63,7 @@ Releases: delete tag remotely+locally, fix, re-tag. Artifacts: `EmuSync-linux-x8
 **Saves / sync**
 - Shared-memcard flag is DB-backed `console_defs.shared_memcard/shared_state`, sourced from `src/cli/consoles_data.py` — never re-hardcode a set (#490). Shared-layout consoles (PS2/DC/GC/PSP/3DS) never sync per-game; they use `/consoles/{key}/memcard` + `_MemcardClient`, with their own history (`console_save_history`), baseline (`console_save_sync_baseline`) and conflicts (`console_save_conflicts`) tables. Only PS2 shares states.
 - Conflict = both sides moved past this device's `save_sync_baseline`, not just a hash mismatch (#460).
+- A failed `get_save_meta` request is never treated as "no save on the server": `_reconcile_save` lets it raise and `run_game` falls back to `_run_offline` (no push/pull) (#717).
 - Blobs carry a transfer envelope (`_pack_envelope`/`_unpack_envelope`, #478): don't add byte sniffers; keep un-enveloped fallbacks for old blobs; **hash envelope-free** (`_memcard_payload_bytes`), never hash `memcard_bytes()`.
 - Archive restores extract to a temp dir then swap (`_extract_tar_to_tmp`), never delete/rename the target first; merge backs up by member relative path; state extract moves files individually (#692).
 - GUI manual push/pull shell out to CLI (`game push-save`/`pull-save`/`push-state`/`pull-state`, `console push-memcard`/`pull-memcard`); exit 0 ok, 2 nothing on server, else error. No TS tar/sniff logic (#479).

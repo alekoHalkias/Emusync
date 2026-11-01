@@ -54,16 +54,11 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
         # otherwise resolve to the cwd, which must never be treated as a save
         # file. The caller's post-launch adoption step picks up and pushes the
         # freshly written save instead.
-        try:
-            meta = client.get_save_meta(game_slug)
-        except Exception:
-            meta = None
+        # A request failure propagates: it is not "no save on the server" (#717).
+        meta = client.get_save_meta(game_slug)
         return meta.get("hash") if meta else None
     p = Path(save_path)
-    try:
-        meta = client.get_save_meta(game_slug)
-    except Exception:
-        meta = None
+    meta = client.get_save_meta(game_slug)  # raises on failure; None only means 204 (#717)
 
     local_hash: Optional[str] = None
     local_mtime: Optional[datetime] = None

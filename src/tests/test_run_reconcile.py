@@ -207,6 +207,8 @@ class _FakeClient:
         self.reported_conflict = None
 
     def get_save_meta(self, slug):
+        if isinstance(self._meta, Exception):
+            raise self._meta  # simulate a failed request (#717)
         return self._meta
 
     def get_save_sync_baseline(self, slug):
@@ -981,3 +983,105 @@ def test_launcher_wrapper_finds_a_python():
     wrapper = Path(__file__).resolve().parent.parent / "emusync"
     r = subprocess.run([str(wrapper), "run", "--help"], capture_output=True, text=True)
     assert r.returncode == 0 and "GAME_SLUG" in r.stdout, r.stderr
+
+
+# ── failed save-meta lookup is not "no server save" (#717) ──────────────────────
+
+@pytest.mark.parametrize("with_path", [True, False])
+def test_reconcile_meta_failure_propagates_and_syncs_nothing(tmp_path, with_path):
+    import httpx
+
+    save = tmp_path / "s.srm"
+    _write_save(save, b"LOCAL", NOW)
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local")
+    client = _FakeClient(httpx.ReadTimeout("slow"))
+
+    with pytest.raises(httpx.HTTPError):
+        _reconcile_save(client, cfg, "g", str(save) if with_path else "")
+
+    assert not client.pushed and not client.pulled
+
+
+def test_reconcile_meta_failure_leaves_real_server_save_untouched(live_server, tmp_path):
+    import httpx
+    from server.sync_client import SyncClient
+
+    class _Flaky(SyncClient):
+        fail = False
+
+        def get_save_meta(self, slug):
+            if self.fail:
+                raise httpx.ReadTimeout("slow")
+            return super().get_save_meta(slug)
+
+    client = _Flaky(live_server["host"], live_server["port"], "", "dev-a", "A")
+    client.add_game("Zelda", "SNES")
+    slug = client.list_games()[0]["slug"]
+    server_save = tmp_path / "server.srm"
+    server_save.write_bytes(b"SERVER-PROGRESS")
+    client.push_save(slug, str(server_save))
+    before = client.get_save_meta(slug)["hash"]
+
+    local = tmp_path / "local.srm"
+    _write_save(local, b"STALE-LOCAL", NOW + timedelta(days=1))  # would win newest-wins
+    client.fail = True
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-a")
+    with pytest.raises(httpx.HTTPError):
+        _reconcile_save(client, cfg, slug, str(local))
+
+    client.fail = False
+    assert client.get_save_meta(slug)["hash"] == before
+
+
+def test_run_game_falls_back_offline_when_save_state_unreadable(monkeypatch, tmp_path):
+    import httpx
+    import cli.run as run_mod
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local", device_name="deck")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+    rom = tmp_path / "g.sfc"
+    rom.write_bytes(b"ROM")
+    gd = GameDeviceConfig(rom_path=str(rom), save_path=str(tmp_path / "g.srm"), launch_command="emu",
+                          state_path="", rom_folder_path=str(tmp_path))
+    released, pushed = [], []
+
+    class _C:
+        def health(self, retries=0, retry_delay=1.5):
+            return True
+
+        def get_game_device(self, slug):
+            return gd
+
+        def get_game(self, slug):
+            return {"name": "G", "console": "SNES"}
+
+        def get_lock(self, slug):
+            return {"locked": False}
+
+        def acquire_lock(self, slug):
+            pass
+
+        def release_lock(self, slug):
+            released.append(slug)
+
+        def push_save(self, slug, path):
+            pushed.append(path)
+
+    def _boom(*a, **k):
+        raise httpx.ReadTimeout("slow")
+
+    offline_calls = []
+
+    def _fake_offline(cfg_, slug, pid_file, command):
+        offline_calls.append(slug)
+        raise SystemExit(0)
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+    monkeypatch.setattr(run_mod, "_reconcile_save", _boom)
+    monkeypatch.setattr(run_mod, "_run_offline", _fake_offline)
+
+    with pytest.raises(SystemExit):
+        run_mod.run_game.callback(game_slug="g", command=())
+    assert offline_calls == ["g"]
+    assert pushed == []
+    assert released == ["g"]
