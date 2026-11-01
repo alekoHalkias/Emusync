@@ -98,3 +98,4 @@ Tests: 6 test_bundle.py + manual build.
 - 2026-11-01 tplan: test_file=none, 3 manual cases defined
 - 2026-11-01 plan redone: bundle CLI via extraResources + cache runtime dir, 8 steps, difficulty 7/10
 - 2026-11-01 implement: step 1 done (requirements split; release.yml line 52 build job left on runtime file)
+- 2026-11-01 implement: steps 2-3 done (extraResources, RUNTIME_DIR/USE_RUNTIME_DIR in runtime.ts, guard removed)

@@ -25,11 +25,11 @@ Ship the Python CLI inside the AppImage and run it from a stable per-user runtim
   - Files: src/requirements.txt, src/requirements-dev.txt, install.sh, Makefile, .github/workflows/ci.yml, .github/workflows/release.yml, .githooks/pre-commit (if needed)
   - Reuses: existing install paths
   - New: requirements-dev.txt - the test deps currently sit in the same file, and the runtime venv must not install them.
-- [ ] 2. Bundle the CLI: add `build.extraResources` copying `emusync.py`, `emusync`, `requirements.txt`, `cli/**`, `server/**`, `shared/**` from `..` to `src`, excluding `__pycache__`, tests, gui, docs, scripts. Files land in `<resources>/src/`.
+- [x] 2. Bundle the CLI: add `build.extraResources` copying `emusync.py`, `emusync`, `requirements.txt`, `cli/**`, `server/**`, `shared/**` from `..` to `src`, excluding `__pycache__`, tests, gui, docs, scripts. Files land in `<resources>/src/`.
   - Files: src/gui/package.json
   - Reuses: electron-builder `extraResources`
   - New: none
-- [ ] 3. Runtime paths in runtime.ts: when `EMUSYNC_SCRIPT` is unset and the app is a packaged Linux AppImage (`app.isPackaged` and `process.env.APPIMAGE`), `RUNTIME_DIR = join(cacheDir(), "runtime")`, `SCRIPT = RUNTIME_DIR/src/emusync.py`, and `PYTHON` checks `RUNTIME_DIR/.cache/.venv/bin/python` through the existing venv lookup (it already derives from `dirname(SCRIPT)/../.cache/.venv`). Otherwise unchanged. Delete `LAUNCHER_STABLE`.
+- [x] 3. Runtime paths in runtime.ts: when `EMUSYNC_SCRIPT` is unset and the app is a packaged Linux AppImage (`app.isPackaged` and `process.env.APPIMAGE`), `RUNTIME_DIR = join(cacheDir(), "runtime")`, `SCRIPT = RUNTIME_DIR/src/emusync.py`, and `PYTHON` checks `RUNTIME_DIR/.cache/.venv/bin/python` through the existing venv lookup (it already derives from `dirname(SCRIPT)/../.cache/.venv`). Otherwise unchanged. Delete `LAUNCHER_STABLE`.
   - Files: src/gui/electron/runtime.ts
   - Reuses: runtime.ts:SCRIPT/PYTHON/LAUNCHER, paths.ts:cacheDir
   - New: RUNTIME_DIR constant - the bootstrap and the paths must agree on one directory.
@@ -73,3 +73,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 Bundling a Python interpreter; Windows bootstrap or Windows Steam shortcuts; a progress UI for first-run pip install; macOS.
 
 ## Log
+Step 3: also removed the #676 LAUNCHER_STABLE guard from steam.ts here (the constant is gone), and PYTHON points at the runtime venv unconditionally when USE_RUNTIME_DIR so it is correct after the first-run bootstrap. Step 5 still awaits ensureRuntime in addGame.

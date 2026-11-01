@@ -23,7 +23,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSy
 import { join, dirname, basename } from "path";
 import { homedir, platform } from "os";
 import shortcutEditor from "steam-shortcut-editor";
-import { LAUNCHER, LAUNCHER_STABLE } from "./runtime";
+import { LAUNCHER } from "./runtime";
 import { ART_DIR } from "./art";
 
 type SteamShortcut = {
@@ -414,9 +414,6 @@ export function registerSteamIpc(): void {
         return { ok: false, error: "Steam appears to be running. Close Steam first, then try again." };
       }
 
-      if (!LAUNCHER_STABLE) {
-        return { ok: false, error: "EmuSync is running from an AppImage with no repo checkout. Set EMUSYNC_SCRIPT to <repo>/src/emusync.py and restart." };
-      }
       const launcherExe = LAUNCHER;
       const exe = `"${launcherExe}"`;
       const startDir = `"${dirname(launcherExe)}"`;
