@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #673
 - Branch: feature/673-steam-fullscreen
-- PR: none
-- Status: implemented
+- PR: pending
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
