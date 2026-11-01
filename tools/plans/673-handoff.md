@@ -4,7 +4,7 @@
 - Issue: #673
 - Branch: feature/673-steam-fullscreen
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -32,9 +32,9 @@ src/gui/electron/display.ts, optionally src/gui/electron/steam.ts
 ### Backwards Compatibility: no breaking changes
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: extends display.ts load() detection
+### Visual Pattern: none (no UI change)
+### Recommendations: Steam env overrides saved preference for the session, not persisted
 
 ## 4. Backend Plan
 ### Design Alignment: TBD
@@ -61,7 +61,10 @@ src/gui/electron/display.ts, optionally src/gui/electron/steam.ts
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/673-steam-fullscreen.md
+1. Force fullscreen on SteamGameId/SteamAppId. Files: src/gui/electron/display.ts. Reuses: --fullscreen condition. New: none.
+2. Tests: manual (no Electron test harness). Files: none.
+3. Docs: none.
 
 ## 9. Review
 ### Findings: TBD
@@ -82,3 +85,4 @@ src/gui/electron/display.ts, optionally src/gui/electron/steam.ts
 ## 12. Log
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=1/10, breaking=no
+- 2026-11-01 fplan: 3 steps written, visual_pattern=none
