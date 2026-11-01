@@ -3,7 +3,7 @@
 Issue: #700
 Branch: feature/700-sse-reconnect-queue
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
