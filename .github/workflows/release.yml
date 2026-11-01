@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m venv .cache/.venv
-          .cache/.venv/bin/pip install -r src/requirements.txt
+          .cache/.venv/bin/pip install -r src/requirements-dev.txt
 
       - name: Run tests
         run: make test
@@ -64,6 +64,11 @@ jobs:
         run: npm run dist --prefix src/gui
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check the AppImage bundles the CLI
+        run: |
+          cd src/gui/dist && ./*.AppImage --appimage-extract 'resources/src/emusync.py' >/dev/null
+          test -f squashfs-root/resources/src/emusync.py
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4

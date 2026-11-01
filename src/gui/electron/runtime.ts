@@ -6,20 +6,24 @@
 // `rt` object — property writes propagate across importers, plain `let`
 // reassignment would not.
 import type { ChildProcess } from "child_process";
-import type { BrowserWindow } from "electron";
+import { app, type BrowserWindow } from "electron";
 import { existsSync } from "fs";
 import { join, dirname } from "path";
-import { CONFIG_PATH } from "./paths";
+import { CONFIG_PATH, cacheDir } from "./paths";
 
 export { CONFIG_PATH };
-export const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../../../emusync.py");
+// A packaged Linux AppImage mounts read-only at a random path, so its bundled CLI is
+// copied to a stable runtime dir laid out like a checkout (runtimeSetup.ts, #677).
+export const RUNTIME_DIR = join(cacheDir(), "runtime");
+export const USE_RUNTIME_DIR = !process.env.EMUSYNC_SCRIPT && app.isPackaged && !!process.env.APPIMAGE;
+export const SCRIPT = process.env.EMUSYNC_SCRIPT
+  ?? (USE_RUNTIME_DIR ? join(RUNTIME_DIR, "src/emusync.py") : join(__dirname, "../../../emusync.py"));
 export const LAUNCHER = join(dirname(SCRIPT), "emusync");
-// A launcher inside an AppImage mount vanishes on exit; never hand it to Steam (#675).
-export const LAUNCHER_STABLE = !LAUNCHER.startsWith("/tmp/.mount_");
 export const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
   const win = process.platform === "win32";
   const venv = join(dirname(SCRIPT), "../.cache/.venv", win ? "Scripts" : "bin", win ? "python.exe" : "python");
-  return existsSync(venv) ? venv : win ? "python" : "python3";
+  // In the runtime dir the venv is created by ensureRuntime, so it may not exist yet at import.
+  return existsSync(venv) || USE_RUNTIME_DIR ? venv : win ? "python" : "python3";
 })();
 
 export const rt = {

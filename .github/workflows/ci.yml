@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m venv .cache/.venv
-          .cache/.venv/bin/pip install -r src/requirements.txt
+          .cache/.venv/bin/pip install -r src/requirements-dev.txt
 
       - name: Run tests
         run: make test

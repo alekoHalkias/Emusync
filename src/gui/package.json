@@ -55,7 +55,22 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false
-    }
+    },
+    "extraResources": [
+      {
+        "from": "..",
+        "to": "src",
+        "filter": [
+          "emusync.py",
+          "emusync",
+          "requirements.txt",
+          "cli/**/*",
+          "server/**/*",
+          "shared/**/*",
+          "!**/__pycache__/**"
+        ]
+      }
+    ]
   },
   "allowScripts": {
     "electron@31.7.7": true,

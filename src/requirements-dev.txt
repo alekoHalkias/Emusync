@@ -1,0 +1,4 @@
+# Runtime deps plus test deps. The packaged app installs only requirements.txt (#677).
+-r requirements.txt
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
