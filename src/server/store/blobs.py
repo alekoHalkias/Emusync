@@ -388,11 +388,12 @@ class SaveStateMixin:
     def _extract_memcard_archive(self, archive: Path, dest: Path) -> None:
         """Extract a memcard tar archive to the destination folder."""
         import tarfile
+        from server.sync_client import _safe_extract_tar
         with tarfile.open(archive, "r:gz") as tf:
             # Extract to a temp location first
             tmp = dest.with_suffix(".tmp")
             tmp.mkdir(parents=True, exist_ok=True)
-            tf.extractall(tmp)
+            _safe_extract_tar(tf, tmp)
             # Move contents to destination
             for item in tmp.iterdir():
                 if item.name != ".":
@@ -457,26 +458,6 @@ class SaveStateMixin:
             return None, None
         dest = self._blob_path("console_saves", console_key)
         dest.parent.mkdir(parents=True, exist_ok=True)
-
-        # Check for folder-based uploads (stored as tar archives)
-        if dest.suffix in (".tar.gz", ".tgz"):
-            archive_ext = "gz" if dest.suffix == ".tar.gz" else "gz"
-            try:
-                import tarfile
-                tmp = dest.with_suffix(".tmp")
-                with tarfile.open(dest, f"r:{archive_ext}") as tf:
-                    # Extract to temp location first
-                    tmp.mkdir(parents=True, exist_ok=True)
-                    tf.extractall(tmp)
-                    # Move contents to destination
-                    for item in tmp.iterdir():
-                        if item.name != ".":
-                            shutil.move(item, dest / item.name)
-                    tmp.rmdir()
-                return dest, meta
-            except tarfile.TarError:
-                # Not a valid tar archive — treat as single file
-                pass
 
         return dest, meta
 

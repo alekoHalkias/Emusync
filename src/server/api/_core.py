@@ -86,7 +86,7 @@ def _monitor_presence() -> None:
                             # acquire of the same threading.Lock would deadlock.
                             for slug in _store.release_device_locks(d.id):
                                 _store.log_event("game_stopped", slug, d.id)
-                            _print_activity(
+                                _print_activity(
                                     f"{_game_label(slug)} lock released ({name} went offline)"
                                 )
         except Exception:
