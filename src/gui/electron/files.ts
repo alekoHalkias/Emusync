@@ -82,7 +82,7 @@ export function registerFilesIpc(): void {
   ipcMain.handle("files:get-file-hash", (_event, filePath: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       const proc = spawn(rt.PYTHON, ["-c",
-        "import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())",
+        "import hashlib,sys\nh=hashlib.sha256()\nf=open(sys.argv[1],'rb')\nfor b in iter(lambda:f.read(1<<20),b''): h.update(b)\nprint(h.hexdigest())",
         filePath,
       ]);
       let output = "";

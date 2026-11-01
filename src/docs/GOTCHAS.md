@@ -151,3 +151,9 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - `cli/run.py` routes SIGHUP/SIGINT through `_interrupt_handler`: with an emulator running it kills the child like SIGTERM (no `sys.exit`, #472) so the push and lock release still run; before launch it raises `KeyboardInterrupt` so Ctrl+C is not swallowed. `stop_heartbeat` is created before the main `try` and set in its `finally`.
 - `_safe_extract_tar` uses `filter="data"` when `tarfile.data_filter` exists; otherwise it rejects non-regular/non-dir members and clears setuid/setgid/sticky bits.
 - Whole-blob transfers use `sync_client._TRANSFER_TIMEOUT` (connect 10s, read/write 600s); health, lock and metadata calls keep their short timeouts and #458 retries are untouched.
+
+## Failed or empty transfers (#715)
+
+- `SyncClient.download_transfer` streams into `<dest>.part` and `os.replace`s it after the SHA-256 check; any failure removes the `.part` and leaves an existing ROM untouched. Extensionless destinations are valid (only directories are refused).
+- `pull_save`/`pull_console_memcard` record the device's sync baseline via a `BackgroundTask` on the `FileResponse`, which runs after the body is sent. An aborted download therefore records nothing. Residual: a client querying the baseline in the instant after the last byte can briefly see the old value.
+- `_stage_upload` rejects zero-byte bodies (400), so an empty blob can never become the newest save/state/memcard generation. Its disk writes run in an executor.

@@ -498,39 +498,43 @@ class SyncClient:
         import hashlib as _hashlib
 
         path = Path(destination_path)
-        if path.is_dir() or not path.suffix:
+        if path.is_dir():
             raise ValueError(
                 f"destination_path must be a full file path, not a directory: {destination_path}"
             )
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Stream into a sibling .part and only replace the real file once the
+        # hash checks out, so a failed transfer never touches an existing ROM (#715).
+        part = path.with_name(path.name + ".part")
         hasher = _hashlib.sha256()
-        with self._client.stream(
-            "GET",
-            self._url(f"/rom-transfers/{transfer_id}/file"),
-            timeout=httpx.Timeout(None),
-        ) as r:
-            r.raise_for_status()
-            expected = expected_hash or r.headers.get("X-Rom-Hash")
-            total = int(r.headers.get("content-length", 0))
-            received = 0
-            with open(destination_path, "wb") as f:
-                for chunk in r.iter_bytes(chunk_size=64 * 1024):
-                    f.write(chunk)
-                    hasher.update(chunk)
-                    received += len(chunk)
-                    if total:
-                        pct = received * 100 // total
-                        mb = received / (1024 * 1024)
-                        print(f"\r  {mb:.1f} / {total/(1024*1024):.1f} MB ({pct}%)", end="", flush=True)
-            print(flush=True)
-        if expected and hasher.hexdigest() != expected:
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                pass
-            raise ValueError(
-                f"ROM transfer integrity check failed (expected {expected[:12]}…, got {hasher.hexdigest()[:12]}…)"
-            )
+        try:
+            with self._client.stream(
+                "GET",
+                self._url(f"/rom-transfers/{transfer_id}/file"),
+                timeout=httpx.Timeout(None),
+            ) as r:
+                r.raise_for_status()
+                expected = expected_hash or r.headers.get("X-Rom-Hash")
+                total = int(r.headers.get("content-length", 0))
+                received = 0
+                with open(part, "wb") as f:
+                    for chunk in r.iter_bytes(chunk_size=64 * 1024):
+                        f.write(chunk)
+                        hasher.update(chunk)
+                        received += len(chunk)
+                        if total:
+                            pct = received * 100 // total
+                            mb = received / (1024 * 1024)
+                            print(f"\r  {mb:.1f} / {total/(1024*1024):.1f} MB ({pct}%)", end="", flush=True)
+                print(flush=True)
+            if expected and hasher.hexdigest() != expected:
+                raise ValueError(
+                    f"ROM transfer integrity check failed (expected {expected[:12]}…, got {hasher.hexdigest()[:12]}…)"
+                )
+            os.replace(part, path)
+        except BaseException:
+            part.unlink(missing_ok=True)
+            raise
 
     def complete_transfer(self, transfer_id: str, status: str = "completed") -> None:
         r = self._client.put(
