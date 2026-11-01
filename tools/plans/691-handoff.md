@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #691
 - Branch: feature/691-path-traversal-tar-presence
-- PR: none
-- Status: implemented
+- PR: #694
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -84,10 +84,10 @@ Plan file: tools/plans/691-path-traversal-tar-presence.md
 ### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #694
+### Server Sync: done
+### Doc Sync: done (none needed)
 
 ## 11. Fix Attempts
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=2/10, breaking=no
@@ -96,3 +96,4 @@ Plan file: tools/plans/691-path-traversal-tar-presence.md
 - tplan step note: reuses make_client/_device_auth/#597 harness; no new fixtures.
 - 2026-11-01 implement: steps 1-6 done (basename check, safe tar extract, dead branch removed, monitor log in loop, tests)
 - 2026-11-01 review: 0 findings, blocked=no
+- 2026-11-01 ship: PR #694, server sync done, doc sync none needed
