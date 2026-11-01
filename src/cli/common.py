@@ -1,6 +1,9 @@
 """Shared helpers used across CLI command modules."""
 from __future__ import annotations
 
+import os
+import shlex
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,6 +13,27 @@ import click
 
 import server.config as cfg_module
 from server.sync_client import SyncClient
+
+
+def split_launch_command(cmd: str, windows: Optional[bool] = None) -> list[str]:
+    """Split a stored launch command into argv (#702).
+
+    Windows keeps backslashes (non-POSIX tokenizing, quotes stripped). A stored
+    command whose executable path has spaces but was never quoted (pre-#702) is
+    repaired by joining the shortest run of leading tokens that is a real file.
+    """
+    if windows is None:
+        windows = os.name == "nt"
+    if windows:
+        argv = [t[1:-1] if len(t) > 1 and t[0] == t[-1] and t[0] in "\"'" else t
+                for t in shlex.split(cmd, posix=False)]
+    else:
+        argv = shlex.split(cmd)
+    if argv and not (os.path.isfile(argv[0]) or shutil.which(argv[0])):
+        for i in range(2, len(argv) + 1):
+            if os.path.isfile(" ".join(argv[:i])):
+                return [" ".join(argv[:i])] + argv[i:]
+    return argv
 
 
 def _parse_iso_utc(iso: Optional[str]) -> Optional[datetime]:
