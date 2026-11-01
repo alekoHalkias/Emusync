@@ -27,9 +27,19 @@ export function createWindow(): void {
 
   applyDisplay(rt.mainWindow);
 
+  // Only http(s) may leave the app; other schemes (file:, javascript:, custom) are dropped (#692).
+  const openSafe = (u: string): void => {
+    if (/^https?:\/\//i.test(u)) shell.openExternal(u);
+  };
   rt.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openSafe(url);
     return { action: "deny" };
+  });
+  rt.mainWindow.webContents.on("will-navigate", (e, url) => {
+    if (url !== rt.mainWindow?.webContents.getURL()) {
+      e.preventDefault();
+      openSafe(url);
+    }
   });
 
   // Electron's default zoom-in accelerator is CmdOrCtrl+Plus, which on a US

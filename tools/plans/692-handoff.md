@@ -4,7 +4,7 @@
 - Issue: #692
 - Branch: feature/692-harden-cors-restore-safety
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -98,3 +98,4 @@ none
 - 2026-11-01 bplan: 9 steps written, backend_pattern=extract-to-temp-then-swap
 - 2026-11-01 fplan: 1 step written, visual_pattern=none
 - 2026-11-01 tplan: test_file=src/tests/test_restore_safety.py, 9 test cases defined
+- 2026-11-01 implement: steps 1-9 done (CORS regex, hmac, temp-extract restores, window.ts guards, tests, docs); full suite 606 passed. Deviation: single commit for all steps; tsc not run (no node_modules)

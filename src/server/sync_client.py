@@ -5,6 +5,7 @@ import io
 import os
 import shutil
 import tarfile
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +54,23 @@ def _unpack_envelope(data: bytes) -> tuple[Optional[int], bytes]:
     return None, data
 
 
+def _extract_tar_to_tmp(data: bytes, mode: str, parent: Path) -> Path:
+    """Extract tar *data* into a fresh temp dir under *parent* (same filesystem,
+    so callers can ``os.replace`` out of it) and return it. Any failure removes
+    the temp dir and re-raises, so a bad archive never touches the real target
+    (#692). The tarfile is always closed."""
+    parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(dir=str(parent), prefix=".emusync-"))
+    os.chmod(tmp, 0o755)  # mkdtemp is 0700; the dir may become the card itself
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode=mode) as tar:
+            _safe_extract_tar(tar, tmp)
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    return tmp
+
+
 def _extract_state_folder(content: bytes, folder: Path) -> None:
     """Overwrite a states folder with a tar.gz archive, keeping a one-generation
     ``.bak`` backup of every file it replaces.
@@ -65,24 +83,34 @@ def _extract_state_folder(content: bytes, folder: Path) -> None:
     exists). ``.bak`` files are skipped when backing up so they don't recurse.
     """
     folder.mkdir(parents=True, exist_ok=True)
-    for existing in list(folder.iterdir()):
-        if existing.is_file() and not existing.name.endswith(".bak"):
-            os.replace(str(existing), str(existing) + ".bak")
     fmt, payload = _unpack_envelope(content)
     if fmt == _FMT_RAW:
+        _backup_state_files(folder)
         (folder / f"{folder.name}.state").write_bytes(payload)
         return
     if fmt == _FMT_TARGZ:
-        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
-            _safe_extract_tar(tar, folder)
-        return
-    # No envelope (blob predates #478) — sniff like before.
+        tmp = _extract_tar_to_tmp(payload, "r:gz", folder.parent)
+    else:
+        # No envelope (blob predates #478) - sniff like before.
+        try:
+            tmp = _extract_tar_to_tmp(content, "r:gz", folder.parent)
+        except tarfile.TarError:
+            # Legacy: server stored a raw state file; write it as <FolderName>.state.
+            _backup_state_files(folder)
+            (folder / f"{folder.name}.state").write_bytes(content)
+            return
     try:
-        with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
-            _safe_extract_tar(tar, folder)
-    except tarfile.TarError:
-        # Legacy: server stored a raw state file; write it as <FolderName>.state.
-        (folder / f"{folder.name}.state").write_bytes(content)
+        _backup_state_files(folder)
+        for item in tmp.iterdir():
+            os.replace(str(item), str(folder / item.name))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _backup_state_files(folder: Path) -> None:
+    for existing in list(folder.iterdir()):
+        if existing.is_file() and not existing.name.endswith(".bak"):
+            os.replace(str(existing), str(existing) + ".bak")
 
 
 def _merge_extract_state_folder(content: bytes, folder: Path) -> None:
@@ -94,31 +122,28 @@ def _merge_extract_state_folder(content: bytes, folder: Path) -> None:
     states — so a pull for one game must not disturb other games' state files
     (issue #294)."""
     folder.mkdir(parents=True, exist_ok=True)
-
-    def _merge(tar: tarfile.TarFile) -> None:
-        for member in tar.getmembers():
-            if not member.isfile():
-                continue
-            target = folder / Path(member.name).name
-            if target.exists():  # back up only what we're about to overwrite
-                os.replace(str(target), str(target) + ".bak")
-        _safe_extract_tar(tar, folder)
-
     fmt, payload = _unpack_envelope(content)
     if fmt == _FMT_RAW:
         # A shared folder has no single canonical filename, so a raw blob
-        # can't be placed safely — ignore it (PS2 states are always tar archives).
+        # can't be placed safely - ignore it (PS2 states are always tar archives).
         return
-    if fmt == _FMT_TARGZ:
-        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
-            _merge(tar)
-        return
-    # No envelope (blob predates #478) — sniff like before.
     try:
-        with tarfile.open(fileobj=io.BytesIO(content), mode="r:gz") as tar:
-            _merge(tar)
+        tmp = _extract_tar_to_tmp(payload if fmt == _FMT_TARGZ else content, "r:gz", folder.parent)
     except tarfile.TarError:
-        pass
+        if fmt == _FMT_TARGZ:
+            raise
+        return  # legacy blob that is not a tar: nothing to merge
+    try:
+        for src in tmp.rglob("*"):
+            if not src.is_file():
+                continue
+            dest = folder / src.relative_to(tmp)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.exists():  # back up exactly the file being overwritten
+                os.replace(str(dest), str(dest) + ".bak")
+            os.replace(str(src), str(dest))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
@@ -216,18 +241,20 @@ def _write_memcard_tar_bytes(card: Path, tar_bytes: bytes) -> None:
     ``tarfile.TarError`` (before any of the above happens) if *tar_bytes*
     isn't actually a tar.
     """
-    tf = tarfile.open(fileobj=io.BytesIO(tar_bytes))
-    bak = card.parent / (card.name + ".bak")
-    if card.is_dir():
-        if bak.exists():
-            shutil.rmtree(bak)
-        shutil.copytree(card, bak)
-    elif card.is_file():
-        shutil.copy2(card, bak)
-        card.unlink()
-    card.mkdir(parents=True, exist_ok=True)
-    _safe_extract_tar(tf, card)
-    tf.close()
+    tmp = _extract_tar_to_tmp(tar_bytes, "r:*", card.parent)
+    try:
+        bak = card.parent / (card.name + ".bak")
+        if card.is_dir():
+            if bak.exists():
+                shutil.rmtree(bak)
+            os.replace(str(card), str(bak))
+        elif card.is_file():
+            shutil.copy2(card, bak)
+            card.unlink()
+        os.replace(str(tmp), str(card))
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
 
 
 def _write_memcard_raw_bytes(card: Path, raw: bytes) -> None:
