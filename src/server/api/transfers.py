@@ -303,6 +303,9 @@ def update_pull_request(pull_request_id: str, request_body: dict, device_id: str
 async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingResponse:
     """Server-Sent Events stream — delivers real-time notifications to a device."""
     queue: asyncio.Queue = asyncio.Queue()
+    old = _device_event_queues.get(device_id)
+    if old is not None:
+        old.put_nowait(None)  # close the superseded stream (#700)
     _device_event_queues[device_id] = queue
 
     async def generator():
@@ -310,6 +313,8 @@ async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingRespons
             while True:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    if event is None:
+                        return
                     yield f"data: {json.dumps(event)}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
@@ -318,6 +323,7 @@ async def stream_events_sse(device_id: str = Depends(_auth)) -> StreamingRespons
         except GeneratorExit:
             pass
         finally:
-            _device_event_queues.pop(device_id, None)
+            if _device_event_queues.get(device_id) is queue:  # not a newer stream's queue (#700)
+                del _device_event_queues[device_id]
 
     return StreamingResponse(generator(), media_type="text/event-stream")

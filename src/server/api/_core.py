@@ -155,6 +155,22 @@ def _sweep_stale_staging() -> None:
         transfer = _store.get_rom_transfer(sub.name)
         if transfer is None or transfer.status != "pending":
             shutil.rmtree(sub, ignore_errors=True)
+        elif _is_stale(transfer.queued_at):
+            # Never fetched: reclaim the disk and stop offering it (#701).
+            _store.update_transfer_status(transfer.id, "failed")
+            shutil.rmtree(sub, ignore_errors=True)
+
+
+# ponytail: fixed age, make it a Config field if users hit it
+_STAGING_MAX_AGE_DAYS = 7
+
+
+def _is_stale(queued_at: str) -> bool:
+    from datetime import datetime, timedelta, timezone
+    try:
+        return datetime.fromisoformat(queued_at) < datetime.now(timezone.utc) - timedelta(days=_STAGING_MAX_AGE_DAYS)
+    except ValueError:
+        return False
 
 
 def _get_store() -> Store:

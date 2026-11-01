@@ -78,8 +78,8 @@ async def test_upload_over_cap_413_and_cleaned(make_client, monkeypatch):
 @pytest.mark.asyncio
 async def test_failed_push_cleans_upload(make_client):
     c = await make_client()
-    with pytest.raises(Exception):  # unknown slug: FK failure
-        await c.post("/games/nope/save", content=b"x" * 20, headers=AUTH)
+    r = await c.post("/games/nope/save", content=b"x" * 20, headers=AUTH)
+    assert r.status_code == 404  # unknown slug is rejected before staging (#701)
     up = _core._get_store()._blob_dir / ".uploads"
     assert not up.exists() or list(up.iterdir()) == []
 

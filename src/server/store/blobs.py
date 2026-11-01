@@ -406,21 +406,6 @@ class SaveStateMixin:
             raise
         return tmp, hasher.hexdigest(), tmp.stat().st_size
 
-    def _extract_memcard_archive(self, archive: Path, dest: Path) -> None:
-        """Extract a memcard tar archive to the destination folder."""
-        import tarfile
-        from server.sync_client import _safe_extract_tar
-        with tarfile.open(archive, "r:gz") as tf:
-            # Extract to a temp location first
-            tmp = dest.with_suffix(".tmp")
-            tmp.mkdir(parents=True, exist_ok=True)
-            _safe_extract_tar(tf, tmp)
-            # Move contents to destination
-            for item in tmp.iterdir():
-                if item.name != ".":
-                    shutil.move(item, dest / item.name)
-            tmp.rmdir()
-
     # ── console memcard push (file or folder) ───────────────────────────────────
 
     def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int,
@@ -448,6 +433,7 @@ class SaveStateMixin:
             (console_key,),
         ).fetchone()
         if row and row["hash"] == h:
+            Path(src).unlink(missing_ok=True)  # staged upload is redundant (#701)
             return dict(row)  # identical content — return existing metadata
 
         # Record in history before moving into live slot
