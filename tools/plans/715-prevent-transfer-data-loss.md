@@ -39,7 +39,7 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
   - Reuses: existing spawn of `rt.PYTHON -c`
   - New: none (snippet edit only; IPC signature unchanged)
 - [x] 7. Tests: new src/tests/test_transfer_dataloss_715.py. Cases: (a) hash mismatch and mid-stream failure leave an existing destination byte-identical and no `.part`; (b) extensionless destination downloads; (c) baseline absent after an aborted pull, present after a completed pull (save and memcard); (d) zero-byte POST to save, state, and memcard returns 400 and stores nothing; (e) `_is_stale` with a naive timestamp does not raise. Real SQLite, no mocks; follow test_rom_transfer.py and test_saves.py setup.
-- [ ] 8. Docs: add the BackgroundTask-baseline pattern to .claude/backend-design-guide.md; add a short #715 note to src/docs/GOTCHAS.md; one line in CLAUDE.md Saves/sync rules (baseline recorded after delivery, empty uploads rejected, ROM downloads via .part).
+- [x] 8. Docs: add the BackgroundTask-baseline pattern to .claude/backend-design-guide.md; add a short #715 note to src/docs/GOTCHAS.md; one line in CLAUDE.md Saves/sync rules (baseline recorded after delivery, empty uploads rejected, ROM downloads via .part).
 
 ## Testing
 - **Test File**: src/tests/test_transfer_dataloss_715.py (new; one file for the bug-fix regressions, per the existing test_hardening_NNN.py convention)
