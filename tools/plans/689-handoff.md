@@ -4,7 +4,7 @@
 - Issue: #689
 - Branch: feature/689-update-vite-toolchain
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
