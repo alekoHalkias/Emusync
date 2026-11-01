@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #675
 - Branch: feature/675-steam-appimage-mount-path
-- PR: none
+- PR: #676
 - Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
@@ -77,8 +77,8 @@ Tests: 3 manual check, no TS harness.
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
+### PR: #676
+### Server Sync: done
 ### Doc Sync: pending
 
 ## 11. Fix Attempts
@@ -93,3 +93,4 @@ Tests: 3 manual check, no TS harness.
 - 2026-11-01 tplan: test_file=none, 2 manual cases defined
 - 2026-11-01 implement: steps 1-2 done (LAUNCHER/LAUNCHER_STABLE in runtime.ts, used in steam.ts/game.ts)
 - 2026-11-01 implement: steps 3-4 done (manual check noted, CLAUDE.md rule)
+- 2026-11-01 ship: PR #676 opened, server sync done
