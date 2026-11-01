@@ -4,7 +4,7 @@
 - Issue: #700
 - Branch: feature/700-sse-reconnect-queue
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
