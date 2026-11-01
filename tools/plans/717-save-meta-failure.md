@@ -18,7 +18,7 @@ A failed `get_save_meta` request must not be read as "server has no save"; the r
   - Files: src/cli/run_reconcile.py
   - Reuses: existing `get_save_meta` 204 -> None contract (sync_client.py, run_ps2.py `_MemcardClient`)
   - New: none
-- [ ] 2. In `run_game`, wrap the `_reconcile_save(...)` call: on `httpx.HTTPError`, warn on stderr, release the lock, and call `_run_offline(cfg, game_slug, game_pid_file, command)` so the game launches with no push or pull; the next online run reconciles by newest-wins.
+- [x] 2. In `run_game`, wrap the `_reconcile_save(...)` call: on `httpx.HTTPError`, warn on stderr, release the lock, and call `_run_offline(cfg, game_slug, game_pid_file, command)` so the game launches with no push or pull; the next online run reconciles by newest-wins.
   - Files: src/cli/run.py
   - Reuses: cli/run_offline.py `_run_offline`, `_release`, existing offline warning text
   - New: none - one try/except around an existing call

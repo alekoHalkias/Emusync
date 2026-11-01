@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+import httpx
 
 import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
@@ -393,7 +394,20 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         # the server's, pull if the server's is newer (newest wins; loser kept
         # as .bak). server_hash = what's authoritative on the server afterwards.
         # For a shared-memcard console this reconciles the console card (#295).
-        server_hash = _reconcile_save(save_client, cfg, save_key, save_path)
+        try:
+            server_hash = _reconcile_save(save_client, cfg, save_key, save_path)
+        except httpx.HTTPError as exc:
+            # Server state couldn't be read: never guess "no save" (#717). Launch
+            # offline with no push/pull; the next online run reconciles.
+            click.echo(
+                f"Warning: couldn't read the server's save state ({exc}) — "
+                f"launching '{game_slug}' offline.",
+                err=True,
+            )
+            stop_heartbeat.set()
+            _release()
+            _run_offline(cfg, game_slug, game_pid_file, command)
+            return  # _run_offline exits
 
         # Still no local match (device has never played this game): if the
         # server already has real progress, pre-seed it into every existing

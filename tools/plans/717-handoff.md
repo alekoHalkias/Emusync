@@ -67,7 +67,7 @@ src/cli/run_reconcile.py (_reconcile_save ~63-66), src/cli/run.py (post-game pus
 ## 8. Implementation Steps
 ### Steps: see tools/plans/717-save-meta-failure.md
 - 1. (done) files: src/cli/run_reconcile.py; reuses get_save_meta 204->None contract; new: none
-- 2. files: src/cli/run.py; reuses _run_offline, _release; new: none (one try/except)
+- 2. (done) files: src/cli/run.py; reuses _run_offline, _release; new: none (one try/except)
 - 3. files: src/tests/test_run_reconcile.py; reuses existing fixtures; new: tests only
 - 4. files: CLAUDE.md; new: one rule line
 
@@ -93,3 +93,4 @@ src/cli/run_reconcile.py (_reconcile_save ~63-66), src/cli/run.py (post-game pus
 - 2026-11-01 bplan: 4 steps written, backend_pattern=propagate errors, reuse offline fallback
 - 2026-11-01 tplan: test_file=src/tests/test_run_reconcile.py, 4 test cases defined
 - 2026-11-01 implement: step 1 done (_reconcile_save propagates get_save_meta errors)
+- 2026-11-01 implement: step 2 done (run_game catches httpx.HTTPError from reconcile, falls back to _run_offline)
