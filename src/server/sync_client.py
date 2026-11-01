@@ -14,13 +14,9 @@ from typing import Optional, Iterator
 import httpx
 
 
-# ── chunked transfer (issue #576) ──────────────────────────────────────────────
-# 10MB chunks for large files (>2GB), resumable on failure. Chunk size is
-# configurable in emusync.toml but defaults to CHUNK_SIZE here so callers don't
-# need a new env var or CLI flag. The chunk status table tracks progress,
-# enabling resume from the last successful chunk if the connection drops.
-CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
-
+# Whole-blob save/state/memcard/mod transfers: short connect, generous read/write
+# so big saves on slow links don't fail at 30s (#699). Health/lock stay short.
+_TRANSFER_TIMEOUT = httpx.Timeout(10, read=600, write=600)
 
 
 # ── transfer envelope (#478) ─────────────────────────────────────────────────
@@ -164,6 +160,14 @@ def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
         target = (dest_root / member.name).resolve()
         if target != dest_root and dest_root not in target.parents:
             raise tarfile.TarError(f"refusing member outside destination: {member.name}")
+    if hasattr(tarfile, "data_filter"):  # 3.12+ and security backports
+        tar.extractall(path=str(dest), filter="data")
+        return
+    # Older Pythons: reject devices/FIFOs and drop setuid/setgid/sticky bits (#699).
+    for member in tar.getmembers():
+        if not (member.isreg() or member.isdir()):
+            raise tarfile.TarError(f"refusing special member in archive: {member.name}")
+        member.mode &= 0o777
     tar.extractall(path=str(dest))
 
 
@@ -304,70 +308,9 @@ class SyncClient:
     def _url(self, path: str) -> str:
         return f"{self._base}{path}"
 
-    # ── chunked push/pull for large files (issue #576) ─────────────────────────
-    def _chunked_push(
-        self, slug: str, save_path: str, is_save: bool
-    ) -> tuple[bool, Optional[str]]:
-        """Push a save in chunks, tracking progress per chunk.
-
-        Returns (success, hash). On failure, the last committed chunk's offset
-        will be retained so a retry can resume from there. The server stores each
-        chunk's status in ChunkStatus rows and aggregates them when complete.
-        """
-        path = Path(save_path)
-        total_size = path.stat().st_size
-        if total_size < CHUNK_SIZE:
-            # Small files use the normal push path
-            return self._normal_push(slug, save_path, is_save)
-
-        hasher = hashlib.sha256()
-        with open(save_path, "rb") as f:
-            offset = 0
-            bytes_transferred = 0
-
-            # Read in chunks and send to server
-            while True:
-                chunk = f.read(CHUNK_SIZE)
-                if not chunk:
-                    break
-
-                offset += len(chunk)
-                hasher.update(chunk)
-                bytes_transferred += len(chunk)
-
-                pct = bytes_transferred * 100 // total_size if total_size else 0
-                print(f"\rPush save: {offset / (1024*1024):.1f}/{total_size / (1024*1024):.1f} MB ({pct:.0f}%)", end="", flush=True)
-
-                # Send chunk to server
-                r = self._client.post(
-                    self._url(f"/games/{slug}/chunks"),
-                    data={"game_slug": slug, "offset": offset - len(chunk)},
-                    files={"data": ("chunk", chunk)},
-                    timeout=30,
-                )
-                r.raise_for_status()
-
-            print("")  # newline after transfer
-
-        hash_val = hasher.hexdigest()
-        return True, hash_val
-
-    def _normal_push(self, slug: str, save_path: str, is_save: bool) -> tuple[bool, Optional[str]]:
-        """Normal (non-chunked) push using existing API."""
-        data = memcard_bytes(Path(save_path)) if not is_save else None
-        r = self._client.post(
-            self._url(f"/games/{slug}/save") if is_save else self._url(f"/games/{slug}/state"),
-            content=data,
-            headers={"Content-Type": "application/octet-stream"},
-            timeout=30,
-        )
-        if is_save:
-            return True, r.json()["hash"]
-        return True, r.json().get("hash")
-
     def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
-        """Pull save to disk. Large saves (>2GB) use chunked GET."""
-        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
+        """Pull save to disk."""
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -375,13 +318,13 @@ class SyncClient:
         return True, r.headers.get("X-Save-Hash")
 
     def push_save(self, slug: str, save_path: str) -> str:
-        """Push save to server. Large saves (>2GB) use chunked POST."""
+        """Push save to server."""
         data = memcard_bytes(Path(save_path))
         r = self._client.post(
             self._url(f"/games/{slug}/save"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
@@ -619,7 +562,7 @@ class SyncClient:
         Folder-based saves (Dolphin GC/Wii, PPSSPP, PCSX2 memcards) arrive as a
         plain tar archive; file-based saves arrive as raw bytes. _write_memcard
         detects which and handles both (#431)."""
-        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -632,7 +575,7 @@ class SyncClient:
             self._url(f"/games/{slug}/save"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
@@ -654,7 +597,7 @@ class SyncClient:
         Folder-based memcards arrive as a plain tar archive; file-based cards
         arrive as raw bytes. _write_memcard detects which and handles both.
         """
-        r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=30)
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -667,7 +610,7 @@ class SyncClient:
             self._url(f"/consoles/{console_key}/memcard"),
             content=data,
             headers={"Content-Type": "application/octet-stream", "X-Card-Format": card_format},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
@@ -696,13 +639,13 @@ class SyncClient:
             self._url(f"/switch/{title_id}/mods/{mod_name}"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=60,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["added"]
 
     def pull_switch_mod(self, title_id: str, mod_name: str, dest_folder: str) -> bool:
-        r = self._client.get(self._url(f"/switch/{title_id}/mods/{mod_name}"), timeout=60)
+        r = self._client.get(self._url(f"/switch/{title_id}/mods/{mod_name}"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False
         r.raise_for_status()
@@ -711,7 +654,7 @@ class SyncClient:
 
     def pull_state(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
         """Write server state to disk. Returns (pulled, server_hash). pulled=False if no state exists."""
-        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -731,7 +674,7 @@ class SyncClient:
     def pull_state_merge(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
         """Pull state into a SHARED states folder, overwriting only this game's
         files (PCSX2 sstates/, issue #294). Returns (pulled, server_hash)."""
-        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -760,7 +703,7 @@ class SyncClient:
             self._url(f"/games/{slug}/state"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]

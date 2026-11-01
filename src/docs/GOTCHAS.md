@@ -145,3 +145,9 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 
 - Receiving a ROM transfer: `cli/transfer.py:_receive_transfer` only writes to a `destination_path` inside this device's configured folders (console game/local/network/extra folders, plus known game `rom_folder_path`s), checked with `_destination_allowed` (realpath, so `..` and symlinks cannot escape). `rom-folder` transfers must land strictly inside a console root, never on it (extraction backs up and replaces the target folder). A transfer for a console not set up on the receiver fails with a log line and is marked failed; set up the console folders first. The interactive `push`/`pull` prompts can still offer an arbitrary folder, but the receiver will refuse it.
 - CORS keeps Origin `null` (`server/api/_core.py`): the packaged Electron renderer loads from `file://`, which sends `null`, and moving it to a custom protocol would break the `file://` artwork URLs in `gui/electron/art.ts`. Consequence: with a blank PIN, any sandboxed iframe or `data:` page on the same machine can read the local API. Set a PIN if that matters; the blank-PIN-means-open design is unchanged.
+
+## Run signals, tar filter, transfer timeouts (#699)
+
+- `cli/run.py` routes SIGHUP/SIGINT through `_interrupt_handler`: with an emulator running it kills the child like SIGTERM (no `sys.exit`, #472) so the push and lock release still run; before launch it raises `KeyboardInterrupt` so Ctrl+C is not swallowed. `stop_heartbeat` is created before the main `try` and set in its `finally`.
+- `_safe_extract_tar` uses `filter="data"` when `tarfile.data_filter` exists; otherwise it rejects non-regular/non-dir members and clears setuid/setgid/sticky bits.
+- Whole-blob transfers use `sync_client._TRANSFER_TIMEOUT` (connect 10s, read/write 600s); health, lock and metadata calls keep their short timeouts and #458 retries are untouched.

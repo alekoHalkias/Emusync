@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shlex
 import signal
 import sys
 import threading
@@ -28,7 +27,7 @@ import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
 from server.sync_client import GameDeviceConfig, _memcard_payload_bytes
 
-from cli.common import _client, _get_device_name, _show_game_running_popup
+from cli.common import _client, _get_device_name, _show_game_running_popup, split_launch_command
 from cli.netrom import resolve_rom_path
 from cli.root import cli
 
@@ -100,7 +99,12 @@ def _resolve_launch_command(gd) -> Optional[str]:
     # `%ROM%` (#518) always follows the ROM actually in use, so renames, moves
     # and offline copies never need the stored command rewritten.
     if cmd and ROM_TOKEN in cmd:
-        return cmd.replace(ROM_TOKEN, effective) if effective else None
+        if not effective:
+            return None
+        # Quote the substitution so a ROM path with spaces stays one argument (#702).
+        for quoted in (f'"{ROM_TOKEN}"', f"'{ROM_TOKEN}'"):
+            cmd = cmd.replace(quoted, f'"{effective}"')
+        return cmd.replace(ROM_TOKEN, f'"{effective}"')
     # Legacy commands with the literal path baked in.
     if network and effective != gd.rom_path and gd.rom_path and cmd:
         cmd = cmd.replace(gd.rom_path, effective)
@@ -126,6 +130,20 @@ def _sigterm_handler(*_) -> None:
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)
+def _interrupt_handler(*args) -> None:
+    """SIGHUP/SIGINT (#699): with an emulator running, same graceful path as
+    SIGTERM so the post-game push and lock release still run. With no child yet
+    (still reconciling), raise so Ctrl+C isn't swallowed; the outer `finally`
+    releases the lock."""
+    if _run_offline_mod._child_proc is None:
+        raise KeyboardInterrupt
+    _sigterm_handler(*args)
+
+
+# SIGHUP doesn't exist on Windows.
+for _sig in (getattr(signal, "SIGHUP", None), signal.SIGINT):
+    if _sig is not None:
+        signal.signal(_sig, _interrupt_handler)
 
 
 # Refresh the lock well inside the TTL so a play session longer than the TTL
@@ -250,7 +268,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 err=True,
             )
             sys.exit(1)
-        launch_argv = tuple(shlex.split(launch_command))
+        launch_argv = tuple(split_launch_command(launch_command))
 
     # Shared-memory-card consoles (PS2): the per-game "save" is actually one card
     # shared across the whole console, so route save reconciliation to the
@@ -336,6 +354,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     click.echo(f"Warning: failed to release lock: {exc}", err=True)
 
     exit_code = 0
+    stop_heartbeat = threading.Event()  # set in the finally so no pre-launch failure leaks it (#699)
     game_pid_file.write_text(str(os.getpid()))
     try:
         # A learned-save-path game (Switch) whose destination isn't known yet
@@ -411,7 +430,6 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
         # Keep the lock fresh for the whole session so a long play can't have its
         # lock stolen at the TTL by another device (issue #238).
-        stop_heartbeat = threading.Event()
         _start_lock_heartbeat(client, game_slug, stop_heartbeat)
 
         # Mark the moment before launch (minus a small epsilon for mtime
@@ -548,6 +566,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         if shared_memcard:
             _learn_ps2_serial(cfg, game_slug, launch_start)
     finally:
+        stop_heartbeat.set()
         _release()
         game_pid_file.unlink(missing_ok=True)
 

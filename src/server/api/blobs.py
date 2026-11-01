@@ -68,6 +68,8 @@ def _pull(kind: _BlobKind, slug: str, device_id: str) -> Response:
 
 
 async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) -> dict:
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")  # before staging (#701)
     tmp, h, size = await _stage_upload(request)
 
     def _store_it() -> SaveMeta:
@@ -81,7 +83,11 @@ async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) ->
         return m
 
     # Offload the synchronous move + DB write so it doesn't block the event loop.
-    meta = await asyncio.to_thread(_store_it)
+    try:
+        meta = await asyncio.to_thread(_store_it)
+    except BaseException:
+        tmp.unlink(missing_ok=True)  # don't leak the staged upload (#701)
+        raise
     _print_activity(f"{kind.noun} pushed: {_game_label(slug)} from {_device_label(device_id)}")
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
@@ -358,144 +364,3 @@ def restore_console_memcard(console_key: str, req: RestoreRequest, device_id: st
     _print_activity(f"memcard restored: {console_key} by {_device_label(device_id)}")
     return {"hash": meta["hash"], "pushed_at": meta["pushed_at"]}
 
-
-# ── chunked transfers (issue #576) ─────────────────────────────────────────────
-# Chunk size is configurable in emusync.toml (default 10MB). Supports files
-# up to 2GB+ by uploading/receiving in pieces and tracking progress per chunk
-# in SQLite. Server reassembles committed chunks into the final blob on GET
-# /games/{slug}/save when no current version exists.
-
-_CHUNK_SIZE: int = 10 * 1024 ** 2  # default; will be set by store init if configured
-
-
-class ChunkUploadRequest(BaseModel):
-    """Multipart chunk upload with offset/size metadata."""
-    game_slug: str
-    offset: int          # bytes from start of file (for out-of-order uploads)
-    data: bytes          # chunk payload
-
-
-@router.post("/games/{slug}/chunks")
-async def push_chunk(
-    slug: str,
-    req: ChunkUploadRequest,
-    device_id: str = Depends(_auth),
-) -> dict:
-    """Accept a single chunk of an upload.
-
-    Store each chunk individually in <data_dir>/blobs/uploads/<slug>/<offset>.
-    When the client sends all chunks (out of order), the server reassembles
-    them into <data_dir>/blobs/saves/<new-blob-id> for later GET.
-
-    Returns {"offset": ..., "total": ...} where total is the expected file size
-    if all chunks match (or None if partial). This lets the client know when
-    it's done uploading.
-    """
-    import os
-    store = _get_store()
-    path = store._blob_path("chunk", slug)
-    try:
-        # Ensure upload directory exists
-        chunk_dir = path.parent
-        chunk_dir.mkdir(parents=True, exist_ok=True)
-
-        # Write chunk to temp location (same filesystem for atomic rename)
-        tmp = chunk_dir / f"{req.offset}.part"
-        with open(tmp, "wb") as f:
-            f.write(req.data)
-        os.replace(tmp, path / str(req.offset))
-
-        # Track progress in SQLite — a simple key/value table keyed by (slug, offset)
-        status_table = store._chunk_status_path()
-        store._conn.execute(
-            "INSERT OR REPLACE INTO chunk_progress (key, value) VALUES (?, ?)",
-            (f"{slug}:{req.offset}", json.dumps({"status": "committed", "at": time.time()})),
-        )
-
-        return {"offset": req.offset}
-
-    except Exception as e:
-        print(f"Chunk upload failed for {slug}:{req.offset}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/games/{slug}/chunks")
-async def list_chunks(slug: str, device_id: str = Depends(_auth)) -> dict:
-    """List all chunks uploaded for a game, returning offset + total size if known."""
-    import time
-    # Aggregate chunk offsets from SQLite and compute expected file size
-    rows = store._conn.execute(
-        "SELECT json_object_group_concat(key || ': ' || value) FROM chunk_progress "
-        f"WHERE key LIKE ? AND value->>'status' = 'committed'",
-        (f"{slug}:%"),
-    ).fetchone()
-    return {"chunks": rows} if rows else {"chunks": []}
-
-
-@router.delete("/games/{slug}/chunks")
-async def cancel_upload(slug: str, device_id: str = Depends(_auth)) -> dict:
-    """Cancel an in-progress chunked upload — delete all partial chunks."""
-    path = store._blob_path("chunk", slug)
-    if path.exists():
-        shutil.rmtree(path)
-
-    # Clear chunk progress
-    store._conn.execute(
-        "DELETE FROM chunk_progress WHERE key LIKE ?",
-        (f"{slug}:%"),
-    )
-    return {"status": "cancelled"}
-
-
-# ── console memcard chunked support (future) ───────────────────────────────────
-@router.post("/consoles/{console_key}/chunks")
-async def push_console_chunk(
-    console_key: str,
-    req: ChunkUploadRequest,
-    device_id: str = Depends(_auth),
-) -> dict:
-    """Accept a chunk for console memcard (same logic as /games/slug/chunks)."""
-    store = _get_store()
-    path = store._blob_path("chunk", f"console:{console_key}")
-    try:
-        chunk_dir = path.parent
-        chunk_dir.mkdir(parents=True, exist_ok=True)
-        tmp = chunk_dir / f"{req.offset}.part"
-        with open(tmp, "wb") as f:
-            f.write(req.data)
-        os.replace(tmp, path / str(req.offset))
-
-        store._conn.execute(
-            "INSERT OR REPLACE INTO chunk_progress (key, value) VALUES (?, ?)",
-            (f"{console_key}:{req.offset}", json.dumps({"status": "committed", "at": time.time()})),
-        )
-        return {"offset": req.offset}
-
-    except Exception as e:
-        print(f"Console chunk upload failed for {console_key}:{req.offset}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/consoles/{console_key}/chunks")
-async def list_console_chunks(console_key: str, device_id: str = Depends(_auth)) -> dict:
-    """List console memcard chunks."""
-    rows = store._conn.execute(
-        "SELECT json_object_group_concat(key || ': ' || value) FROM chunk_progress "
-        f"WHERE key LIKE ? AND value->>'status' = 'committed'",
-        (f"{console_key}:%"),
-    ).fetchone()
-    return {"chunks": rows} if rows else {"chunks": []}
-
-
-@router.delete("/consoles/{console_key}/chunks")
-async def cancel_console_upload(console_key: str, device_id: str = Depends(_auth)) -> dict:
-    """Cancel console memcard chunked upload."""
-    path = store._blob_path("chunk", f"console:{console_key}")
-    if path.exists():
-        shutil.rmtree(path)
-
-    store._conn.execute(
-        "DELETE FROM chunk_progress WHERE key LIKE ?",
-        (f"{console_key}:%"),
-    )
-    return {"status": "cancelled"}
