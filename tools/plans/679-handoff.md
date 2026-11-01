@@ -4,7 +4,7 @@
 - Issue: #679
 - Branch: feature/679-update-dependencies
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -55,3 +55,4 @@ Tests: make test-changed / make test, make lint, make build-gui.
 ### Summary
 Drop unused adm-zip and refresh in-range deps; major bumps deferred to follow-up issues.
 - 2026-11-01 tplan: test_file=none new, 3 checks defined
+- 2026-11-01 implement: steps 1-7 done except follow-up issues (deferred to ship; uvicorn[standard] kept)
