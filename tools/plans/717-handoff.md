@@ -72,15 +72,15 @@ src/cli/run_reconcile.py (_reconcile_save ~63-66), src/cli/run.py (post-game pus
 - 4. (done) files: CLAUDE.md; new: one rule line
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: none (diff checked against CLAUDE.md rules, #460 baseline untouched, #704/#715 push guards unaffected)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
 ### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done (CLAUDE.md rule added in step 4; no ARCHITECTURE change needed)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -96,3 +96,6 @@ src/cli/run_reconcile.py (_reconcile_save ~63-66), src/cli/run.py (post-game pus
 - 2026-11-01 implement: step 2 done (run_game catches httpx.HTTPError from reconcile, falls back to _run_offline)
 - 2026-11-01 implement: step 3 done (4 regression tests; fail on old code, pass now)
 - 2026-11-01 implement: step 4 done (CLAUDE.md rule); all steps complete
+- 2026-11-01 review: 0 findings, blocked=no
+- 2026-11-01 ship: server sync done
+- 2026-11-01 ship: doc sync - CLAUDE.md only
