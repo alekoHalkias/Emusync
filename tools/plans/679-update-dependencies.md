@@ -34,6 +34,16 @@ Remove unused dependencies and bring in-range dependencies current; hold major f
 - [ ] 6. Docs: none needed - no behavior, rule, or architecture change.
 - [ ] 7. File follow-up issues (one per major group: Electron+electron-builder+electron-vite, Vite+plugin-react, React 19 types, TypeScript 7) via `gh issue create`.
 
+## Testing
+- **Test File**: none new; existing src/tests suite and src/tests/test_bundle.py
+- **Test Cases**:
+  - full suite: `make test` passes on updated Python floors
+  - test_bundle.py: packaging/requirements check still passes
+- **Edge Cases**:
+  - adm-zip removal: build-gui and electron-builder succeed (no hidden dynamic require)
+- **Integration Points**:
+  - make lint and make build-gui
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

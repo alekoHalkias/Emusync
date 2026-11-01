@@ -46,3 +46,12 @@ Design alignment: manifest-only change. Majors deferred to follow-ups.
 3. Raise Python floors: requirements*.txt; no new code.
 4. Verify lint/build/test: Makefile targets.
 5-7. Tests none, docs none, file follow-up issues for majors.
+
+## 6. Testing Plan (summary)
+### Test File: none new; existing suite + test_bundle.py
+### Outline
+Backend: remove adm-zip; npm update in-range; raise Python floors; verify lint/build/test; file follow-ups for majors.
+Tests: make test-changed / make test, make lint, make build-gui.
+### Summary
+Drop unused adm-zip and refresh in-range deps; major bumps deferred to follow-up issues.
+- 2026-11-01 tplan: test_file=none new, 3 checks defined
