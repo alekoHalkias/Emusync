@@ -4,7 +4,7 @@
 - Issue: #679
 - Branch: feature/679-update-dependencies
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
