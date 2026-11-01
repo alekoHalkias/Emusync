@@ -29,6 +29,17 @@ Show a flat "All games" list under the console cards on the home screen, each ro
 - [ ] 4. Tests: renderer has no test harness; verify manually with `make dev-gui` (offline cache path included) and run `make test-changed`.
 - [ ] 5. Docs: none needed - small UI addition, no IPC/config/schema change.
 
+## Testing
+- **Test File**: none - the renderer has no component test harness and the change adds no backend code; guide reuses `make test-changed` as the gate.
+- **Test Cases**:
+  - Manual: home screen lists all games sorted by name; Play launches a local game; Settings opens GameModal.
+- **Edge Cases**:
+  - Remote-only or locked game: Play disabled.
+  - Server offline: list renders from the cached rows.
+  - No games: existing empty state only, no empty list.
+- **Integration Points**:
+  - GameModal onChanged -> App.reload(true) refreshes the list.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

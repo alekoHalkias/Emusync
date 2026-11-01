@@ -47,12 +47,14 @@ ConsoleGrid.tsx (or sibling), App.tsx, game-list/.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: none (no renderer harness; manual verify + make test-changed)
+### Test Cases: manual list/play/settings check
+### Edge Cases: locked/remote game, offline cache, no games
+### Integration Points: GameModal onChanged -> reload(true)
+### Outline
+Frontend: 1 AllGamesList.tsx (new, reuses GameModal); 2 ConsoleGrid/App wiring; 3 styles.css
+Tests: 4 manual verify + make test-changed; 5 docs none
+### Summary: Home screen gains a flat all-games list with Play and Settings per row.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -89,3 +91,4 @@ ConsoleGrid.tsx (or sibling), App.tsx, game-list/.
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=2/10, breaking=no
 - 2026-11-01 fplan: 5 steps written, visual_pattern=flat list rows reusing btn classes
+- 2026-11-01 tplan: test_file=none, 3 manual cases defined
