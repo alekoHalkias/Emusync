@@ -4,7 +4,7 @@
 - Issue: #702
 - Branch: feature/702-launch-command-quoting
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
