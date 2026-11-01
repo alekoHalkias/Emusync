@@ -6,10 +6,11 @@ import hashlib
 import json
 import uuid
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 import asyncio
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from ._core import (
@@ -179,10 +180,14 @@ def update_transfer(transfer_id: str, request_body: dict, device_id: str = Depen
 @router.post("/games/{slug}/rom-pull-request")
 async def create_pull_request(
     slug: str,
-    request_body: dict,
+    request_body: Any = Body(...),
     device_id: str = Depends(_auth),
 ) -> dict:
     """Request a ROM from another device. The source device uploads it when online."""
+    if not isinstance(request_body, dict):
+        raise HTTPException(status_code=400, detail="Body must be a JSON object")
+    if request_body.get("kind", "rom") not in ("rom", "rom-folder", "network-upload"):
+        raise HTTPException(status_code=400, detail="Invalid kind")
     store = _get_store()
     game = store.get_game(slug)
     if not game:

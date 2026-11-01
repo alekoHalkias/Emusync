@@ -26,6 +26,9 @@ from ._core import (
 
 router = APIRouter()
 
+# ponytail: fixed ceiling for save/state/memcard pushes, make it a Config field if users hit it (#704)
+_MAX_UPLOAD_BYTES = 4 * 1024**3
+
 
 class RestoreRequest(BaseModel):
     version_id: str
@@ -81,7 +84,11 @@ async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) ->
         return m
 
     # Offload the synchronous move + DB write so it doesn't block the event loop.
-    meta = await asyncio.to_thread(_store_it)
+    try:
+        meta = await asyncio.to_thread(_store_it)
+    except BaseException:
+        tmp.unlink(missing_ok=True)  # failed push must not leak the staged upload (#704)
+        raise
     _print_activity(f"{kind.noun} pushed: {_game_label(slug)} from {_device_label(device_id)}")
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
@@ -138,8 +145,10 @@ async def _stage_upload(request: Request):
     try:
         with open(tmp, "wb") as f:
             async for chunk in request.stream():
-                f.write(chunk)
                 size += len(chunk)
+                if size > _MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Upload too large")
+                f.write(chunk)
                 if not hashing_started:
                     header_buf += chunk
                     if len(header_buf) < _ENVELOPE_HEADER_LEN:
@@ -314,7 +323,10 @@ async def push_console_memcard(console_key: str, request: Request, device_id: st
         store.set_console_save_sync_baseline(console_key, device_id, m["hash"], m["pushed_at"])
         return m
 
-    meta = await asyncio.to_thread(_store_it)
+    try:
+        meta = await asyncio.to_thread(_store_it)
+    finally:
+        tmp.unlink(missing_ok=True)  # no-op once moved; reclaims it on error or dedupe hit (#704)
     _print_activity(f"memcard pushed: {console_key} from {_device_label(device_id)}")
     return {"hash": meta["hash"], "pushed_at": meta["pushed_at"]}
 

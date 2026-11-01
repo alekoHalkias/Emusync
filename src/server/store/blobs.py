@@ -84,8 +84,9 @@ class SaveStateMixin:
         blob_id = self._insert_blob_row(table, game_slug, device_id, h, len(data), now)
         # Write the file before committing so a crash never leaves a row without bytes.
         self._blob_path(table, blob_id).write_bytes(data)
-        self._prune_history(table, game_slug)
+        stale = self._prune_history(table, game_slug)
         self._conn.commit()
+        self._unlink_blobs(table, stale)
         return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now, size=len(data))
 
     def _push_blob_file(self, table: str, game_slug: str, device_id: str, src: Path, h: str, size: int) -> SaveMeta:
@@ -103,21 +104,40 @@ class SaveStateMixin:
                 game_slug=game_slug, device_id=current["device_id"],
                 hash=current["hash"], pushed_at=current["pushed_at"], size=current["size"],
             )
-        blob_id = self._insert_blob_row(table, game_slug, device_id, h, size, now)
-        os.replace(src, self._blob_path(table, blob_id))
-        self._prune_history(table, game_slug)
-        self._conn.commit()
+        # Move the file in first, then the row: a failed move must not leave an
+        # uncommitted row for the next commit on this connection to persist (#704).
+        blob_id = str(uuid.uuid4())
+        dest = self._blob_path(table, blob_id)
+        try:
+            os.replace(src, dest)
+            self._conn.execute(
+                f"INSERT INTO {table} (id, game_slug, device_id, hash, pushed_at, size) "
+                f"VALUES (?, ?, ?, ?, ?, ?)",
+                (blob_id, game_slug, device_id, h, now, size),
+            )
+            stale = self._prune_history(table, game_slug)
+            self._conn.commit()
+        except BaseException:
+            self._conn.rollback()
+            dest.unlink(missing_ok=True)
+            raise
+        self._unlink_blobs(table, stale)
         return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now, size=size)
 
-    def _prune_history(self, table: str, game_slug: str) -> None:
-        """Delete all but the newest HISTORY_LIMIT generations (rows + files)."""
+    def _unlink_blobs(self, table: str, ids: list[str]) -> None:
+        for blob_id in ids:
+            self._blob_path(table, blob_id).unlink(missing_ok=True)
+
+    def _prune_history(self, table: str, game_slug: str) -> list[str]:
+        """Delete rows beyond the newest HISTORY_LIMIT generations; return their ids.
+
+        Files are unlinked by the caller *after* commit (#704)."""
         ids = [
             r["id"] for r in self._conn.execute(
                 f"SELECT id FROM {table} WHERE game_slug = ? ORDER BY rowid DESC", (game_slug,)
             ).fetchall()
         ]
-        for blob_id in ids[HISTORY_LIMIT:]:
-            self._blob_path(table, blob_id).unlink(missing_ok=True)
+        stale = ids[HISTORY_LIMIT:]
         self._conn.execute(
             f"""DELETE FROM {table}
                 WHERE game_slug = ? AND rowid NOT IN (
@@ -125,6 +145,7 @@ class SaveStateMixin:
                 )""",
             (game_slug, game_slug, HISTORY_LIMIT),
         )
+        return stale
 
     def _meta_from_row(self, game_slug: str, row) -> SaveMeta:
         return SaveMeta(
@@ -366,24 +387,24 @@ class SaveStateMixin:
     def _archive_memcard_folder(self, folder: Path) -> tuple[Path, str, int]:
         """Tar and compress a memcard folder to a single archive.
 
-        Returns (path, hash, size). The tar is created in memory then written
-        to a temp file for hashing; this ensures we hash the actual archived
-        bytes, not the uncompressed folder.
+        Returns (path, hash, size). The tar is streamed straight to a temp file
+        (never held in memory, #704) and the hash is of the archived bytes.
         """
         import tarfile
-        from io import BytesIO
-
-        buf = BytesIO()
-        with tarfile.open(fileobj=buf, mode="w:gz") as tf:
-            for item in sorted(folder.iterdir()):
-                arcname = (item.relative_to(folder)).as_posix()
-                tf.add(item, arcname=arcname)
-        buf.seek(0)
 
         tmp = self.new_upload_path()
-        with open(tmp, "wb") as f:
-            f.write(buf.getvalue())
-        return tmp, hashlib.sha256(buf.getvalue()).hexdigest(), len(buf.getvalue())
+        try:
+            with tarfile.open(tmp, mode="w:gz") as tf:
+                for item in sorted(folder.iterdir()):
+                    tf.add(item, arcname=(item.relative_to(folder)).as_posix())
+            hasher = hashlib.sha256()
+            with open(tmp, "rb") as f:
+                while chunk := f.read(1024 * 1024):
+                    hasher.update(chunk)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
+        return tmp, hasher.hexdigest(), tmp.stat().st_size
 
     def _extract_memcard_archive(self, archive: Path, dest: Path) -> None:
         """Extract a memcard tar archive to the destination folder."""
