@@ -4,7 +4,7 @@
 - Issue: #673
 - Branch: feature/673-steam-fullscreen
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -90,3 +90,4 @@ Docs: 3 none
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=1/10, breaking=no
 - 2026-11-01 fplan: 3 steps written, visual_pattern=none
 - 2026-11-01 tplan: test_file=none (manual), 2 test cases defined
+- 2026-11-01 implement: steps 1-3 done (SteamGameId/SteamAppId force fullscreen in display.ts)

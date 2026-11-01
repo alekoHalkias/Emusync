@@ -21,9 +21,11 @@ function load(): Display {
   } catch { /* corrupt file — fall back to defaults */ }
   // First run (nothing saved): fullscreen via --fullscreen or on Steam Deck/SteamOS.
   const autoFullscreen = process.argv.includes("--fullscreen") || !!process.env.SteamDeck || !!process.env.SteamOS;
+  // Steam sets these for every launch, including non-Steam shortcuts (#673).
+  const steamLaunch = !!process.env.SteamGameId || !!process.env.SteamAppId;
   return {
     scale: SCALES.includes(saved.scale as number) ? (saved.scale as number) : 1,
-    fullscreen: process.argv.includes("--fullscreen") || (saved.fullscreen ?? autoFullscreen),
+    fullscreen: process.argv.includes("--fullscreen") || steamLaunch || (saved.fullscreen ?? autoFullscreen),
     autoUpdateEnabled: saved.autoUpdateEnabled ?? true,
   };
 }
