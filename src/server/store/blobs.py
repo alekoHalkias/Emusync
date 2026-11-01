@@ -427,6 +427,7 @@ class SaveStateMixin:
             (console_key,),
         ).fetchone()
         if row and row["hash"] == h:
+            Path(src).unlink(missing_ok=True)  # staged upload is redundant (#701)
             return dict(row)  # identical content — return existing metadata
 
         # Record in history before moving into live slot

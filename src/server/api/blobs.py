@@ -68,6 +68,8 @@ def _pull(kind: _BlobKind, slug: str, device_id: str) -> Response:
 
 
 async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) -> dict:
+    if not _get_store().get_game(slug):
+        raise HTTPException(status_code=404, detail="Game not found")  # before staging (#701)
     tmp, h, size = await _stage_upload(request)
 
     def _store_it() -> SaveMeta:
@@ -81,7 +83,11 @@ async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) ->
         return m
 
     # Offload the synchronous move + DB write so it doesn't block the event loop.
-    meta = await asyncio.to_thread(_store_it)
+    try:
+        meta = await asyncio.to_thread(_store_it)
+    except BaseException:
+        tmp.unlink(missing_ok=True)  # don't leak the staged upload (#701)
+        raise
     _print_activity(f"{kind.noun} pushed: {_game_label(slug)} from {_device_label(device_id)}")
     return {"hash": meta.hash, "pushed_at": meta.pushed_at}
 
