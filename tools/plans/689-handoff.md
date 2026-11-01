@@ -54,3 +54,4 @@ Backend: bump set, Node 22 in CI, verify, docs. Tests: make test, build-gui, tsc
 ### Summary
 Move the Vite toolchain to current majors together and require Node 22 in CI.
 - 2026-11-01 implement: steps 1-5 done, no config changes needed, Node 22 in CI; tsc errors 6 (unchanged baseline)
+- 2026-11-01 ship: PR #690, server sync done, review 0 findings (manifest/yml only), doc sync in-branch (CLAUDE.md)
