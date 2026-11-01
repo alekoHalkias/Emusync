@@ -91,3 +91,11 @@ src/cli/console.py, src/gui/electron/emulator/scan.ts, src/cli/run.py
 - Step 3: src/cli/console.py, src/gui/electron/emulator/scan.ts; quotes only.
 - Step 4: tests, real files. Step 5: docs none.
 - 2026-11-01 bplan: 5 steps written, backend_pattern=shared pure helper in cli/common.py
+
+## Test plan summary (tplan)
+### Outline
+Backend: helper in cli/common.py; wire run.py + run_offline.py + bare-token quoting; quote exec_path in console.py and scan.ts.
+Tests: test_launch_command_split.py (new, real files), extend test_launch_command_token.py.
+### Summary
+Spaced or Windows emulator paths and spaced ROM paths now yield correct argv; stored unquoted commands still work.
+- 2026-11-01 tplan: test_file=src/tests/test_launch_command_split.py, 6 test cases defined

@@ -29,6 +29,18 @@ Launch commands built with a spaced or backslashed emulator path, and previously
 - [ ] 4. Tests: src/tests/test_launch_command_split.py - spaced exec path (quoted and legacy unquoted using a real temp file), Windows-style tokenization (call internal split with nt mode), bare `%ROM%` with spaces yields one arg, plain commands unchanged; extend test_launch_command_token.py for the bare-token case. No mocks, real files.
 - [ ] 5. Docs: none needed - internal parsing fix, no CLI/IPC/config change; one line in src/docs/GOTCHAS.md only if review asks.
 
+## Testing
+- **Test File**: src/tests/test_launch_command_split.py (new, plain pytest, real temp files); extend src/tests/test_launch_command_token.py
+- **Test Cases**:
+  - quoted spaced exec path: argv[0] is the full path
+  - legacy unquoted spaced exec path (real temp file): tokens re-joined into argv[0]
+  - Windows tokenization (`nt` flag on helper): backslashes kept, quotes stripped
+  - bare `%ROM%` with spaced ROM path: one argument; single-quoted token too
+- **Edge Cases**:
+  - plain command with exec on PATH is unchanged
+  - nonexistent exec: returns the plain tokenization, no exception
+- **Integration Points**: `_resolve_launch_command` output feeds `split_launch_command`; both run.py and run_offline.py call it
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
