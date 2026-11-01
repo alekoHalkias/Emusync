@@ -30,7 +30,7 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
   - Files: src/server/api/blobs.py
   - Reuses: pattern at src/server/api/transfers.py create_rom_transfer
   - New: none
-- [ ] 5. `_is_stale`: treat a naive timestamp as UTC and catch `TypeError` as well as `ValueError`.
+- [x] 5. `_is_stale`: treat a naive timestamp as UTC and catch `TypeError` as well as `ValueError`.
   - Files: src/server/api/_core.py
   - Reuses: naive-to-UTC handling already in `_presence_tick`
   - New: none

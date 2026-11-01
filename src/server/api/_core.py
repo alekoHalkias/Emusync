@@ -168,9 +168,12 @@ _STAGING_MAX_AGE_DAYS = 7
 def _is_stale(queued_at: str) -> bool:
     from datetime import datetime, timedelta, timezone
     try:
-        return datetime.fromisoformat(queued_at) < datetime.now(timezone.utc) - timedelta(days=_STAGING_MAX_AGE_DAYS)
+        queued = datetime.fromisoformat(queued_at)
     except ValueError:
         return False
+    if queued.tzinfo is None:  # naive stamp: treat as UTC, as _presence_tick does (#715)
+        queued = queued.replace(tzinfo=timezone.utc)
+    return queued < datetime.now(timezone.utc) - timedelta(days=_STAGING_MAX_AGE_DAYS)
 
 
 def _get_store() -> Store:
