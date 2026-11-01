@@ -3,7 +3,7 @@
 Issue: #675
 Branch: feature/675-steam-appimage-mount-path
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
