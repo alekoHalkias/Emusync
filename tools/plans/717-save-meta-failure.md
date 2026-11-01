@@ -14,7 +14,7 @@ A failed `get_save_meta` request must not be read as "server has no save"; the r
 - **Recommendations**: none. The `get_save_sync_baseline` swallow stays (None baseline is the documented conservative fallback, #460).
 
 ## Steps
-- [ ] 1. In `_reconcile_save`, remove the two `try/except Exception: meta = None` around `get_save_meta` so request errors propagate; a 204 still yields `None`.
+- [x] 1. In `_reconcile_save`, remove the two `try/except Exception: meta = None` around `get_save_meta` so request errors propagate; a 204 still yields `None`.
   - Files: src/cli/run_reconcile.py
   - Reuses: existing `get_save_meta` 204 -> None contract (sync_client.py, run_ps2.py `_MemcardClient`)
   - New: none
