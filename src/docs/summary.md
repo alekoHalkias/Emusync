@@ -10,6 +10,6 @@ Keeps emulator save files in sync across devices on a local network. Play a game
 
 - **Python 3.10+**: FastAPI backend, Click CLI
 - **SQLite**: WAL-mode storage for saves/config
-- **Electron 31 + React 18**: Cross-platform GUI
+- **Electron 45 + React 18**: Cross-platform GUI
 - **zconf/mDNS**: Service discovery on LAN
 - **Key packages**: `uvicorn`, `to
