@@ -30,3 +30,4 @@ Additive is allowed (new column with default, new defaulted request field, new o
 ## Cross-device requests
 Device-to-device asks reuse `rom_pull_requests` (server-brokered, `kind` column picks the behavior, status `pending/fulfilled/failed`) instead of new tables. Fulfilment logic lives in one Python function called by the sync-daemon drain and by a CLI command for GUI-approved cases.
 - Archive extraction: always via sync_client._safe_extract_tar (never raw extractall). Upload filenames: reduce to basename, 400 on empty/./..
+- Post-delivery side effects (e.g. recording a pull baseline): attach a `BackgroundTask` to the `FileResponse` so it runs only after the body is fully sent; never before the response (#715). Whole-file downloads go to `<dest>.part` then `os.replace`.

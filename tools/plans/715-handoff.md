@@ -4,7 +4,7 @@
 - Issue: #715
 - Branch: feature/715-prevent-transfer-data-loss
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -39,9 +39,9 @@ src/server/sync_client.py, src/server/api/blobs.py, src/server/store/blobs.py, s
 ### Recommendations: TBD
 
 ## 4. Backend Plan
-### Design Alignment: TBD
-### Backend Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: fits thin-route/store pattern; no schema, endpoint or protocol change.
+### Backend Pattern: Starlette BackgroundTask on FileResponse records the baseline after delivery; .part + os.replace for downloads.
+### Recommendations: add BackgroundTask pattern to backend-design-guide.md.
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
@@ -63,7 +63,15 @@ src/server/sync_client.py, src/server/api/blobs.py, src/server/store/blobs.py, s
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/715-prevent-transfer-data-loss.md
+- Step 1: sync_client.py; reuses download_transfer loop; no new code.
+- Step 2: api/blobs.py; reuses FileResponse + set_*_sync_baseline; no new code.
+- Step 3: api/blobs.py; reuses _stage_upload cleanup block; no new code.
+- Step 4: api/blobs.py; reuses create_rom_transfer executor pattern; no new code.
+- Step 5: api/_core.py; reuses _presence_tick naive-UTC handling; no new code.
+- Step 6: gui/electron/files.ts; edits existing python snippet; no new code.
+- Step 7: tests/test_transfer_dataloss_715.py; new file, regression tests required by policy.
+- Step 8: docs; design guide, GOTCHAS, CLAUDE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -84,3 +92,4 @@ src/server/sync_client.py, src/server/api/blobs.py, src/server/store/blobs.py, s
 ## 12. Log
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=3/10, breaking=no
+- 2026-11-01 bplan: 8 steps written, backend_pattern=BackgroundTask baseline + .part download
