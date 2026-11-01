@@ -126,6 +126,20 @@ def _sigterm_handler(*_) -> None:
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)
+def _interrupt_handler(*args) -> None:
+    """SIGHUP/SIGINT (#699): with an emulator running, same graceful path as
+    SIGTERM so the post-game push and lock release still run. With no child yet
+    (still reconciling), raise so Ctrl+C isn't swallowed; the outer `finally`
+    releases the lock."""
+    if _run_offline_mod._child_proc is None:
+        raise KeyboardInterrupt
+    _sigterm_handler(*args)
+
+
+# SIGHUP doesn't exist on Windows.
+for _sig in (getattr(signal, "SIGHUP", None), signal.SIGINT):
+    if _sig is not None:
+        signal.signal(_sig, _interrupt_handler)
 
 
 # Refresh the lock well inside the TTL so a play session longer than the TTL
@@ -336,6 +350,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                     click.echo(f"Warning: failed to release lock: {exc}", err=True)
 
     exit_code = 0
+    stop_heartbeat = threading.Event()  # set in the finally so no pre-launch failure leaks it (#699)
     game_pid_file.write_text(str(os.getpid()))
     try:
         # A learned-save-path game (Switch) whose destination isn't known yet
@@ -411,7 +426,6 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
         # Keep the lock fresh for the whole session so a long play can't have its
         # lock stolen at the TTL by another device (issue #238).
-        stop_heartbeat = threading.Event()
         _start_lock_heartbeat(client, game_slug, stop_heartbeat)
 
         # Mark the moment before launch (minus a small epsilon for mtime
@@ -548,6 +562,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
         if shared_memcard:
             _learn_ps2_serial(cfg, game_slug, launch_start)
     finally:
+        stop_heartbeat.set()
         _release()
         game_pid_file.unlink(missing_ok=True)
 

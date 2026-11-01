@@ -140,3 +140,9 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - The PIN is compared with `hmac.compare_digest` on encoded bytes.
 - Archive restores (`_write_memcard_tar_bytes`, `_extract_state_folder`, `_merge_extract_state_folder`) extract into a `.emusync-*` temp dir next to the target via `_extract_tar_to_tmp` and only then back up and `os.replace` into place; a bad archive leaves the target untouched. Merge backs up `folder/<member relative path>`, matching where the member is written.
 - `window.ts` only passes http(s) URLs to `shell.openExternal` and cancels `will-navigate` away from the app page.
+
+## Run signals, tar filter, transfer timeouts (#699)
+
+- `cli/run.py` routes SIGHUP/SIGINT through `_interrupt_handler`: with an emulator running it kills the child like SIGTERM (no `sys.exit`, #472) so the push and lock release still run; before launch it raises `KeyboardInterrupt` so Ctrl+C is not swallowed. `stop_heartbeat` is created before the main `try` and set in its `finally`.
+- `_safe_extract_tar` uses `filter="data"` when `tarfile.data_filter` exists; otherwise it rejects non-regular/non-dir members and clears setuid/setgid/sticky bits.
+- Whole-blob transfers use `sync_client._TRANSFER_TIMEOUT` (connect 10s, read/write 600s); health, lock and metadata calls keep their short timeouts and #458 retries are untouched.

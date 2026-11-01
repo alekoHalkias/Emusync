@@ -14,6 +14,10 @@ from typing import Optional, Iterator
 import httpx
 
 
+# Whole-blob save/state/memcard/mod transfers: short connect, generous read/write
+# so big saves on slow links don't fail at 30s (#699). Health/lock stay short.
+_TRANSFER_TIMEOUT = httpx.Timeout(10, read=600, write=600)
+
 
 # ── transfer envelope (#478) ─────────────────────────────────────────────────
 # Every save/state/memcard/mod blob is prefixed with a small declared-format
@@ -156,6 +160,14 @@ def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
         target = (dest_root / member.name).resolve()
         if target != dest_root and dest_root not in target.parents:
             raise tarfile.TarError(f"refusing member outside destination: {member.name}")
+    if hasattr(tarfile, "data_filter"):  # 3.12+ and security backports
+        tar.extractall(path=str(dest), filter="data")
+        return
+    # Older Pythons: reject devices/FIFOs and drop setuid/setgid/sticky bits (#699).
+    for member in tar.getmembers():
+        if not (member.isreg() or member.isdir()):
+            raise tarfile.TarError(f"refusing special member in archive: {member.name}")
+        member.mode &= 0o777
     tar.extractall(path=str(dest))
 
 
@@ -298,7 +310,7 @@ class SyncClient:
 
     def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
         """Pull save to disk."""
-        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -312,7 +324,7 @@ class SyncClient:
             self._url(f"/games/{slug}/save"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
@@ -550,7 +562,7 @@ class SyncClient:
         Folder-based saves (Dolphin GC/Wii, PPSSPP, PCSX2 memcards) arrive as a
         plain tar archive; file-based saves arrive as raw bytes. _write_memcard
         detects which and handles both (#431)."""
-        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -563,7 +575,7 @@ class SyncClient:
             self._url(f"/games/{slug}/save"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
@@ -585,7 +597,7 @@ class SyncClient:
         Folder-based memcards arrive as a plain tar archive; file-based cards
         arrive as raw bytes. _write_memcard detects which and handles both.
         """
-        r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=30)
+        r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -598,7 +610,7 @@ class SyncClient:
             self._url(f"/consoles/{console_key}/memcard"),
             content=data,
             headers={"Content-Type": "application/octet-stream", "X-Card-Format": card_format},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
@@ -627,13 +639,13 @@ class SyncClient:
             self._url(f"/switch/{title_id}/mods/{mod_name}"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=60,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["added"]
 
     def pull_switch_mod(self, title_id: str, mod_name: str, dest_folder: str) -> bool:
-        r = self._client.get(self._url(f"/switch/{title_id}/mods/{mod_name}"), timeout=60)
+        r = self._client.get(self._url(f"/switch/{title_id}/mods/{mod_name}"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False
         r.raise_for_status()
@@ -642,7 +654,7 @@ class SyncClient:
 
     def pull_state(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
         """Write server state to disk. Returns (pulled, server_hash). pulled=False if no state exists."""
-        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -662,7 +674,7 @@ class SyncClient:
     def pull_state_merge(self, slug: str, state_path: str) -> tuple[bool, Optional[str]]:
         """Pull state into a SHARED states folder, overwriting only this game's
         files (PCSX2 sstates/, issue #294). Returns (pulled, server_hash)."""
-        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=30)
+        r = self._client.get(self._url(f"/games/{slug}/state"), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
@@ -691,7 +703,7 @@ class SyncClient:
             self._url(f"/games/{slug}/state"),
             content=data,
             headers={"Content-Type": "application/octet-stream"},
-            timeout=30,
+            timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
