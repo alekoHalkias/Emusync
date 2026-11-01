@@ -4,7 +4,7 @@
 - Issue: #691
 - Branch: feature/691-path-traversal-tar-presence
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -94,3 +94,4 @@ Plan file: tools/plans/691-path-traversal-tar-presence.md
 - 2026-11-01 bplan: 6 steps written, backend_pattern=reuse _safe_extract_tar, inline basename check
 - 2026-11-01 tplan: test_file=test_rom_transfer.py/test_console_memcard.py/test_devices.py, 7 test cases defined
 - tplan step note: reuses make_client/_device_auth/#597 harness; no new fixtures.
+- 2026-11-01 implement: steps 1-6 done (basename check, safe tar extract, dead branch removed, monitor log in loop, tests)

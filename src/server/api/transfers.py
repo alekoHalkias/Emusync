@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import asyncio
 
@@ -55,7 +55,10 @@ async def create_rom_transfer(
         raise HTTPException(status_code=404, detail="Target device not found")
 
     transfer_id = str(uuid.uuid4())
-    filename = x_filename or "rom"
+    # Reduce the client-supplied name to a basename so it can't escape the staging dir (#691).
+    filename = PurePosixPath((x_filename or "rom").replace("\\", "/")).name
+    if filename in ("", ".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid X-Filename header")
     transfer_subdir = Path(data_dir) / "rom_staging" / transfer_id
     transfer_subdir.mkdir(parents=True, exist_ok=True)
     staged_path = transfer_subdir / filename
