@@ -71,9 +71,9 @@ src/server/api/transfers.py, mods.py, src/server/store/switch_mods.py, src/cli/r
 See tools/plans/693-robustness-cleanup.md (steps 1-7, each annotated with Files/Reuses/New).
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 0 high/medium; low: lock retry has no delay (two immediate attempts); lock-retry test omitted (documented in plan log)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -92,3 +92,4 @@ See tools/plans/693-robustness-cleanup.md (steps 1-7, each annotated with Files/
 - 2026-11-01 bplan: 7 steps written, backend_pattern=boundary validation + _core helpers
 - 2026-11-01 tplan: testing section added
 - 2026-11-01 implement: steps 1-7 done (single commit)
+- 2026-11-01 review: 0 blocking findings, blocked=no
