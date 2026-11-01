@@ -15,6 +15,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
 from ..store import SaveMeta
@@ -53,11 +54,14 @@ def _pull(kind: _BlobKind, slug: str, device_id: str) -> Response:
     if path is None:
         return Response(status_code=204)
     _print_activity(f"{kind.noun} pulled: {_game_label(slug)} by {_device_label(device_id)}")
+    background = None
     if kind is _SAVE:
-        # This device's copy now agrees with the server as of this hash — record
-        # it so a later reconcile on this device can tell "unchanged since I last
-        # synced" from a real local edit (issue #460).
-        _get_store().set_save_sync_baseline(slug, device_id, meta.hash, meta.pushed_at)
+        # This device's copy agrees with the server as of this hash once the body
+        # is delivered — record it then (not before), so an aborted download can't
+        # hide a real conflict (#460, #715).
+        background = BackgroundTask(
+            _get_store().set_save_sync_baseline, slug, device_id, meta.hash, meta.pushed_at
+        )
     # FileResponse streams from disk instead of loading the blob into memory.
     return FileResponse(
         path,
@@ -67,6 +71,7 @@ def _pull(kind: _BlobKind, slug: str, device_id: str) -> Response:
             "X-Pushed-At": meta.pushed_at,
             "X-Device-Id": meta.device_id,
         },
+        background=background,
     )
 
 
@@ -296,9 +301,8 @@ def pull_console_memcard(console_key: str, device_id: str = Depends(_auth)) -> R
     path, meta = _get_store().pull_console_save_path(console_key)
     if path is None:
         return Response(status_code=204)
-    # This device's copy now agrees with the server as of this hash (#481,
-    # mirrors _pull's per-game baseline write).
-    _get_store().set_console_save_sync_baseline(console_key, device_id, meta["hash"], meta["pushed_at"])
+    # Baseline is recorded after the body is delivered (#481, #715; mirrors _pull).
+    store = _get_store()
     _print_activity(f"memcard pulled: {console_key} by {_device_label(device_id)}")
     return FileResponse(
         path,
@@ -309,6 +313,9 @@ def pull_console_memcard(console_key: str, device_id: str = Depends(_auth)) -> R
             "X-Device-Id": meta["device_id"],
             "X-Card-Format": meta.get("card_format", ""),
         },
+        background=BackgroundTask(
+            store.set_console_save_sync_baseline, console_key, device_id, meta["hash"], meta["pushed_at"]
+        ),
     )
 
 

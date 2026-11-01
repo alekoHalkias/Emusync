@@ -18,7 +18,7 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
   - Files: src/server/sync_client.py
   - Reuses: existing streaming loop and hash check in `download_transfer`
   - New: none
-- [ ] 2. Baseline after delivery: in `_pull` and `pull_console_memcard`, replace the pre-response `set_*_sync_baseline` call with `BackgroundTask(...)` passed to `FileResponse(background=...)`.
+- [x] 2. Baseline after delivery: in `_pull` and `pull_console_memcard`, replace the pre-response `set_*_sync_baseline` call with `BackgroundTask(...)` passed to `FileResponse(background=...)`.
   - Files: src/server/api/blobs.py
   - Reuses: `FileResponse`, `store.set_save_sync_baseline`, `store.set_console_save_sync_baseline`
   - New: none (Starlette built-in; no ack endpoint needed)

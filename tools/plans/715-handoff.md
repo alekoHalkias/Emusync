@@ -100,3 +100,4 @@ Docs: design guide, GOTCHAS, CLAUDE.md rule line
 - Step 7 (tests): tests/test_transfer_dataloss_715.py; reuses conftest make_client/AUTH and test_saves baseline pattern; new file justified by per-issue regression convention.
 - 2026-11-01 implement: step 1 done (download ROMs via .part then replace, allow extensionless)
 - 2026-11-01 implement: step 1 done (download ROMs via .part then replace, allow extensionless)
+- 2026-11-01 implement: step 2 done (record pull baseline after body is sent)
