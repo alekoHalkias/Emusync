@@ -101,3 +101,4 @@ Tests: 6 test_bundle.py + manual build.
 - 2026-11-01 implement: steps 2-3 done (extraResources, RUNTIME_DIR/USE_RUNTIME_DIR in runtime.ts, guard removed)
 - 2026-11-01 implement: step 4 done (runtimeSetup.ts ensureRuntime)
 - 2026-11-01 implement: step 5 done (ensureRuntime awaited by server start, daemon start, preflight, addGame)
+- 2026-11-01 implement: steps 6-7 done (test_bundle.py 3 passing; release smoke step)

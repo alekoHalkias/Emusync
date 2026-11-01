@@ -41,11 +41,11 @@ Ship the Python CLI inside the AppImage and run it from a stable per-user runtim
   - Files: src/gui/electron/server.ts, src/gui/electron/steam.ts
   - Reuses: server.ts start/preflight handlers, steam.ts `{ ok, error }` returns
   - New: none
-- [ ] 6. Guard tests (Python, no mocks): `src/tests/test_bundle.py` (a) loads `src/gui/package.json` and asserts every directory under `src/` that contains `.py` files, except the explicit exclude list (gui, tests, scripts, docs), is covered by an `extraResources` filter, and `emusync.py`/`emusync`/`requirements.txt` are present; (b) asserts `requirements.txt` contains no pytest entries and `requirements-dev.txt` includes it.
+- [x] 6. Guard tests (Python, no mocks): `src/tests/test_bundle.py` (a) loads `src/gui/package.json` and asserts every directory under `src/` that contains `.py` files, except the explicit exclude list (gui, tests, scripts, docs), is covered by an `extraResources` filter, and `emusync.py`/`emusync`/`requirements.txt` are present; (b) asserts `requirements.txt` contains no pytest entries and `requirements-dev.txt` includes it.
   - Files: src/tests/test_bundle.py
   - Reuses: existing pytest setup (`Path(__file__)` repo-root pattern from test_launcher_wrapper_finds_a_python)
   - New: one test file - nothing existing checks the bundle config.
-- [ ] 7. Release smoke check: after `Build AppImage` in release.yml, extract the AppImage (`--appimage-extract`) and fail if `squashfs-root/resources/src/emusync.py` is missing.
+- [x] 7. Release smoke check: after `Build AppImage` in release.yml, extract the AppImage (`--appimage-extract`) and fail if `squashfs-root/resources/src/emusync.py` is missing.
   - Files: .github/workflows/release.yml
   - Reuses: existing build step
   - New: one workflow step - the only place the packaged layout is observable.

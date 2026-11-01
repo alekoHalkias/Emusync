@@ -65,6 +65,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check the AppImage bundles the CLI
+        run: |
+          cd src/gui/dist && ./*.AppImage --appimage-extract 'resources/src/emusync.py' >/dev/null
+          test -f squashfs-root/resources/src/emusync.py
+
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
