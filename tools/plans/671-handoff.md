@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #671
 - Branch: feature/671-fix-game-launch
-- PR: none
+- PR: pending
 - Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
