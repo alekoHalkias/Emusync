@@ -98,3 +98,5 @@ Docs: design guide, GOTCHAS, CLAUDE.md rule line
 - 2026-11-01 bplan: 8 steps written, backend_pattern=BackgroundTask baseline + .part download
 - 2026-11-01 tplan: test_file=src/tests/test_transfer_dataloss_715.py, 9 test cases defined
 - Step 7 (tests): tests/test_transfer_dataloss_715.py; reuses conftest make_client/AUTH and test_saves baseline pattern; new file justified by per-issue regression convention.
+- 2026-11-01 implement: step 1 done (download ROMs via .part then replace, allow extensionless)
+- 2026-11-01 implement: step 1 done (download ROMs via .part then replace, allow extensionless)

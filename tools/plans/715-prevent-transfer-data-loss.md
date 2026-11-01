@@ -14,7 +14,7 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
 - **Recommendations**: Record the sync baseline with a Starlette `BackgroundTask` attached to the `FileResponse`; it only runs after the body is fully sent, so no new ack endpoint or client change is needed. Add this pattern to the design guide.
 
 ## Steps
-- [ ] 1. `download_transfer`: stream into `<dest>.part`, verify hash, then `os.replace` onto dest; on any failure unlink the `.part` and leave dest untouched. Drop the `not path.suffix` rejection (keep `is_dir()`), so extensionless ROMs are accepted.
+- [x] 1. `download_transfer`: stream into `<dest>.part`, verify hash, then `os.replace` onto dest; on any failure unlink the `.part` and leave dest untouched. Drop the `not path.suffix` rejection (keep `is_dir()`), so extensionless ROMs are accepted.
   - Files: src/server/sync_client.py
   - Reuses: existing streaming loop and hash check in `download_transfer`
   - New: none
