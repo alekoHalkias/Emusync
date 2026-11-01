@@ -4,7 +4,7 @@
 - Issue: #701
 - Branch: feature/701-upload-leaks
 - PR: none
-- Status: designed
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
