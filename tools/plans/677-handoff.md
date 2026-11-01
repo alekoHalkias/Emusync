@@ -4,7 +4,7 @@
 - Issue: #677
 - Branch: feature/677-appimage-steam-launcher
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -33,9 +33,9 @@ src/gui/electron/runtime.ts, steam.ts, game.ts, server.ts, paths.ts; src/gui/pac
 ### Backwards Compatibility: not breaking
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: no new UI; native folder dialog pattern from files.ts
+### Visual Pattern: none
+### Recommendations: none
 
 ## 4. Backend Plan
 ### Design Alignment: TBD
@@ -62,7 +62,12 @@ src/gui/electron/runtime.ts, steam.ts, game.ts, server.ts, paths.ts; src/gui/pac
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps
+1. display.ts: add optional repoPath (reuses load/save).
+2. launcher.ts (new; display.ts<->runtime.ts import cycle): findLauncher() and pickLauncher().
+3. steam.ts + game.ts: use findLauncher() ?? pickLauncher(); drop LAUNCHER_STABLE guard; readers fall back to LAUNCHER.
+4. Tests: manual + tsc.
+5. Docs: CLAUDE.md rule update.
 
 ## 9. Review
 ### Findings: TBD
@@ -83,3 +88,4 @@ src/gui/electron/runtime.ts, steam.ts, game.ts, server.ts, paths.ts; src/gui/pac
 ## 12. Log
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
+- 2026-11-01 fplan: 5 steps written, visual_pattern=none
