@@ -31,6 +31,8 @@ node src/scripts/scan-roms.mjs <folder> [--ext gba,sfc] [--depth 3] [--verbose]
 
 Stack: Python 3.10+/Click, FastAPI+uvicorn, SQLite, zeroconf, tomlkit, httpx; Electron 31, React 18, TS, electron-vite, electron-updater.
 
+Build toolchain pin (#682): electron-vite 2.x peers Vite 4/5 only, so Vite stays on 5.x and `@vitejs/plugin-react` on 5.x until electron-vite is bumped (#681); Vite 6+/plugin-react 6 follow that.
+
 ## Testing
 
 - **Before marking a task complete run `make test-changed`** (falls back to full suite). CI runs `make test`.

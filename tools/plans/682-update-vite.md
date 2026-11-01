@@ -14,13 +14,13 @@ Bump @vitejs/plugin-react to the highest major compatible with electron-vite 2.3
 - **Recommendations**: electron-vite 2.3.0 peers vite ^4 || ^5, so Vite stays on 5.x; plugin-react 5.2.0 is the highest supporting Vite 5 (6.x needs Vite 8).
 
 ## Steps
-- [ ] 1. Set @vitejs/plugin-react to ^5.2.0 in src/gui/package.json and refresh the lockfile.
+- [x] 1. Set @vitejs/plugin-react to ^5.2.0 in src/gui/package.json and refresh the lockfile.
   - Files: src/gui/package.json, src/gui/package-lock.json
   - Reuses: npm
   - New: none
-- [ ] 2. Verify: make lint, make build-gui, make test.
-- [ ] 3. Tests: none new; existing suite and build cover it.
-- [ ] 4. Docs: CLAUDE.md note that Vite 6+ and plugin-react 6 wait on electron-vite major (#681).
+- [x] 2. Verify: make lint, make build-gui, make test.
+- [x] 3. Tests: none new; existing suite and build cover it.
+- [x] 4. Docs: CLAUDE.md note that Vite 6+ and plugin-react 6 wait on electron-vite major (#681).
 
 ## Testing
 - **Test File**: none new

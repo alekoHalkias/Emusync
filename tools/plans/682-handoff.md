@@ -4,7 +4,7 @@
 - Issue: #682
 - Branch: feature/682-update-vite
 - PR: none
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -31,3 +31,4 @@ Manifest-only.
 
 ## 12. Log
 - 2026-11-01 issue/design/bplan/tplan: plugin-react only; Vite blocked on #681
+- 2026-11-01 implement/review/ship: plugin-react 5.2.0, Vite held at 5.4.21; lint/build/test pass (594 passed); review 0 findings; server sync skipped by directive
