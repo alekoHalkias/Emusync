@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #693
 - Branch: feature/693-robustness-cleanup
-- PR: none
-- Status: implemented
+- PR: #695
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -77,8 +77,8 @@ See tools/plans/693-robustness-cleanup.md (steps 1-7, each annotated with Files/
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
+### PR: #695
+### Server Sync: done
 ### Doc Sync: pending
 
 ## 11. Fix Attempts
@@ -93,3 +93,4 @@ See tools/plans/693-robustness-cleanup.md (steps 1-7, each annotated with Files/
 - 2026-11-01 tplan: testing section added
 - 2026-11-01 implement: steps 1-7 done (single commit)
 - 2026-11-01 review: 0 blocking findings, blocked=no
+- 2026-11-01 ship: PR #695, server sync done
