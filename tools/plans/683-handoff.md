@@ -4,7 +4,7 @@
 - Issue: #683
 - Branch: feature/683-react-19
 - PR: none
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -22,3 +22,5 @@ Existing suite + tsc both configs + build-gui. No new tests.
 
 ## 12. Log
 - 2026-11-01 issue/design/fplan/tplan: collapsed for a dependency-only change
+- 2026-11-01 implement: steps 1-4 done; tsc web shows 3 errors identical to React 18 baseline; build-gui ok; make test 593 pass + test_health_retry flaky under parallel load (passes alone)
+- 2026-11-01 review: 0 findings (manifest-only)
