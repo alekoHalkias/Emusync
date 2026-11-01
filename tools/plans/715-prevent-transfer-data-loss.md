@@ -26,7 +26,7 @@ A failed, partial, or empty transfer never overwrites or hides existing ROMs, sa
   - Files: src/server/api/blobs.py
   - Reuses: `_stage_upload` existing cleanup-on-exception block
   - New: none
-- [ ] 4. Offload upload writes: `await loop.run_in_executor(None, f.write, chunk)` in `_stage_upload`, matching `create_rom_transfer`.
+- [x] 4. Offload upload writes: `await loop.run_in_executor(None, f.write, chunk)` in `_stage_upload`, matching `create_rom_transfer`.
   - Files: src/server/api/blobs.py
   - Reuses: pattern at src/server/api/transfers.py create_rom_transfer
   - New: none

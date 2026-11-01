@@ -102,3 +102,4 @@ Docs: design guide, GOTCHAS, CLAUDE.md rule line
 - 2026-11-01 implement: step 1 done (download ROMs via .part then replace, allow extensionless)
 - 2026-11-01 implement: step 2 done (record pull baseline after body is sent)
 - 2026-11-01 implement: step 3 done (reject empty uploads with 400)
+- 2026-11-01 implement: step 4 done (offload upload writes to executor (same edit as step 3))
