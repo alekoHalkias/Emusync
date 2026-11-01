@@ -4,7 +4,7 @@
 - Issue: #675
 - Branch: feature/675-steam-appimage-mount-path
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
