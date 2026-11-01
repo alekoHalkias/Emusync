@@ -45,3 +45,7 @@ Surfacing launch errors in the GUI (game.ts uses stdio ignore); file separately 
 Step 1: reproduced by inspection; GUI stdio hidden, Steam wrapper venv path missing.
 Step 2: fixed src/emusync venv lookup; GUI launch now writes <data_dir>/launch.log (GUI root cause still unconfirmed).
 Note: pre-existing tsc errors (files.ts rt.PYTHON, steam-shortcut-editor types) are out of scope.
+
+## Fix attempt 1
+Cause: launch.log showed `can't open file src/gui/out/emusync.py`: runtime.ts SCRIPT used `../emusync.py` after #611; from out/main it must be `../../../emusync.py`. Also fixes launcher:path (Steam) and PYTHON venv lookup.
+- [x] F1.1 runtime.ts SCRIPT path restored. The %ROM% display in the editor is by design (#518), not the cause.

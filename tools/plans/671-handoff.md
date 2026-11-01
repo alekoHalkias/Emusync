@@ -4,7 +4,7 @@
 - Issue: #671
 - Branch: feature/671-fix-game-launch
 - PR: pending
-- Status: implemented
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -92,3 +92,4 @@ Docs: 4 none
 - 2026-11-01 tplan: test_file=src/tests/test_run_reconcile.py, 1 test case defined
 - 2026-11-01 implement: steps 1-2 done (wrapper venv lookup, GUI launch.log)
 - 2026-11-01 implement: steps 3-4 done (wrapper regression test; docs none needed)
+- 2026-11-01 implement: F1.1 SCRIPT path in runtime.ts (real root cause of GUI+Steam)

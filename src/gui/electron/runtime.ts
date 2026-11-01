@@ -12,7 +12,7 @@ import { join, dirname } from "path";
 import { CONFIG_PATH } from "./paths";
 
 export { CONFIG_PATH };
-export const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../emusync.py");
+export const SCRIPT = process.env.EMUSYNC_SCRIPT ?? join(__dirname, "../../../emusync.py");
 export const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
   const win = process.platform === "win32";
   const venv = join(dirname(SCRIPT), "../.cache/.venv", win ? "Scripts" : "bin", win ? "python.exe" : "python");
