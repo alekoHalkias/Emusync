@@ -2,7 +2,7 @@
 
 Issue: #717
 Branch: feature/717-save-meta-failure
-PR: none
+PR: #719
 Status: implemented
 Fix attempts: 0
 

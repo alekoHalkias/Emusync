@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #717
 - Branch: feature/717-save-meta-failure
-- PR: none
-- Status: implemented
+- PR: #719
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 - Related: #718 (separate issue, not yet branched)
