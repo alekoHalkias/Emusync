@@ -1,0 +1,34 @@
+# Plan: #671 Fix games not launching from EmuSync
+
+Issue: #671
+Branch: feature/671-fix-game-launch
+PR: none
+Status: planned
+Fix attempts: 0
+
+## Goal
+Find why `emusync run <slug>` no longer starts the emulator and fix it at the source, with a regression test.
+
+## Design Alignment
+- **Backend Pattern**: launch flows through `cli/run.py:_resolve_launch_command` then `shlex.split` then `_launch_and_wait`; fix stays in that path, no new modules.
+- **Recommendations**: none. Root cause is not yet known; step 1 reproduces it before any code change.
+
+## Steps
+- [ ] 1. Reproduce: run `.venv/bin/python src/emusync.py run <slug>` in a terminal on an affected device (the GUI spawns it with `stdio: "ignore"`, which hides the error) and record the stderr/exit code in the handoff Log. Candidates: `_resolve_launch_command` returning None, empty `launch_command`, `%ROM%` resolution, network/share changes from #663, device dedupe from #657 (device_id/game_devices lookup).
+  - Files: none (investigation only)
+  - Reuses: existing CLI
+  - New: none
+- [ ] 2. Fix the identified cause at its origin in the shared function.
+  - Files: determined by step 1 (expected src/cli/run.py or src/server/store/*)
+  - Reuses: `_resolve_launch_command`, `resolve_rom_path`
+  - New: none expected
+- [ ] 3. Tests: regression test for the identified failure in src/tests/test_integration.py (or the module matching the cause). No mocks, real SQLite.
+- [ ] 4. Docs: none needed unless the cause reveals a rule worth adding to src/docs/GOTCHAS.md.
+
+## Checklist
+Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
+
+## Not in this plan
+Surfacing launch errors in the GUI (game.ts uses stdio ignore); file separately if wanted.
+
+## Log
