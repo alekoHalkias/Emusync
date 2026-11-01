@@ -48,12 +48,14 @@ src/cli/run_reconcile.py (_reconcile_save ~63-66), src/cli/run.py (post-game pus
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_run_reconcile.py
+### Test Cases: meta_error_propagates; meta_204_still_pushes; server_save_survives_meta_failure (live_server); run_game_falls_back_offline
+### Edge Cases: 5xx same as timeout; no-save_path branch propagates; _MemcardClient path
+### Integration Points: run.py try/except -> _run_offline; lock release
+### Outline:
+- Backend: 1 run_reconcile.py stop swallowing meta errors; 2 run.py catch HTTPError -> _run_offline; 4 CLAUDE.md rule line
+- Tests: 3 extend _FakeClient, 4 cases (reuses _FakeClient, _write_save, live_server)
+### Summary: A failed save-meta request no longer reads as "no server save"; the run launches offline instead of pushing or overwriting.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -89,3 +91,4 @@ src/cli/run_reconcile.py (_reconcile_save ~63-66), src/cli/run.py (post-game pus
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-01 bplan: 4 steps written, backend_pattern=propagate errors, reuse offline fallback
+- 2026-11-01 tplan: test_file=src/tests/test_run_reconcile.py, 4 test cases defined
