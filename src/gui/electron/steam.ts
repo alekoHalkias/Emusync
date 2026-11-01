@@ -24,6 +24,7 @@ import { join, dirname, basename } from "path";
 import { homedir, platform } from "os";
 import shortcutEditor from "steam-shortcut-editor";
 import { LAUNCHER } from "./runtime";
+import { ensureRuntime } from "./runtimeSetup";
 import { ART_DIR } from "./art";
 
 type SteamShortcut = {
@@ -414,6 +415,9 @@ export function registerSteamIpc(): void {
         return { ok: false, error: "Steam appears to be running. Close Steam first, then try again." };
       }
 
+      // A shortcut to a launcher that is not provisioned yet would fail at play time (#677).
+      const runtime = await ensureRuntime();
+      if (!runtime.ok) return { ok: false, error: runtime.error };
       const launcherExe = LAUNCHER;
       const exe = `"${launcherExe}"`;
       const startDir = `"${dirname(launcherExe)}"`;

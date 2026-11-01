@@ -8,6 +8,7 @@ import { dataDir } from "./paths";
 import { parse as parseTOML } from "smol-toml";
 import { CONFIG_PATH, SCRIPT, PYTHON, rt } from "./runtime";
 import { writeConfig } from "./config-store";
+import { ensureRuntime } from "./runtimeSetup";
 
 // ── sync daemon ─────────────────────────────────────────────────────────────
 
@@ -24,6 +25,13 @@ export function startSyncDaemon(): void {
     return; // No config yet (fresh install showing setup screen)
   }
 
+  ensureRuntime().then((r) => {
+    if (!r.ok) { console.error(r.error); return; }
+    if (!rt.syncDaemonProcess) spawnSyncDaemon();
+  });
+}
+
+function spawnSyncDaemon(): void {
   try {
     const proc = spawn(PYTHON, [SCRIPT, "sync-daemon"], {
       stdio: "ignore",
@@ -62,9 +70,15 @@ export function stopSyncDaemon(): void {
 
 // ── server process ──────────────────────────────────────────────────────────
 
-export function startServerProcess(): Promise<{ ok: boolean; error?: string }> {
-  if (rt.serverProcess) return Promise.resolve({ ok: true });
+export async function startServerProcess(): Promise<{ ok: boolean; error?: string }> {
+  if (rt.serverProcess) return { ok: true };
+  const ready = await ensureRuntime();
+  if (!ready.ok) return ready;
+  if (rt.serverProcess) return { ok: true };
+  return spawnServer();
+}
 
+function spawnServer(): Promise<{ ok: boolean; error?: string }> {
   return new Promise<{ ok: boolean; error?: string }>((resolve) => {
     let resolved = false;
     let tail = ""; // last output, surfaced if the server dies before it is ready
@@ -151,7 +165,9 @@ export function registerServerIpc(): void {
   });
 
   // Can PYTHON import the server's dependencies? Lets Setup explain a broken install up front.
-  ipcMain.handle("server:preflight", () => {
+  ipcMain.handle("server:preflight", async () => {
+    const ready = await ensureRuntime();
+    if (!ready.ok) return ready;
     return new Promise<{ ok: boolean; error?: string }>((resolve) => {
       const proc = spawn(PYTHON, ["-c", "import fastapi, uvicorn, click, tomlkit, zeroconf, httpx"], { stdio: ["ignore", "ignore", "pipe"] });
       let err = "";

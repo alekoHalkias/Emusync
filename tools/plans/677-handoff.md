@@ -100,3 +100,4 @@ Tests: 6 test_bundle.py + manual build.
 - 2026-11-01 implement: step 1 done (requirements split; release.yml line 52 build job left on runtime file)
 - 2026-11-01 implement: steps 2-3 done (extraResources, RUNTIME_DIR/USE_RUNTIME_DIR in runtime.ts, guard removed)
 - 2026-11-01 implement: step 4 done (runtimeSetup.ts ensureRuntime)
+- 2026-11-01 implement: step 5 done (ensureRuntime awaited by server start, daemon start, preflight, addGame)

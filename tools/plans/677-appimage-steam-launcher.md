@@ -37,7 +37,7 @@ Ship the Python CLI inside the AppImage and run it from a stable per-user runtim
   - Files: src/gui/electron/runtimeSetup.ts
   - Reuses: runtime.ts constants, files.ts/server.ts spawn patterns, install.sh error wording
   - New: runtimeSetup.ts - no existing module copies or provisions anything at startup.
-- [ ] 5. Wire it in: `server:start` and `daemon` start await `ensureRuntime()` and return `{ ok:false, error }` on failure (reusing the #534 early-exit shape); `server:preflight` awaits it first and returns its error; `steam:addGame` awaits it and returns its error before touching shortcuts.vdf; remove the #676 LAUNCHER_STABLE branch and message in steam.ts.
+- [x] 5. Wire it in: `server:start` and `daemon` start await `ensureRuntime()` and return `{ ok:false, error }` on failure (reusing the #534 early-exit shape); `server:preflight` awaits it first and returns its error; `steam:addGame` awaits it and returns its error before touching shortcuts.vdf; remove the #676 LAUNCHER_STABLE branch and message in steam.ts.
   - Files: src/gui/electron/server.ts, src/gui/electron/steam.ts
   - Reuses: server.ts start/preflight handlers, steam.ts `{ ok, error }` returns
   - New: none
