@@ -3,7 +3,7 @@
 Issue: #684
 Branch: feature/684-typescript-7
 PR: none
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal
@@ -14,16 +14,16 @@ Bump TypeScript to 7.0.2 without growing the type error set.
 - **Recommendations**: none
 
 ## Steps
-- [ ] 1. Set typescript ^7.0.2 in src/gui/package.json and lockfile.
+- [x] 1. Set typescript ^7.0.2 in src/gui/package.json and lockfile.
   - Files: src/gui/package.json, src/gui/package-lock.json
   - Reuses: npm
   - New: none
-- [ ] 2. Add src/gui/renderer/src/vite-env.d.ts (`/// <reference types="vite/client" />`) so the css side-effect import type-checks under TS 7.
+- [x] 2. Add src/gui/renderer/src/vite-env.d.ts (`/// <reference types="vite/client" />`) so the css side-effect import type-checks under TS 7.
   - Files: src/gui/renderer/src/vite-env.d.ts
   - Reuses: vite/client types
   - New: one-line file - TS 7 rejects an undeclared side-effect import
-- [ ] 3. Verify: tsc both configs show only the 6 pre-existing errors; make lint, build-gui, test pass.
-- [ ] 4. Tests: none new. Docs: none needed.
+- [x] 3. Verify: tsc both configs show only the 6 pre-existing errors; make lint, build-gui, test pass.
+- [x] 4. Tests: none new. Docs: none needed.
 
 ## Testing
 - **Test File**: none new; existing suite

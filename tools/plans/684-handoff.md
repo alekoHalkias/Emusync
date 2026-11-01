@@ -4,7 +4,7 @@
 - Issue: #684
 - Branch: feature/684-typescript-7
 - PR: none
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -28,3 +28,4 @@ No new tests. make lint, make build-gui, make test; tsc error set must not grow 
 
 ## 12. Log
 - 2026-11-01 issue/design/bplan/tplan: collapsed for a tooling-only change, plan_target=bplan, difficulty=2/10, breaking=no
+- 2026-11-01 implement/review/ship: steps done; tsc 7.0.2 error set equals 5.9.3 baseline; pytest 594 passed; server sync skipped per directive
