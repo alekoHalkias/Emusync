@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #701
 - Branch: feature/701-upload-leaks
-- PR: none
-- Status: implemented
+- PR: #710
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -38,11 +38,12 @@ src/server/api/blobs.py, src/server/store/blobs.py, src/server/api/_core.py, src
 
 ## 10. Ship
 ### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### PR: #710
+### Server Sync: done
+### Doc Sync: done (none needed)
 
 ## 12. Log
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-01 implement: steps 1-5 done in one commit (full suite 630 passed)
+- 2026-11-01 ship: PR #710, server sync done, no doc changes needed
