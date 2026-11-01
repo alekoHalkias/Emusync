@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shlex
 import signal
 import sys
 import threading
@@ -28,7 +27,7 @@ import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
 from server.sync_client import GameDeviceConfig, _memcard_payload_bytes
 
-from cli.common import _client, _get_device_name, _show_game_running_popup
+from cli.common import _client, _get_device_name, _show_game_running_popup, split_launch_command
 from cli.netrom import resolve_rom_path
 from cli.root import cli
 
@@ -100,7 +99,12 @@ def _resolve_launch_command(gd) -> Optional[str]:
     # `%ROM%` (#518) always follows the ROM actually in use, so renames, moves
     # and offline copies never need the stored command rewritten.
     if cmd and ROM_TOKEN in cmd:
-        return cmd.replace(ROM_TOKEN, effective) if effective else None
+        if not effective:
+            return None
+        # Quote the substitution so a ROM path with spaces stays one argument (#702).
+        for quoted in (f'"{ROM_TOKEN}"', f"'{ROM_TOKEN}'"):
+            cmd = cmd.replace(quoted, f'"{effective}"')
+        return cmd.replace(ROM_TOKEN, f'"{effective}"')
     # Legacy commands with the literal path baked in.
     if network and effective != gd.rom_path and gd.rom_path and cmd:
         cmd = cmd.replace(gd.rom_path, effective)
@@ -264,7 +268,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
                 err=True,
             )
             sys.exit(1)
-        launch_argv = tuple(shlex.split(launch_command))
+        launch_argv = tuple(split_launch_command(launch_command))
 
     # Shared-memory-card consoles (PS2): the per-game "save" is actually one card
     # shared across the whole console, so route save reconciliation to the

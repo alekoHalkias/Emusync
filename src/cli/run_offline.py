@@ -6,7 +6,6 @@ import hashlib
 import json
 import logging
 import os
-import shlex
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -15,6 +14,7 @@ from typing import Optional
 
 import click
 
+from cli.common import split_launch_command
 from server.sync_client import GameDeviceConfig
 
 logger = logging.getLogger("emusync.run")
@@ -147,7 +147,7 @@ def _run_offline(cfg, game_slug: str, game_pid_file: Path, command: tuple[str, .
                 err=True,
             )
             sys.exit(1)
-        launch_argv = tuple(shlex.split(launch_command))
+        launch_argv = tuple(split_launch_command(launch_command))
     else:
         click.echo(
             f"EmuSync server unreachable and no cached launch command for '{game_slug}'. "
