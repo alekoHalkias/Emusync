@@ -34,11 +34,11 @@ Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocatio
   - Reuses: existing warning style from the #717 save fallback.
   - Change: wrap `pull_state` / `pull_state_merge` in `try/except Exception`; on failure warn on stderr and clear the local `state_path` used for the post-game state push, so a stale local state is never pushed over a server state this device could not read.
   - New: none.
-- [ ] 5. SyncClient cleanup: remove the dead first `pull_save`/`push_save` copies; `push_state` folder pack recurses (`rglob`, arcname relative posix path, skip `.bak`, `name_prefix` matched on basename); `_backup_state_files` backs up nested files too, so nested pulls keep a `.bak`.
+- [x] 5. SyncClient cleanup: remove the dead first `pull_save`/`push_save` copies; `push_state` folder pack recurses (`rglob`, arcname relative posix path, skip `.bak`, `name_prefix` matched on basename); `_backup_state_files` backs up nested files too, so nested pulls keep a `.bak`.
   - Files: src/server/sync_client.py
   - Reuses: `_memcard_payload_bytes` rglob/relative-path pattern.
   - New: none.
-- [ ] 6. Raw save writes are atomic and never silently skipped. `_write_memcard_raw_bytes` writes to a sibling `.part` then `os.replace`; if the target is a directory it raises ValueError instead of returning (so `pull_save` does not report pulled=True).
+- [x] 6. Raw save writes are atomic and never silently skipped. `_write_memcard_raw_bytes` writes to a sibling `.part` then `os.replace`; if the target is a directory it raises ValueError instead of returning (so `pull_save` does not report pulled=True).
   - Files: src/server/sync_client.py
   - Reuses: `.part` + `os.replace` pattern from `download_transfer`.
   - New: none.
@@ -91,3 +91,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 - 2026-11-02 bplan: plan written
 - 2026-11-02 tplan: testing section added
 Step 4: used a state_pull_failed flag instead of clearing state_path, so the post-game path-adoption PUT never blanks the stored state path.
+Step 6: dropped the directory-target raise. test_memcard_folder_sync.py::test_write_memcard_legacy_fallback_does_not_crash_on_directory_target requires the skip on purpose (folder-card device receiving an old flat-file blob must not crash; its post-game push migrates the server). Atomic .part write kept.

@@ -107,7 +107,7 @@ def _extract_state_folder(content: bytes, folder: Path) -> None:
 
 
 def _backup_state_files(folder: Path) -> None:
-    for existing in list(folder.iterdir()):
+    for existing in list(folder.rglob("*")):  # nested states get a .bak too (#734)
         if existing.is_file() and not existing.name.endswith(".bak"):
             os.replace(str(existing), str(existing) + ".bak")
 
@@ -265,12 +265,24 @@ def _write_memcard_tar_bytes(card: Path, tar_bytes: bytes) -> None:
 
 
 def _write_memcard_raw_bytes(card: Path, raw: bytes) -> None:
-    """Write *raw* to *card* (a file-based memcard), backing up whatever was there."""
-    if card.exists() and card.is_file():
+    """Write *raw* to *card* (a file-based memcard), backing up whatever was there.
+
+    Written to a sibling ``.part`` then ``os.replace``d, so a crash mid-write never
+    truncates the real save (#734). A directory at *card* is left alone on purpose:
+    a folder-card device receiving an old flat-file blob must not crash, and its
+    post-game push then migrates the server to the folder layout."""
+    if card.is_dir():
+        return
+    if card.is_file():
         shutil.copy2(card, card.parent / (card.name + ".bak"))
-    if not card.exists() or card.is_file():
-        card.parent.mkdir(parents=True, exist_ok=True)
-        card.write_bytes(raw)
+    card.parent.mkdir(parents=True, exist_ok=True)
+    part = card.with_name(card.name + ".part")
+    try:
+        part.write_bytes(raw)
+        os.replace(part, card)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
 
 
 def _write_memcard(card: Path, data: bytes) -> None:
@@ -307,28 +319,6 @@ class SyncClient:
 
     def _url(self, path: str) -> str:
         return f"{self._base}{path}"
-
-    def pull_save(self, slug: str, save_path: str) -> tuple[bool, Optional[str]]:
-        """Pull save to disk."""
-        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=_TRANSFER_TIMEOUT)
-        if r.status_code == 204:
-            return False, None
-        r.raise_for_status()
-        _write_memcard(Path(save_path), r.content)
-        return True, r.headers.get("X-Save-Hash")
-
-    def push_save(self, slug: str, save_path: str) -> str:
-        """Push save to server."""
-        data = memcard_bytes(Path(save_path))
-        r = self._client.post(
-            self._url(f"/games/{slug}/save"),
-            content=data,
-            headers={"Content-Type": "application/octet-stream"},
-            timeout=_TRANSFER_TIMEOUT,
-        )
-        r.raise_for_status()
-        return r.json()["hash"]
-
 
     def health(self, retries: int = 0, retry_delay: float = 1.5) -> bool:
         """True if the server answers /health.
@@ -700,13 +690,15 @@ class SyncClient:
             # (PCSX2 sstates/) this selects just this game's serial files (#294).
             buf = io.BytesIO()
             with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-                for f in sorted(p.iterdir()):
+                # rglob: subfolder states must sync too, matching the recursive
+                # extract (#734). Relative arcnames keep the layout.
+                for f in sorted(p.rglob("*")):
                     # Skip .bak backups so they don't propagate to the server/peers.
                     if not (f.is_file() and not f.name.endswith(".bak")):
                         continue
                     if name_prefix is not None and not f.name.startswith(name_prefix):
                         continue
-                    tar.add(str(f), arcname=f.name)
+                    tar.add(str(f), arcname=f.relative_to(p).as_posix())
             data = _pack_envelope(_FMT_TARGZ, buf.getvalue())
         else:
             data = _pack_envelope(_FMT_RAW, p.read_bytes())

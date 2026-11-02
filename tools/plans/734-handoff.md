@@ -85,8 +85,8 @@ Tests
 - done 2. cli/run_reconcile.py; reuses _decide_save_action (optional baseline_hash param); no new code.
 - done 3. store/locks.py, store/games.py; reuses LOCK_TTL_HOURS + locks PK; new _lock_cutoff (shared by 3 queries).
 - done 4. cli/run.py state pull block; reuses #717 warn pattern; no new code.
-- 5. sync_client.py push_state/_backup_state_files/dup removal; reuses _memcard_payload_bytes rglob pattern.
-- 6. sync_client.py _write_memcard_raw_bytes; reuses download_transfer .part pattern.
+- done 5. sync_client.py push_state/_backup_state_files/dup removal; reuses _memcard_payload_bytes rglob pattern.
+- done 6. sync_client.py _write_memcard_raw_bytes; reuses download_transfer .part pattern.
 - 7. store/blobs.py console history/pull; reuses _prune_history return-ids shape, _unlink_blobs.
 - 8. tests: test_integrity, test_console_memcard, test_run_reconcile, test_locks, test_state_sync, test_memcard_folder_sync.
 - 9. docs: GOTCHAS, CLAUDE.md, design guide.
@@ -116,3 +116,5 @@ Tests
 - 2026-11-02 implement: step 2 done (baseline decides pre-launch push or pull)
 - 2026-11-02 implement: step 3 done (lock TTL on read and atomic acquire)
 - 2026-11-02 implement: step 4 done (failed state pull warns and launch continues)
+- 2026-11-02 implement: step 5 done (recursive state push, nested state backups, drop duplicate save methods)
+- 2026-11-02 implement: step 6 done (recursive state push, nested backups, atomic raw save write, drop duplicate save methods (steps 5+6))
