@@ -99,7 +99,7 @@ Docs
 5. [done] GameGrid Refresh + mount-time call - GameGrid.tsx; reuses parts/setBulkMsg/onChanged.
 6. [done] NetworkPlaySetup uses setupNetworkPlay instead of roms[0] - NetworkPlaySetup.tsx.
 7. [done] Tests - src/tests/test_network_rom.py; build typecheck for GUI.
-8. Docs - CLAUDE.md, src/docs/ARCHITECTURE.md.
+8. [done] Docs - CLAUDE.md, src/docs/ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -132,3 +132,4 @@ Docs
 - 2026-11-02 implement: step 5 done (auto-link network games on grid load and Refresh locations)
 - 2026-11-02 implement: step 6 done (NetworkPlaySetup links via setupNetworkPlay instead of scan roms[0])
 - 2026-11-02 implement: step 7 done (tests for network-link-candidates)
+- 2026-11-02 implement: step 8 done (document network auto-link)

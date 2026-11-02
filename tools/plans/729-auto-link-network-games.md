@@ -35,7 +35,7 @@ A network-drive game set up on one device is linked automatically on any other d
   - Files: src/tests/test_network_autolink.py
   - Reuses: tests/test_network_rom.py helpers, conftest `client`, `AUTH`, `_device_auth`
   - New: test file - existing one is over the size limit.
-- [ ] 8. Docs: CLAUDE.md network bullet (#660) and src/docs/ARCHITECTURE.md (REST route, IPC `rom:autoLinkNetworkGames`, netplay.ts, auto-link on Refresh locations and grid load).
+- [x] 8. Docs: CLAUDE.md network bullet (#660) and src/docs/ARCHITECTURE.md (REST route, IPC `rom:autoLinkNetworkGames`, netplay.ts, auto-link on Refresh locations and grid load).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md
 
 ## Testing
