@@ -12,7 +12,8 @@ from server.sync_client import GameDeviceConfig
 from cli.common import _client, _print_table
 from cli.mod import _title_id_for
 from cli.root import cli
-from cli.run_switch import _seed_switch_save, _switch_profile_dirs
+from cli.run_switch import _resolve_switch_profile, _seed_switch_save, _switch_profile_dirs
+from server import config as cfg_module
 
 
 @cli.group()
@@ -199,6 +200,7 @@ def game_ensure_switch_save_folder(slug: str) -> None:
     """
     client = _client()
     title_id = _title_id_for(client, slug)
+    _resolve_switch_profile(client, cfg_module.load().device_id)  # #727
     created = []
     for profile_dir in _switch_profile_dirs():
         dest = profile_dir / title_id
@@ -229,6 +231,7 @@ def game_pull_switch_save(slug: str) -> None:
     """
     client = _client()
     title_id = _title_id_for(client, slug)
+    _resolve_switch_profile(client, cfg_module.load().device_id)  # #727
     seeded = _seed_switch_save(client, slug, title_id)
     if not seeded:
         click.echo("No save on the server yet, or no local Eden profile exists to seed into.", err=True)

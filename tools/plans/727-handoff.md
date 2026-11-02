@@ -97,3 +97,4 @@ Tests: (6) test_switch_profile.py, 6 cases + edge cases.
 - 2026-11-01 implement: started; user confirmed Deck live profile is 0F9E31CF8F16E6677DFF94055FFF9B3D
 - 2026-11-01 implement: step 1 done (consoles.switch_profile_id v33 + API field)
 - 2026-11-01 implement: step 2 done (SyncClient.update_device_console)
+- 2026-11-01 implement: steps 3-5 done (profiles.dat detection, device profile resolve/store, save_path correction; conftest isolation)

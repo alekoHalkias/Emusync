@@ -22,14 +22,14 @@ Every device keeps one Eden profile on its Switch console row, and Switch saves 
   - Files: src/server/sync_client.py
   - Reuses: `get_device_consoles` request style
   - New: one method - no client wrapper for this PUT exists (the GUI calls it from api.ts).
-- [ ] 3. Profile detection and restriction in `run_switch.py`: `_eden_profile_folders(save_root)` parses `<eden root>/nand/system/save/8000000000000010/su/avators/profiles.dat` (0x10 header, 0xC8-byte entries, first 16 bytes = UUID, skip all-zero, folder = reversed bytes as upper hex). Module-level `_device_profile` set via `_set_switch_profile(p)`. `_switch_profile_dirs()` returns `root/<_device_profile>` (created if missing) when set; else the profiles.dat folders that exist; else today's non-`.bak` scan.
+- [x] 3. Profile detection and restriction in `run_switch.py`: `_eden_profile_folders(save_root)` parses `<eden root>/nand/system/save/8000000000000010/su/avators/profiles.dat` (0x10 header, 0xC8-byte entries, first 16 bytes = UUID, skip all-zero, folder = reversed bytes as upper hex). Module-level `_device_profile` set via `_set_switch_profile(p)`. `_switch_profile_dirs()` returns `root/<_device_profile>` (created if missing) when set; else the profiles.dat folders that exist; else today's non-`.bak` scan.
   - Files: src/cli/run_switch.py
   - Reuses: `_SWITCH_NAND_ROOTS`, existing `_switch_profile_dirs` call sites unchanged
   - New: profiles.dat parser - no existing reader. Module-level profile: ponytail, avoids threading a param through five functions; a param if more callers appear.
-- [ ] 4. `_resolve_switch_profile(client, cfg) -> str` in run_switch.py: read this device's Switch console row (`shortform_name` or `console_name` == "Switch"); use its `switch_profile_id`, else the first detected profiles.dat folder and store it on the row via `update_device_console` (fill-only-blank, best effort); call `_set_switch_profile`. Call it in `run_game` for Switch, and in `game.py` `ensure-switch-save-folder` / `pull-switch-save`.
+- [x] 4. `_resolve_switch_profile(client, cfg) -> str` in run_switch.py: read this device's Switch console row (`shortform_name` or `console_name` == "Switch"); use its `switch_profile_id`, else the first detected profiles.dat folder and store it on the row via `update_device_console` (fill-only-blank, best effort); call `_set_switch_profile`. Call it in `run_game` for Switch, and in `game.py` `ensure-switch-save-folder` / `pull-switch-save`.
   - Files: src/cli/run_switch.py, src/cli/run.py, src/cli/game.py
   - Reuses: `client.get_device_consoles`, step 2 method, existing try/except warning pattern
-- [ ] 5. Correct a stored save_path in another profile: in `run_game`, extend the #725 `.bak` self-heal so a Switch `save_path` whose parent folder is not the device profile is dropped; the existing title-ID match then re-picks inside the device profile and persists it via `set_game_device`, or seeding fills it.
+- [x] 5. Correct a stored save_path in another profile: in `run_game`, extend the #725 `.bak` self-heal so a Switch `save_path` whose parent folder is not the device profile is dropped; the existing title-ID match then re-picks inside the device profile and persists it via `set_game_device`, or seeding fills it.
   - Files: src/cli/run.py
   - Reuses: #725 self-heal block, `_find_local_switch_save`, `_seed_switch_save`
 - [ ] 6. Tests: new src/tests/test_switch_profile.py (API/migration cases reuse the `client` fixture and the put-console helper style from test_network_rom.py; CLI cases reuse `_make_title`-style tmp_path NAND trees and the stub-client `run_game.callback` harness from test_run_reconcile.py). No mocks for store/API, real SQLite.
@@ -56,3 +56,4 @@ Schema bump: yes (v33). New IPC channel (+ emusync.d.ts): no. New CLI subcommand
 GUI editor for the profile (row is editable via the existing PUT); moving existing save data out of stray profile folders (left untouched).
 
 ## Log
+Steps 3-5: committed together (shared run_switch/run.py code); _resolve_switch_profile takes device_id instead of cfg; conftest autouse fixture resets the module profile and default NAND roots for test isolation.

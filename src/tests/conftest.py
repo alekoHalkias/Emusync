@@ -121,3 +121,13 @@ def live_server(tmp_path):
     yield {"host": "127.0.0.1", "port": port}
     server.should_exit = True
     thread.join(timeout=5)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_switch_profile(monkeypatch, tmp_path):
+    """#727: the device Eden profile is module state and the default NAND roots
+    are the real home dirs; reset both so no test sees another's (or the
+    machine's) profile. Tests that need a NAND tree patch the roots themselves."""
+    import cli.run_switch as rs
+    monkeypatch.setattr(rs, "_device_profile", "")
+    monkeypatch.setattr(rs, "_SWITCH_NAND_ROOTS", (tmp_path / "no-eden-nand",))

@@ -64,17 +64,82 @@ def _is_backup_path(path: str) -> bool:
     return any(part.endswith(".bak") for part in Path(path).parts)
 
 
-def _switch_profile_dirs() -> list[Path]:
-    """Every existing profile-ID folder under each NAND save root.
+def _profiles_dat(save_root: Path) -> Path:
+    """Eden's account list for the NAND that *save_root* belongs to."""
+    return save_root.parents[2] / "system/save/8000000000000010/su/avators/profiles.dat"
 
-    `.bak` copies are skipped: Eden never reads them, and adopting a save
-    inside one left the Deck syncing a dead folder (#725).
+
+def _eden_profile_folders(save_root: Path) -> list[str]:
+    """Save-folder names of Eden's real profiles, from profiles.dat (#727).
+
+    Layout: 0x10-byte header, then 0xC8-byte user entries whose first 16 bytes
+    are the UUID; the save folder is those bytes reversed, as upper hex. Stray
+    folders like `<half of the ID>0000000000000000` are not in it. Missing or
+    unreadable file: [] (caller falls back to scanning).
     """
+    try:
+        data = _profiles_dat(save_root).read_bytes()
+    except OSError:
+        return []
+    folders = []
+    for off in range(0x10, len(data) - 0xC7, 0xC8):
+        uuid = data[off:off + 16]
+        if any(uuid):
+            folders.append(uuid[::-1].hex().upper())
+    return folders
+
+
+# This device's Eden profile folder, set once per process by
+# _resolve_switch_profile (#727). ponytail: module-level instead of a param
+# threaded through five functions; make it a param if more callers appear.
+_device_profile = ""
+
+
+def _set_switch_profile(profile: str) -> None:
+    global _device_profile
+    _device_profile = profile
+
+
+def _resolve_switch_profile(client, device_id: str) -> str:
+    """Pick this device's Eden profile and make it the only one saves use (#727).
+
+    The device's Switch console row wins (`switch_profile_id`); if blank, the
+    first profile in profiles.dat is used and stored on that row once. Best
+    effort: an unreachable server or no profiles.dat leaves the fallback scan.
+    ponytail: first profiles.dat user; a multi-user Eden picks by editing the row.
+    """
+    rows: list[dict] = []
+    try:
+        rows = [c for c in client.get_device_consoles(device_id) if c.get("console_name") == "Switch"]
+    except Exception:
+        pass
+    profile = next((c.get("switch_profile_id") for c in rows if c.get("switch_profile_id")), "")
+    if not profile:
+        detected = [f for r in _SWITCH_NAND_ROOTS if r.is_dir() for f in _eden_profile_folders(r)]
+        profile = detected[0] if detected else ""
+        if profile and rows:
+            try:
+                client.update_device_console(device_id, {**rows[0], "switch_profile_id": profile})
+            except Exception as exc:
+                click.echo(f"Warning: failed to store the Switch profile: {exc}", err=True)
+    _set_switch_profile(profile)
+    return profile
+
+
+def _switch_profile_dirs() -> list[Path]:
+    """The profile folder(s) Switch saves may live in on this device.
+
+    With a device profile set: only `<root>/<profile>` (#727), so a save is
+    never adopted from or seeded into another profile. Otherwise the profiles
+    listed in profiles.dat, else every non-`.bak` folder (#725).
+    """
+    roots = [r for r in _SWITCH_NAND_ROOTS if r.is_dir()]
+    if _device_profile:
+        return [r / _device_profile for r in roots]
     dirs: list[Path] = []
-    for root in _SWITCH_NAND_ROOTS:
-        if not root.is_dir():
-            continue
-        dirs.extend(d for d in root.iterdir() if d.is_dir() and not d.name.endswith(".bak"))
+    for root in roots:
+        listed = [root / f for f in _eden_profile_folders(root) if (root / f).is_dir()]
+        dirs.extend(listed or (d for d in root.iterdir() if d.is_dir() and not d.name.endswith(".bak")))
     return dirs
 
 
@@ -83,6 +148,7 @@ def _switch_title_save_dirs() -> list[Path]:
     return [
         title_dir
         for profile_dir in _switch_profile_dirs()
+        if profile_dir.is_dir()
         for title_dir in profile_dir.iterdir()
         if title_dir.is_dir() and not title_dir.name.endswith(".bak")
     ]
