@@ -109,8 +109,8 @@ Docs
 ## 10. Ship
 ### Status: shipped
 ### PR: #730
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -134,3 +134,5 @@ Docs
 - 2026-11-02 implement: step 8 done (document network auto-link)
 - 2026-11-02 implement: all 8 steps done
 - 2026-11-02 review: 2 findings, blocked=no
+- 2026-11-02 ship: server sync done
+- 2026-11-02 ship: doc sync updated ARCHITECTURE.md, GOTCHAS.md, CLAUDE.md
