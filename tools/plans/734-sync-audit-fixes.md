@@ -3,7 +3,7 @@
 Issue: #734
 Branch: feature/734-sync-audit-fixes
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal

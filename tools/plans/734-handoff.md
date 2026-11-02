@@ -4,7 +4,7 @@
 - Issue: #734
 - Branch: feature/734-sync-audit-fixes
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -121,3 +121,4 @@ Tests
 - 2026-11-02 implement: step 7 done (console history unlinked after commit, pulls stream immutable history copy)
 - 2026-11-02 implement: step 8 done (regression tests for hashing, reconcile, locks, console pulls, state push)
 - 2026-11-02 implement: step 9 done (docs for sync audit fixes)
+- 2026-11-02 implement: all steps done, lint ok, test-changed 165 passed
