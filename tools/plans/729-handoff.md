@@ -102,9 +102,9 @@ Docs
 8. [done] Docs - CLAUDE.md, src/docs/ARCHITECTURE.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: (1) test-gap netplay.ts:20 - Electron linkNetworkGame has no automated test (no harness); (2) style GameGrid.tsx:116 - auto-link reruns on every GameGrid mount (idempotent, one request when nothing to link). Checked: rom_rel_path is relative to the console network folder in every writer (useConsoleImport, resolveRomPaths, localToNetwork), so mount_root + rel is correct; rel-path traversal rejected; no schema/config/path rule touched; new IPC in emusync.d.ts.
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: shipped
@@ -133,3 +133,4 @@ Docs
 - 2026-11-02 implement: step 7 done (tests for network-link-candidates)
 - 2026-11-02 implement: step 8 done (document network auto-link)
 - 2026-11-02 implement: all 8 steps done
+- 2026-11-02 review: 2 findings, blocked=no
