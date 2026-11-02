@@ -32,7 +32,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
 - [x] 5. Dedup at creation: `GameRequest.rom_filename: str = ""`, `rom_size: int = 0`; `POST /games` returns the matched game with `"matched": true` when `find_game_by_rom` hits on the same console, else inserts as today with `"matched": false`. `sync_client.add_game(..., rom_filename="", rom_size=0)`. CLI `console import` passes basename + `os.path.getsize` (files only), sets `rom_size` on both `GameDeviceConfig` builds, prints "linked to existing <slug>" when matched.
   - Files: src/server/api/games.py, src/server/sync_client.py, src/cli/console.py
   - Reuses: existing route, client method, import loop.
-- [ ] 6. `cli/netrom.py:upload_to_network` sets `gd.rom_size` from the uploaded file.
+- [x] 6. `cli/netrom.py:upload_to_network` sets `gd.rom_size` from the uploaded file.
   - Files: src/cli/netrom.py
   - Reuses: existing gd update block.
 - [ ] 7. Candidates: `network_link_candidates` exact query unchanged; rows gain `rom_size`, `filename` (basename of `rom_rel_path`), `match: "exact"`. Second query adds `match: "fuzzy"` rows: other devices' network rows with `rom_size > 0`, console where this device has a `device_network_folder`, no config on this device, slug not already exact; one row per slug (latest rowid), same `mount_root` field.

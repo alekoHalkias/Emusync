@@ -308,6 +308,7 @@ def upload_to_network(client, device_id: str, slug: str) -> str:
     local = gd.rom_path
     gd.rom_source, gd.rom_path, gd.local_rom_path = "network", master, local
     gd.rom_rel_path, gd.rom_sha256 = rel, res.sha256
+    gd.rom_size = os.path.getsize(master)
     gd.rom_folder_path = os.path.dirname(master)
     gd.launch_command = gd.launch_command.replace(local, master)
     client.set_game_device(slug, gd)
