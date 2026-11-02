@@ -59,7 +59,8 @@ Proposed: for every game with a network source whose share_id equals one of this
 ### Recommendations: register before `/games/{slug}` so the literal path is not taken as a slug.
 
 ## 5. Merged Plan
-### Conflicts Resolved: none
+Plan file: tools/plans/729-auto-link-network-games.md
+### Conflicts Resolved: docs steps from both plans merged (CLAUDE.md, ARCHITECTURE.md); backend route ordered before the Electron/renderer steps that call it.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
@@ -78,18 +79,15 @@ Proposed: for every game with a network source whose share_id equals one of this
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps (backend, tools/plans/729-auto-link-network-games-backend.md)
-- B1 store `network_link_candidates(device_id)` - src/server/store/games.py; reuses get_network_source_for_game's columns/share join; new because that method is per-slug and does not filter by this device's share or existing config.
-- B2 route `GET /games/network-link-candidates` - src/server/api/games.py; reuses _auth/_get_store and the /games/overview placement; new because no route lists candidates.
-- B3 tests - src/tests/test_network_rom.py; reuses that file's fixtures.
-- B4 docs - src/docs/ARCHITECTURE.md, CLAUDE.md.
-### Steps (frontend, tools/plans/729-auto-link-network-games-frontend.md)
-- F1 move setupNetworkPlay + helpers to gui/electron/sync/netplay.ts, split out linkNetworkGame - rom.ts, netplay.ts, sync.ts; reuses existing handler body; new module because rom.ts is 552 lines.
-- F2 IPC rom:autoLinkNetworkGames - netplay.ts, preload.ts, emusync.d.ts; reuses linkNetworkGame; new because no bulk link channel exists.
-- F3 GameGrid Refresh locations + mount-time call - GameGrid.tsx; reuses parts/setBulkMsg/onChanged.
-- F4 NetworkPlaySetup tryAutoImport uses setupNetworkPlay instead of roms[0] - NetworkPlaySetup.tsx.
-- F5 tests: build typecheck + manual; no Electron test harness.
-- F6 docs - CLAUDE.md, src/docs/ARCHITECTURE.md.
+### Steps (merged, tools/plans/729-auto-link-network-games.md)
+1. Store network_link_candidates - src/server/store/games.py; reuses get_network_source_for_game join; new because that is per-slug.
+2. Route GET /games/network-link-candidates - src/server/api/games.py; reuses _auth/_get_store.
+3. Move setupNetworkPlay to gui/electron/sync/netplay.ts, split linkNetworkGame - rom.ts, netplay.ts, sync.ts; new module because rom.ts is 552 lines.
+4. IPC rom:autoLinkNetworkGames - netplay.ts, preload.ts, emusync.d.ts; reuses linkNetworkGame.
+5. GameGrid Refresh + mount-time call - GameGrid.tsx; reuses parts/setBulkMsg/onChanged.
+6. NetworkPlaySetup uses setupNetworkPlay instead of roms[0] - NetworkPlaySetup.tsx.
+7. Tests - src/tests/test_network_rom.py; build typecheck for GUI.
+8. Docs - CLAUDE.md, src/docs/ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -112,3 +110,4 @@ Proposed: for every game with a network source whose share_id equals one of this
 - 2026-11-02 design: scope=backend+ui, plan_target=both, difficulty=4/10, breaking=no
 - 2026-11-02 bplan: 4 steps written, backend_pattern=store mixin method + thin route
 - 2026-11-02 fplan: 6 steps written, visual_pattern=no new UI, Refresh status line part
+- 2026-11-02 merge: 2 conflicts resolved, 0 unresolved
