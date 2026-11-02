@@ -3,10 +3,10 @@
 ## Metadata
 - Issue: #727
 - Branch: feature/727-switch-device-profile
-- PR: none
-- Status: shipped
+- PR: #728
+- Status: implementing
 - Created: 2026-11-01
-- Fix attempts: 0
+- Fix attempts: 1
 
 ## 1. Issue
 ### Summary
@@ -85,7 +85,7 @@ Tests: (6) test_switch_profile.py, 6 cases + edge cases.
 ### Doc Sync: pending
 
 ## 11. Fix Attempts
-### Attempt 1: none
+### Attempt 1: prefer the Eden root that already has the device profile
 ### Attempt 2: none
 ### Attempt 3: none
 

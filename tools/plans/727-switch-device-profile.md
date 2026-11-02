@@ -2,9 +2,9 @@
 
 Issue: #727
 Branch: feature/727-switch-device-profile
-PR: none
-Status: implemented
-Fix attempts: 0
+PR: #728
+Status: implementing
+Fix attempts: 1
 
 ## Goal
 Every device keeps one Eden profile on its Switch console row, and Switch saves are matched, seeded, pulled and detected only inside `<nand root>/<that profile>/<title id>`.
@@ -57,3 +57,9 @@ GUI editor for the profile (row is editable via the existing PUT); moving existi
 
 ## Log
 Steps 3-5: committed together (shared run_switch/run.py code); _resolve_switch_profile takes device_id instead of cfg; conftest autouse fixture resets the module profile and default NAND roots for test isolation.
+
+## Fix attempt 1
+Failure: review - with both Eden roots present, `_switch_profile_dirs` returned `<root>/<profile>` for each, so seeding created the profile folder in the inactive root.
+Cause: no preference for the root that already has the profile.
+- [ ] F1.1 Return only roots where `<root>/<profile>` exists; fall back to every existing root when none has it yet.
+  - Files: src/cli/run_switch.py, src/tests/test_switch_profile.py
