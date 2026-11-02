@@ -54,7 +54,7 @@ Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocatio
   - tests/test_locks.py: expired lock reads as unlocked via API; acquire by another device succeeds after TTL; same-device refresh still works; held fresh lock still 409.
   - tests/test_state_sync.py: push_state folder includes subfolder files and skips `.bak`.
   - tests/test_memcard_folder_sync.py (or test_state_sync.py): raw pull onto a directory raises; raw write leaves no `.part`.
-- [ ] 9. Docs: GOTCHAS.md entry for server-side envelope-free hashing (#734) and lock TTL on read; one-line CLAUDE.md rule under Saves/sync; design guide line from Design Alignment. ARCHITECTURE.md: none needed - no new routes, IPC, CLI or config.
+- [x] 9. Docs: GOTCHAS.md entry for server-side envelope-free hashing (#734) and lock TTL on read; one-line CLAUDE.md rule under Saves/sync; design guide line from Design Alignment. ARCHITECTURE.md: none needed - no new routes, IPC, CLI or config.
 
 ## Testing
 - **Test Files**: src/tests/test_integrity.py, test_console_memcard.py, test_run_reconcile.py, test_locks.py, test_state_sync.py (all existing; extend, no new files)
