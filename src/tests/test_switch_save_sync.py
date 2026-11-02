@@ -14,6 +14,7 @@ from cli.run_switch import (
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
+    _switch_title_id_from_save_path,
 )
 
 
@@ -193,3 +194,11 @@ def test_finds_title_under_emudeck_style_second_root(monkeypatch, tmp_path):
     result = _resolve_written_switch_save(since)
 
     assert result == str(title_dir)
+
+
+def test_switch_title_id_from_save_path():
+    """#725: the learned Eden folder name is the title ID; anything else is ""."""
+    assert _switch_title_id_from_save_path("/x/profile/0100F43008C44000") == "0100F43008C44000"
+    assert _switch_title_id_from_save_path("/x/profile/0100F43008C44000/") == "0100F43008C44000"
+    assert _switch_title_id_from_save_path("/x/profile/Pokemon Legends Z-A") == ""
+    assert _switch_title_id_from_save_path("") == ""

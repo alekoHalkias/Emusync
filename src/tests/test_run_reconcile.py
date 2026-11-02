@@ -1085,3 +1085,55 @@ def test_run_game_falls_back_offline_when_save_state_unreadable(monkeypatch, tmp
     assert offline_calls == ["g"]
     assert pushed == []
     assert released == ["g"]
+
+
+def _switch_backfill_run(monkeypatch, tmp_path, stored_id, save_dir_name):
+    """Run a Switch launch whose device already knows its save folder (#725)."""
+    import cli.run as run_mod
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-local", device_name="Deck")
+    monkeypatch.setattr(run_mod.cfg_module, "load", lambda: cfg)
+    save_dir = tmp_path / "nand" / "profile-a" / save_dir_name
+    save_dir.mkdir(parents=True)
+    (save_dir / "main").write_bytes(b"progress")
+    gd = GameDeviceConfig(
+        rom_path=str(tmp_path / "Pokemon Legends Z-A.nsp"), save_path=str(save_dir),
+        launch_command="eden", state_path="", rom_folder_path=str(tmp_path),
+    )
+    update_calls = []
+
+    class _C:
+        def health(self, retries=0, retry_delay=1.5): return True
+        def get_game_device(self, slug): return gd
+        def get_game(self, slug):
+            return {"name": "Pokemon Legends Z-A", "console": "Switch", "switch_title_id": stored_id}
+        def get_lock(self, slug): return {"locked": False}
+        def acquire_lock(self, slug): pass
+        def release_lock(self, slug): pass
+        def get_save_meta(self, slug): return None
+        def push_save(self, slug, path): return "h"
+        def set_game_device(self, slug, updated_gd): pass
+        def list_switch_mods(self, title_id): return []
+        def update_game(self, slug, name, switch_title_id=""):
+            update_calls.append(switch_title_id)
+
+    monkeypatch.setattr(run_mod, "_client", lambda c: _C())
+    monkeypatch.setattr(run_mod, "_launch_and_wait", lambda argv, pid_file: 0)
+    monkeypatch.setattr(run_mod, "_resolve_written_switch_save", lambda since: None)
+    with pytest.raises(SystemExit):
+        run_mod.run_game.callback(game_slug="pokemon-legends-z-a", command=())
+    return update_calls
+
+
+def test_switch_known_save_path_backfills_blank_title_id(monkeypatch, tmp_path):
+    """Regression (#725): a device with a learned save folder but no server title
+    ID never published it, so the other device could not link the save."""
+    assert _switch_backfill_run(monkeypatch, tmp_path, "", "0100F43008C44000") == ["0100F43008C44000"]
+
+
+def test_switch_known_save_path_keeps_stored_title_id(monkeypatch, tmp_path):
+    assert _switch_backfill_run(monkeypatch, tmp_path, "0100F43008C44000", "0100F43008C44000") == []
+
+
+def test_switch_non_hex_save_folder_stores_nothing(monkeypatch, tmp_path):
+    assert _switch_backfill_run(monkeypatch, tmp_path, "", "my-save") == []
