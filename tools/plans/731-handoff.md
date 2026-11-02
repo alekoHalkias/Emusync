@@ -61,9 +61,9 @@ User answers (2026-11-02):
 ### Backwards Compatibility: non-breaking. Additive column + optional field; rom_size 0 rows never fuzzy-matched; IPC return extended only.
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: fuzzy proposals (network + relink) in one MatchConfirmModal following LocalToNetworkModal; on-load discovery via the bulkMsg status line with Review, Refresh opens the modal. Plan file: tools/plans/731-network-game-matching-ui.md (10 steps).
+### Visual Pattern: existing Modal/modal-actions/checkbox list; guide gained a "match confirmation lists" rule.
+### Recommendations: declined proposals session-only; scanNewRoms unchanged (wizard is the confirmation step); GameConfig manual add not deduped.
 
 ## 4. Backend Plan
 ### Design Alignment: additive schema v34 column + defaulted request fields; dedup in the single creation route POST /games; fuzzy candidates extend existing /games/network-link-candidates; CLI search reuses detect._scan_rom_dir.
@@ -103,6 +103,17 @@ User answers (2026-11-02):
 - B10 tests: src/tests/test_network_matching.py (real SQLite).
 - B11 docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
 
+- F1 types (rom_size, romSize, addGame rom arg): api.ts, game-list/types.ts, useGameList.ts, emusync.d.ts; reuses existing types/_fetch.
+- F2 files:size IPC: files.ts, preload.ts, d.ts; reuses files:exists pattern; new - no IPC exposes size (get-file-hash reads whole file).
+- F3 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, emulator/ipc.ts; reuses scanRomDir; new thin name+size filter.
+- F4 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame + network-source; new confirm channel - fuzzy hits must not persist from auto-link.
+- F5 useBrokenRoms size backfill, relink proposals, size-checked siblings: useBrokenRoms.ts; reuses refresh loop/sourceFor/updateRom.
+- F6 MatchConfirmModal: new component; reuses LocalToNetworkModal structure - its move/upload actions do not apply.
+- F7 GameGrid wiring: GameGrid.tsx; reuses bulkMsg + handleRefreshLocations.
+- F8 import dedup via addGame match: useConsoleImport.ts; reuses addGame/setGameDevice/gamesOverview.
+- F9 verify build + tsc + manual.
+- F10 docs: CLAUDE.md, ARCHITECTURE.md.
+
 ## 9. Review
 ### Findings: TBD
 ### Blocked: TBD
@@ -123,3 +134,4 @@ User answers (2026-11-02):
 - 2026-11-02 issue: workflow initialized; clarified scope with user (filename+size fallback, confirm fuzzy, prevent+merge duplicates, all four surfaces)
 - 2026-11-02 design: scope=backend+ui, plan_target=both, difficulty=7/10, breaking=no; split #732 (merge duplicates)
 - 2026-11-02 bplan: 11 steps written, backend_pattern=additive v34 rom_size + dedup in POST /games + fuzzy candidates on existing route
+- 2026-11-02 fplan: 10 steps written, visual_pattern=LocalToNetworkModal-style MatchConfirmModal + status-line Review
