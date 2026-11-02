@@ -4,7 +4,7 @@
 - Issue: #727
 - Branch: feature/727-switch-device-profile
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -94,3 +94,4 @@ Tests: (6) test_switch_profile.py, 6 cases + edge cases.
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-01 bplan: 7 steps written, backend_pattern=per-device console column + restricted profile dirs
 - 2026-11-01 tplan: test_file=src/tests/test_switch_profile.py, 6 test cases defined
+- 2026-11-01 implement: started; user confirmed Deck live profile is 0F9E31CF8F16E6677DFF94055FFF9B3D
