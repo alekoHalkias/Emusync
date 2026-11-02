@@ -102,6 +102,13 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
   }
 
   const cards = Array.from(cardMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  if (cards.length > 0) {
+    // "All games" pseudo-console (#720): key "all" shows every game in GameGrid.
+    cards.unshift({
+      key: "all", label: "All games", abbr: "ALL",
+      totalGames: games.length, localGames: games.filter((g) => g.isLocal).length,
+    });
+  }
 
   if (cards.length === 0) {
     return (
