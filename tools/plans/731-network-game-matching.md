@@ -51,11 +51,11 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
 - [x] 10. Types: `GameDeviceConfig.rom_size?: number`; `GameOverview.rom_size: number`; `GameRow.romSize` mapped in useGameList; `addGame(name, console?, rom?: { filename: string; size: number })` posts `rom_filename` / `rom_size` and returns `Game & { matched?: boolean }`.
   - Files: src/gui/renderer/src/api.ts, src/gui/renderer/src/components/game-list/types.ts, src/gui/renderer/src/components/game-list/useGameList.ts
   - Reuses: existing types, `_fetch`.
-- [ ] 11. `files:size` IPC (regular file size, else 0) + preload + emusync.d.ts.
+- [x] 11. `files:size` IPC (regular file size, else 0) + preload + emusync.d.ts.
   - Files: src/gui/electron/files.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: `files:exists` pattern.
   - New: channel - nothing exposes size (`files:get-file-hash` reads the whole file).
-- [ ] 12. TS matcher: export `scanRomDir`, add `findRomByNameSize(roots, filename, size, consoleKey?)` in scan.ts; IPC `rom:findByNameSize` + preload + d.ts.
+- [x] 12. TS matcher: export `scanRomDir`, add `findRomByNameSize(roots, filename, size, consoleKey?)` in scan.ts; IPC `rom:findByNameSize` + preload + d.ts.
   - Files: src/gui/electron/emulator/scan.ts, src/gui/electron/emulator/ipc.ts, preload.ts, emusync.d.ts
   - Reuses: scanRomDir (same walker semantics as Python `_scan_rom_dir`).
   - New: name+size filter + channel.
@@ -125,3 +125,4 @@ Schema bump: yes (v34). New IPC channel (+ emusync.d.ts): yes (files:size, rom:f
 - 2026-11-02 merge: 18 steps, 6 conflicts resolved, 0 unresolved
 Step 7: updated test_network_autolink exact key-set assertion here (planned for step 17) to keep the suite green.
 Step 9: _relocated_gd takes the device's console list + console name (not a single row) so the caller passes get_device_consoles output directly; added _rom_missing gate so the server is only asked when the ROM is actually missing.
+Step 11-12: committed together (shared preload/d.ts edits); findRomByNameSize takes no consoleKey (dir ROMs have size 0 and never match, so the dir-pattern lookup is unneeded); the preload/d.ts entries for step 13's rom:confirmNetworkMatch were added here too.

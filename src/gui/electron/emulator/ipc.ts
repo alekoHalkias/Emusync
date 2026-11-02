@@ -4,7 +4,7 @@ import { homedir } from "os";
 import { rt } from "../runtime";
 import { loadConsoleDefinitionsIfNeeded } from "./console-defs";
 import { detectEmulatorsForConsole } from "./detect";
-import { runEmulatorScan } from "./scan";
+import { findRomByNameSize, runEmulatorScan } from "./scan";
 import { scanLibraryFolders, type LibraryFolderMatch } from "./library";
 import type { DetectedEmulatorOption, EmulatorScanResult } from "./types";
 
@@ -37,6 +37,10 @@ export function registerEmulatorIpc(): void {
     await loadConsoleDefinitionsIfNeeded();
     return runEmulatorScan(params);
   });
+
+  // Same ROM by filename + size under a set of folders (#731); null when ambiguous.
+  ipcMain.handle("rom:findByNameSize", (_event, roots: string[], filename: string, size: number): string | null =>
+    findRomByNameSize(roots, filename, size));
 
   // Bulk-library import (#462): non-recursive scan of a library root's
   // immediate subfolders, each matched against known console names.

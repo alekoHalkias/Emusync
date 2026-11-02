@@ -98,8 +98,8 @@ Backend
 - 9 CLI run finds a moved ROM for this launch only (pure `_relocated_gd`). [done]
 Frontend
 - 10 Types + `addGame` ROM arg. [done]
-- 11 IPC `files:size`.
-- 12 IPC `rom:findByNameSize` over `scanRomDir`.
+- 11 IPC `files:size`. [done]
+- 12 IPC `rom:findByNameSize` over `scanRomDir`. [done]
 - 13 Auto-link: exact silent, fuzzy -> proposals; IPC `rom:confirmNetworkMatch`.
 - 14 Refresh: size backfill, moved-ROM relink proposals, size-checked sibling relink.
 - 15 MatchConfirmModal + status-line Review in GameGrid.
@@ -128,8 +128,8 @@ Tests
 - 8 find_rom_by_name_size: cli/netrom.py; reuses detect._scan_rom_dir. [done]
 - 9 CLI run fallback, not persisted: cli/run.py; reuses _resolve_launch_command, get_device_consoles; new _relocated_gd. [done]
 - 10 renderer types + addGame rom arg: api.ts, types.ts, useGameList.ts; reuses _fetch. [done]
-- 11 files:size IPC: files.ts, preload.ts, d.ts; new - no size IPC.
-- 12 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, ipc.ts; reuses scanRomDir.
+- 11 files:size IPC: files.ts, preload.ts, d.ts; new - no size IPC. [done]
+- 12 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, ipc.ts; reuses scanRomDir. [done]
 - 13 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame; new confirm channel.
 - 14 useBrokenRoms backfill/proposals/size-checked siblings: useBrokenRoms.ts; reuses refresh/sourceFor/updateRom.
 - 15 MatchConfirmModal + GameGrid wiring: new component; reuses LocalToNetworkModal structure, bulkMsg.
@@ -170,3 +170,5 @@ Tests
 - 2026-11-02 implement: step 8 done (find_rom_by_name_size over _scan_rom_dir)
 - 2026-11-02 implement: step 9 done (run launches a moved ROM found by filename+size, not persisted)
 - 2026-11-02 implement: step 10 done (renderer rom_size types and addGame ROM arg)
+- 2026-11-02 implement: step 11 done (files:size IPC)
+- 2026-11-02 implement: step 12 done (files:size and rom:findByNameSize IPC)

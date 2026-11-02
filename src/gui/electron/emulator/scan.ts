@@ -1,5 +1,5 @@
 // ROM directory scanning and save/state path resolution for the import wizard.
-import { existsSync, readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, realpathSync, statSync } from "fs";
 import { join, basename, extname, dirname } from "path";
 import { rt } from "../runtime";
 import { findLatestFileInDir } from "../files";
@@ -101,6 +101,24 @@ function dirMatchesPattern(dir: string, pattern: string): boolean {
     }
   }
   return false;
+}
+
+/** The single ROM under `roots` with `filename` (case-insensitive) and `size` (#731),
+ *  else null: size 0, no hit and more than one hit all mean "no match". Mirrors
+ *  cli/netrom.py:find_rom_by_name_size. */
+export function findRomByNameSize(roots: string[], filename: string, size: number): string | null {
+  if (!filename || !(size > 0)) return null;
+  const want = filename.replace(/\\/g, "/").split("/").pop()!.toLowerCase();
+  const hits = new Set<string>();
+  for (const root of new Set(roots.filter(Boolean))) {
+    for (const p of scanRomDir(root)) {
+      try {
+        const st = statSync(p);
+        if (basename(p).toLowerCase() === want && st.isFile() && st.size === size) hits.add(realpathSync(p));
+      } catch { /* vanished mid-scan */ }
+    }
+  }
+  return hits.size === 1 ? [...hits][0] : null;
 }
 
 function scanRomDir(dir: string, depth = 0, consoleKey?: string): string[] {
