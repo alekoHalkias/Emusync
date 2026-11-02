@@ -4,7 +4,7 @@
 - Issue: #727
 - Branch: feature/727-switch-device-profile
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -99,3 +99,4 @@ Tests: (6) test_switch_profile.py, 6 cases + edge cases.
 - 2026-11-01 implement: step 2 done (SyncClient.update_device_console)
 - 2026-11-01 implement: steps 3-5 done (profiles.dat detection, device profile resolve/store, save_path correction; conftest isolation)
 - 2026-11-01 implement: step 6 done (test_switch_profile.py, 9 tests; verified on real Arch profiles.dat)
+- 2026-11-01 implement: step 7 done (GOTCHAS, ARCHITECTURE; CLAUDE.md in step 2)

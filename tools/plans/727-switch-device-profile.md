@@ -3,7 +3,7 @@
 Issue: #727
 Branch: feature/727-switch-device-profile
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -33,7 +33,7 @@ Every device keeps one Eden profile on its Switch console row, and Switch saves 
   - Files: src/cli/run.py
   - Reuses: #725 self-heal block, `_find_local_switch_save`, `_seed_switch_save`
 - [x] 6. Tests: new src/tests/test_switch_profile.py (API/migration cases reuse the `client` fixture and the put-console helper style from test_network_rom.py; CLI cases reuse `_make_title`-style tmp_path NAND trees and the stub-client `run_game.callback` harness from test_run_reconcile.py). No mocks for store/API, real SQLite.
-- [ ] 7. Docs: GOTCHAS Switch section, CLAUDE.md Switch rule line, ARCHITECTURE consoles columns.
+- [x] 7. Docs: GOTCHAS Switch section, CLAUDE.md Switch rule line, ARCHITECTURE consoles columns.
 
 ## Testing
 - **Test File**: src/tests/test_switch_profile.py
