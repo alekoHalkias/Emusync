@@ -74,7 +74,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
   - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts (+ done-phase view)
   - Reuses: addGame, setGameDevice, gamesOverview.
 ### Verification and docs
-- [ ] 17. Tests (see Testing): new src/tests/test_network_matching.py; extend src/tests/test_network_autolink.py (fuzzy cases + update the exact key-set assertion); `make test-changed`. GUI: `make build-gui`, `make lint`, `tsc --noEmit` no new errors beyond the known list, manual script below.
+- [x] 17. Tests (see Testing): new src/tests/test_network_matching.py; extend src/tests/test_network_autolink.py (fuzzy cases + update the exact key-set assertion); `make test-changed`. GUI: `make build-gui`, `make lint`, `tsc --noEmit` no new errors beyond the known list, manual script below.
 - [ ] 18. Docs: CLAUDE.md Rules (#731: matching key, v34 `rom_size`, POST /games dedup, fuzzy candidates, run fallback not persisted, files:size / rom:findByNameSize / rom:confirmNetworkMatch, MatchConfirmModal); src/docs/ARCHITECTURE.md (request/response fields, IPC table); src/docs/GOTCHAS.md (why fuzzy matches are never auto-persisted, rom_size 0 rows).
 
 ## Testing
@@ -127,3 +127,4 @@ Step 7: updated test_network_autolink exact key-set assertion here (planned for 
 Step 9: _relocated_gd takes the device's console list + console name (not a single row) so the caller passes get_device_consoles output directly; added _rom_missing gate so the server is only asked when the ROM is actually missing.
 Step 11-12: committed together (shared preload/d.ts edits); findRomByNameSize takes no consoleKey (dir ROMs have size 0 and never match, so the dir-pattern lookup is unneeded); the preload/d.ts entries for step 13's rom:confirmNetworkMatch were added here too.
 Step 13: both matchers now return the path as seen under its root (dedupe still by realpath) so a symlinked mount relativizes cleanly.
+Step 17: make test 724 passed / 3 skipped; make lint, make build-gui, tsc (no new errors) ok. GUI manual script NOT run (no display in this session) - left for the user, listed in the PR.

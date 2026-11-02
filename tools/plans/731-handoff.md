@@ -105,7 +105,7 @@ Frontend
 - 15 MatchConfirmModal + status-line Review in GameGrid. [done]
 - 16 Import reuses matched game; "N linked to existing games". [done]
 Tests
-- 17 test_network_matching.py (new) + test_network_autolink.py (extended); build/lint/tsc + manual GUI script.
+- 17 test_network_matching.py (new) + test_network_autolink.py (extended); build/lint/tsc + manual GUI script. [done]
 - 18 Docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
 ### Summary: Records ROM size per device so games match across devices by filename + size: exact network links stay automatic, fuzzy ones are confirmed in a modal, imports stop creating duplicate games, and `emusync run` can launch a moved ROM.
 
@@ -134,7 +134,7 @@ Tests
 - 14 useBrokenRoms backfill/proposals/size-checked siblings: useBrokenRoms.ts; reuses refresh/sourceFor/updateRom. [done]
 - 15 MatchConfirmModal + GameGrid wiring: new component; reuses LocalToNetworkModal structure, bulkMsg. [done]
 - 16 import dedup: useConsoleImport.ts; reuses addGame/setGameDevice/gamesOverview. [done]
-- 17 tests + GUI verify.
+- 17 tests + GUI verify. [done]
 - 18 docs.
 
 ## 9. Review
@@ -176,3 +176,4 @@ Tests
 - 2026-11-02 implement: step 14 done (Refresh size backfill, moved-ROM relink proposals, size-checked siblings)
 - 2026-11-02 implement: step 15 done (MatchConfirmModal and GameGrid review wiring)
 - 2026-11-02 implement: step 16 done (import reuses a ROM-matched existing game)
+- 2026-11-02 implement: step 17 done (matching tests: rom_size, POST /games dedup, file search, run fallback, fuzzy candidates)
