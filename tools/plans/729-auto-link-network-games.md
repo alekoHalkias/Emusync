@@ -14,7 +14,7 @@ A network-drive game set up on one device is linked automatically on any other d
   - Files: src/server/store/games.py
   - Reuses: columns/share join of `get_network_source_for_game`
   - New: method - existing one is per-slug and does not filter by this device's share or existing config.
-- [ ] 2. Route `GET /games/network-link-candidates` in `src/server/api/games.py`, before `GET /games/{slug}`; `_auth`, returns the Store list.
+- [x] 2. Route `GET /games/network-link-candidates` in `src/server/api/games.py`, before `GET /games/{slug}`; `_auth`, returns the Store list.
   - Files: src/server/api/games.py
   - Reuses: `_auth`, `_get_store`, `/games/overview` placement
 - [ ] 3. Move `rom:setupNetworkPlay`, `tailSegments`, `consoleSaveStateFolders` from `gui/electron/sync/rom.ts` to new `gui/electron/sync/netplay.ts`; split the handler body into `linkNetworkGame(slug, src, mountRoot)` (rel-path safety check, `existsSync`, path rewrite, `PUT /games/{slug}/device`). `rom:setupNetworkPlay` keeps its signature. Export `registerNetPlayIpc()`, called from `gui/electron/sync.ts`.

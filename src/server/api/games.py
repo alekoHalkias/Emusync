@@ -71,6 +71,13 @@ def games_overview(device_id: str = Depends(_auth)) -> list[dict]:
     return _get_store().games_overview(device_id)
 
 
+@router.get("/games/network-link-candidates")
+def network_link_candidates(device_id: str = Depends(_auth)) -> list[dict]:
+    """Network-drive games the caller can link from its own mount of the same
+    share (issue #729). Registered before /games/{slug}."""
+    return _get_store().network_link_candidates(device_id)
+
+
 @router.get("/games/{slug}")
 def get_game(slug: str, device_id: str = Depends(_auth)) -> dict:
     game = _get_store().get_game(slug)
