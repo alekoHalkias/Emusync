@@ -14,20 +14,20 @@ Show a flat "All games" list under the console cards on the home screen, each ro
 - **Recommendations**: none
 
 ## Steps
-- [ ] 1. New `AllGamesList` component: sorted rows (name, console label, Network/Local tag), a Play button (disabled unless `isLocal && !locked`) and a Settings button that opens the existing `GameModal`. Observable result: list renders from the `games` array.
+- [x] 1. New `AllGamesList` component: sorted rows (name, console label, Network/Local tag), a Play button (disabled unless `isLocal && !locked`) and a Settings button that opens the existing `GameModal`. Observable result: list renders from the `games` array.
   - Files: src/gui/renderer/src/components/AllGamesList.tsx
   - Reuses: GameModal + GameModalTarget (same target shape as GameGrid.openSettings), PlayIcon from icons.tsx, GameRow type
   - New: component - GameGrid is tied to a single console and cards; no flat-row list exists
-- [ ] 2. Render it below the console grid and thread `onPlay`/`onChanged`/console-key resolver from App.
+- [x] 2. Render it below the console grid and thread `onPlay`/`onChanged`/console-key resolver from App.
   - Files: src/gui/renderer/src/components/ConsoleGrid.tsx, src/gui/renderer/src/App.tsx
   - Reuses: ConsoleGrid's abbrToDef map (resolves a game's console to its key for GameModal), App.handlePlay, App.reload(true)
   - New: two optional props on ConsoleGrid - it owns the console-def lookup, so the list goes there
-- [ ] 3. Styles for the rows (flex row, gap, border) in styles.css next to `.console-grid`.
+- [x] 3. Styles for the rows (flex row, gap, border) in styles.css next to `.console-grid`.
   - Files: src/gui/renderer/src/styles.css
   - Reuses: existing CSS variables
   - New: `.all-games-*` rules - none existing for list rows
-- [ ] 4. Tests: renderer has no test harness; verify manually with `make dev-gui` (offline cache path included) and run `make test-changed`.
-- [ ] 5. Docs: none needed - small UI addition, no IPC/config/schema change.
+- [x] 4. Tests: renderer has no test harness; verify manually with `make dev-gui` (offline cache path included) and run `make test-changed`.
+- [x] 5. Docs: none needed - small UI addition, no IPC/config/schema change.
 
 ## Testing
 - **Test File**: none - the renderer has no component test harness and the change adds no backend code; guide reuses `make test-changed` as the gate.

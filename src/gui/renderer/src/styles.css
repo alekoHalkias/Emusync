@@ -392,6 +392,18 @@ input.error { border-color: var(--red); }
   border-color: rgba(255,255,255,0.08);
 }
 
+/* ── All games list (home screen, #720) ─────────────────────────────────────── */
+.all-games { margin-top: 28px; }
+.all-games-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+}
+.all-games-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.all-games-meta { opacity: 0.6; font-size: 12px; }
+
 /* ── Console grid (home screen) ─────────────────────────────────────────────── */
 .console-grid {
   display: grid;

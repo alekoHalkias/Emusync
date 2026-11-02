@@ -370,6 +370,8 @@ export default function App(): React.ReactElement {
               onSelectConsole={(key, label, abbr) =>
                 setScreen({ name: "console", key, label, abbr })
               }
+              onPlay={handlePlay}
+              onChanged={() => reload(true)}
             />
           )
         )}

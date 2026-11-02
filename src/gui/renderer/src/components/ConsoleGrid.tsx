@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { GameRow } from "./game-list/types";
 import { GamepadIcon } from "./icons";
+import AllGamesList from "./AllGamesList";
 
 // Accent colour per console key (no more emoji — logo fetched from retroarch-assets)
 const CONSOLE_COLOR: Record<string, string> = {
@@ -67,9 +68,11 @@ function ConsoleIcon({ consoleKey, abbr }: { consoleKey: string; abbr: string })
 type Props = {
   games: GameRow[];
   onSelectConsole: (consoleKey: string, consoleLabel: string, consoleAbbr: string) => void;
+  onPlay: (slug: string, name: string) => void;
+  onChanged: () => void;
 };
 
-export default function ConsoleGrid({ games, onSelectConsole }: Props): React.ReactElement {
+export default function ConsoleGrid({ games, onSelectConsole, onPlay, onChanged }: Props): React.ReactElement {
   const [consoleDefs, setConsoleDefs] = useState<ConsoleDef[]>([]);
 
   useEffect(() => {
@@ -114,6 +117,7 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
   }
 
   return (
+    <>
     <div className="console-grid">
       {cards.map((c) => {
         const color = CONSOLE_COLOR[c.key] ?? DEFAULT_COLOR;
@@ -138,5 +142,15 @@ export default function ConsoleGrid({ games, onSelectConsole }: Props): React.Re
         );
       })}
     </div>
+    <AllGamesList
+      games={games}
+      consoleKeyFor={(g) => {
+        const stored = (g.console ?? "").toUpperCase();
+        return abbrToDef.get(stored)?.key ?? stored.toLowerCase();
+      }}
+      onPlay={onPlay}
+      onChanged={onChanged}
+    />
+    </>
   );
 }
