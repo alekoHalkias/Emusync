@@ -3,7 +3,7 @@
 Source plans: tools/plans/729-auto-link-network-games-frontend.md, tools/plans/729-auto-link-network-games-backend.md
 Branch: feature/729-auto-link-network-games
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal

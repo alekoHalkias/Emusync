@@ -4,7 +4,7 @@
 - Issue: #729
 - Branch: feature/729-auto-link-network-games
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -128,8 +128,8 @@ Docs
 - 2026-11-02 implement: step 2 done (add GET /games/network-link-candidates)
 - 2026-11-02 implement: step 3 done (move network play IPC into sync/netplay.ts)
 - 2026-11-02 implement: step 4 done (expose rom:autoLinkNetworkGames in preload and types)
-- 2026-11-02 implement: step 4 done (expose rom:autoLinkNetworkGames in preload and types)
 - 2026-11-02 implement: step 5 done (auto-link network games on grid load and Refresh locations)
 - 2026-11-02 implement: step 6 done (NetworkPlaySetup links via setupNetworkPlay instead of scan roms[0])
 - 2026-11-02 implement: step 7 done (tests for network-link-candidates)
 - 2026-11-02 implement: step 8 done (document network auto-link)
+- 2026-11-02 implement: all 8 steps done
