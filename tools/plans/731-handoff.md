@@ -4,7 +4,7 @@
 - Issue: #731
 - Branch: feature/731-network-game-matching
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-02
 - Fix attempts: 0
 
