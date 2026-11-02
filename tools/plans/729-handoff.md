@@ -3,7 +3,7 @@
 ## Metadata
 - Issue: #729
 - Branch: feature/729-auto-link-network-games
-- PR: none
+- PR: #730
 - Status: shipped
 - Created: 2026-11-02
 - Fix attempts: 0
@@ -107,8 +107,8 @@ Docs
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #730
 ### Server Sync: pending
 ### Doc Sync: pending
 
