@@ -29,7 +29,7 @@ Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocatio
   - Reuses: `LOCK_TTL_HOURS`; existing `locks` PRIMARY KEY on game_slug.
   - Change: `get_lock` returns None when `acquired_at` is older than the TTL (covers API, cli/sync.py, cli/watch.py, cli/run.py). `acquire_lock` becomes one `INSERT ... ON CONFLICT(game_slug) DO UPDATE ... WHERE locks.device_id = excluded.device_id OR locks.acquired_at < :cutoff`, then re-reads the holder and raises ValueError if it is not the caller. games.py overview `LEFT JOIN locks` adds `AND l.acquired_at >= :cutoff` so an expired lock doesn't show as running.
   - New: small `_lock_cutoff()` helper in locks.py returning the ISO cutoff - shared by get_lock, acquire_lock and the overview query.
-- [ ] 4. Failed state pull no longer blocks launch.
+- [x] 4. Failed state pull no longer blocks launch.
   - Files: src/cli/run.py (state pull block only)
   - Reuses: existing warning style from the #717 save fallback.
   - Change: wrap `pull_state` / `pull_state_merge` in `try/except Exception`; on failure warn on stderr and clear the local `state_path` used for the post-game state push, so a stale local state is never pushed over a server state this device could not read.
@@ -90,3 +90,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 ## Log
 - 2026-11-02 bplan: plan written
 - 2026-11-02 tplan: testing section added
+Step 4: used a state_pull_failed flag instead of clearing state_path, so the post-game path-adoption PUT never blanks the stored state path.

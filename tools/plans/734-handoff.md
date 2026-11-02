@@ -84,7 +84,7 @@ Tests
 - done 1. store/blobs.py; reuses sync_client envelope constants + _stage_upload rule; new _payload_sha256 (no helper hashes stored bytes envelope-free).
 - done 2. cli/run_reconcile.py; reuses _decide_save_action (optional baseline_hash param); no new code.
 - done 3. store/locks.py, store/games.py; reuses LOCK_TTL_HOURS + locks PK; new _lock_cutoff (shared by 3 queries).
-- 4. cli/run.py state pull block; reuses #717 warn pattern; no new code.
+- done 4. cli/run.py state pull block; reuses #717 warn pattern; no new code.
 - 5. sync_client.py push_state/_backup_state_files/dup removal; reuses _memcard_payload_bytes rglob pattern.
 - 6. sync_client.py _write_memcard_raw_bytes; reuses download_transfer .part pattern.
 - 7. store/blobs.py console history/pull; reuses _prune_history return-ids shape, _unlink_blobs.
@@ -115,3 +115,4 @@ Tests
 - 2026-11-02 implement: step 1 done (envelope-free hash for integrity, last-good and restores)
 - 2026-11-02 implement: step 2 done (baseline decides pre-launch push or pull)
 - 2026-11-02 implement: step 3 done (lock TTL on read and atomic acquire)
+- 2026-11-02 implement: step 4 done (failed state pull warns and launch continues)
