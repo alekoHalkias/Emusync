@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import signal
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -32,6 +33,38 @@ def _launch_and_wait(command: tuple[str, ...], game_pid_file: Path) -> int:
     code = _child_proc.wait()
     _child_proc = None
     return code
+
+
+def _detach_after_game(exit_code: int, log_path: Path) -> None:
+    """Fork the post-game push/lock release into its own background session (#725).
+
+    The parent exits at once with the emulator's code (os._exit, so run_game's
+    `finally` does not release the lock it still needs), so Steam sees the game
+    closed immediately and can't cut the push short. The child returns and runs
+    the rest of run_game unchanged, with stdio on *log_path* so no pipe Steam
+    holds keeps it attached. No os.fork (Windows): returns, push runs inline.
+    ponytail: setsid escapes the process group, not a cgroup-wide kill.
+    """
+    if not hasattr(os, "fork"):
+        return
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if os.fork() > 0:
+        os._exit(exit_code)
+    os.setsid()
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        out = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    except OSError:
+        out = os.open(os.devnull, os.O_WRONLY)
+    null_in = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(null_in, 0)
+    os.dup2(out, 1)
+    os.dup2(out, 2)
+    os.close(null_in)
+    os.close(out)
 
 
 def _cache_game_device(cfg, game_slug: str, gd: GameDeviceConfig,

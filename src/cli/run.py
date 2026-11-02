@@ -71,9 +71,11 @@ from cli.run_ps3 import _resolve_written_ps3_save  # noqa: F401
 from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
 from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
     _find_local_switch_save,
+    _is_backup_path,
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
+    _switch_title_id_from_save_path,
     _sync_switch_mods,
 )
 
@@ -186,7 +188,9 @@ def _start_lock_heartbeat(client, game_slug: str, stop: threading.Event) -> thre
 @cli.command("run")
 @click.argument("game_slug")
 @click.argument("command", nargs=-1)
-def run_game(game_slug: str, command: tuple[str, ...]) -> None:
+@click.option("--detach/--no-detach", default=True, show_default=True,
+              help="Run the post-game push in a background process so the launcher exits at once (#725).")
+def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> None:
     """Reconcile save, launch the emulator, push save.
 
     GAME_SLUG is the game's slug (from 'emusync game list'). Normally that's all
@@ -301,7 +305,24 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     _cache_game_device(cfg, game_slug, gd, game_name=game_name, console=console_abbr)
 
     save_path = gd.save_path
-    shared_memcard = console_abbr in _SHARED_MEMCARD_CONSOLES
+    # Backfill (#725): this device already learned its Eden save folder (e.g.
+    # before #443 existed) but the server has no title ID, so the other
+    # devices can never match or seed this save. Publish it now.
+    if console_abbr == "Switch" and save_path and not switch_title_id:
+        backfill_id = _switch_title_id_from_save_path(save_path)
+        if backfill_id:
+            try:
+                client.update_game(game_slug, game_name, switch_title_id=backfill_id)
+                switch_title_id = resolved_title_id = backfill_id
+            except Exception as exc:
+                click.echo(f"Warning: failed to store the Switch title ID: {exc}", err=True)
+    # Self-heal (#725): a save adopted from a `.bak` profile copy is a folder
+    # Eden never reads. Drop it so the title-ID match below re-picks (and
+    # persists) the live profile's folder.
+    if console_abbr == "Switch" and save_path and _is_backup_path(save_path):
+        click.echo(f"Ignoring stored save path inside a .bak backup folder: {save_path}", err=True)
+        save_path = ""
+    shared_memcard =console_abbr in _SHARED_MEMCARD_CONSOLES
     save_client = _MemcardClient(client, console_abbr, cfg) if shared_memcard else client
     save_key = console_abbr if shared_memcard else game_slug
     # Whether save states live in a shared, serial-named folder (PS2 sstates/) and
@@ -444,7 +465,7 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
 
         # Keep the lock fresh for the whole session so a long play can't have its
         # lock stolen at the TTL by another device (issue #238).
-        _start_lock_heartbeat(client, game_slug, stop_heartbeat)
+        heartbeat = _start_lock_heartbeat(client, game_slug, stop_heartbeat)
 
         # Mark the moment before launch (minus a small epsilon for mtime
         # granularity) so we can tell which save/state files were written *this*
@@ -458,6 +479,13 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             _release()
             sys.exit(1)
         stop_heartbeat.set()
+        # Python default is False so in-process callers (tests) never fork.
+        if detach:
+            # A beat mid-request at fork time would leave the child holding a
+            # copied, never-released httpx pool lock; wait it out (lock calls
+            # time out in 10s).
+            heartbeat.join(timeout=15)
+            _run_offline_mod._detach_after_game(exit_code, Path(cfg.data_dir) / "launch.log")
 
         # Detect where RetroArch actually wrote the save/state this session — it
         # may differ in folder and/or extension from what we configured (content
