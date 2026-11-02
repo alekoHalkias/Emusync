@@ -75,7 +75,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
   - Reuses: addGame, setGameDevice, gamesOverview.
 ### Verification and docs
 - [x] 17. Tests (see Testing): new src/tests/test_network_matching.py; extend src/tests/test_network_autolink.py (fuzzy cases + update the exact key-set assertion); `make test-changed`. GUI: `make build-gui`, `make lint`, `tsc --noEmit` no new errors beyond the known list, manual script below.
-- [ ] 18. Docs: CLAUDE.md Rules (#731: matching key, v34 `rom_size`, POST /games dedup, fuzzy candidates, run fallback not persisted, files:size / rom:findByNameSize / rom:confirmNetworkMatch, MatchConfirmModal); src/docs/ARCHITECTURE.md (request/response fields, IPC table); src/docs/GOTCHAS.md (why fuzzy matches are never auto-persisted, rom_size 0 rows).
+- [x] 18. Docs: CLAUDE.md Rules (#731: matching key, v34 `rom_size`, POST /games dedup, fuzzy candidates, run fallback not persisted, files:size / rom:findByNameSize / rom:confirmNetworkMatch, MatchConfirmModal); src/docs/ARCHITECTURE.md (request/response fields, IPC table); src/docs/GOTCHAS.md (why fuzzy matches are never auto-persisted, rom_size 0 rows).
 
 ## Testing
 - **Test Files**: src/tests/test_network_matching.py (new: schema, round-trip, POST /games dedup, Python matcher, run fallback); src/tests/test_network_autolink.py (extended: candidate `match` / fuzzy rows). Real SQLite, `client` fixture, `AUTH` + `_device_auth`, `tmp_path` files; no mocks.
