@@ -31,10 +31,28 @@ A network-drive game set up on one device is linked automatically on any other d
 - [ ] 6. NetworkPlaySetup: `tryAutoImport` uses `window.emusync.rom.setupNetworkPlay(slug, mount)` instead of whole-mount scan + `roms[0]`; ok -> existing `onChanged(); onClose(); onPlay(...)`, else `setMode("manual")`.
   - Files: gui/renderer/src/components/NetworkPlaySetup.tsx
   - Reuses: `rom:setupNetworkPlay`
-- [ ] 7. Tests in `src/tests/test_network_rom.py` (real SQLite, `client` fixture, two `X-Device-ID`s): (a) same share ID -> B gets one candidate with B's `mount_root` and A's `rom_rel_path`; (b) different share ID -> empty; (c) blank share ID either side -> empty; (d) B already has a config -> empty; (e) A never lists its own game; (f) two B console rows for the same console -> one candidate. Frontend: `npm run build` in src/gui for typecheck; no Electron test harness.
-  - Files: src/tests/test_network_rom.py
+- [ ] 7. Tests in new `src/tests/test_network_autolink.py` (test_network_rom.py is already 360 lines), importing `_add_game`, `_console_row`, `_set_share` from `tests.test_network_rom`. Real SQLite, no mocks. Cases listed under Testing. Frontend: `npm run build` in src/gui for typecheck of the new channel; no Electron test harness.
+  - Files: src/tests/test_network_autolink.py
+  - Reuses: tests/test_network_rom.py helpers, conftest `client`, `AUTH`, `_device_auth`
+  - New: test file - existing one is over the size limit.
 - [ ] 8. Docs: CLAUDE.md network bullet (#660) and src/docs/ARCHITECTURE.md (REST route, IPC `rom:autoLinkNetworkGames`, netplay.ts, auto-link on Refresh locations and grid load).
   - Files: CLAUDE.md, src/docs/ARCHITECTURE.md
+
+## Testing
+- **Test File**: src/tests/test_network_autolink.py
+- **Test Cases**:
+  - match: A configures a network game (rom_rel_path set) on console GBA with share-1; B has a GBA console row (created via a different game) with share-1 and no config for A's game -> B's `GET /games/network-link-candidates` returns exactly that slug with B's `mount_root` and A's `rom_rel_path`/`launch_command`.
+  - share mismatch: B on share-2 -> A's game not listed.
+  - blank share: either side `network_share_id` blank -> not listed.
+  - already configured: B has a game_devices row for the slug -> not listed.
+  - own games: A's call never lists A's own game.
+  - local source: A's row `rom_source=local` or blank `rom_rel_path` -> not listed.
+- **Edge Cases**:
+  - B has two GBA console rows with the same share -> one candidate (GROUP BY slug).
+  - B's matching console has blank `device_network_folder` -> not listed.
+- **Integration Points**:
+  - Route registered before `/games/{slug}`: a 200 list (not a 404 "Game not found") proves it.
+  - Electron `rom:autoLinkNetworkGames` consumes the payload keys (slug, rom_rel_path, rom_path, launch_command, save_path, state_path, console, mount_root); a key-set assertion in the match test pins them.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. Config/data file change: no.
@@ -51,3 +69,4 @@ Enabling Play for non-local games. Sync-daemon/SSE-triggered linking. Server-sid
 
 ## Log
 - 2026-11-02 merge: 2 conflicts resolved, 0 unresolved
+- 2026-11-02 tplan: testing section added

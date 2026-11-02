@@ -64,12 +64,24 @@ Plan file: tools/plans/729-auto-link-network-games.md
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_network_autolink.py (new; test_network_rom.py is 360 lines), reusing _add_game/_console_row/_set_share from tests.test_network_rom.
+### Test Cases: match (B gets slug + mount_root + rel path, key set pinned); share mismatch; blank share either side; B already configured; A never sees own game; local source or blank rom_rel_path excluded.
+### Edge Cases: two B console rows same share -> one candidate; B matching console with blank device_network_folder -> excluded.
+### Integration Points: route resolves before /games/{slug}; payload keys consumed by rom:autoLinkNetworkGames. GUI verified by npm run build + manual two-device check.
+### Outline:
+Backend
+- 1. Store.network_link_candidates(device_id): one query, matching share ID, no existing config on this device.
+- 2. GET /games/network-link-candidates.
+Frontend
+- 3. Move rom:setupNetworkPlay into gui/electron/sync/netplay.ts, split out linkNetworkGame.
+- 4. IPC rom:autoLinkNetworkGames (+ preload, emusync.d.ts): link every candidate whose file exists.
+- 5. GameGrid: auto-link on grid load and on Refresh locations ("N network games linked.").
+- 6. NetworkPlaySetup: use setupNetworkPlay instead of linking scan roms[0].
+Tests
+- 7. src/tests/test_network_autolink.py: 6 cases + 2 edge cases, real SQLite.
+Docs
+- 8. CLAUDE.md, src/docs/ARCHITECTURE.md.
+### Summary: A network-drive game on one device is linked automatically on any device whose console network share ID matches, using its own mount + the stored relative ROM path.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -111,3 +123,4 @@ Plan file: tools/plans/729-auto-link-network-games.md
 - 2026-11-02 bplan: 4 steps written, backend_pattern=store mixin method + thin route
 - 2026-11-02 fplan: 6 steps written, visual_pattern=no new UI, Refresh status line part
 - 2026-11-02 merge: 2 conflicts resolved, 0 unresolved
+- 2026-11-02 tplan: test_file=src/tests/test_network_autolink.py, 8 test cases defined
