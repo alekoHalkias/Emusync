@@ -1,0 +1,125 @@
+# Handoff: #731 Improve network game matching and prevent duplicate games
+
+## Metadata
+- Issue: #731
+- Branch: feature/731-network-game-matching
+- PR: none
+- Status: planned
+- Created: 2026-11-02
+- Fix attempts: 0
+
+## 1. Issue
+### Summary
+Network-drive games should link on every device that can see them, and the same ROM should never become two separate games.
+
+### Motivation
+Auto-link (#729) requires an exact `network_share_id` match plus a valid `rom_rel_path`; missing/unwritable markers or differing rel paths mean no link. Same ROM imported on two devices can yield two slugs, splitting saves/history.
+
+### Proposed Behavior / Steps to Reproduce
+User answers (2026-11-02):
+- Symptoms: games not auto-linking; duplicate games.
+- Fallback when share ID/rel path fails: filename + size within this device's console network folder.
+- Confirmation: exact matches auto-link silently; fuzzy (filename+size) matches shown for confirmation.
+- Duplicates: prevent at import/link (reuse game on filename+size match, same console) AND offer confirmed merge of existing duplicates (newest save wins, history from both kept).
+- Surfaces: GameGrid auto-link on load, Refresh locations (#616/#650), console import wizard (#644), CLI `run` ROM resolution.
+- No concrete repro case; general improvement.
+
+### Affected Area
+- `src/server/store/games.py` (`network_link_candidates`), `src/server/api/games.py`
+- `src/gui/electron/sync/netplay.ts` (`rom:autoLinkNetworkGames`)
+- `src/gui/renderer/src/components/game-list/useBrokenRoms.ts`, `console-import/scanNewRoms.ts`, `useNetworkShare.ts`, `useConsoleImport.ts`
+- `src/cli/run.py`, `src/cli/netrom.py`
+- Store: game merge across all `game_slug`-referencing tables
+
+### Acceptance Criteria
+- [ ] Exact share-ID + rel-path matches still auto-link silently.
+- [ ] Fallback filename + size match in this device's console network folder, shown for confirmation.
+- [ ] Never link by first ROM in a mount; same filename with different size is not a match.
+- [ ] Import/link reuses an existing game on filename + size match (same console).
+- [ ] (moved to #732) Existing duplicates detected and mergeable after confirmation; newest save wins, history preserved.
+- [ ] All four surfaces use the same matching rules.
+- [ ] Integration tests (real SQLite) for fallback candidates, duplicate prevention, merge.
+
+## 2. Design
+### Scope: backend + ui. Matching (exact + filename/size fallback) and duplicate prevention. Merging existing duplicates split to #732.
+### Backend Changes:
+- Schema v34 (`_migrate` `from_version < 34`, bump `_SCHEMA_VERSION`, add to `_SCHEMA`): `game_devices.rom_size INTEGER NOT NULL DEFAULT 0`. v34 verified free on all remote branches (main/727/729 at 33, 725 at 32).
+- `rom_size` on models.GameDevice, api/games.py device request + response, sync_client GameDeviceConfig; set by CLI console import (`cli/console.py`) and `cli/netrom.py`.
+- Store: lookup existing game by (console, ROM basename, rom_size > 0) for duplicate prevention; expose via API for import/scan.
+- `network_link_candidates` (games.py:152): also return fuzzy rows where this device has the console's `device_network_folder` but share IDs differ/blank; include `rom_size`, `match` = exact|fuzzy.
+- CLI `run`: missing stored ROM path -> unique filename + size hit in console network/local folders, used for this launch only, stderr note.
+- Python matcher helper reused by CLI paths; never "first ROM in mount"; size mismatch = no match; size 0 = no fuzzy match.
+### UI Changes:
+- Electron main: TS filename + size matcher (same rules); `rom:autoLinkNetworkGames` (netplay.ts) links exact silently, returns fuzzy proposals (additive return field).
+- GameGrid: confirm modal for fuzzy proposals (on load + Refresh locations).
+- useBrokenRoms sibling relink: require size match when rom_size known.
+- Console import (useConsoleImport/useNetworkShare) + scanNewRoms: reuse existing game on filename + size match instead of new slug.
+- Device PUTs send `rom_size`; update emusync.d.ts.
+### Plan Target: both
+### Sub-issues: #732 Merge existing duplicate games
+### Difficulty: 7/10
+### Backwards Compatibility: non-breaking. Additive column + optional field; rom_size 0 rows never fuzzy-matched; IPC return extended only.
+
+## 3. Frontend Plan
+### Design Alignment: TBD
+### Visual Pattern: TBD
+### Recommendations: TBD
+
+## 4. Backend Plan
+### Design Alignment: additive schema v34 column + defaulted request fields; dedup in the single creation route POST /games; fuzzy candidates extend existing /games/network-link-candidates; CLI search reuses detect._scan_rom_dir.
+### Backend Pattern: preserve-on-None extended to scalars (`rom_size: Optional[int] = None`); ROM identity = casefolded basename + rom_size, same console, size 0 / ambiguous never match. Guide updated.
+### Recommendations: GUI must send rom_size on every device PUT and backfill on Refresh locations, else rows stay at 0 and never match. Plan file: tools/plans/731-network-game-matching.md (11 steps).
+
+## 5. Merged Plan
+### Conflicts Resolved: none
+### Unresolved Conflicts: none
+
+## 6. Testing Plan
+### Test File: TBD
+### Test Cases: TBD
+### Edge Cases: TBD
+### Integration Points: TBD
+### Outline: TBD
+### Summary: TBD
+
+## 7. Test Design
+### Test Scope: TBD
+### Test Types: TBD
+### Test Cases: TBD
+### Affected Existing Tests: TBD
+### Implementation Checklist: TBD
+
+## 8. Implementation Steps
+### Steps: see tools/plans/731-network-game-matching.md
+- B1 schema v34 rom_size: schema.py; reuses _try/_migrate chain; new column only.
+- B2 model/store round-trip: models.py, store/games.py; reuses inline column lists.
+- B3 device API + sync_client rom_size (None = preserve): api/games.py, sync_client.py; reuses set_game_device route + get_game_device.
+- B4 store.find_game_by_rom: store/games.py; new - no ROM-identity lookup exists (get_network_source_for_game is per-slug).
+- B5 POST /games dedup + CLI console import passes filename/size: api/games.py, sync_client.py, cli/console.py; reuses add_game route/client/import loop.
+- B6 netrom upload_to_network sets rom_size: cli/netrom.py; reuses existing gd update block.
+- B7 fuzzy candidates: store/games.py network_link_candidates; reuses method/route/mount_root join; new second SELECT - single GROUP BY would mix exact/fuzzy rows.
+- B8 find_rom_by_name_size: cli/netrom.py; reuses detect._scan_rom_dir; new thin name+size filter.
+- B9 CLI run fallback, not persisted: cli/run.py; reuses _resolve_launch_command, get_device_consoles, B8; new _relocated_gd helper - run has no ROM search.
+- B10 tests: src/tests/test_network_matching.py (real SQLite).
+- B11 docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
+
+## 9. Review
+### Findings: TBD
+### Blocked: TBD
+### Blockers: TBD
+
+## 10. Ship
+### Status: pending
+### PR: none
+### Server Sync: pending
+### Doc Sync: pending
+
+## 11. Fix Attempts
+### Attempt 1: none
+### Attempt 2: none
+### Attempt 3: none
+
+## 12. Log
+- 2026-11-02 issue: workflow initialized; clarified scope with user (filename+size fallback, confirm fuzzy, prevent+merge duplicates, all four surfaces)
+- 2026-11-02 design: scope=backend+ui, plan_target=both, difficulty=7/10, breaking=no; split #732 (merge duplicates)
+- 2026-11-02 bplan: 11 steps written, backend_pattern=additive v34 rom_size + dedup in POST /games + fuzzy candidates on existing route
