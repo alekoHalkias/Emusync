@@ -7,6 +7,7 @@ import { registerStateIpc } from "./sync/state";
 import { registerRomIpc } from "./sync/rom";
 import { registerRecoveryIpc } from "./sync/recovery";
 import { registerNetUploadIpc } from "./sync/netupload";
+import { registerNetPlayIpc } from "./sync/netplay";
 
 export function registerSyncIpc(): void {
   registerSaveIpc();
@@ -15,4 +16,5 @@ export function registerSyncIpc(): void {
   registerRomIpc();
   registerRecoveryIpc();
   registerNetUploadIpc();
+  registerNetPlayIpc();
 }

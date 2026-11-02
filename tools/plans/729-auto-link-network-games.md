@@ -17,7 +17,7 @@ A network-drive game set up on one device is linked automatically on any other d
 - [x] 2. Route `GET /games/network-link-candidates` in `src/server/api/games.py`, before `GET /games/{slug}`; `_auth`, returns the Store list.
   - Files: src/server/api/games.py
   - Reuses: `_auth`, `_get_store`, `/games/overview` placement
-- [ ] 3. Move `rom:setupNetworkPlay`, `tailSegments`, `consoleSaveStateFolders` from `gui/electron/sync/rom.ts` to new `gui/electron/sync/netplay.ts`; split the handler body into `linkNetworkGame(slug, src, mountRoot)` (rel-path safety check, `existsSync`, path rewrite, `PUT /games/{slug}/device`). `rom:setupNetworkPlay` keeps its signature. Export `registerNetPlayIpc()`, called from `gui/electron/sync.ts`.
+- [x] 3. Move `rom:setupNetworkPlay`, `tailSegments`, `consoleSaveStateFolders` from `gui/electron/sync/rom.ts` to new `gui/electron/sync/netplay.ts`; split the handler body into `linkNetworkGame(slug, src, mountRoot)` (rel-path safety check, `existsSync`, path rewrite, `PUT /games/{slug}/device`). `rom:setupNetworkPlay` keeps its signature. Export `registerNetPlayIpc()`, called from `gui/electron/sync.ts`.
   - Files: gui/electron/sync/rom.ts, gui/electron/sync/netplay.ts, gui/electron/sync.ts
   - Reuses: existing handler body, `loadServerCfg`
   - New: netplay.ts - rom.ts is 552 lines.
@@ -70,3 +70,4 @@ Enabling Play for non-local games. Sync-daemon/SSE-triggered linking. Server-sid
 ## Log
 - 2026-11-02 merge: 2 conflicts resolved, 0 unresolved
 - 2026-11-02 tplan: testing section added
+Step 3: netplay.ts was written with the rom:autoLinkNetworkGames handler included (step 4's main-process part) since it lives in the same new file; step 4 commit covers preload and emusync.d.ts.
