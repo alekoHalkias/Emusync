@@ -92,15 +92,15 @@ Tests
 - done 9. docs: GOTCHAS, CLAUDE.md, design guide.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 2 - docs-stale ARCHITECTURE.md:14 (run_reconcile mtime description); test-gap cli/run.py:476 (state-pull fallback untested)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: shipped
 ### PR: #735
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -123,3 +123,6 @@ Tests
 - 2026-11-02 implement: step 9 done (docs for sync audit fixes)
 - 2026-11-02 implement: all steps done, lint ok, test-changed 165 passed
 - 2026-11-02 ship: make test 708 passed, PR #735 opened
+- 2026-11-02 review: 2 findings, blocked=no
+- 2026-11-02 ship: server sync done
+- 2026-11-02 ship: doc sync updated ARCHITECTURE.md (GOTCHAS.md, CLAUDE.md updated in step 9)
