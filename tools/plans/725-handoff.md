@@ -4,9 +4,9 @@
 - Issue: #725
 - Branch: feature/725-switch-legends-za-save-link
 - PR: #726
-- Status: shipped
+- Status: implementing
 - Created: 2026-11-01
-- Fix attempts: 0
+- Fix attempts: 1
 
 ## 1. Issue
 ### Summary
@@ -83,7 +83,7 @@ Tests: helper + run_game backfill tests.
 ### Doc Sync: pending
 
 ## 11. Fix Attempts
-### Attempt 1: none
+### Attempt 1: GUI launch must pass --no-detach (exit = push done)
 ### Attempt 2: none
 ### Attempt 3: none
 

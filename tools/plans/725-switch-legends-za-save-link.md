@@ -3,8 +3,8 @@
 Issue: #725
 Branch: feature/725-switch-legends-za-save-link
 PR: #726
-Status: implemented
-Fix attempts: 0
+Status: implementing
+Fix attempts: 1
 
 ## Goal
 (a) A Switch game whose device already has a learned save folder publishes its title ID to the server, so other devices can match and seed the same save. (b) The post-game push/release runs in a detached background process so quitting the game from Steam returns immediately and Steam cannot cut the push short.
@@ -49,3 +49,9 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 Correcting a wrong stored title ID; titledb fuzzy matching; additional Eden roots.
 
 ## Log
+
+## Fix attempt 1
+Failure: review - GUI `game:launch` (src/gui/electron/game.ts) relies on the `emusync run` process exit meaning push + lock release are done (it already spawns detached); CLI default `--detach` would emit `game:exited` while the lock is still held, re-creating the "Playing on Steam" race.
+Cause: detach default applies to every CLI caller, including the GUI.
+- [ ] F1.1 Pass `--no-detach` in `game:launch`'s spawn args.
+  - Files: src/gui/electron/game.ts
