@@ -17,6 +17,7 @@ mirrors, and cli/run_wii.py for the Wii sibling this is a near-exact copy of).
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -24,6 +25,19 @@ import click
 
 from cli.common import _mtime
 from cli.detect import _switch_title_id_from_rom  # noqa: F401 — re-exported for existing callers/tests
+
+_TITLE_ID_FOLDER_RE = re.compile(r"[0-9A-Fa-f]{16}")
+
+
+def _switch_title_id_from_save_path(save_path: str) -> str:
+    """The title ID a learned Eden save folder is named after, or "" (#725).
+
+    A device whose save_path was learned before the #443 backfill existed
+    never published the ID, so other devices had nothing to match or seed.
+    """
+    name = Path(save_path).name if save_path else ""
+    # Kept as-is (not upper-cased): it's the literal folder name to match on disk.
+    return name if _TITLE_ID_FOLDER_RE.fullmatch(name) else ""
 
 # Native + flatpak Eden NAND roots (mirrors _WII_NAND_ROOTS in cli/run_wii.py).
 # Eden has no Flathub package yet (AppImage-only), so there's no flatpak root —

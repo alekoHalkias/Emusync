@@ -14,7 +14,7 @@ Fix attempts: 0
 - **Recommendations**: Root cause on the user's Deck/Arch data is not observed (the local DB here has no Z-A row). The fix covers the gap found in code; if the stored ID is non-blank but wrong, that is a separate follow-up.
 
 ## Steps
-- [ ] 1. In `run_switch.py` add `_switch_title_id_from_save_path(save_path)`: returns the folder basename if it matches the 16-hex title ID regex, else "".
+- [x] 1. In `run_switch.py` add `_switch_title_id_from_save_path(save_path)`: returns the folder basename if it matches the 16-hex title ID regex, else "".
   - Files: src/cli/run_switch.py
   - Reuses: `_SWITCH_TITLE_ID_RE` pattern in src/cli/detect.py (bracket-free variant needed)
   - New: one small helper - existing `_switch_title_id_from_rom` parses a bracketed filename tag, not a folder name.
