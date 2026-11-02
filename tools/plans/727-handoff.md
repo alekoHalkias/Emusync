@@ -48,12 +48,14 @@ store schema/consoles, consoles API, cli/run_switch.py, cli/run.py, cli/game.py.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_switch_profile.py
+### Test Cases: migration; PUT/GET preserve; profiles.dat parse; profile-restricted dirs; find/seed/resolve scope; run_game save_path correction
+### Edge Cases: missing/truncated profiles.dat fallback; stored wins; fill-once with warn-only failure
+### Integration Points: CLI -> GET/PUT /devices/{id}/consoles -> store.set_console
+### Outline:
+Backend: (1) consoles.switch_profile_id v33 + API field; (2) SyncClient.update_device_console; (3) profiles.dat detection, _switch_profile_dirs restricted to device profile; (4) resolve/store device profile in run/game; (5) correct save_path in another profile; (7) docs.
+Tests: (6) test_switch_profile.py, 6 cases + edge cases.
+### Summary: Each device records its Eden profile on its Switch console row and Switch saves are only ever placed in <nand root>/<that profile>/<title id>.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -91,3 +93,4 @@ store schema/consoles, consoles API, cli/run_switch.py, cli/run.py, cli/game.py.
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-01 bplan: 7 steps written, backend_pattern=per-device console column + restricted profile dirs
+- 2026-11-01 tplan: test_file=src/tests/test_switch_profile.py, 6 test cases defined
