@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 32
+_SCHEMA_VERSION = 33
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS consoles (
     device_local_folder   TEXT NOT NULL DEFAULT '',
     device_extra_folders  TEXT NOT NULL DEFAULT '[]',
     network_share_id      TEXT NOT NULL DEFAULT '',
+    switch_profile_id     TEXT NOT NULL DEFAULT '',
     UNIQUE(device_id, console_name, device_game_folder)
 );
 CREATE TABLE IF NOT EXISTS game_devices (
@@ -583,4 +584,8 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # Server-resolved (ARP) MAC of the device's NIC; devices sharing one are
         # the same machine under a regenerated UUID and get merged (#656).
         _try(conn, "ALTER TABLE devices ADD COLUMN mac TEXT")
+    if from_version < 33:
+        # This device's Eden profile folder; Switch saves live only in
+        # <nand root>/<profile>/<title id> on each device (#727).
+        _try(conn, "ALTER TABLE consoles ADD COLUMN switch_profile_id TEXT NOT NULL DEFAULT ''")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

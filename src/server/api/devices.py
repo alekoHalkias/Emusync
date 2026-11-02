@@ -64,6 +64,7 @@ def get_device_consoles(target_device_id: str, device_id: str = Depends(_auth)) 
             "device_local_folder": c.device_local_folder,
             "device_extra_folders": c.device_extra_folders,
             "network_share_id": c.network_share_id,
+            "switch_profile_id": c.switch_profile_id,
         }
         for c in consoles
     ]
@@ -85,6 +86,7 @@ class ConsoleFoldersRequest(BaseModel):
     device_local_folder: str = ""
     device_extra_folders: Optional[list[str]] = None  # None = keep what is stored (#629)
     network_share_id: Optional[str] = None            # None = keep what is stored (#644)
+    switch_profile_id: Optional[str] = None           # None = keep what is stored (#727)
 
 
 @router.put("/devices/{target_device_id}/consoles/{console_id}")

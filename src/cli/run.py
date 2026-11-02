@@ -72,6 +72,7 @@ from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported 
 from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
     _find_local_switch_save,
     _is_backup_path,
+    _resolve_switch_profile,
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
@@ -322,6 +323,14 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
     if console_abbr == "Switch" and save_path and _is_backup_path(save_path):
         click.echo(f"Ignoring stored save path inside a .bak backup folder: {save_path}", err=True)
         save_path = ""
+    # #727: saves live only in this device's own Eden profile. A stored path in
+    # any other profile folder is dropped the same way, so the title-ID match
+    # or seed below places the save in <root>/<device profile>/<title id>.
+    if console_abbr == "Switch":
+        profile = _resolve_switch_profile(client, cfg.device_id)
+        if profile and save_path and Path(save_path).parent.name != profile:
+            click.echo(f"Ignoring stored save path outside Eden profile {profile}: {save_path}", err=True)
+            save_path = ""
     shared_memcard =console_abbr in _SHARED_MEMCARD_CONSOLES
     save_client = _MemcardClient(client, console_abbr, cfg) if shared_memcard else client
     save_key = console_abbr if shared_memcard else game_slug

@@ -36,6 +36,7 @@ class Console:
     device_local_folder: str = ""    # this device's local copy destination (issue #255)
     device_extra_folders: list[str] = field(default_factory=list)  # additional ROM folders (issue #629)
     network_share_id: str = ""       # marker-file UUID identifying the share behind device_network_folder (#644)
+    switch_profile_id: str = ""      # this device's Eden profile folder for Switch saves (#727)
 
 
 @dataclass
