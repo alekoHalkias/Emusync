@@ -4,7 +4,7 @@
 - Issue: #725
 - Branch: feature/725-switch-legends-za-save-link
 - PR: #726
-- Status: shipped
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 1
 
@@ -104,3 +104,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 review: 3 findings, blocked=no (2 correctness fixed)
 - 2026-11-01 ship: doc sync updated ARCHITECTURE.md (GOTCHAS.md, CLAUDE.md in step 5)
 - 2026-11-01 ship: server sync done
+- 2026-11-01 plan-update: root cause on Deck = .bak profile folder adopted; steps R1-R3 added

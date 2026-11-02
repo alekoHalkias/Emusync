@@ -3,7 +3,7 @@
 Issue: #725
 Branch: feature/725-switch-legends-za-save-link
 PR: #726
-Status: implemented
+Status: implementing
 Fix attempts: 1
 
 ## Goal
@@ -57,3 +57,12 @@ Cause: detach default applies to every CLI caller, including the GUI.
   - Files: src/gui/electron/game.ts
 - [x] F1.2 Join the lock heartbeat thread before forking, so the child never inherits an httpx pool lock held by an in-flight heartbeat request.
   - Files: src/cli/run.py
+
+## Root cause found (Deck)
+`emusync game list` shows the Deck's Z-A save_path inside `.../0000000000000000/0F9E31CF8F16E6677DFF94055FFF9B3D.bak/0100F43008C44000`: a backup profile folder Eden never reads. `run_switch._switch_profile_dirs` returns every directory, `.bak` included, so `_find_local_switch_save` adopted it, `_seed_switch_save` seeds into it and `_resolve_written_switch_save` scans it. Once stored, the bad path is never revisited because the title-ID re-match only runs when save_path is blank.
+- [ ] R1 Skip `.bak` folders in `_switch_profile_dirs` and `_switch_title_save_dirs` (profile and title level).
+  - Files: src/cli/run_switch.py
+  - Reuses: existing `.bak` naming convention (sync_client backups)
+- [ ] R2 Self-heal a stored Switch save_path that has a `.bak` path component: treat it as blank in `run_game`, so the existing title-ID match re-picks the live profile and persists it via `set_game_device`.
+  - Files: src/cli/run.py, src/cli/run_switch.py (`_is_backup_path` helper)
+- [ ] R3 Tests in test_switch_save_sync.py (profile .bak skipped by find/seed/resolve) and test_run_reconcile.py (stored .bak save_path re-matched to the live profile). GOTCHAS line.
