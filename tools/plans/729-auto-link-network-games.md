@@ -31,7 +31,7 @@ A network-drive game set up on one device is linked automatically on any other d
 - [x] 6. NetworkPlaySetup: `tryAutoImport` uses `window.emusync.rom.setupNetworkPlay(slug, mount)` instead of whole-mount scan + `roms[0]`; ok -> existing `onChanged(); onClose(); onPlay(...)`, else `setMode("manual")`.
   - Files: gui/renderer/src/components/NetworkPlaySetup.tsx
   - Reuses: `rom:setupNetworkPlay`
-- [ ] 7. Tests in new `src/tests/test_network_autolink.py` (test_network_rom.py is already 360 lines), importing `_add_game`, `_console_row`, `_set_share` from `tests.test_network_rom`. Real SQLite, no mocks. Cases listed under Testing. Frontend: `npm run build` in src/gui for typecheck of the new channel; no Electron test harness.
+- [x] 7. Tests in new `src/tests/test_network_autolink.py` (test_network_rom.py is already 360 lines), importing `_add_game`, `_console_row`, `_set_share` from `tests.test_network_rom`. Real SQLite, no mocks. Cases listed under Testing. Frontend: `npm run build` in src/gui for typecheck of the new channel; no Electron test harness.
   - Files: src/tests/test_network_autolink.py
   - Reuses: tests/test_network_rom.py helpers, conftest `client`, `AUTH`, `_device_auth`
   - New: test file - existing one is over the size limit.

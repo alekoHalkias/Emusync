@@ -98,7 +98,7 @@ Docs
 4. [done] [done] IPC rom:autoLinkNetworkGames - netplay.ts, preload.ts, emusync.d.ts; reuses linkNetworkGame.
 5. [done] GameGrid Refresh + mount-time call - GameGrid.tsx; reuses parts/setBulkMsg/onChanged.
 6. [done] NetworkPlaySetup uses setupNetworkPlay instead of roms[0] - NetworkPlaySetup.tsx.
-7. Tests - src/tests/test_network_rom.py; build typecheck for GUI.
+7. [done] Tests - src/tests/test_network_rom.py; build typecheck for GUI.
 8. Docs - CLAUDE.md, src/docs/ARCHITECTURE.md.
 
 ## 9. Review
@@ -131,3 +131,4 @@ Docs
 - 2026-11-02 implement: step 4 done (expose rom:autoLinkNetworkGames in preload and types)
 - 2026-11-02 implement: step 5 done (auto-link network games on grid load and Refresh locations)
 - 2026-11-02 implement: step 6 done (NetworkPlaySetup links via setupNetworkPlay instead of scan roms[0])
+- 2026-11-02 implement: step 7 done (tests for network-link-candidates)
