@@ -187,7 +187,9 @@ def _start_lock_heartbeat(client, game_slug: str, stop: threading.Event) -> thre
 @cli.command("run")
 @click.argument("game_slug")
 @click.argument("command", nargs=-1)
-def run_game(game_slug: str, command: tuple[str, ...]) -> None:
+@click.option("--detach/--no-detach", default=True, show_default=True,
+              help="Run the post-game push in a background process so the launcher exits at once (#725).")
+def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> None:
     """Reconcile save, launch the emulator, push save.
 
     GAME_SLUG is the game's slug (from 'emusync game list'). Normally that's all
@@ -470,6 +472,9 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
             _release()
             sys.exit(1)
         stop_heartbeat.set()
+        # Python default is False so in-process callers (tests) never fork.
+        if detach:
+            _run_offline_mod._detach_after_game(exit_code, Path(cfg.data_dir) / "launch.log")
 
         # Detect where RetroArch actually wrote the save/state this session — it
         # may differ in folder and/or extension from what we configured (content

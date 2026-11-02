@@ -95,3 +95,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 plan-update: added detached post-game push (fork+setsid, detach flag default off in-process), difficulty 5/10
 - 2026-11-01 implement: step 1 done (_switch_title_id_from_save_path helper)
 - 2026-11-01 implement: step 2 done (backfill title ID when save_path already known)
+- 2026-11-01 implement: step 3 done (fork post-game push into a detached session)
