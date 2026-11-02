@@ -86,6 +86,8 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("files:get-save-time", savePath),
     exists: (p: string): Promise<boolean> =>
       ipcRenderer.invoke("files:exists", p),
+    size: (p: string): Promise<number> =>
+      ipcRenderer.invoke("files:size", p),
     ensureShareMarker: (folder: string): Promise<{ id: string | null; created: boolean }> =>
       ipcRenderer.invoke("files:ensure-share-marker", folder),
     getFileHash: (filePath: string): Promise<string> =>
@@ -147,8 +149,12 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("rom:uploadMaster", localPath, networkPath),
     setupNetworkPlay: (slug: string, mountRoot: string): Promise<{ ok: boolean; romPath?: string; error?: string }> =>
       ipcRenderer.invoke("rom:setupNetworkPlay", slug, mountRoot),
-    autoLinkNetworkGames: (): Promise<{ ok: boolean; linked: number }> =>
+    autoLinkNetworkGames: (): Promise<{ ok: boolean; linked: number; proposals?: Array<{ slug: string; console: string; romPath: string; mountRoot: string }> }> =>
       ipcRenderer.invoke("rom:autoLinkNetworkGames"),
+    confirmNetworkMatch: (slug: string, romPath: string, mountRoot: string): Promise<{ ok: boolean; romPath?: string; error?: string }> =>
+      ipcRenderer.invoke("rom:confirmNetworkMatch", slug, romPath, mountRoot),
+    findByNameSize: (roots: string[], filename: string, size: number): Promise<string | null> =>
+      ipcRenderer.invoke("rom:findByNameSize", roots, filename, size),
     deleteFile: (absolutePath: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("rom:deleteFile", absolutePath),
     fulfillNetworkUpload: (requestId: string, approve: boolean): Promise<{ ok: boolean; error?: string }> =>

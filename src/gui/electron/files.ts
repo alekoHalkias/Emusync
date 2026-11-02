@@ -63,6 +63,11 @@ export function registerFilesIpc(): void {
   // Bare existence check, used by the Refresh locations scan (issue #616).
   ipcMain.handle("files:exists", (_event, p: string): boolean => existsSync(p));
 
+  // Regular-file size, 0 for a folder/missing path: half of the ROM identity key (#731).
+  ipcMain.handle("files:size", (_event, p: string): number => {
+    try { const st = statSync(p); return st.isFile() ? st.size : 0; } catch { return 0; }
+  });
+
   // Network-share identity (issue #644): read the folder's .emusync-share-id marker,
   // creating one when absent. id is null when there is no marker and it is not writable.
   ipcMain.handle("files:ensure-share-marker", (_event, folder: string): { id: string | null; created: boolean } => {

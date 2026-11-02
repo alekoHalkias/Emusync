@@ -178,6 +178,15 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - `rom_rel_path` is relative to the console network folder (the folder holding `.emusync-share-id`) in every writer (`useConsoleImport`, `resolveRomPaths`, `localToNetwork`), so `mount_root` + `rom_rel_path` is the same file on any device. `linkNetworkGame` (`gui/electron/sync/netplay.ts`) rejects `..`/drive-qualified rel paths and skips the game silently when the file is missing.
 - `NetworkPlaySetup.tryAutoImport` used to scan the whole mount and link `scanResult.roms[0]`, which could be a different game; it now calls `rom:setupNetworkPlay`. Never link by taking the first scanned ROM.
 
+## ROM identity matching (#731)
+
+- Same ROM = same console + casefolded basename (`/` and `\` both separators) + equal `game_devices.rom_size` (schema v34). Size is reported by the client that can see the file (`files:size`, `os.path.getsize`); the server never stats paths.
+- `rom_size = 0` means unknown (pre-#731 rows, folder ROMs such as PS3/Switch dirs) and never matches. Refresh locations backfills sizes for ROMs it can see; until then old games are matched only by the exact share-ID path.
+- A filename + size hit is evidence, not proof (two dumps can share both), so it is never saved without the user: `rom:autoLinkNetworkGames` and `useBrokenRoms.refresh` return proposals for `MatchConfirmModal`, and CLI `run` uses a hit for that one launch (`_relocated_gd`) without writing the config. More than one hit is "no match"; never take the first.
+- Duplicate prevention is in `POST /games` because every client (GUI wizard, CLI `console import`) creates the slug there before the device PUT. Name-equal games already collapsed via `INSERT OR IGNORE`; this catches renamed ones. Merging duplicates created earlier is #732.
+- Searches are bounded: `emulator/scan.ts:findRomByNameSize` caches each root's walk for 10s so one auto-link/Refresh pass reads a share once (it runs synchronously in the main process), and `cli/netrom.py:find_rom_by_name_size` drops roots failing `path_is_reachable(root, is_dir=True)` so a dead NFS mount cannot hang `emusync run`.
+- `rom_size` is `Optional[int] = None` on the device PUT and in `GameDeviceConfig`: callers that PUT the whole row without it (older clients, `run.py` post-launch updates) keep the stored value instead of zeroing it.
+
 ## Sync audit fixes (#734)
 
 - Server-side blob hashes are envelope-free everywhere. `_stage_upload` always recorded `sha256(payload)` (no `ES1\0`+format header), but `_classify_blob`, `_last_good_version`, `_push_blob` (restore path) and `restore_console_save` hashed the full file, so every post-#478 save was reported `damaged`/`hash_mismatch` and restored generations got hashes no client could match. All of them now use `store/blobs.py:_payload_sha256`. Generations restored before the fix keep their old hash; clients converge after one re-push.

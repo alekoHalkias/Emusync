@@ -7,6 +7,11 @@ from server.store.locks import _lock_cutoff
 from server.store.models import Game, GameDevice
 
 
+def rom_basename(path: str) -> str:
+    """Casefolded last path segment, splitting on both / and \\ (#731)."""
+    return path.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1].casefold()
+
+
 class GameMixin:
     """Operates on `self._conn`; mixed into Store."""
 
@@ -77,18 +82,18 @@ class GameDeviceMixin:
         self._conn.execute(
             """INSERT OR REPLACE INTO game_devices
                (game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path,
-                rom_source, rom_rel_path, local_rom_path, rom_sha256)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                rom_source, rom_rel_path, local_rom_path, rom_sha256, rom_size)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command,
              gd.state_path, gd.rom_folder_path, gd.rom_source, gd.rom_rel_path,
-             gd.local_rom_path, gd.rom_sha256),
+             gd.local_rom_path, gd.rom_sha256, gd.rom_size),
         )
         self._conn.commit()
 
     def get_game_device(self, game_slug: str, device_id: str) -> Optional[GameDevice]:
         row = self._conn.execute(
             """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path,
-                      rom_folder_path, rom_source, rom_rel_path, local_rom_path, rom_sha256
+                      rom_folder_path, rom_source, rom_rel_path, local_rom_path, rom_sha256, rom_size
                FROM game_devices WHERE game_slug = ? AND device_id = ?""",
             (game_slug, device_id),
         ).fetchone()
@@ -150,6 +155,25 @@ class GameDeviceMixin:
         ).fetchone()
         return dict(row) if row else None
 
+    def find_game_by_rom(self, console: str, filename: str, size: int) -> Optional[str]:
+        """Slug of an existing game on *console* whose ROM on any device has the
+        same casefolded basename and size (#731), or None. Size 0 never matches.
+        Among several (pre-existing duplicates) the oldest game wins."""
+        if not filename or not size or size <= 0:
+            return None
+        want = rom_basename(filename)
+        rows = self._conn.execute(
+            """SELECT g.slug, gd.rom_path, gd.rom_rel_path, gd.local_rom_path
+               FROM game_devices gd JOIN games g ON g.slug = gd.game_slug
+               WHERE g.console = ? AND gd.rom_size = ?
+               ORDER BY g.rowid""",
+            (console, size),
+        ).fetchall()
+        for r in rows:
+            if want in {rom_basename(r[k]) for k in ("rom_path", "rom_rel_path", "local_rom_path") if r[k]}:
+                return r["slug"]
+        return None
+
     def network_link_candidates(self, device_id: str) -> list[dict]:
         """Network-drive games *device_id* can link itself (issue #729).
 
@@ -164,7 +188,7 @@ class GameDeviceMixin:
         rows = self._conn.execute(
             """SELECT g.slug, g.console, gd.rom_path, gd.rom_rel_path, gd.launch_command,
                       gd.save_path, gd.state_path, src.network_share_id AS share_id,
-                      mine.device_network_folder AS mount_root, MAX(gd.rowid) AS _r
+                      mine.device_network_folder AS mount_root, gd.rom_size, MAX(gd.rowid) AS _r
                FROM game_devices gd
                JOIN games g       ON g.slug = gd.game_slug
                JOIN consoles src  ON src.device_id = gd.device_id AND src.console_name = g.console
@@ -179,7 +203,32 @@ class GameDeviceMixin:
                ORDER BY g.slug""",
             (device_id, device_id, device_id),
         ).fetchall()
-        return [{k: r[k] for k in r.keys() if k != "_r"} for r in rows]
+        exact = [{**{k: r[k] for k in r.keys() if k != "_r"}, "match": "exact"} for r in rows]
+        # Fuzzy (#731): the share ID doesn't prove it's the same drive, but the
+        # client can look for the same filename + size under its own mount and
+        # ask the user. Needs a known size; never auto-linked.
+        fuzzy = self._conn.execute(
+            """SELECT g.slug, g.console, gd.rom_path, gd.rom_rel_path, gd.launch_command,
+                      gd.save_path, gd.state_path, '' AS share_id,
+                      mine.device_network_folder AS mount_root, gd.rom_size, MAX(gd.rowid) AS _r
+               FROM game_devices gd
+               JOIN games g       ON g.slug = gd.game_slug
+               JOIN consoles mine ON mine.device_id = ? AND mine.console_name = g.console
+                                 AND mine.device_network_folder != ''
+               WHERE gd.rom_source = 'network' AND gd.rom_rel_path != '' AND gd.rom_size > 0
+                     AND gd.device_id != ?
+                     AND NOT EXISTS (SELECT 1 FROM game_devices x
+                                      WHERE x.game_slug = g.slug AND x.device_id = ?)
+               GROUP BY g.slug
+               ORDER BY g.slug""",
+            (device_id, device_id, device_id),
+        ).fetchall()
+        seen = {c["slug"] for c in exact}
+        exact += [{**{k: r[k] for k in r.keys() if k != "_r"}, "match": "fuzzy"}
+                  for r in fuzzy if r["slug"] not in seen]
+        for c in exact:
+            c["filename"] = c["rom_rel_path"].replace("\\", "/").rsplit("/", 1)[-1]
+        return exact
 
     def games_overview(self, device_id: str) -> list[dict]:
         """Everything the game list needs for one device, in a single query.
@@ -202,7 +251,7 @@ class GameDeviceMixin:
                          ORDER BY s.rowid DESC LIMIT 1) AS last_push,
                       gd.rom_path, gd.save_path, gd.state_path,
                       gd.launch_command, gd.rom_folder_path,
-                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path, gd.rom_size,
                       (gd.game_slug IS NOT NULL) AS is_local
                FROM games g
                LEFT JOIN locks l        ON l.game_slug = g.slug AND l.acquired_at >= ?
@@ -228,6 +277,7 @@ class GameDeviceMixin:
                 "rom_source": r["rom_source"] or "local",
                 "rom_rel_path": r["rom_rel_path"] or "",
                 "local_rom_path": r["local_rom_path"] or "",
+                "rom_size": r["rom_size"] or 0,
             })
         return result
 
@@ -235,7 +285,7 @@ class GameDeviceMixin:
         rows = self._conn.execute(
             """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
                       gd.launch_command, gd.state_path, gd.rom_folder_path,
-                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path, gd.rom_size
                FROM game_devices gd
                JOIN games g ON g.slug = gd.game_slug
                WHERE gd.device_id = ?

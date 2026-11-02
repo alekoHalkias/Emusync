@@ -55,6 +55,8 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   const [error, setError]         = useState("");
   const [progress, setProgress]   = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  // ROMs the server recognised as an existing game by filename + size (#731).
+  const [romMatched, setRomMatched] = useState(0);
   const [savedFolders, setSavedFolders] = useState<string[]>([]);
   const [pushResults, setPushResults]   = useState<PushResult[]>([]);
   const [artProgress, setArtProgress]   = useState({ done: 0, total: 0, failed: 0 });
@@ -329,6 +331,9 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     const errs: string[] = [];
     const imported: ImportedEntry[] = [];
     const consoleAbbr = getConsoleAbbreviation(consoleSel, consoles);
+    // Games already set up on this device: a ROM match onto one of these is a second copy, not a new link (#731).
+    const configuredHere = new Set((await gamesOverview().catch(() => [])).filter((o) => o.is_local).map((o) => o.slug));
+    let matchedCount = 0;
     // Shared-save consoles (PS2/DC/GC/PSP) share one card across all games, so
     // the per-game save must not be renamed/moved on import (#294/#295/#402).
     // Only PS2 also shares its STATES — the rest keep per-game state handling.
@@ -356,8 +361,20 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
         const { romPath, savePath, statePath, launchCmd, romRelPath, netRoot, localCopyPath, romSha } =
           await resolveImportPaths(rom, { romSource, localRomRoot, scanRoots, scanRoot, safeBase, sharedLayout, sharedStateLayout });
 
-        const slug = rom.linkedSlug ?? (await addGame(displayName, consoleAbbr)).slug;
+        const romSize = await emusync.files.size(romPath).catch(() => 0);
+        let slug = rom.linkedSlug;
+        if (!slug) {
+          const filename = romPath.replace(/\\/g, "/").split("/").pop() ?? "";
+          const game = await addGame(displayName, consoleAbbr, romSize > 0 ? { filename, size: romSize } : undefined);
+          slug = game.slug;
+          if (game.matched) {
+            matchedCount++;
+            if (configuredHere.has(slug)) { setProgress({ done: i + 1, total: toImport.length }); continue; }
+          }
+        }
+        configuredHere.add(slug);
         await setGameDevice(slug, {
+          ...(romSize > 0 ? { rom_size: romSize } : {}),
           rom_path: romPath,
           save_path: savePath,
           launch_command: launchCmd,
@@ -380,6 +397,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
       setProgress({ done: i + 1, total: toImport.length });
     }
     setImportErrors(errs);
+    setRomMatched(matchedCount);
     if (imported.length > 0 && networkRoot) void saveShareId();
     setPhase("done");
     // Network ROMs live on a share every device reaches, so there's nothing to
@@ -510,7 +528,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     // state
     phase, consoles, consoleSel, emulators, suggestions, emuSel,
     extraPaths, removedDirs, roms, selected, names, error, progress,
-    importErrors, pushResults, pushSaves, pushStates, artProgress,
+    importErrors, romMatched, pushResults, pushSaves, pushStates, artProgress,
     romSource, networkRoot, localRomRoot, nameWarnings, share, linkedCount, ignoredCount: ignored.size,
     // derived
     grouped, selectedCount, consoleLabel, currentStep, showStepper, allRomDirs,

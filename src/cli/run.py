@@ -12,6 +12,7 @@ and tests.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import os
 import signal
@@ -29,7 +30,7 @@ from server.store import LOCK_TTL_HOURS
 from server.sync_client import GameDeviceConfig, _memcard_payload_bytes
 
 from cli.common import _client, _get_device_name, _show_game_running_popup, split_launch_command
-from cli.netrom import resolve_rom_path
+from cli.netrom import find_rom_by_name_size, resolve_rom_path
 from cli.root import cli
 
 from cli import run_offline as _run_offline_mod
@@ -113,6 +114,34 @@ def _resolve_launch_command(gd) -> Optional[str]:
     if network and effective != gd.rom_path and gd.rom_path and cmd:
         cmd = cmd.replace(gd.rom_path, effective)
     return cmd
+
+
+def _rom_missing(gd) -> bool:
+    """True when the ROM copy a launch would use is not on disk (#731)."""
+    network = getattr(gd, "rom_source", "local") == "network"
+    path = resolve_rom_path(gd.rom_source, gd.rom_path, gd.local_rom_path) if network else gd.rom_path
+    return not path or not os.path.exists(path)
+
+
+def _relocated_gd(gd, consoles: list[dict], console_name: str):
+    """A copy of *gd* pointed at its ROM found elsewhere in this device's console
+    folders by filename + size (#731), or None. Only used for this launch: a
+    fuzzy match is never written back to the server config."""
+    if not getattr(gd, "rom_size", 0) or not gd.rom_path or not _rom_missing(gd):
+        return None
+    keys = ("device_network_folder", "device_local_folder", "device_game_folder")
+    roots: list[str] = []
+    for c in consoles:
+        if (c.get("console_name") or "").lower() != (console_name or "").lower():
+            continue
+        roots += [c.get(k) or "" for k in keys] + list(c.get("device_extra_folders") or [])
+    hit = find_rom_by_name_size(roots, gd.rom_path, gd.rom_size)
+    if not hit:
+        return None
+    moved = copy.copy(gd)
+    moved.rom_source, moved.rom_path, moved.local_rom_path = "local", hit, ""
+    moved.launch_command = gd.launch_command.replace(gd.rom_path, hit) if gd.launch_command else ""
+    return moved
 
 
 def _sigterm_handler(*_) -> None:
@@ -265,7 +294,19 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
         # The emulator invocation lives in the game config — parse it into argv.
         # For a network-sourced ROM this prefers the live NAS master, falls back
         # to a localized copy, or refuses if neither is reachable.
-        launch_command = _resolve_launch_command(gd)
+        launch_gd = gd
+        if getattr(gd, "rom_size", 0) and _rom_missing(gd):
+            try:
+                console_name = (client.get_game(game_slug) or {}).get("console", "")
+                moved = _relocated_gd(gd, client.get_device_consoles(cfg.device_id), console_name)
+            except Exception:
+                moved = None
+            if moved:
+                click.echo(f"ROM for '{game_slug}' is missing at {gd.rom_path}; launching the "
+                           f"same file found at {moved.rom_path}. Use Refresh locations in "
+                           f"the GUI to save the new location.", err=True)
+                launch_gd = moved
+        launch_command = _resolve_launch_command(launch_gd)
         if launch_command is None:
             click.echo(
                 f"ROM for '{game_slug}' is unavailable: the network share is "

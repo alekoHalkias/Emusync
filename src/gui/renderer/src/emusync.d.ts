@@ -6,6 +6,14 @@
 // on purpose (the config is an open TOML dict, and the emulator result types
 // live in the electron package); tightening those is tracked separately.
 
+/** A filename + size network match awaiting user confirmation (#731). */
+export interface NetworkMatchProposal {
+  slug: string;
+  console: string;
+  romPath: string;
+  mountRoot: string;
+}
+
 /** A `.bak` loser found on local disk (issue #285). */
 export interface LocalBak {
   path: string;
@@ -65,6 +73,8 @@ export interface EmusyncBridge {
     ensureSave: (savePath: string) => Promise<{ created: boolean }>;
     getSaveTime: (savePath: string) => Promise<string | null>;
     exists: (path: string) => Promise<boolean>;
+    /** Regular-file size in bytes, 0 for folders/missing (#731). */
+    size: (path: string) => Promise<number>;
     ensureShareMarker: (folder: string) => Promise<{ id: string | null; created: boolean }>;
     getFileHash: (filePath: string) => Promise<string>;
     getLatestInFolder: (dirPath: string) => Promise<{ path: string; time: string } | null>;
@@ -94,7 +104,12 @@ export interface EmusyncBridge {
     delocalize: (slug: string) => Promise<{ ok: boolean; launchCommand?: string; error?: string }>;
     uploadMaster: (localPath: string, networkPath: string) => Promise<{ ok: boolean; sha256?: string; skipped?: boolean; error?: string }>;
     setupNetworkPlay: (slug: string, mountRoot: string) => Promise<{ ok: boolean; romPath?: string; error?: string }>;
-    autoLinkNetworkGames: () => Promise<{ ok: boolean; linked: number }>;
+    /** Exact share matches are linked; filename + size matches come back as `proposals` for confirmation (#731). */
+    autoLinkNetworkGames: () => Promise<{ ok: boolean; linked: number; proposals?: NetworkMatchProposal[] }>;
+    /** Persist one confirmed network match (#731). */
+    confirmNetworkMatch: (slug: string, romPath: string, mountRoot: string) => Promise<{ ok: boolean; romPath?: string; error?: string }>;
+    /** The single ROM under `roots` with this filename + size, else null (#731). */
+    findByNameSize: (roots: string[], filename: string, size: number) => Promise<string | null>;
     deleteFile: (absolutePath: string) => Promise<{ ok: boolean; error?: string }>;
     fulfillNetworkUpload: (requestId: string, approve: boolean) => Promise<{ ok: boolean; error?: string }>;
     localizeSizes: (slugs: string[]) => Promise<Record<string, number>>;

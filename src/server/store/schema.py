@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 33
+_SCHEMA_VERSION = 34
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS game_devices (
     rom_rel_path    TEXT NOT NULL DEFAULT '',
     local_rom_path  TEXT NOT NULL DEFAULT '',
     rom_sha256      TEXT NOT NULL DEFAULT '',
+    rom_size        INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (game_slug, device_id)
 );
 CREATE TABLE IF NOT EXISTS saves (
@@ -588,4 +589,8 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # This device's Eden profile folder; Switch saves live only in
         # <nand root>/<profile>/<title id> on each device (#727).
         _try(conn, "ALTER TABLE consoles ADD COLUMN switch_profile_id TEXT NOT NULL DEFAULT ''")
+    if from_version < 34:
+        # This device's ROM file size; with the basename it identifies the same
+        # ROM across devices for network matching and duplicate prevention (#731).
+        _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_size INTEGER NOT NULL DEFAULT 0")
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")

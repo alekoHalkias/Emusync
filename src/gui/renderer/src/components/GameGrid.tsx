@@ -16,7 +16,8 @@ import LocationResolverModal from "./LocationResolverModal";
 import LocalToNetworkModal from "./LocalToNetworkModal";
 import ConsoleImport from "./ConsoleImport";
 import { scanNewRoms, type NewRomScan } from "./console-import/scanNewRoms";
-import type { LocalCandidate } from "./game-list/useBrokenRoms";
+import type { LocalCandidate, MatchProposal } from "./game-list/useBrokenRoms";
+import MatchConfirmModal from "./MatchConfirmModal";
 import { isRomMissing, useBrokenRoms } from "./game-list/useBrokenRoms";
 import { CheckSquareIcon, DownloadIcon, GamepadIcon, GearIcon, RefreshIcon, SquareIcon, TrashIcon, WarningIcon } from "./icons";
 
@@ -48,6 +49,10 @@ const CONSOLE_ACCENT: Record<string, string> = {
   lynx:      "#92400e",
 };
 const DEFAULT_ACCENT = "#374151";
+
+/** Network-link proposals from rom:autoLinkNetworkGames in the shared MatchProposal shape (#731). */
+const netProposals = (rows?: Array<{ slug: string; romPath: string; mountRoot: string }>): MatchProposal[] =>
+  (rows ?? []).map((r) => ({ slug: r.slug, romPath: r.romPath, kind: "network" as const, mountRoot: r.mountRoot }));
 
 type Props = {
   consoleKey: string;
@@ -81,6 +86,16 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   // remounts and re-fetches art (it may have just been edited in the
   // Artwork tab) without refetching every other card on the screen.
   const [localCandidates, setLocalCandidates] = useState<LocalCandidate[]>([]);
+  // Filename + size matches awaiting confirmation (#731); declined slugs stay hidden for this session.
+  const [proposals, setProposals] = useState<MatchProposal[]>([]);
+  const [declined, setDeclined] = useState<Set<string>>(new Set());
+  const [showMatches, setShowMatches] = useState(false);
+  const [matchNoticeHidden, setMatchNoticeHidden] = useState(false);
+  // Proposals cover every console; only this grid's games are shown (#731).
+  const gameName = new Map(gamesIn.map((g) => [g.slug, g.name]));
+  const visibleMatches = proposals
+    .filter((p) => !declined.has(p.slug) && gameName.has(p.slug))
+    .map((p) => ({ ...p, name: gameName.get(p.slug)! }));
   // New ROMs found by Refresh (#650); the button in the message bar opens the wizard on them.
   const [newRoms, setNewRoms] = useState<NewRomScan | null>(null);
   const [reviewNew, setReviewNew] = useState(false);
@@ -113,7 +128,10 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   useEffect(() => {
     window.emusync.steam.addedSlugs().then((slugs) => setSteamSlugs(new Set(slugs))).catch(() => {});
     // Link other devices' network games on a share this device also has (#729).
-    window.emusync.rom.autoLinkNetworkGames().then((r) => { if (r.linked > 0) onChanged(); }).catch(() => {});
+    window.emusync.rom.autoLinkNetworkGames().then((r) => {
+      if (r.linked > 0) onChanged();
+      setProposals(netProposals(r.proposals));
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -430,12 +448,19 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   }
 
   async function handleRefreshLocations(): Promise<void> {
-    const { linked } = await window.emusync.rom.autoLinkNetworkGames().catch(() => ({ linked: 0 }));
-    const { missing: n, corrected, candidates } = await refreshBroken(currentDeviceId ?? undefined);
+    const auto = await window.emusync.rom.autoLinkNetworkGames().catch(() => ({ linked: 0, proposals: [] }));
+    const linked = auto.linked;
+    const { missing: n, corrected, candidates, proposals: relinks } = await refreshBroken(currentDeviceId ?? undefined);
+    const matches = [...netProposals(auto.proposals), ...relinks];
+    const matchCount = matches.filter((p) => !declined.has(p.slug) && gameName.has(p.slug)).length;
+    setProposals(matches);
+    setMatchNoticeHidden(false);
+    if (matchCount) setShowMatches(true);
     const parts = [
       n ? `${n} game${n !== 1 ? "s" : ""} with a missing ROM flagged.` : "All ROM locations are valid.",
       corrected ? `${corrected} ROM source${corrected !== 1 ? "s" : ""} corrected (local/network).` : "",
       linked ? `${linked} network game${linked !== 1 ? "s" : ""} linked.` : "",
+      matchCount ? `${matchCount} possible game match${matchCount !== 1 ? "es" : ""} to review.` : "",
     ].filter(Boolean);
     setBulkMsg({ text: `${parts.join(" ")} Checking folders for new games...`, isError: n > 0 });
     if (corrected || linked) onChanged();
@@ -548,14 +573,23 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
         </button>
       </div>
 
-      {bulkMsg && (
+      {(bulkMsg || (visibleMatches.length > 0 && !matchNoticeHidden)) && (
         <div
-          style={{ fontSize: 12, padding: "4px 16px", color: bulkMsg.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)", cursor: "pointer" }}
-          onClick={() => setBulkMsg(null)}
-          role={bulkMsg.isError ? "alert" : "status"}
+          style={{ fontSize: 12, padding: "4px 16px", color: bulkMsg?.isError ? "var(--color-danger, #e5484d)" : "var(--text-muted)", cursor: "pointer" }}
+          onClick={() => { setBulkMsg(null); setMatchNoticeHidden(true); }}
+          role={bulkMsg?.isError ? "alert" : "status"}
           title="Dismiss"
         >
-          {bulkMsg.text}
+          {bulkMsg?.text ?? `${visibleMatches.length} possible game match${visibleMatches.length !== 1 ? "es" : ""} found.`}
+          {visibleMatches.length > 0 && !showMatches && (
+            <button
+              className="btn btn-ghost"
+              style={{ fontSize: 12, padding: "1px 8px", marginLeft: 8 }}
+              onClick={(e) => { e.stopPropagation(); setShowMatches(true); }}
+            >
+              Review matches
+            </button>
+          )}
           {newRoms && (
             <button
               className="btn btn-ghost"
@@ -669,6 +703,18 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
       )}
       {localCandidates.length > 0 && (
         <LocalToNetworkModal candidates={localCandidates} onClose={(changed) => { setLocalCandidates([]); if (changed) onChanged(); }} />
+      )}
+      {showMatches && localCandidates.length === 0 && visibleMatches.length > 0 && (
+        <MatchConfirmModal
+          proposals={visibleMatches}
+          onClose={(changed, nope) => {
+            setShowMatches(false);
+            setDeclined((prev) => new Set([...prev, ...nope]));
+            const shown = new Set(visibleMatches.map((p) => p.slug));
+            setProposals((prev) => prev.filter((p) => !shown.has(p.slug)));
+            if (changed) onChanged();
+          }}
+        />
       )}
 
       {netPlayTarget && (

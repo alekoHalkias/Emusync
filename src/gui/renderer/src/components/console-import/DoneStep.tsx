@@ -2,7 +2,7 @@ import type { ConsoleImportVM } from "./useConsoleImport";
 import { CheckIcon, CloseIcon, UploadIcon } from "../icons";
 
 export function DoneStep({ vm }: { vm: ConsoleImportVM }) {
-  const { progress, importErrors, pushResults, artProgress } = vm;
+  const { progress, importErrors, romMatched, pushResults, artProgress } = vm;
   const fetchingArt = artProgress.total > 0 && artProgress.done < artProgress.total;
   return (
     <>
@@ -14,6 +14,11 @@ export function DoneStep({ vm }: { vm: ConsoleImportVM }) {
         {importErrors.length > 0 && (
           <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
             Failed: {importErrors.join(", ")}
+          </p>
+        )}
+        {romMatched > 0 && (
+          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            {romMatched} linked to existing game{romMatched !== 1 ? "s" : ""} with the same ROM.
           </p>
         )}
         {!fetchingArt && artProgress.failed > 0 && (
