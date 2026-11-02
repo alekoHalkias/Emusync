@@ -87,7 +87,7 @@ User answers (2026-11-02):
 ### Integration Points: SyncClient.add_game against live_server; GUI manual script (5 scenarios) since no JS runner.
 ### Outline:
 Backend
-- 1 Schema v34 `game_devices.rom_size`.
+- 1 Schema v34 `game_devices.rom_size`. [done]
 - 2 Model/store round-trip incl. overview.
 - 3 Device PUT/GET + sync_client `rom_size` (None = keep).
 - 4 `store.find_game_by_rom` (casefolded basename + size, same console).
@@ -118,7 +118,7 @@ Tests
 
 ## 8. Implementation Steps
 ### Steps: merged, see tools/plans/731-network-game-matching.md (18 steps)
-- 1 schema v34 rom_size: schema.py; reuses _try/_migrate.
+- 1 schema v34 rom_size: schema.py; reuses _try/_migrate. [done]
 - 2 model/store round-trip: models.py, store/games.py; reuses inline column lists.
 - 3 device API + sync_client rom_size (None = preserve): api/games.py, sync_client.py; reuses set_game_device route.
 - 4 store.find_game_by_rom: store/games.py; new - no ROM-identity lookup exists.
@@ -160,3 +160,4 @@ Tests
 - 2026-11-02 fplan: 10 steps written, visual_pattern=LocalToNetworkModal-style MatchConfirmModal + status-line Review
 - 2026-11-02 merge: 6 conflicts resolved, 0 unresolved
 - 2026-11-02 tplan: test_file=src/tests/test_network_matching.py (+ test_network_autolink.py), 17 test cases defined
+- 2026-11-02 implement: step 1 done (schema v34 game_devices.rom_size)

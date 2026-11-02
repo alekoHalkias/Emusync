@@ -17,7 +17,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
 
 ## Steps
 ### Backend
-- [ ] 1. Schema v34: `game_devices.rom_size INTEGER NOT NULL DEFAULT 0` in `_SCHEMA`, `_SCHEMA_VERSION = 34`, `if from_version < 34` `_try` ALTER. v34 verified free on all remote branches.
+- [x] 1. Schema v34: `game_devices.rom_size INTEGER NOT NULL DEFAULT 0` in `_SCHEMA`, `_SCHEMA_VERSION = 34`, `if from_version < 34` `_try` ALTER. v34 verified free on all remote branches.
   - Files: src/server/store/schema.py
   - Reuses: `_try` / `_migrate` chain.
 - [ ] 2. Model + store round-trip: `GameDevice.rom_size: int = 0`; add to `set_game_device` INSERT, `get_game_device` SELECT, `games_overview` (`rom_size` key), `list_game_devices_for_device`.
