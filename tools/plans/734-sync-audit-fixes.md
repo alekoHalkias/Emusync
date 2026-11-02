@@ -42,7 +42,7 @@ Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocatio
   - Files: src/server/sync_client.py
   - Reuses: `.part` + `os.replace` pattern from `download_transfer`.
   - New: none.
-- [ ] 7. Console memcard store: history files unlinked only after commit; pulls stream an immutable history file instead of the live slot.
+- [x] 7. Console memcard store: history files unlinked only after commit; pulls stream an immutable history file instead of the live slot.
   - Files: src/server/store/blobs.py
   - Reuses: `_prune_history` (returns stale ids, caller unlinks after commit) shape; `_unlink_blobs`.
   - Change: `_prune_console_history` returns stale ids; `_push_console_history_row` returns them; `push_console_save_file` unlinks them after `commit()`. `pull_console_save_path` returns the newest `console_save_history` file whose hash equals the live `console_saves.hash` (falls back to the live `console_saves/<key>` path for cards with no matching history, e.g. pre-#480).

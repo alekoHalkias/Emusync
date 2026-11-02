@@ -450,7 +450,7 @@ class SaveStateMixin:
             return dict(row)  # identical content — return existing metadata
 
         # Record in history before moving into live slot
-        self._push_console_history_row(console_key, device_id, h, size, now, card_format, src)
+        stale = self._push_console_history_row(console_key, device_id, h, size, now, card_format, src)
 
         dest = self._blob_path("console_saves", console_key)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -464,21 +464,32 @@ class SaveStateMixin:
             (console_key, device_id, h, now, size, card_format),
         )
         self._conn.commit()
+        self._unlink_blobs("console_save_history", stale)  # after commit (#704, #734)
         return {"device_id": device_id, "hash": h, "pushed_at": now, "size": size, "card_format": card_format}
 
     def pull_console_save_path(self, console_key: str) -> tuple[Optional[Path], Optional[dict]]:
-        """Pull the console's shared-card.
+        """The console's shared card as (path, meta), or (None, None).
 
-        Returns (path, meta). For folder uploads (GCIFolder format), the path
-        points to a temporary directory with extracted contents; callers should
-        delete it on error. For file uploads, returns the single file path.
+        Prefers the newest history generation with the live hash: history files
+        are written once and never replaced, so a push landing mid-download
+        can't swap the bytes under a streaming response (#734). Cards with no
+        matching history (pre-#480) fall back to the live slot.
         """
         meta = self.get_console_save_meta(console_key)
         if meta is None:
             return None, None
+        row = self._conn.execute(
+            "SELECT id FROM console_save_history WHERE console_key = ? AND hash = ? "
+            "ORDER BY rowid DESC LIMIT 1",
+            (console_key, meta["hash"]),
+        ).fetchone()
+        if row:
+            hist = self._blob_path("console_save_history", row["id"])
+            if hist.exists():
+                return hist, meta
         dest = self._blob_path("console_saves", console_key)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-
+        if not dest.exists():
+            return None, None
         return dest, meta
 
     def get_console_save_meta(self, console_key: str) -> Optional[dict]:
@@ -491,7 +502,7 @@ class SaveStateMixin:
     # ── console-scoped shared save history (issue #480) ──────────────────────────
 
     def _push_console_history_row(self, console_key: str, device_id: str, h: str, size: int, now: str,
-                                    card_format: str, src: Path) -> None:
+                                    card_format: str, src: Path) -> list[str]:
         """Record a new history generation, deduping against the newest one —
         mirrors _push_blob. *src* is copied (not moved): the caller still needs
         it intact to move into the live console_saves slot afterward."""
@@ -500,7 +511,7 @@ class SaveStateMixin:
             (console_key,),
         ).fetchone()
         if current and current["hash"] == h:
-            return
+            return []
         blob_id = str(uuid.uuid4())
         hist_path = self._blob_path("console_save_history", blob_id)
         hist_path.parent.mkdir(parents=True, exist_ok=True)
@@ -510,17 +521,16 @@ class SaveStateMixin:
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (blob_id, console_key, device_id, h, now, size, card_format),
         )
-        self._prune_console_history(console_key)
+        return self._prune_console_history(console_key)
 
-    def _prune_console_history(self, console_key: str) -> None:
-        """Delete all but the newest HISTORY_LIMIT generations (rows + files)."""
+    def _prune_console_history(self, console_key: str) -> list[str]:
+        """Delete all but the newest HISTORY_LIMIT generation rows; return the
+        pruned ids. Files are unlinked by the caller after commit (#704, #734)."""
         ids = [
             r["id"] for r in self._conn.execute(
                 "SELECT id FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC", (console_key,)
             ).fetchall()
         ]
-        for blob_id in ids[HISTORY_LIMIT:]:
-            self._blob_path("console_save_history", blob_id).unlink(missing_ok=True)
         self._conn.execute(
             """DELETE FROM console_save_history
                 WHERE console_key = ? AND rowid NOT IN (
@@ -528,6 +538,7 @@ class SaveStateMixin:
                 )""",
             (console_key, console_key, HISTORY_LIMIT),
         )
+        return ids[HISTORY_LIMIT:]
 
     def list_console_save_history(self, console_key: str) -> list[dict]:
         """Every retained generation of a console's shared card, newest first."""
