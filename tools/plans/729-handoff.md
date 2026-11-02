@@ -92,7 +92,7 @@ Docs
 
 ## 8. Implementation Steps
 ### Steps (merged, tools/plans/729-auto-link-network-games.md)
-1. Store network_link_candidates - src/server/store/games.py; reuses get_network_source_for_game join; new because that is per-slug.
+1. [done] Store network_link_candidates - src/server/store/games.py; reuses get_network_source_for_game join; new because that is per-slug.
 2. Route GET /games/network-link-candidates - src/server/api/games.py; reuses _auth/_get_store.
 3. Move setupNetworkPlay to gui/electron/sync/netplay.ts, split linkNetworkGame - rom.ts, netplay.ts, sync.ts; new module because rom.ts is 552 lines.
 4. IPC rom:autoLinkNetworkGames - netplay.ts, preload.ts, emusync.d.ts; reuses linkNetworkGame.
@@ -124,3 +124,4 @@ Docs
 - 2026-11-02 fplan: 6 steps written, visual_pattern=no new UI, Refresh status line part
 - 2026-11-02 merge: 2 conflicts resolved, 0 unresolved
 - 2026-11-02 tplan: test_file=src/tests/test_network_autolink.py, 8 test cases defined
+- 2026-11-02 implement: step 1 done (add Store.network_link_candidates)

@@ -3,7 +3,7 @@
 Issue: #729
 Branch: feature/729-auto-link-network-games
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal

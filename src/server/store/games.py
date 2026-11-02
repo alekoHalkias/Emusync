@@ -149,6 +149,37 @@ class GameDeviceMixin:
         ).fetchone()
         return dict(row) if row else None
 
+    def network_link_candidates(self, device_id: str) -> list[dict]:
+        """Network-drive games *device_id* can link itself (issue #729).
+
+        A game qualifies when another device has it network-sourced with a
+        ``rom_rel_path``, that device's console for the game carries the same
+        non-blank ``network_share_id`` as one of *device_id*'s consoles (which
+        has a ``device_network_folder``), and *device_id* has no config for it.
+        ``mount_root`` is *device_id*'s own network folder for that share. One
+        row per game, from the most recently written source row (SQLite takes
+        the bare columns from the MAX(gd.rowid) row).
+        """
+        rows = self._conn.execute(
+            """SELECT g.slug, g.console, gd.rom_path, gd.rom_rel_path, gd.launch_command,
+                      gd.save_path, gd.state_path, src.network_share_id AS share_id,
+                      mine.device_network_folder AS mount_root, MAX(gd.rowid) AS _r
+               FROM game_devices gd
+               JOIN games g       ON g.slug = gd.game_slug
+               JOIN consoles src  ON src.device_id = gd.device_id AND src.console_name = g.console
+                                 AND src.network_share_id != ''
+               JOIN consoles mine ON mine.device_id = ? AND mine.console_name = g.console
+                                 AND mine.network_share_id = src.network_share_id
+                                 AND mine.device_network_folder != ''
+               WHERE gd.rom_source = 'network' AND gd.rom_rel_path != '' AND gd.device_id != ?
+                     AND NOT EXISTS (SELECT 1 FROM game_devices x
+                                      WHERE x.game_slug = g.slug AND x.device_id = ?)
+               GROUP BY g.slug
+               ORDER BY g.slug""",
+            (device_id, device_id, device_id),
+        ).fetchall()
+        return [{k: r[k] for k in r.keys() if k != "_r"} for r in rows]
+
     def games_overview(self, device_id: str) -> list[dict]:
         """Everything the game list needs for one device, in a single query.
 
