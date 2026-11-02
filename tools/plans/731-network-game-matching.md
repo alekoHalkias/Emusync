@@ -48,7 +48,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
   - Reuses: `_resolve_launch_command`, `get_device_consoles`, step 8.
   - New: `_relocated_gd(gd, console_row) -> gd | None` - run has no ROM search. Pure (caller fetches the console row) so it is testable without a server, like `_resolve_launch_command`.
 ### Frontend (after backend: depends on steps 2, 3, 5, 7)
-- [ ] 10. Types: `GameDeviceConfig.rom_size?: number`; `GameOverview.rom_size: number`; `GameRow.romSize` mapped in useGameList; `addGame(name, console?, rom?: { filename: string; size: number })` posts `rom_filename` / `rom_size` and returns `Game & { matched?: boolean }`.
+- [x] 10. Types: `GameDeviceConfig.rom_size?: number`; `GameOverview.rom_size: number`; `GameRow.romSize` mapped in useGameList; `addGame(name, console?, rom?: { filename: string; size: number })` posts `rom_filename` / `rom_size` and returns `Game & { matched?: boolean }`.
   - Files: src/gui/renderer/src/api.ts, src/gui/renderer/src/components/game-list/types.ts, src/gui/renderer/src/components/game-list/useGameList.ts
   - Reuses: existing types, `_fetch`.
 - [ ] 11. `files:size` IPC (regular file size, else 0) + preload + emusync.d.ts.

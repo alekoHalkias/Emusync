@@ -88,6 +88,7 @@ export function useGameList(): UseGameList {
             savePath: g.save_path || undefined,
             statePath: g.state_path || undefined,
             romSource: g.rom_source,
+            romSize: g.rom_size ?? 0,
             hasLocalCopy: g.rom_source === "network" && !!g.local_rom_path,
           };
         })
