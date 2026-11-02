@@ -16,7 +16,7 @@ Make server-side hashes envelope-free everywhere, drive pre-launch push/pull fro
 Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocation hunks near the top and ~line 265) and `server/sync_client.py` (GameDeviceConfig, ~362-432). This plan's edits are in other regions (state pull block, lines 311-330, push_state, memcard writers), so no textual conflict is expected.
 
 ## Steps
-- [ ] 1. Envelope-free hash helper used by integrity, last-good, restore and console restore. An enveloped push reports `ok`; a restored generation's hash equals the client's content hash.
+- [x] 1. Envelope-free hash helper used by integrity, last-good, restore and console restore. An enveloped push reports `ok`; a restored generation's hash equals the client's content hash.
   - Files: src/server/store/blobs.py
   - Reuses: server/sync_client.py:_ENVELOPE_MAGIC, _ENVELOPE_HEADER_LEN (already imported by api/blobs.py); same stripping rule as api/blobs.py:_stage_upload.
   - New: module-level `_payload_sha256(data: bytes) -> str` (strip header only when the magic is present) - no existing helper hashes stored bytes envelope-free. Use it in `_push_blob` (covers `_restore_blob` and `push_save(data)`), `_classify_blob`, `_last_good_version`, `restore_console_save`.

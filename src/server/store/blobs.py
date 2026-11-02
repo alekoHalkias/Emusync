@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Optional
 
 from server.store.models import SaveMeta
+from server.sync_client import _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC
 
 # How many generations to retain per game, per blob table. Older rows (and their
 # on-disk files) are pruned on every push.
@@ -35,6 +36,18 @@ HISTORY_LIMIT = 5
 # ``cli.run._SAVE_SHRINK_FLOOR`` — kept as a separate server-side copy so the
 # store never imports from the CLI (issue #285).
 _SHRINK_FLOOR = 0.5
+
+
+def _payload_sha256(data: bytes) -> str:
+    """Content hash of a stored blob, excluding the #478 transfer envelope header.
+
+    Must match api/blobs.py:_stage_upload, which records the envelope-free hash
+    on push; hashing the full bytes flags every enveloped blob as damaged and
+    gives restored generations hashes no client can match (#734).
+    """
+    if data[:len(_ENVELOPE_MAGIC)] == _ENVELOPE_MAGIC:
+        data = data[_ENVELOPE_HEADER_LEN:]
+    return hashlib.sha256(data).hexdigest()
 
 
 class SaveStateMixin:
@@ -72,7 +85,7 @@ class SaveStateMixin:
 
     def _push_blob(self, table: str, game_slug: str, device_id: str, data: bytes) -> SaveMeta:
         """Store *data* as a new generation, writing the bytes to disk."""
-        h = hashlib.sha256(data).hexdigest()
+        h = _payload_sha256(data)
         now = datetime.now(timezone.utc).isoformat()
         current = self._newest_row(table, game_slug)
         # Dedupe: identical to the current blob → don't create another generation.
@@ -239,7 +252,7 @@ class SaveStateMixin:
                 reasons.append("zero_byte")
             if prior is not None and prior["size"] and actual < prior["size"] * _SHRINK_FLOOR:
                 reasons.append("shrank")
-            if hashlib.sha256(path.read_bytes()).hexdigest() != row["hash"]:
+            if _payload_sha256(path.read_bytes()) != row["hash"]:
                 reasons.append("hash_mismatch")
 
         return {
@@ -263,7 +276,7 @@ class SaveStateMixin:
             p = self._blob_path(table, r["id"])
             if not p.exists():
                 continue
-            if hashlib.sha256(p.read_bytes()).hexdigest() == r["hash"]:
+            if _payload_sha256(p.read_bytes()) == r["hash"]:
                 return r["id"]
         return None
 
@@ -543,7 +556,7 @@ class SaveStateMixin:
         data = src.read_bytes()
         tmp = self.new_upload_path()
         tmp.write_bytes(data)
-        h = hashlib.sha256(data).hexdigest()
+        h = _payload_sha256(data)
         return self.push_console_save_file(
             console_key, row["device_id"], tmp, h, len(data), row["card_format"] or ""
         )
