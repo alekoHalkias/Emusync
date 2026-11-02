@@ -16,7 +16,9 @@ export function registerGameIpc(): void {
     // Output goes to launch.log so a failed launch leaves a visible error.
     let log: number | "ignore" = "ignore";
     try { log = openSync(join(dataDir(), "launch.log"), "w"); } catch {}
-    const proc = spawn(PYTHON, [SCRIPT, "run", slug], {
+    // --no-detach (#725): this process's exit must mean push + lock release are
+    // done; it's already detached from the GUI, so the CLI's fork isn't needed.
+    const proc = spawn(PYTHON, [SCRIPT, "run", "--no-detach", slug], {
       stdio: ["ignore", log, log],
       detached: true,
       env: { ...process.env, DISPLAY: process.env.DISPLAY || ":0", WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY || "wayland-0" },

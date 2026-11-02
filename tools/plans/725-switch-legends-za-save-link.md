@@ -3,7 +3,7 @@
 Issue: #725
 Branch: feature/725-switch-legends-za-save-link
 PR: #726
-Status: implementing
+Status: implemented
 Fix attempts: 1
 
 ## Goal
@@ -53,5 +53,5 @@ Correcting a wrong stored title ID; titledb fuzzy matching; additional Eden root
 ## Fix attempt 1
 Failure: review - GUI `game:launch` (src/gui/electron/game.ts) relies on the `emusync run` process exit meaning push + lock release are done (it already spawns detached); CLI default `--detach` would emit `game:exited` while the lock is still held, re-creating the "Playing on Steam" race.
 Cause: detach default applies to every CLI caller, including the GUI.
-- [ ] F1.1 Pass `--no-detach` in `game:launch`'s spawn args.
+- [x] F1.1 Pass `--no-detach` in `game:launch`'s spawn args.
   - Files: src/gui/electron/game.ts

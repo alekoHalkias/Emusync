@@ -4,7 +4,7 @@
 - Issue: #725
 - Branch: feature/725-switch-legends-za-save-link
 - PR: #726
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 1
 
@@ -99,3 +99,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 implement: step 4 done (backfill, helper and real-fork detach tests)
 - 2026-11-01 implement: step 5 done (GOTCHAS + CLAUDE.md); all steps complete
 - 2026-11-01 ship: tests pass (671), PR #726 opened
+- 2026-11-01 implement: F1.1 done (GUI launch passes --no-detach)
