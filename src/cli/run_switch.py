@@ -59,23 +59,32 @@ _SWITCH_LOAD_ROOTS = (
 )
 
 
+def _is_backup_path(path: str) -> bool:
+    """True if any component of *path* is a `.bak` backup folder (#725)."""
+    return any(part.endswith(".bak") for part in Path(path).parts)
+
+
 def _switch_profile_dirs() -> list[Path]:
-    """Every existing profile-ID folder under each NAND save root."""
+    """Every existing profile-ID folder under each NAND save root.
+
+    `.bak` copies are skipped: Eden never reads them, and adopting a save
+    inside one left the Deck syncing a dead folder (#725).
+    """
     dirs: list[Path] = []
     for root in _SWITCH_NAND_ROOTS:
         if not root.is_dir():
             continue
-        dirs.extend(d for d in root.iterdir() if d.is_dir())
+        dirs.extend(d for d in root.iterdir() if d.is_dir() and not d.name.endswith(".bak"))
     return dirs
 
 
 def _switch_title_save_dirs() -> list[Path]:
-    """Every title's save folder across every discovered profile."""
+    """Every title's save folder across every discovered profile (no `.bak`)."""
     return [
         title_dir
         for profile_dir in _switch_profile_dirs()
         for title_dir in profile_dir.iterdir()
-        if title_dir.is_dir()
+        if title_dir.is_dir() and not title_dir.name.endswith(".bak")
     ]
 
 

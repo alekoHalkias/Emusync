@@ -71,6 +71,7 @@ from cli.run_ps3 import _resolve_written_ps3_save  # noqa: F401
 from cli.run_wii import _resolve_written_wii_save  # noqa: F401 — re-exported for existing callers/tests
 from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/tests
     _find_local_switch_save,
+    _is_backup_path,
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
@@ -315,6 +316,12 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
                 switch_title_id = resolved_title_id = backfill_id
             except Exception as exc:
                 click.echo(f"Warning: failed to store the Switch title ID: {exc}", err=True)
+    # Self-heal (#725): a save adopted from a `.bak` profile copy is a folder
+    # Eden never reads. Drop it so the title-ID match below re-picks (and
+    # persists) the live profile's folder.
+    if console_abbr == "Switch" and save_path and _is_backup_path(save_path):
+        click.echo(f"Ignoring stored save path inside a .bak backup folder: {save_path}", err=True)
+        save_path = ""
     shared_memcard =console_abbr in _SHARED_MEMCARD_CONSOLES
     save_client = _MemcardClient(client, console_abbr, cfg) if shared_memcard else client
     save_key = console_abbr if shared_memcard else game_slug

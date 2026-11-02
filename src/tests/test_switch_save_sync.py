@@ -11,6 +11,7 @@ from pathlib import Path
 
 from cli.run_switch import (
     _find_local_switch_save,
+    _is_backup_path,
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
@@ -202,3 +203,24 @@ def test_switch_title_id_from_save_path():
     assert _switch_title_id_from_save_path("/x/profile/0100F43008C44000/") == "0100F43008C44000"
     assert _switch_title_id_from_save_path("/x/profile/Pokemon Legends Z-A") == ""
     assert _switch_title_id_from_save_path("") == ""
+
+
+def test_bak_profile_folder_is_never_matched_or_resolved(monkeypatch, tmp_path):
+    """Regression (#725): the Deck adopted a save inside a `<profile>.bak` copy
+    Eden never reads. Find, resolve and seed must all ignore `.bak` folders."""
+    nand_root = tmp_path / "save"
+    monkeypatch.setattr("cli.run_switch._SWITCH_NAND_ROOTS", (nand_root,))
+    bak = _make_title(nand_root, "0F9E31CF8F16E6677DFF94055FFF9B3D.bak", "0100F43008C44000")
+    (bak / "main").write_text("old")
+    live = _make_title(nand_root, "0F9E31CF8F16E6677DFF94055FFF9B3D", "0100F43008C44000")
+    (live / "main").write_text("current")
+    (live.parent / "0100F43008C44000.bak").mkdir()
+
+    assert _find_local_switch_save("0100F43008C44000") == str(live)
+    assert _resolve_written_switch_save(time.time() - 60) == str(live)
+
+
+def test_is_backup_path():
+    assert _is_backup_path("/n/0F9E.bak/0100F43008C44000")
+    assert _is_backup_path("/n/profile/0100F43008C44000.bak")
+    assert not _is_backup_path("/n/profile/0100F43008C44000")
