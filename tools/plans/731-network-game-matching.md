@@ -39,7 +39,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
   - Files: src/server/store/games.py
   - Reuses: method, route, `mount_root` join.
   - New: second SELECT - one GROUP BY would mix exact/fuzzy bare columns.
-- [ ] 8. Python matcher `find_rom_by_name_size(roots, filename, size, console_key="")` in netrom.py over `detect._scan_rom_dir`.
+- [x] 8. Python matcher `find_rom_by_name_size(roots, filename, size, console_key="")` in netrom.py over `detect._scan_rom_dir`.
   - Files: src/cli/netrom.py
   - Reuses: src/cli/detect.py:_scan_rom_dir.
   - New: thin name+size filter.

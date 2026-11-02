@@ -327,3 +327,22 @@ def delocalize_rom(local_path: str, network_path: str) -> bool:
         raise LocalizeError("refusing to delete the network master")
     os.unlink(local_path)
     return True
+
+
+def find_rom_by_name_size(roots: list[str], filename: str, size: int, console_key: str = "") -> Optional[str]:
+    """The single ROM under *roots* with *filename* (casefolded) and *size* (#731).
+
+    None when size is unknown (0), nothing matches, or more than one file does:
+    a fuzzy match must be unambiguous, never "the first ROM in the mount".
+    """
+    from cli.detect import _scan_rom_dir
+
+    if not filename or not size or size <= 0:
+        return None
+    want = filename.replace("\\", "/").rsplit("/", 1)[-1].casefold()
+    hits: set[str] = set()
+    for root in {r for r in roots if r and os.path.isdir(r)}:
+        for p in _scan_rom_dir(root, console_key=console_key or None):
+            if os.path.basename(p).casefold() == want and os.path.isfile(p) and os.path.getsize(p) == size:
+                hits.add(os.path.realpath(p))
+    return hits.pop() if len(hits) == 1 else None
