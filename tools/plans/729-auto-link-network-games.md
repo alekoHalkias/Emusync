@@ -21,7 +21,7 @@ A network-drive game set up on one device is linked automatically on any other d
   - Files: gui/electron/sync/rom.ts, gui/electron/sync/netplay.ts, gui/electron/sync.ts
   - Reuses: existing handler body, `loadServerCfg`
   - New: netplay.ts - rom.ts is 552 lines.
-- [ ] 4. IPC `rom:autoLinkNetworkGames` in netplay.ts: fetch step 2's route, `linkNetworkGame` each candidate sequentially, skip failures/missing files silently, return `{ ok, linked }` (`{ ok: false, linked: 0 }` if unreachable). Add to preload.ts and emusync.d.ts.
+- [x] 4. IPC `rom:autoLinkNetworkGames` in netplay.ts: fetch step 2's route, `linkNetworkGame` each candidate sequentially, skip failures/missing files silently, return `{ ok, linked }` (`{ ok: false, linked: 0 }` if unreachable). Add to preload.ts and emusync.d.ts.
   - Files: gui/electron/sync/netplay.ts, gui/electron/preload.ts, gui/renderer/src/emusync.d.ts
   - Reuses: `linkNetworkGame`
   - New: channel - no bulk link exists.
