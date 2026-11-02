@@ -201,3 +201,14 @@ def test_run_moves_save_path_from_stray_profile_to_device_profile(monkeypatch, t
     with pytest.raises(SystemExit):
         run_mod.run_game.callback(game_slug="pokemon-legends-z-a", command=())
     assert stored and stored[0] == str(live)
+
+
+def test_device_profile_prefers_the_root_that_has_it(tmp_path, monkeypatch):
+    active = _eden(tmp_path / "a")
+    inactive = tmp_path / "b/eden/nand/user/save/0000000000000000"
+    inactive.mkdir(parents=True)
+    monkeypatch.setattr(rs, "_SWITCH_NAND_ROOTS", (inactive, active))
+    rs._set_switch_profile(ARCH_FOLDER)
+    assert rs._switch_profile_dirs() == [inactive / ARCH_FOLDER, active / ARCH_FOLDER]  # none has it yet
+    (active / ARCH_FOLDER).mkdir()
+    assert rs._switch_profile_dirs() == [active / ARCH_FOLDER]

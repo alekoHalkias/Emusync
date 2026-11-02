@@ -3,7 +3,7 @@
 Issue: #727
 Branch: feature/727-switch-device-profile
 PR: #728
-Status: implementing
+Status: implemented
 Fix attempts: 1
 
 ## Goal
@@ -61,5 +61,5 @@ Steps 3-5: committed together (shared run_switch/run.py code); _resolve_switch_p
 ## Fix attempt 1
 Failure: review - with both Eden roots present, `_switch_profile_dirs` returned `<root>/<profile>` for each, so seeding created the profile folder in the inactive root.
 Cause: no preference for the root that already has the profile.
-- [ ] F1.1 Return only roots where `<root>/<profile>` exists; fall back to every existing root when none has it yet.
+- [x] F1.1 Return only roots where `<root>/<profile>` exists; fall back to every existing root when none has it yet.
   - Files: src/cli/run_switch.py, src/tests/test_switch_profile.py

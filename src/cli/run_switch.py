@@ -135,7 +135,10 @@ def _switch_profile_dirs() -> list[Path]:
     """
     roots = [r for r in _SWITCH_NAND_ROOTS if r.is_dir()]
     if _device_profile:
-        return [r / _device_profile for r in roots]
+        # Prefer the root that already has it, so a second (inactive) Eden root
+        # never gets a profile folder created by seeding.
+        return [r / _device_profile for r in roots if (r / _device_profile).is_dir()] or \
+            [r / _device_profile for r in roots]
     dirs: list[Path] = []
     for root in roots:
         listed = [root / f for f in _eden_profile_folders(root) if (root / f).is_dir()]
