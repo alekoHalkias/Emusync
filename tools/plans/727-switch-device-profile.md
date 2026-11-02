@@ -32,7 +32,7 @@ Every device keeps one Eden profile on its Switch console row, and Switch saves 
 - [x] 5. Correct a stored save_path in another profile: in `run_game`, extend the #725 `.bak` self-heal so a Switch `save_path` whose parent folder is not the device profile is dropped; the existing title-ID match then re-picks inside the device profile and persists it via `set_game_device`, or seeding fills it.
   - Files: src/cli/run.py
   - Reuses: #725 self-heal block, `_find_local_switch_save`, `_seed_switch_save`
-- [ ] 6. Tests: new src/tests/test_switch_profile.py (API/migration cases reuse the `client` fixture and the put-console helper style from test_network_rom.py; CLI cases reuse `_make_title`-style tmp_path NAND trees and the stub-client `run_game.callback` harness from test_run_reconcile.py). No mocks for store/API, real SQLite.
+- [x] 6. Tests: new src/tests/test_switch_profile.py (API/migration cases reuse the `client` fixture and the put-console helper style from test_network_rom.py; CLI cases reuse `_make_title`-style tmp_path NAND trees and the stub-client `run_game.callback` harness from test_run_reconcile.py). No mocks for store/API, real SQLite.
 - [ ] 7. Docs: GOTCHAS Switch section, CLAUDE.md Switch rule line, ARCHITECTURE consoles columns.
 
 ## Testing
