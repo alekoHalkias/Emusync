@@ -14,7 +14,7 @@ Every device keeps one Eden profile on its Switch console row, and Switch saves 
 - **Recommendations**: Profile auto-detected from Eden's `profiles.dat` (byte-reversed 16-byte UUID = folder name; verified on Arch: UUID bytes b6ff0f84...97b94db6 -> folder B64DB997096B19C19A95F548840FFFB6). Stored value wins over detection so a wrong pick can be fixed by editing the row.
 
 ## Steps
-- [ ] 1. Store + API: `consoles.switch_profile_id TEXT NOT NULL DEFAULT ''` (`_SCHEMA`, `_SCHEMA_VERSION = 33`, `if from_version < 33` ALTER); `Console.switch_profile_id`; add to `set_console`/`get_console`/`list_consoles` column lists; `GET /devices/{id}/consoles` returns it; `ConsoleFoldersRequest.switch_profile_id: Optional[str] = None`.
+- [x] 1. Store + API: `consoles.switch_profile_id TEXT NOT NULL DEFAULT ''` (`_SCHEMA`, `_SCHEMA_VERSION = 33`, `if from_version < 33` ALTER); `Console.switch_profile_id`; add to `set_console`/`get_console`/`list_consoles` column lists; `GET /devices/{id}/consoles` returns it; `ConsoleFoldersRequest.switch_profile_id: Optional[str] = None`.
   - Files: src/server/store/schema.py, src/server/store/models.py, src/server/store/consoles.py, src/server/api/devices.py
   - Reuses: network_share_id column/field pattern end to end
   - New: none beyond the column
