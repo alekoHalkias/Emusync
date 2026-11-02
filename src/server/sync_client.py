@@ -183,6 +183,8 @@ class GameDeviceConfig:
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
+    # ROM file size (#731); None = leave the server's stored value alone.
+    rom_size: Optional[int] = None
     # Console-level network/local folder config; transient — populates the console row.
     device_network_folder: str = ""
     device_local_folder: str = ""
@@ -415,6 +417,7 @@ class SyncClient:
             rom_rel_path=d.get("rom_rel_path", ""),
             local_rom_path=d.get("local_rom_path", ""),
             rom_sha256=d.get("rom_sha256", ""),
+            rom_size=d.get("rom_size", 0),
         )
 
     def set_game_device(self, slug: str, cfg: GameDeviceConfig) -> None:
@@ -425,7 +428,8 @@ class SyncClient:
                   "rom_source": cfg.rom_source, "rom_rel_path": cfg.rom_rel_path,
                   "local_rom_path": cfg.local_rom_path, "rom_sha256": cfg.rom_sha256,
                   "device_network_folder": cfg.device_network_folder,
-                  "device_local_folder": cfg.device_local_folder},
+                  "device_local_folder": cfg.device_local_folder,
+                  **({"rom_size": cfg.rom_size} if cfg.rom_size is not None else {})},
             timeout=10,
         )
         r.raise_for_status()

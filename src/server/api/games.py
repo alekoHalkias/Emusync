@@ -38,6 +38,9 @@ class GameDeviceRequest(BaseModel):
     rom_rel_path: str = ""
     local_rom_path: str = ""
     rom_sha256: str = ""
+    # ROM file size on this device (#731). None keeps the stored value, so a
+    # client that predates the field cannot zero it on its whole-row PUT.
+    rom_size: Optional[int] = None
     # Transient: populate the console row's per-console network/local folders.
     device_network_folder: str = ""
     device_local_folder: str = ""
@@ -120,7 +123,8 @@ def get_game_device(slug: str, device_id: str = Depends(_auth)) -> dict:
     return {"rom_path": gd.rom_path, "save_path": gd.save_path, "launch_command": gd.launch_command,
             "state_path": gd.state_path, "rom_folder_path": gd.rom_folder_path,
             "rom_source": gd.rom_source, "rom_rel_path": gd.rom_rel_path,
-            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256}
+            "local_rom_path": gd.local_rom_path, "rom_sha256": gd.rom_sha256,
+            "rom_size": gd.rom_size}
 
 
 @router.delete("/games/{slug}/device")
@@ -163,6 +167,10 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
     game = store.get_game(slug)
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
+    rom_size = req.rom_size
+    if rom_size is None:
+        prev = store.get_game_device(slug, device_id)
+        rom_size = prev.rom_size if prev else 0
     store.set_game_device(
         GameDevice(
             game_slug=slug,
@@ -176,6 +184,7 @@ def set_game_device(slug: str, req: GameDeviceRequest, device_id: str = Depends(
             rom_rel_path=req.rom_rel_path,
             local_rom_path=req.local_rom_path,
             rom_sha256=req.rom_sha256,
+            rom_size=rom_size,
         )
     )
 

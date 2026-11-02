@@ -89,7 +89,7 @@ User answers (2026-11-02):
 Backend
 - 1 Schema v34 `game_devices.rom_size`. [done]
 - 2 Model/store round-trip incl. overview. [done]
-- 3 Device PUT/GET + sync_client `rom_size` (None = keep).
+- 3 Device PUT/GET + sync_client `rom_size` (None = keep). [done] [done]
 - 4 `store.find_game_by_rom` (casefolded basename + size, same console).
 - 5 POST /games returns existing game on ROM match (`matched`); CLI import sends filename/size.
 - 6 netrom upload records size.
@@ -120,7 +120,7 @@ Tests
 ### Steps: merged, see tools/plans/731-network-game-matching.md (18 steps)
 - 1 schema v34 rom_size: schema.py; reuses _try/_migrate. [done]
 - 2 model/store round-trip: models.py, store/games.py; reuses inline column lists. [done]
-- 3 device API + sync_client rom_size (None = preserve): api/games.py, sync_client.py; reuses set_game_device route.
+- 3 device API + sync_client rom_size (None = preserve): api/games.py, sync_client.py; reuses set_game_device route. [done] [done]
 - 4 store.find_game_by_rom: store/games.py; new - no ROM-identity lookup exists.
 - 5 POST /games dedup + CLI import: api/games.py, sync_client.py, cli/console.py; reuses add_game route/client/import loop.
 - 6 netrom upload sets rom_size: cli/netrom.py; reuses gd update block.
@@ -162,3 +162,5 @@ Tests
 - 2026-11-02 tplan: test_file=src/tests/test_network_matching.py (+ test_network_autolink.py), 17 test cases defined
 - 2026-11-02 implement: step 1 done (schema v34 game_devices.rom_size)
 - 2026-11-02 implement: step 2 done (rom_size in GameDevice and store queries)
+- 2026-11-02 implement: step 3 done (rom_size on device PUT/GET and sync_client, None preserves)
+- 2026-11-02 implement: step 3 done (rom_size on device PUT/GET and sync_client, None preserves)
