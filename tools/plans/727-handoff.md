@@ -74,15 +74,15 @@ Tests: (6) test_switch_profile.py, 6 cases + edge cases.
 6. tests. 7. docs.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: correctness - seeding created the profile folder in an inactive second Eden root; fixed F1.1.
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #728
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: prefer the Eden root that already has the device profile
@@ -101,3 +101,6 @@ Tests: (6) test_switch_profile.py, 6 cases + edge cases.
 - 2026-11-01 implement: step 6 done (test_switch_profile.py, 9 tests; verified on real Arch profiles.dat)
 - 2026-11-01 implement: step 7 done (GOTCHAS, ARCHITECTURE; CLAUDE.md in step 2)
 - 2026-11-01 implement: F1.1 done (prefer root with the profile)
+- 2026-11-01 review: 1 finding, fixed
+- 2026-11-01 ship: server sync done
+- 2026-11-01 ship: doc sync done (CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md in steps 2 and 7)
