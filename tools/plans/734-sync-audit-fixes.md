@@ -56,6 +56,30 @@ Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocatio
   - tests/test_memcard_folder_sync.py (or test_state_sync.py): raw pull onto a directory raises; raw write leaves no `.part`.
 - [ ] 9. Docs: GOTCHAS.md entry for server-side envelope-free hashing (#734) and lock TTL on read; one-line CLAUDE.md rule under Saves/sync; design guide line from Design Alignment. ARCHITECTURE.md: none needed - no new routes, IPC, CLI or config.
 
+## Testing
+- **Test Files**: src/tests/test_integrity.py, test_console_memcard.py, test_run_reconcile.py, test_locks.py, test_state_sync.py (all existing; extend, no new files)
+- **Test Cases**:
+  - integrity_ok_for_enveloped_save: `store.push_save(_pack_envelope(_FMT_RAW, payload))` -> `integrity_for_game` status ok, hash == sha256(payload); reuses test_integrity Store pattern.
+  - last_good_finds_enveloped_version: corrupt current via existing `_corrupt_current`, last_good points at the enveloped prior.
+  - restore_hash_is_envelope_free: push two enveloped versions, `restore_save(v1)` hash == sha256(payload1).
+  - console_restore_hash_is_envelope_free: same for `restore_console_save`.
+  - console_pull_serves_history_copy: after push, `pull_console_save_path` path content hashes to meta hash and is not the live slot; legacy card (live row, no history) falls back to live path.
+  - console_prune_unlinks_after_commit: push HISTORY_LIMIT+1 cards, oldest history file gone, row count == HISTORY_LIMIT.
+  - decide_pull_when_only_server_changed: baseline == local, server differs, local mtime LATER -> pull.
+  - decide_push_when_only_local_changed: server == baseline, local differs, local mtime EARLIER -> push.
+  - decide_diverged_uses_mtime: both differ from baseline -> existing mtime rule.
+  - expired_lock_reads_unlocked: backdate `acquired_at` past LOCK_TTL_HOURS via `store._conn`, GET /games/{slug}/lock -> locked false; overview lock_device_id None.
+  - other_device_acquires_expired_lock / fresh_lock_still_409 / same_device_refresh_ok via `_device_auth`.
+  - push_state_folder_includes_subfolders: nested file packed with relative arcname, `.bak` skipped, `name_prefix` matches basename; round-trip through `_extract_state_folder`.
+  - raw_write_atomic_and_dir_guard: `_write_memcard_raw_bytes` leaves no `.part`, keeps `.bak`; directory target raises ValueError.
+- **Edge Cases**:
+  - Legacy un-enveloped blob still hashes to sha256(full bytes) (existing test_integrity cases keep passing unchanged).
+  - Lock exactly at the cutoff; naive legacy `acquired_at` string.
+  - No baseline -> unchanged mtime behaviour (existing test_run_reconcile cases).
+- **Integration Points**:
+  - api/blobs.py:_stage_upload hash must equal `_payload_sha256` for the same bytes (assert in integrity test via API push).
+  - cli/run.py state pull failure: covered by a run_game test in test_run_reconcile.py using an unreachable/500 state route if an existing live_server pattern there fits; otherwise noted in PR as manual.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
@@ -65,3 +89,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 
 ## Log
 - 2026-11-02 bplan: plan written
+- 2026-11-02 tplan: testing section added

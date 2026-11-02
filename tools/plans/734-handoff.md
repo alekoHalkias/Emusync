@@ -54,12 +54,23 @@ See issue #734 checklist. Regression tests for items 1-4 at minimum.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: extend test_integrity, test_console_memcard, test_run_reconcile, test_locks, test_state_sync
+### Test Cases: 13 (see plan Testing section)
+### Edge Cases: legacy un-enveloped blobs, lock at cutoff / naive timestamp, no-baseline reconcile
+### Integration Points: _stage_upload hash == _payload_sha256; run.py state pull fallback
+### Outline:
+Backend
+- 1 envelope-free _payload_sha256 for integrity, last-good, restore, console restore (store/blobs.py)
+- 2 baseline-driven _decide_save_action (cli/run_reconcile.py)
+- 3 lock TTL on read, atomic acquire, overview join filter (store/locks.py, store/games.py)
+- 4 state pull failure warns, launch continues, no post-game state push (cli/run.py)
+- 5 push_state recursive, nested .bak backups, drop duplicate pull_save/push_save (sync_client.py)
+- 6 atomic raw save write, directory guard (sync_client.py)
+- 7 console history unlink after commit, pulls stream immutable history copy (store/blobs.py)
+- 9 docs: GOTCHAS, CLAUDE.md, design guide
+Tests
+- 8 13 cases across 5 existing test files, real SQLite, no mocks
+### Summary: Fixes false "damaged" integrity verdicts and unmatchable restore hashes, stops stale saves overwriting newer ones, frees expired locks, and hardens state/memcard transfer edge cases.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -100,3 +111,4 @@ See issue #734 checklist. Regression tests for items 1-4 at minimum.
 - 2026-11-02 issue: workflow initialized
 - 2026-11-02 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-02 bplan: 9 steps written, backend_pattern=existing store mixins + sync_client, no schema
+- 2026-11-02 tplan: test_file=5 existing files, 13 test cases defined
