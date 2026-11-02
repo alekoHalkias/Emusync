@@ -4,7 +4,7 @@
 - Issue: #731
 - Branch: feature/731-network-game-matching
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -178,3 +178,4 @@ Tests
 - 2026-11-02 implement: step 16 done (import reuses a ROM-matched existing game)
 - 2026-11-02 implement: step 17 done (matching tests: rom_size, POST /games dedup, file search, run fallback, fuzzy candidates)
 - 2026-11-02 implement: step 18 done (docs for ROM identity matching)
+- 2026-11-02 implement: all 18 steps done

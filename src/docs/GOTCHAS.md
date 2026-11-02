@@ -180,7 +180,7 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 
 ## ROM identity matching (#731)
 
-- Same ROM = same console + casefolded basename (`/` and `\\` both separators) + equal `game_devices.rom_size` (schema v34). Size is reported by the client that can see the file (`files:size`, `os.path.getsize`); the server never stats paths.
+- Same ROM = same console + casefolded basename (`/` and `\` both separators) + equal `game_devices.rom_size` (schema v34). Size is reported by the client that can see the file (`files:size`, `os.path.getsize`); the server never stats paths.
 - `rom_size = 0` means unknown (pre-#731 rows, folder ROMs such as PS3/Switch dirs) and never matches. Refresh locations backfills sizes for ROMs it can see; until then old games are matched only by the exact share-ID path.
 - A filename + size hit is evidence, not proof (two dumps can share both), so it is never saved without the user: `rom:autoLinkNetworkGames` and `useBrokenRoms.refresh` return proposals for `MatchConfirmModal`, and CLI `run` uses a hit for that one launch (`_relocated_gd`) without writing the config. More than one hit is "no match"; never take the first.
 - Duplicate prevention is in `POST /games` because every client (GUI wizard, CLI `console import`) creates the slug there before the device PUT. Name-equal games already collapsed via `INSERT OR IGNORE`; this catches renamed ones. Merging duplicates created earlier is #732.
