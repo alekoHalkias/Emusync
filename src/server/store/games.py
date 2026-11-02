@@ -76,18 +76,18 @@ class GameDeviceMixin:
         self._conn.execute(
             """INSERT OR REPLACE INTO game_devices
                (game_slug, device_id, rom_path, save_path, launch_command, state_path, rom_folder_path,
-                rom_source, rom_rel_path, local_rom_path, rom_sha256)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                rom_source, rom_rel_path, local_rom_path, rom_sha256, rom_size)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (gd.game_slug, gd.device_id, gd.rom_path, gd.save_path, gd.launch_command,
              gd.state_path, gd.rom_folder_path, gd.rom_source, gd.rom_rel_path,
-             gd.local_rom_path, gd.rom_sha256),
+             gd.local_rom_path, gd.rom_sha256, gd.rom_size),
         )
         self._conn.commit()
 
     def get_game_device(self, game_slug: str, device_id: str) -> Optional[GameDevice]:
         row = self._conn.execute(
             """SELECT game_slug, device_id, rom_path, save_path, launch_command, state_path,
-                      rom_folder_path, rom_source, rom_rel_path, local_rom_path, rom_sha256
+                      rom_folder_path, rom_source, rom_rel_path, local_rom_path, rom_sha256, rom_size
                FROM game_devices WHERE game_slug = ? AND device_id = ?""",
             (game_slug, device_id),
         ).fetchone()
@@ -201,7 +201,7 @@ class GameDeviceMixin:
                          ORDER BY s.rowid DESC LIMIT 1) AS last_push,
                       gd.rom_path, gd.save_path, gd.state_path,
                       gd.launch_command, gd.rom_folder_path,
-                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path,
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path, gd.rom_size,
                       (gd.game_slug IS NOT NULL) AS is_local
                FROM games g
                LEFT JOIN locks l        ON l.game_slug = g.slug
@@ -227,6 +227,7 @@ class GameDeviceMixin:
                 "rom_source": r["rom_source"] or "local",
                 "rom_rel_path": r["rom_rel_path"] or "",
                 "local_rom_path": r["local_rom_path"] or "",
+                "rom_size": r["rom_size"] or 0,
             })
         return result
 
@@ -234,7 +235,7 @@ class GameDeviceMixin:
         rows = self._conn.execute(
             """SELECT g.slug, g.name, g.console, gd.rom_path, gd.save_path,
                       gd.launch_command, gd.state_path, gd.rom_folder_path,
-                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path
+                      gd.rom_source, gd.rom_rel_path, gd.local_rom_path, gd.rom_size
                FROM game_devices gd
                JOIN games g ON g.slug = gd.game_slug
                WHERE gd.device_id = ?

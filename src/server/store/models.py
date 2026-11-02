@@ -54,6 +54,7 @@ class GameDevice:
     rom_rel_path: str = ""          # path relative to the console's network root
     local_rom_path: str = ""        # on-demand local copy; empty until localized
     rom_sha256: str = ""            # master hash captured at localize time
+    rom_size: int = 0               # ROM file size on this device; 0 = unknown/folder ROM (#731)
 
 
 @dataclass
