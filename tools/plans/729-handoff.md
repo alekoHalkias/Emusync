@@ -49,9 +49,9 @@ Proposed: for every game with a network source whose share_id equals one of this
 ### Backwards Compatibility: not breaking. Additive route and IPC channel; rom:setupNetworkPlay signature unchanged; no schema/config changes; existing device configs never overwritten.
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: fits; no new UI, only an extra part in the Refresh locations status line.
+### Visual Pattern: reuse setBulkMsg phrasing (plan: tools/plans/729-auto-link-network-games-frontend.md)
+### Recommendations: move network-play code out of sync/rom.ts (552 lines) into sync/netplay.ts.
 
 ## 4. Backend Plan
 ### Design Alignment: fits; thin route over one inline-SQL method in the games mixin, read-only, no schema change. Route path changed from the design's `/devices/me/...` to `GET /games/network-link-candidates` to sit with `/games/overview`.
@@ -83,6 +83,13 @@ Proposed: for every game with a network source whose share_id equals one of this
 - B2 route `GET /games/network-link-candidates` - src/server/api/games.py; reuses _auth/_get_store and the /games/overview placement; new because no route lists candidates.
 - B3 tests - src/tests/test_network_rom.py; reuses that file's fixtures.
 - B4 docs - src/docs/ARCHITECTURE.md, CLAUDE.md.
+### Steps (frontend, tools/plans/729-auto-link-network-games-frontend.md)
+- F1 move setupNetworkPlay + helpers to gui/electron/sync/netplay.ts, split out linkNetworkGame - rom.ts, netplay.ts, sync.ts; reuses existing handler body; new module because rom.ts is 552 lines.
+- F2 IPC rom:autoLinkNetworkGames - netplay.ts, preload.ts, emusync.d.ts; reuses linkNetworkGame; new because no bulk link channel exists.
+- F3 GameGrid Refresh locations + mount-time call - GameGrid.tsx; reuses parts/setBulkMsg/onChanged.
+- F4 NetworkPlaySetup tryAutoImport uses setupNetworkPlay instead of roms[0] - NetworkPlaySetup.tsx.
+- F5 tests: build typecheck + manual; no Electron test harness.
+- F6 docs - CLAUDE.md, src/docs/ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -104,3 +111,4 @@ Proposed: for every game with a network source whose share_id equals one of this
 - 2026-11-02 issue: workflow initialized
 - 2026-11-02 design: scope=backend+ui, plan_target=both, difficulty=4/10, breaking=no
 - 2026-11-02 bplan: 4 steps written, backend_pattern=store mixin method + thin route
+- 2026-11-02 fplan: 6 steps written, visual_pattern=no new UI, Refresh status line part
