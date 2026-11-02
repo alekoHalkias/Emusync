@@ -70,7 +70,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
   - Files: src/gui/renderer/src/components/MatchConfirmModal.tsx (new), src/gui/renderer/src/components/GameGrid.tsx
   - Reuses: LocalToNetworkModal structure/classes, Modal, `bulkMsg`, `handleRefreshLocations`.
   - New: component - LocalToNetworkModal's move/upload actions do not apply.
-- [ ] 16. Import dedup: `_runImport` sends `{ filename, size }` (via `files:size`) to `addGame` when `rom.linkedSlug` is unset; `matched` + already configured here (overview `is_local`) -> skip PUT, count as already imported; otherwise PUT with `rom_size`. Done phase shows "N linked to existing games". scanNewRoms unchanged.
+- [x] 16. Import dedup: `_runImport` sends `{ filename, size }` (via `files:size`) to `addGame` when `rom.linkedSlug` is unset; `matched` + already configured here (overview `is_local`) -> skip PUT, count as already imported; otherwise PUT with `rom_size`. Done phase shows "N linked to existing games". scanNewRoms unchanged.
   - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts (+ done-phase view)
   - Reuses: addGame, setGameDevice, gamesOverview.
 ### Verification and docs
