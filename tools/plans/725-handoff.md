@@ -72,15 +72,15 @@ Tests: helper + run_game backfill tests.
 5. docs - GOTCHAS.md, CLAUDE.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: (1) correctness, GUI launch needed --no-detach - fixed F1.1; (2) correctness, join heartbeat before fork - fixed F1.2; (3) docs-stale ARCHITECTURE run.py row - fixed in doc sync.
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: shipped
 ### PR: #726
 ### Server Sync: pending
-### Doc Sync: pending
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: GUI launch must pass --no-detach (exit = push done)
@@ -101,3 +101,5 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 ship: tests pass (671), PR #726 opened
 - 2026-11-01 implement: F1.1 done (GUI launch passes --no-detach)
 - 2026-11-01 implement: F1.2 done (join heartbeat before fork)
+- 2026-11-01 review: 3 findings, blocked=no (2 correctness fixed)
+- 2026-11-01 ship: doc sync updated ARCHITECTURE.md (GOTCHAS.md, CLAUDE.md in step 5)
