@@ -25,6 +25,7 @@
 - Actions: `<div className="modal-actions">` with two buttons (cancel + confirm)
 - Cancel: `btn btn-ghost`, Confirm: `btn btn-danger` or `btn`
 - Spinner: `<span className="spinner" />` inside button text for busy state
+- Match confirmation lists (#731): LocalToNetworkModal shape; one checkbox row per proposal showing name + found path, all checked; never auto-open from a background check, surface a count in the status line with a Review action instead.
 
 ## Inputs
 - Search: `game-grid-search` class, placeholder "Search..."

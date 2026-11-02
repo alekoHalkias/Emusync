@@ -11,6 +11,7 @@ export type GameDeviceConfig = {
   rom_rel_path?: string;
   local_rom_path?: string;
   rom_sha256?: string;
+  rom_size?: number;          // ROM file size on this device; omitted = server keeps stored value (#731)
   // Transient hints (not stored on the game) used to populate the console row's
   // per-console network/local folders during a network import.
   device_network_folder?: string;
@@ -84,6 +85,7 @@ export type GameOverview = {
   rom_source: string;        // 'local' | 'network' (issue #255)
   rom_rel_path: string;
   local_rom_path: string;
+  rom_size: number;          // 0 = unknown (#731)
 };
 
 /** One call returning lock + last save + this device's config for every game. */
@@ -91,7 +93,9 @@ export const gamesOverview = (): Promise<GameOverview[]> => _fetch("GET", "/game
 
 export const listGames = (): Promise<Game[]> => _fetch("GET", "/games");
 export const getGame = (slug: string): Promise<Game> => _fetch("GET", `/games/${slug}`);
-export const addGame = (name: string, console?: string): Promise<Game> => _fetch("POST", "/games", { name, console });
+/** Create a game; with `rom`, the server returns an existing game holding the same ROM instead (`matched`, #731). */
+export const addGame = (name: string, console?: string, rom?: { filename: string; size: number }): Promise<Game & { matched?: boolean }> =>
+  _fetch("POST", "/games", { name, console, ...(rom ? { rom_filename: rom.filename, rom_size: rom.size } : {}) });
 export const updateGame = (slug: string, name: string): Promise<Game> =>
   _fetch("PUT", `/games/${slug}`, { name });
 export const removeGame = (slug: string): Promise<void> => _fetch("DELETE", `/games/${slug}`);

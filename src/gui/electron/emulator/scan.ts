@@ -1,5 +1,5 @@
 // ROM directory scanning and save/state path resolution for the import wizard.
-import { existsSync, readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, realpathSync, statSync } from "fs";
 import { join, basename, extname, dirname } from "path";
 import { rt } from "../runtime";
 import { findLatestFileInDir } from "../files";
@@ -101,6 +101,38 @@ function dirMatchesPattern(dir: string, pattern: string): boolean {
     }
   }
   return false;
+}
+
+/** The single ROM under `roots` with `filename` (case-insensitive) and `size` (#731),
+ *  else null: size 0, no hit and more than one hit all mean "no match". Mirrors
+ *  cli/netrom.py:find_rom_by_name_size. */
+// ponytail: 10s per-root cache so one autoLink/Refresh pass (one lookup per game)
+// walks each share once; a longer-lived index would need invalidation on file changes.
+const SCAN_TTL_MS = 10_000;
+const scanCache = new Map<string, { at: number; files: string[] }>();
+function cachedScan(root: string): string[] {
+  const hit = scanCache.get(root);
+  if (hit && Date.now() - hit.at < SCAN_TTL_MS) return hit.files;
+  const files = scanRomDir(root);
+  scanCache.set(root, { at: Date.now(), files });
+  return files;
+}
+
+export function findRomByNameSize(roots: string[], filename: string, size: number): string | null {
+  if (!filename || !(size > 0)) return null;
+  const want = filename.replace(/\\/g, "/").split("/").pop()!.toLowerCase();
+  // Keyed by realpath so two roots reaching the same file count once; the value
+  // keeps the path as seen under the root so callers can relativize it.
+  const hits = new Map<string, string>();
+  for (const root of new Set(roots.filter(Boolean))) {
+    for (const p of cachedScan(root)) {
+      try {
+        const st = statSync(p);
+        if (basename(p).toLowerCase() === want && st.isFile() && st.size === size) hits.set(realpathSync(p), p);
+      } catch { /* vanished mid-scan */ }
+    }
+  }
+  return hits.size === 1 ? [...hits.values()][0] : null;
 }
 
 function scanRomDir(dir: string, depth = 0, consoleKey?: string): string[] {

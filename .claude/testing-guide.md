@@ -57,3 +57,6 @@ Give the module a path constant for the OS source (e.g. `server.arp._ARP_PATH`) 
 ### Fake network share
 Share-dependent code (marker file, ROM copy) is tested against a `tmp_path` directory holding `.emusync-share-id`; no mount mocking. Daemon/CLI fulfilment functions run against `live_server` with a real `SyncClient`.
 - Client-side download failure paths (no mocks): serve bytes from a stdlib `http.server` thread and point a real `SyncClient` at it; call route helpers like `_pull` directly to assert state before/after `resp.background()` (#715).
+
+### ROM identity / file-search helpers (#731)
+Write real files of controlled size in `tmp_path` (`write_bytes(b"\0" * n)`) and assert unique-hit / ambiguous / size-mismatch / size-0 cases. CLI fallbacks that need server data take the fetched row as an argument (pure helper) so they are tested like `_resolve_launch_command` with a `SimpleNamespace` gd. When a route's response shape grows, update any exact key-set assertion in the same PR.
