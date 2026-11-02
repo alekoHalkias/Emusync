@@ -458,7 +458,7 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
 
         # Keep the lock fresh for the whole session so a long play can't have its
         # lock stolen at the TTL by another device (issue #238).
-        _start_lock_heartbeat(client, game_slug, stop_heartbeat)
+        heartbeat = _start_lock_heartbeat(client, game_slug, stop_heartbeat)
 
         # Mark the moment before launch (minus a small epsilon for mtime
         # granularity) so we can tell which save/state files were written *this*
@@ -474,6 +474,10 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
         stop_heartbeat.set()
         # Python default is False so in-process callers (tests) never fork.
         if detach:
+            # A beat mid-request at fork time would leave the child holding a
+            # copied, never-released httpx pool lock; wait it out (lock calls
+            # time out in 10s).
+            heartbeat.join(timeout=15)
             _run_offline_mod._detach_after_game(exit_code, Path(cfg.data_dir) / "launch.log")
 
         # Detect where RetroArch actually wrote the save/state this session — it
