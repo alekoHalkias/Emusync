@@ -43,7 +43,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
   - Files: src/cli/netrom.py
   - Reuses: src/cli/detect.py:_scan_rom_dir.
   - New: thin name+size filter.
-- [ ] 9. CLI `run` fallback: no external `command` and the effective ROM is missing on disk -> search this device's console row folders (`device_network_folder`, `device_local_folder`, `device_game_folder`, `device_extra_folders`, via `client.get_device_consoles`) with step 8; on a hit resolve the launch command from a `dataclasses.replace(gd, rom_path=hit, launch_command=<old path replaced>)` copy (`_relocated_gd`), stderr note; stored config untouched.
+- [x] 9. CLI `run` fallback: no external `command` and the effective ROM is missing on disk -> search this device's console row folders (`device_network_folder`, `device_local_folder`, `device_game_folder`, `device_extra_folders`, via `client.get_device_consoles`) with step 8; on a hit resolve the launch command from a `dataclasses.replace(gd, rom_path=hit, launch_command=<old path replaced>)` copy (`_relocated_gd`), stderr note; stored config untouched.
   - Files: src/cli/run.py
   - Reuses: `_resolve_launch_command`, `get_device_consoles`, step 8.
   - New: `_relocated_gd(gd, console_row) -> gd | None` - run has no ROM search. Pure (caller fetches the console row) so it is testable without a server, like `_resolve_launch_command`.
@@ -124,3 +124,4 @@ Schema bump: yes (v34). New IPC channel (+ emusync.d.ts): yes (files:size, rom:f
 - 2026-11-02 fplan: 10 steps written
 - 2026-11-02 merge: 18 steps, 6 conflicts resolved, 0 unresolved
 Step 7: updated test_network_autolink exact key-set assertion here (planned for step 17) to keep the suite green.
+Step 9: _relocated_gd takes the device's console list + console name (not a single row) so the caller passes get_device_consoles output directly; added _rom_missing gate so the server is only asked when the ROM is actually missing.

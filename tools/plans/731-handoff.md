@@ -95,7 +95,7 @@ Backend
 - 6 netrom upload records size. [done]
 - 7 network-link-candidates adds `match`/`filename`/`rom_size` + fuzzy rows. [done]
 - 8 Python `find_rom_by_name_size` over `_scan_rom_dir`. [done]
-- 9 CLI run finds a moved ROM for this launch only (pure `_relocated_gd`).
+- 9 CLI run finds a moved ROM for this launch only (pure `_relocated_gd`). [done]
 Frontend
 - 10 Types + `addGame` ROM arg.
 - 11 IPC `files:size`.
@@ -126,7 +126,7 @@ Tests
 - 6 netrom upload sets rom_size: cli/netrom.py; reuses gd update block. [done]
 - 7 fuzzy candidates: store/games.py; reuses method/route; new second SELECT (GROUP BY would mix rows). [done]
 - 8 find_rom_by_name_size: cli/netrom.py; reuses detect._scan_rom_dir. [done]
-- 9 CLI run fallback, not persisted: cli/run.py; reuses _resolve_launch_command, get_device_consoles; new _relocated_gd.
+- 9 CLI run fallback, not persisted: cli/run.py; reuses _resolve_launch_command, get_device_consoles; new _relocated_gd. [done]
 - 10 renderer types + addGame rom arg: api.ts, types.ts, useGameList.ts; reuses _fetch.
 - 11 files:size IPC: files.ts, preload.ts, d.ts; new - no size IPC.
 - 12 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, ipc.ts; reuses scanRomDir.
@@ -168,3 +168,4 @@ Tests
 - 2026-11-02 implement: step 6 done (upload_to_network records rom_size)
 - 2026-11-02 implement: step 7 done (fuzzy network-link candidates with match/filename/rom_size)
 - 2026-11-02 implement: step 8 done (find_rom_by_name_size over _scan_rom_dir)
+- 2026-11-02 implement: step 9 done (run launches a moved ROM found by filename+size, not persisted)
