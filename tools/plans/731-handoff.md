@@ -4,7 +4,7 @@
 - Issue: #731
 - Branch: feature/731-network-game-matching
 - PR: #733
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -184,3 +184,4 @@ Tests
 - 2026-11-02 implement: all 18 steps done
 - 2026-11-02 ship: tests pass (724), PR #733 opened
 - 2026-11-02 review: 3 findings, blocked=yes
+- 2026-11-02 implement: steps 19-20 done (review fixes: scan cache, reachable roots)

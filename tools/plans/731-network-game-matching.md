@@ -3,7 +3,7 @@
 Source plans: tools/plans/731-network-game-matching-ui.md (fplan, commit dba21778), tools/plans/731-network-game-matching.md (bplan, commit 73855f52)
 Branch: feature/731-network-game-matching
 PR: #733
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -78,10 +78,10 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
 - [x] 18. Docs: CLAUDE.md Rules (#731: matching key, v34 `rom_size`, POST /games dedup, fuzzy candidates, run fallback not persisted, files:size / rom:findByNameSize / rom:confirmNetworkMatch, MatchConfirmModal); src/docs/ARCHITECTURE.md (request/response fields, IPC table); src/docs/GOTCHAS.md (why fuzzy matches are never auto-persisted, rom_size 0 rows).
 
 ## Review fixes
-- [ ] 19. scan.ts: cache each root's scanRomDir result for a short TTL so one autoLink/refresh pass walks each folder once (findRomByNameSize reuses the cached list).
+- [x] 19. scan.ts: cache each root's scanRomDir result for a short TTL so one autoLink/refresh pass walks each folder once (findRomByNameSize reuses the cached list).
   - Files: src/gui/electron/emulator/scan.ts
   - Reuses: scanRomDir.
-- [ ] 20. netrom.py: find_rom_by_name_size skips roots that fail path_is_reachable (2s timeout) before scanning.
+- [x] 20. netrom.py: find_rom_by_name_size skips roots that fail path_is_reachable (2s timeout) before scanning.
   - Files: src/cli/netrom.py
   - Reuses: path_is_reachable.
 
@@ -136,3 +136,4 @@ Step 9: _relocated_gd takes the device's console list + console name (not a sing
 Step 11-12: committed together (shared preload/d.ts edits); findRomByNameSize takes no consoleKey (dir ROMs have size 0 and never match, so the dir-pattern lookup is unneeded); the preload/d.ts entries for step 13's rom:confirmNetworkMatch were added here too.
 Step 13: both matchers now return the path as seen under its root (dedupe still by realpath) so a symlinked mount relativizes cleanly.
 Step 17: make test 724 passed / 3 skipped; make lint, make build-gui, tsc (no new errors) ok. GUI manual script NOT run (no display in this session) - left for the user, listed in the PR.
+Step 20: path_is_reachable gained is_dir=True (it only probed files), reused by find_rom_by_name_size.

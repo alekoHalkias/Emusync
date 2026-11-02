@@ -85,15 +85,16 @@ def join_network(network_root: str, rel: str) -> str:
     return os.path.join(network_root, *safe.split("/"))
 
 
-def _probe_isfile(path: str, result: list) -> None:
+def _probe_isfile(path: str, result: list, check=os.path.isfile) -> None:
     try:
-        result.append(os.path.isfile(path))
+        result.append(check(path))
     except OSError:
         result.append(False)
 
 
-def path_is_reachable(path: str, timeout: float = 2.0) -> bool:
-    """True iff *path* is an existing file reachable within *timeout* seconds.
+def path_is_reachable(path: str, timeout: float = 2.0, *, is_dir: bool = False) -> bool:
+    """True iff *path* is an existing file (or folder, with *is_dir*) reachable
+    within *timeout* seconds.
 
     The check runs in a daemon thread so a hung/dead network mount — where
     ``os.path.isfile`` can block on the OS uninterruptibly — never freezes the
@@ -103,7 +104,8 @@ def path_is_reachable(path: str, timeout: float = 2.0) -> bool:
     if not path:
         return False
     result: list = []
-    t = threading.Thread(target=_probe_isfile, args=(path, result), daemon=True)
+    check = os.path.isdir if is_dir else os.path.isfile
+    t = threading.Thread(target=_probe_isfile, args=(path, result, check), daemon=True)
     t.start()
     t.join(timeout)
     if t.is_alive():
@@ -341,7 +343,8 @@ def find_rom_by_name_size(roots: list[str], filename: str, size: int, console_ke
         return None
     want = filename.replace("\\", "/").rsplit("/", 1)[-1].casefold()
     hits: dict[str, str] = {}  # realpath -> path as seen under its root
-    for root in {r for r in roots if r and os.path.isdir(r)}:
+    # path_is_reachable first: a dead NFS mount must not hang `emusync run` (#731 review).
+    for root in {r for r in roots if r and path_is_reachable(r, is_dir=True)}:
         for p in _scan_rom_dir(root, console_key=console_key or None):
             if os.path.basename(p).casefold() == want and os.path.isfile(p) and os.path.getsize(p) == size:
                 hits[os.path.realpath(p)] = p
