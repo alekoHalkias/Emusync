@@ -25,7 +25,7 @@ A network-drive game set up on one device is linked automatically on any other d
   - Files: gui/electron/sync/netplay.ts, gui/electron/preload.ts, gui/renderer/src/emusync.d.ts
   - Reuses: `linkNetworkGame`
   - New: channel - no bulk link exists.
-- [ ] 5. GameGrid: `handleRefreshLocations` calls `autoLinkNetworkGames()` first; `linked > 0` -> `onChanged()` and "N network game(s) linked." in `parts`. Mount-time `useEffect([])` calls it once, `onChanged()` when `linked > 0`, errors ignored.
+- [x] 5. GameGrid: `handleRefreshLocations` calls `autoLinkNetworkGames()` first; `linked > 0` -> `onChanged()` and "N network game(s) linked." in `parts`. Mount-time `useEffect([])` calls it once, `onChanged()` when `linked > 0`, errors ignored.
   - Files: gui/renderer/src/components/GameGrid.tsx
   - Reuses: `parts`/`setBulkMsg`/`onChanged`
 - [ ] 6. NetworkPlaySetup: `tryAutoImport` uses `window.emusync.rom.setupNetworkPlay(slug, mount)` instead of whole-mount scan + `roms[0]`; ok -> existing `onChanged(); onClose(); onPlay(...)`, else `setMode("manual")`.
