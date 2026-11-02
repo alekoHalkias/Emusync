@@ -3,7 +3,7 @@
 Issue: #725
 Branch: feature/725-switch-legends-za-save-link
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -28,7 +28,7 @@ Fix attempts: 0
   - New: `_detach_after_game` - no existing fork or daemonize helper in the codebase; fork keeps all in-memory state (clients, hashes, launch_start) so no new subcommand or argument plumbing is needed.
   - Known limits: lock heartbeat is stopped before the fork, so a very long push is covered only by the lock TTL (hours); a relaunch during the background push is blocked by the still-held lock, which is the intended protection; if Steam/systemd kills the whole cgroup, setsid alone cannot survive it.
 - [x] 4. Tests: src/tests/test_switch_save_sync.py - helper returns ID for a 16-hex folder and "" otherwise; run with `save_path` set and blank server ID backfills the ID (real SQLite, existing fixtures in that file); no backfill when ID already stored. No mocks.
-- [ ] 5. Docs: GOTCHAS.md: one line on the Switch backfill; a "post-game push is detached (#725)" note (fork+setsid, tests use detach=False, Windows inline); CLAUDE.md Saves/sync rules one line.
+- [x] 5. Docs: GOTCHAS.md: one line on the Switch backfill; a "post-game push is detached (#725)" note (fork+setsid, tests use detach=False, Windows inline); CLAUDE.md Saves/sync rules one line.
 
 ## Testing
 - **Test File**: src/tests/test_switch_save_sync.py (helper cases); src/tests/test_run_reconcile.py (run_game backfill, reusing its existing run_game harness)

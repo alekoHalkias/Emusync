@@ -4,7 +4,7 @@
 - Issue: #725
 - Branch: feature/725-switch-legends-za-save-link
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -97,3 +97,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 implement: step 2 done (backfill title ID when save_path already known)
 - 2026-11-01 implement: step 3 done (fork post-game push into a detached session)
 - 2026-11-01 implement: step 4 done (backfill, helper and real-fork detach tests)
+- 2026-11-01 implement: step 5 done (GOTCHAS + CLAUDE.md); all steps complete
