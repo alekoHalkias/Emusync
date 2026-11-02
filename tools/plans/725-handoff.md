@@ -100,3 +100,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 implement: step 5 done (GOTCHAS + CLAUDE.md); all steps complete
 - 2026-11-01 ship: tests pass (671), PR #726 opened
 - 2026-11-01 implement: F1.1 done (GUI launch passes --no-detach)
+- 2026-11-01 implement: F1.2 done (join heartbeat before fork)

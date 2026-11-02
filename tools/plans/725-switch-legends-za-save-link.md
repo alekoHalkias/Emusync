@@ -3,7 +3,7 @@
 Issue: #725
 Branch: feature/725-switch-legends-za-save-link
 PR: #726
-Status: implementing
+Status: implemented
 Fix attempts: 1
 
 ## Goal
@@ -55,5 +55,5 @@ Failure: review - GUI `game:launch` (src/gui/electron/game.ts) relies on the `em
 Cause: detach default applies to every CLI caller, including the GUI.
 - [x] F1.1 Pass `--no-detach` in `game:launch`'s spawn args.
   - Files: src/gui/electron/game.ts
-- [ ] F1.2 Join the lock heartbeat thread before forking, so the child never inherits an httpx pool lock held by an in-flight heartbeat request.
+- [x] F1.2 Join the lock heartbeat thread before forking, so the child never inherits an httpx pool lock held by an in-flight heartbeat request.
   - Files: src/cli/run.py
