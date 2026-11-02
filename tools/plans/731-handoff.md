@@ -102,7 +102,7 @@ Frontend
 - 12 IPC `rom:findByNameSize` over `scanRomDir`. [done]
 - 13 Auto-link: exact silent, fuzzy -> proposals; IPC `rom:confirmNetworkMatch`. [done]
 - 14 Refresh: size backfill, moved-ROM relink proposals, size-checked sibling relink. [done]
-- 15 MatchConfirmModal + status-line Review in GameGrid.
+- 15 MatchConfirmModal + status-line Review in GameGrid. [done]
 - 16 Import reuses matched game; "N linked to existing games".
 Tests
 - 17 test_network_matching.py (new) + test_network_autolink.py (extended); build/lint/tsc + manual GUI script.
@@ -132,7 +132,7 @@ Tests
 - 12 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, ipc.ts; reuses scanRomDir. [done]
 - 13 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame; new confirm channel. [done]
 - 14 useBrokenRoms backfill/proposals/size-checked siblings: useBrokenRoms.ts; reuses refresh/sourceFor/updateRom. [done]
-- 15 MatchConfirmModal + GameGrid wiring: new component; reuses LocalToNetworkModal structure, bulkMsg.
+- 15 MatchConfirmModal + GameGrid wiring: new component; reuses LocalToNetworkModal structure, bulkMsg. [done]
 - 16 import dedup: useConsoleImport.ts; reuses addGame/setGameDevice/gamesOverview.
 - 17 tests + GUI verify.
 - 18 docs.
@@ -174,3 +174,4 @@ Tests
 - 2026-11-02 implement: step 12 done (files:size and rom:findByNameSize IPC)
 - 2026-11-02 implement: step 13 done (netplay exact/fuzzy proposals and rom:confirmNetworkMatch)
 - 2026-11-02 implement: step 14 done (Refresh size backfill, moved-ROM relink proposals, size-checked siblings)
+- 2026-11-02 implement: step 15 done (MatchConfirmModal and GameGrid review wiring)

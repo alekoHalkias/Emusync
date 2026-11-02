@@ -66,7 +66,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
 - [x] 14. useBrokenRoms: `refresh` backfills `rom_size` for existing local ROMs with `romSize` 0; missing local ROMs with `romSize > 0` searched in the console folders via `rom:findByNameSize` and returned as relink proposals; `relink` sibling probe requires matching `files:size` when `romSize > 0`; `updateRom` sends `rom_size`.
   - Files: src/gui/renderer/src/components/game-list/useBrokenRoms.ts
   - Reuses: refresh loop, getDeviceConsoles, sourceFor folder list, updateRom.
-- [ ] 15. `MatchConfirmModal` (network-link and relink rows, checkboxes all checked, Link / Not now, inline per-row errors) and GameGrid wiring: load keeps proposals and shows "N possible game matches found. Review" in the status line; Refresh merges network + relink proposals, adds the count to its message, opens the modal (after LocalToNetworkModal if both apply). Session-declined slugs filtered.
+- [x] 15. `MatchConfirmModal` (network-link and relink rows, checkboxes all checked, Link / Not now, inline per-row errors) and GameGrid wiring: load keeps proposals and shows "N possible game matches found. Review" in the status line; Refresh merges network + relink proposals, adds the count to its message, opens the modal (after LocalToNetworkModal if both apply). Session-declined slugs filtered.
   - Files: src/gui/renderer/src/components/MatchConfirmModal.tsx (new), src/gui/renderer/src/components/GameGrid.tsx
   - Reuses: LocalToNetworkModal structure/classes, Modal, `bulkMsg`, `handleRefreshLocations`.
   - New: component - LocalToNetworkModal's move/upload actions do not apply.
