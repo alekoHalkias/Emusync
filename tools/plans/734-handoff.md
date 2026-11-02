@@ -126,3 +126,4 @@ Tests
 - 2026-11-02 review: 2 findings, blocked=no
 - 2026-11-02 ship: server sync done
 - 2026-11-02 ship: doc sync updated ARCHITECTURE.md (GOTCHAS.md, CLAUDE.md updated in step 9)
+- 2026-11-02 ship: merged origin/main after #733, resolved doc conflicts, make test 738 passed
