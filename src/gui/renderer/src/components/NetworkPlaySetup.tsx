@@ -6,7 +6,6 @@ import {
   getGameNetworkSource,
   listGameDevices,
   listOutgoingPullRequests,
-  setGameDevice,
   whoami,
   type DeviceForGame,
   type GameNetworkSource,
@@ -104,7 +103,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
 
         // Auto-scan: if we have a console key and a local network mount, try immediately
         if (foundKey && foundMount) {
-          await tryAutoImport(foundKey, foundMount);
+          await tryAutoImport(foundMount);
         } else {
           // No mount configured on this device — drop straight to manual options
           setMode("manual");
@@ -116,35 +115,14 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
     })();
   }, [slug]);
 
-  async function tryAutoImport(key: string, mount: string): Promise<void> {
+  // Link this exact game at <mount>/<rom_rel_path> (#729); never take the first
+  // ROM a whole-mount scan returns, which can be a different game.
+  async function tryAutoImport(mount: string): Promise<void> {
     if (autoAttempted.current) return;
     autoAttempted.current = true;
     try {
-      const { options: emulatorOptions } = await window.emusync.emulator.detect(key);
-      if (!emulatorOptions || emulatorOptions.length === 0) {
-        setMode("manual");
-        return;
-      }
-      const emulator = emulatorOptions[0];
-      const scanResult = await window.emusync.emulator.scan(key, emulator, [mount]);
-
-      if (!scanResult?.roms || scanResult.roms.length === 0) {
-        // Game not found on this device's network mount — show manual options
-        setMode("manual");
-        return;
-      }
-
-      const rom = scanResult.roms[0];
-      if (!rom.romPath) { setMode("manual"); return; }
-
-      await setGameDevice(slug, {
-        rom_source: "network",
-        rom_path: rom.romPath,
-        save_path: rom.savePath,
-        state_path: rom.statePath || "",
-        launch_command: rom.launchCommand,
-        rom_folder_path: mount,
-      });
+      const res = await window.emusync.rom.setupNetworkPlay(slug, mount);
+      if (!res.ok) { setMode("manual"); return; }
       onChanged();
       onClose();
       onPlay(slug, name);
@@ -160,7 +138,7 @@ export default function NetworkPlaySetup({ slug, name, onClose, onPlay, onChange
     try {
       const mount = networkMount;
       if (mount) {
-        await tryAutoImport(consoleKey, mount);
+        await tryAutoImport(mount);
         if (mode === "manual") setError(`Game not found on ${mount}`);
       } else if (gameNetworkSource && consoleKey) {
         setShowConsoleImport(true);

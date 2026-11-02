@@ -28,7 +28,7 @@ A network-drive game set up on one device is linked automatically on any other d
 - [x] 5. GameGrid: `handleRefreshLocations` calls `autoLinkNetworkGames()` first; `linked > 0` -> `onChanged()` and "N network game(s) linked." in `parts`. Mount-time `useEffect([])` calls it once, `onChanged()` when `linked > 0`, errors ignored.
   - Files: gui/renderer/src/components/GameGrid.tsx
   - Reuses: `parts`/`setBulkMsg`/`onChanged`
-- [ ] 6. NetworkPlaySetup: `tryAutoImport` uses `window.emusync.rom.setupNetworkPlay(slug, mount)` instead of whole-mount scan + `roms[0]`; ok -> existing `onChanged(); onClose(); onPlay(...)`, else `setMode("manual")`.
+- [x] 6. NetworkPlaySetup: `tryAutoImport` uses `window.emusync.rom.setupNetworkPlay(slug, mount)` instead of whole-mount scan + `roms[0]`; ok -> existing `onChanged(); onClose(); onPlay(...)`, else `setMode("manual")`.
   - Files: gui/renderer/src/components/NetworkPlaySetup.tsx
   - Reuses: `rom:setupNetworkPlay`
 - [ ] 7. Tests in new `src/tests/test_network_autolink.py` (test_network_rom.py is already 360 lines), importing `_add_game`, `_console_row`, `_set_share` from `tests.test_network_rom`. Real SQLite, no mocks. Cases listed under Testing. Frontend: `npm run build` in src/gui for typecheck of the new channel; no Electron test harness.
