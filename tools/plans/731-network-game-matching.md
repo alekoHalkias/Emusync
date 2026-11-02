@@ -3,7 +3,7 @@
 Source plans: tools/plans/731-network-game-matching-ui.md (fplan, commit dba21778), tools/plans/731-network-game-matching.md (bplan, commit 73855f52)
 Branch: feature/731-network-game-matching
 PR: #733
-Status: implemented
+Status: implementing
 Fix attempts: 0
 
 ## Goal
@@ -76,6 +76,14 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
 ### Verification and docs
 - [x] 17. Tests (see Testing): new src/tests/test_network_matching.py; extend src/tests/test_network_autolink.py (fuzzy cases + update the exact key-set assertion); `make test-changed`. GUI: `make build-gui`, `make lint`, `tsc --noEmit` no new errors beyond the known list, manual script below.
 - [x] 18. Docs: CLAUDE.md Rules (#731: matching key, v34 `rom_size`, POST /games dedup, fuzzy candidates, run fallback not persisted, files:size / rom:findByNameSize / rom:confirmNetworkMatch, MatchConfirmModal); src/docs/ARCHITECTURE.md (request/response fields, IPC table); src/docs/GOTCHAS.md (why fuzzy matches are never auto-persisted, rom_size 0 rows).
+
+## Review fixes
+- [ ] 19. scan.ts: cache each root's scanRomDir result for a short TTL so one autoLink/refresh pass walks each folder once (findRomByNameSize reuses the cached list).
+  - Files: src/gui/electron/emulator/scan.ts
+  - Reuses: scanRomDir.
+- [ ] 20. netrom.py: find_rom_by_name_size skips roots that fail path_is_reachable (2s timeout) before scanning.
+  - Files: src/cli/netrom.py
+  - Reuses: path_is_reachable.
 
 ## Testing
 - **Test Files**: src/tests/test_network_matching.py (new: schema, round-trip, POST /games dedup, Python matcher, run fallback); src/tests/test_network_autolink.py (extended: candidate `match` / fuzzy rows). Real SQLite, `client` fixture, `AUTH` + `_device_auth`, `tmp_path` files; no mocks.

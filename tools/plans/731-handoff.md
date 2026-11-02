@@ -4,7 +4,7 @@
 - Issue: #731
 - Branch: feature/731-network-game-matching
 - PR: #733
-- Status: shipped
+- Status: implementing
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -138,9 +138,12 @@ Tests
 - 18 docs. [done]
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings:
+1. correctness - src/gui/electron/emulator/scan.ts:116: findRomByNameSize re-walks the whole root synchronously per candidate; autoLink/refresh call it N times per load in the main process.
+2. correctness - src/cli/netrom.py:344: find_rom_by_name_size scans roots without path_is_reachable, so run's fallback can hang on a dead NFS mount.
+3. test-gap - GUI manual script not run (no display); noted in PR.
+### Blocked: yes (findings 1-2)
+### Blockers: fix steps 19-20 in plan
 
 ## 10. Ship
 ### Status: shipped
@@ -180,3 +183,4 @@ Tests
 - 2026-11-02 implement: step 18 done (docs for ROM identity matching)
 - 2026-11-02 implement: all 18 steps done
 - 2026-11-02 ship: tests pass (724), PR #733 opened
+- 2026-11-02 review: 3 findings, blocked=yes
