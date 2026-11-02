@@ -101,7 +101,7 @@ Frontend
 - 11 IPC `files:size`. [done]
 - 12 IPC `rom:findByNameSize` over `scanRomDir`. [done]
 - 13 Auto-link: exact silent, fuzzy -> proposals; IPC `rom:confirmNetworkMatch`. [done]
-- 14 Refresh: size backfill, moved-ROM relink proposals, size-checked sibling relink.
+- 14 Refresh: size backfill, moved-ROM relink proposals, size-checked sibling relink. [done]
 - 15 MatchConfirmModal + status-line Review in GameGrid.
 - 16 Import reuses matched game; "N linked to existing games".
 Tests
@@ -131,7 +131,7 @@ Tests
 - 11 files:size IPC: files.ts, preload.ts, d.ts; new - no size IPC. [done]
 - 12 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, ipc.ts; reuses scanRomDir. [done]
 - 13 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame; new confirm channel. [done]
-- 14 useBrokenRoms backfill/proposals/size-checked siblings: useBrokenRoms.ts; reuses refresh/sourceFor/updateRom.
+- 14 useBrokenRoms backfill/proposals/size-checked siblings: useBrokenRoms.ts; reuses refresh/sourceFor/updateRom. [done]
 - 15 MatchConfirmModal + GameGrid wiring: new component; reuses LocalToNetworkModal structure, bulkMsg.
 - 16 import dedup: useConsoleImport.ts; reuses addGame/setGameDevice/gamesOverview.
 - 17 tests + GUI verify.
@@ -173,3 +173,4 @@ Tests
 - 2026-11-02 implement: step 11 done (files:size IPC)
 - 2026-11-02 implement: step 12 done (files:size and rom:findByNameSize IPC)
 - 2026-11-02 implement: step 13 done (netplay exact/fuzzy proposals and rom:confirmNetworkMatch)
+- 2026-11-02 implement: step 14 done (Refresh size backfill, moved-ROM relink proposals, size-checked siblings)
