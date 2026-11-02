@@ -1,4 +1,4 @@
-// ROM transfer/localize/delocalize/upload-master/network-play-setup IPC.
+// ROM transfer/localize/delocalize/upload-master IPC (network play lives in netplay.ts).
 import { ipcMain, type WebContents } from "electron";
 import { existsSync, mkdirSync, unlinkSync, rmdirSync, renameSync, statSync, statfsSync, copyFileSync, createReadStream, createWriteStream } from "fs";
 import { createHash } from "crypto";
@@ -415,105 +415,6 @@ export function registerRomIpc(): void {
       }
     }
   );
-
-  // ── play-time cross-device network setup (issue #270) ───────────────────────
-  // For a game configured on a network share by another device, point THIS
-  // device at the same share (its own mount root), verify the ROM is reachable,
-  // and create a network-source config here so it can be played. Save/state paths
-  // are derived from this device's console folders when configured; run.py's
-  // post-launch auto-detection refines them on first play.
-  ipcMain.handle(
-    "rom:setupNetworkPlay",
-    async (_event, slug: string, mountRoot: string): Promise<{ ok: boolean; romPath?: string; error?: string }> => {
-      try {
-        if (!mountRoot) return { ok: false, error: "No mount root selected" };
-        const { host, port, authHeaders } = loadServerCfg();
-        const srcRes = await fetch(`http://${host}:${port}/games/${slug}/network-source`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
-        if (!srcRes.ok) return { ok: false, error: "No network-drive config found for this game on any device" };
-        const src = await srcRes.json() as {
-          console: string; rom_path: string; rom_rel_path: string;
-          launch_command: string; save_path: string; state_path: string;
-        };
-
-        const rel = src.rom_rel_path;
-        // Reject traversal / absolute / drive-qualified rel-paths before joining.
-        const segs = rel.replace(/\\/g, "/").split("/").filter(Boolean);
-        if (!rel || rel.includes(":") || segs.some(s => s === "..")) {
-          return { ok: false, error: `Unsafe ROM path from source device: ${rel}` };
-        }
-        const romPath = join(mountRoot, ...segs);
-        if (!existsSync(romPath)) {
-          return { ok: false, error: `ROM not found at ${romPath}. Check that the share is mounted and the root is correct.` };
-        }
-
-        // Derive this device's save/state paths from its console folders, reusing
-        // the source's per-game tail (GameName/GameName.srm and GameName/).
-        const folders = await consoleSaveStateFolders(host, port, authHeaders, src.console);
-        const saveTail = tailSegments(src.save_path, 2);
-        const stateTail = tailSegments(src.state_path, 1);
-        const savePath = folders.saveFolder && saveTail.length
-          ? join(folders.saveFolder, ...saveTail)
-          : src.save_path;
-        const statePath = src.state_path
-          ? (folders.stateFolder && stateTail.length ? join(folders.stateFolder, ...stateTail) : src.state_path)
-          : "";
-
-        const launchCommand = src.rom_path
-          ? src.launch_command.split(src.rom_path).join(romPath)
-          : src.launch_command;
-
-        const updated = {
-          rom_path: romPath,
-          save_path: savePath,
-          state_path: statePath,
-          launch_command: launchCommand,
-          rom_folder_path: dirname(romPath),
-          rom_source: "network",
-          rom_rel_path: rel,
-          local_rom_path: "",
-          device_network_folder: mountRoot,
-        };
-        const putRes = await fetch(`http://${host}:${port}/games/${slug}/device`, {
-          method: "PUT",
-          headers: { ...authHeaders, "Content-Type": "application/json" },
-          body: JSON.stringify(updated),
-        });
-        if (!putRes.ok) return { ok: false, error: "Verified the ROM, but failed to save the config" };
-        return { ok: true, romPath };
-      } catch (e: any) {
-        return { ok: false, error: e.message || "Network play setup failed" };
-      }
-    }
-  );
-}
-
-/** Last `n` path segments of `p` (splitting on / or \), for rebasing a path. */
-function tailSegments(p: string, n: number): string[] {
-  if (!p) return [];
-  const segs = p.replace(/\\/g, "/").split("/").filter(Boolean);
-  return segs.slice(Math.max(0, segs.length - n));
-}
-
-// This device's configured save/state folders for a console (set during import),
-// used to place a cross-device network game's saves/states locally (issue #270).
-async function consoleSaveStateFolders(
-  host: string, port: number, authHeaders: Record<string, string>, consoleName: string,
-): Promise<{ saveFolder: string; stateFolder: string }> {
-  try {
-    const whoamiRes = await fetch(`http://${host}:${port}/whoami`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
-    if (!whoamiRes.ok) return { saveFolder: "", stateFolder: "" };
-    const { device_id } = await whoamiRes.json() as { device_id: string };
-    const consolesRes = await fetch(`http://${host}:${port}/devices/${device_id}/consoles`, { headers: authHeaders, signal: AbortSignal.timeout(5000) });
-    if (!consolesRes.ok) return { saveFolder: "", stateFolder: "" };
-    const consoles = await consolesRes.json() as Array<{ console_name: string; device_save_folder?: string; device_state_folder?: string }>;
-    const matches = consoles.filter(c => c.console_name === consoleName);
-    return {
-      saveFolder: matches.find(c => c.device_save_folder)?.device_save_folder || "",
-      stateFolder: matches.find(c => c.device_state_folder)?.device_state_folder || "",
-    };
-  } catch {
-    return { saveFolder: "", stateFolder: "" };
-  }
 }
 
 // Look up this game's console, then its configured local-copy folder on this

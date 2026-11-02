@@ -112,6 +112,8 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
 
   useEffect(() => {
     window.emusync.steam.addedSlugs().then((slugs) => setSteamSlugs(new Set(slugs))).catch(() => {});
+    // Link other devices' network games on a share this device also has (#729).
+    window.emusync.rom.autoLinkNetworkGames().then((r) => { if (r.linked > 0) onChanged(); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -428,13 +430,15 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
   }
 
   async function handleRefreshLocations(): Promise<void> {
+    const { linked } = await window.emusync.rom.autoLinkNetworkGames().catch(() => ({ linked: 0 }));
     const { missing: n, corrected, candidates } = await refreshBroken(currentDeviceId ?? undefined);
     const parts = [
       n ? `${n} game${n !== 1 ? "s" : ""} with a missing ROM flagged.` : "All ROM locations are valid.",
       corrected ? `${corrected} ROM source${corrected !== 1 ? "s" : ""} corrected (local/network).` : "",
+      linked ? `${linked} network game${linked !== 1 ? "s" : ""} linked.` : "",
     ].filter(Boolean);
     setBulkMsg({ text: `${parts.join(" ")} Checking folders for new games...`, isError: n > 0 });
-    if (corrected) onChanged();
+    if (corrected || linked) onChanged();
     setLocalCandidates(candidates);
     const scan = await scanNewRoms(consoleKey, currentDeviceId ?? "");
     const found = scan.status === "ok" && scan.count > 0;
