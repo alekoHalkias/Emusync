@@ -277,6 +277,7 @@ export default function App(): React.ReactElement {
   // Determine which games belong to the currently-selected console
   const consoleGames = screen.name === "console"
     ? games.filter((g) => {
+        if (screen.key === "all") return true;
         const stored = (g.console ?? "").toUpperCase();
         return stored === screen.abbr.toUpperCase() || stored === screen.key.toUpperCase();
       })
@@ -370,8 +371,6 @@ export default function App(): React.ReactElement {
               onSelectConsole={(key, label, abbr) =>
                 setScreen({ name: "console", key, label, abbr })
               }
-              onPlay={handlePlay}
-              onChanged={() => reload(true)}
             />
           )
         )}

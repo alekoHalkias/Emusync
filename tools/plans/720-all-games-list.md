@@ -50,12 +50,12 @@ Search/filter, push/pull or device actions in the list, pagination.
 
 ## Fix attempt 1 (design change requested by user)
 Cause: the flat list was rejected; user wants an "All games" card in the console list that opens a grid of all games.
-- [ ] F1.1 Revert the list: delete AllGamesList.tsx; restore ConsoleGrid.tsx props/render, App.tsx props and styles.css to main.
+- [x] F1.1 Revert the list: delete AllGamesList.tsx; restore ConsoleGrid.tsx props/render, App.tsx props and styles.css to main.
   - Files: components/AllGamesList.tsx, ConsoleGrid.tsx, App.tsx, styles.css
   - Reuses: git checkout main -- <files>
-- [ ] F1.2 Add an "All games" card (key "all", abbr "ALL") first in ConsoleGrid; App filters nothing for key "all" so the existing GameGrid shows every game.
+- [x] F1.2 Add an "All games" card (key "all", abbr "ALL") first in ConsoleGrid; App filters nothing for key "all" so the existing GameGrid shows every game.
   - Files: ConsoleGrid.tsx, App.tsx
   - Reuses: console-card markup, onSelectConsole, consoleGames filter
-- [ ] F1.3 GameGrid "all" mode: per-game console key for cards/modal, hide folders, refresh and import controls (they are per-console).
+- [x] F1.3 GameGrid "all" mode: per-game console key for cards/modal, hide folders, refresh and import controls (they are per-console).
   - Files: components/GameGrid.tsx
   - Reuses: existing GameGrid; only a keyFor(g) helper and an isAll guard

@@ -4,7 +4,7 @@
 - Issue: #720
 - Branch: feature/720-all-games-list
 - PR: #721
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -95,3 +95,4 @@ Tests: 4 manual verify + make test-changed; 5 docs none
 - 2026-11-01 implement: steps 1-5 done (AllGamesList, ConsoleGrid wiring, styles; tsc clean, 666 tests pass; manual GUI check not run)
 - 2026-11-01 review: 0 findings, blocked=no
 - 2026-11-01 fix-plan: user rejected flat list; replacing with All games console card (F1.1-F1.3)
+- 2026-11-01 implement: F1.1-F1.3 done (All games card replaces list; tsc error in GameGrid:332 is pre-existing)

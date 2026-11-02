@@ -370,6 +370,9 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
     setShowSteamRestart(false);
   }
 
+  // "all" = the All games pseudo-console (#720): per-game console key, no per-console tools.
+  const isAll = consoleKey === "all";
+  const keyFor = (g: GameRow): string => (isAll ? (g.console ?? "").toLowerCase() : consoleKey);
   const accent = CONSOLE_ACCENT[consoleKey] ?? DEFAULT_ACCENT;
 
   const searched = search.trim()
@@ -394,7 +397,7 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
       slug: g.slug,
       name: g.name,
       gameConsole: g.console ?? "",
-      consoleKey,
+      consoleKey: keyFor(g),
       gameIsLocal: g.isLocal,
       savePath: g.savePath,
       statePath: g.statePath,
@@ -480,6 +483,7 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
             ))}
           </select>
         </div>
+        {!isAll && (<>
         <button
           className="btn btn-ghost game-grid-header-btn"
           onClick={() => setShowFolders(true)}
@@ -495,6 +499,7 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
         >
           <RefreshIcon />
         </button>
+        </>)}
         <div style={{ flex: 1 }} />
         <button
           className="btn btn-ghost game-grid-header-btn"
@@ -586,8 +591,8 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
                   <GameCard
                     key={`${g.slug}:${artType}:${artRefresh[g.slug] ?? 0}`}
                     game={g}
-                    consoleKey={consoleKey}
-                    consoleAccent={accent}
+                    consoleKey={keyFor(g)}
+                    consoleAccent={isAll ? (CONSOLE_ACCENT[keyFor(g)] ?? DEFAULT_ACCENT) : accent}
                     artType={artType}
                     selected={selectedSlugs.has(g.slug)}
                     inSteam={steamSlugs?.has(g.slug)}
@@ -611,8 +616,8 @@ export default function GameGrid({ consoleKey, games: gamesIn, onPlay, onChanged
                   <GameCard
                     key={`${g.slug}:${artType}:${artRefresh[g.slug] ?? 0}`}
                     game={g}
-                    consoleKey={consoleKey}
-                    consoleAccent={accent}
+                    consoleKey={keyFor(g)}
+                    consoleAccent={isAll ? (CONSOLE_ACCENT[keyFor(g)] ?? DEFAULT_ACCENT) : accent}
                     artType={artType}
                     selected={selectedSlugs.has(g.slug)}
                     inSteam={steamSlugs?.has(g.slug)}
