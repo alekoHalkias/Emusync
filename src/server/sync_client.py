@@ -442,6 +442,13 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
+    def update_device_console(self, device_id: str, console: dict) -> None:
+        """PUT one of this device's console rows back. The route replaces every
+        folder field, so pass the full row as read from get_device_consoles (#727)."""
+        body = {k: v for k, v in console.items() if k not in ("id", "console_name")}
+        r = self._client.put(self._url(f"/devices/{device_id}/consoles/{console['id']}"), json=body, timeout=10)
+        r.raise_for_status()
+
     def create_rom_transfer(
         self, slug: str, to_device_id: str, destination_path: str, rom_path: str, kind: str = "rom"
     ) -> dict:

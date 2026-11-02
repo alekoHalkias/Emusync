@@ -18,7 +18,7 @@ Every device keeps one Eden profile on its Switch console row, and Switch saves 
   - Files: src/server/store/schema.py, src/server/store/models.py, src/server/store/consoles.py, src/server/api/devices.py
   - Reuses: network_share_id column/field pattern end to end
   - New: none beyond the column
-- [ ] 2. Client: `SyncClient.update_device_console(device_id, console: dict)` PUTs the full row (the route replaces all folder fields, so the caller sends back what it read plus `switch_profile_id`).
+- [x] 2. Client: `SyncClient.update_device_console(device_id, console: dict)` PUTs the full row (the route replaces all folder fields, so the caller sends back what it read plus `switch_profile_id`).
   - Files: src/server/sync_client.py
   - Reuses: `get_device_consoles` request style
   - New: one method - no client wrapper for this PUT exists (the GUI calls it from api.ts).
