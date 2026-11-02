@@ -340,9 +340,9 @@ def find_rom_by_name_size(roots: list[str], filename: str, size: int, console_ke
     if not filename or not size or size <= 0:
         return None
     want = filename.replace("\\", "/").rsplit("/", 1)[-1].casefold()
-    hits: set[str] = set()
+    hits: dict[str, str] = {}  # realpath -> path as seen under its root
     for root in {r for r in roots if r and os.path.isdir(r)}:
         for p in _scan_rom_dir(root, console_key=console_key or None):
             if os.path.basename(p).casefold() == want and os.path.isfile(p) and os.path.getsize(p) == size:
-                hits.add(os.path.realpath(p))
-    return hits.pop() if len(hits) == 1 else None
+                hits[os.path.realpath(p)] = p
+    return next(iter(hits.values())) if len(hits) == 1 else None

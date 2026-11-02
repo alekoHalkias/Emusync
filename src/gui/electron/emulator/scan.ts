@@ -109,16 +109,18 @@ function dirMatchesPattern(dir: string, pattern: string): boolean {
 export function findRomByNameSize(roots: string[], filename: string, size: number): string | null {
   if (!filename || !(size > 0)) return null;
   const want = filename.replace(/\\/g, "/").split("/").pop()!.toLowerCase();
-  const hits = new Set<string>();
+  // Keyed by realpath so two roots reaching the same file count once; the value
+  // keeps the path as seen under the root so callers can relativize it.
+  const hits = new Map<string, string>();
   for (const root of new Set(roots.filter(Boolean))) {
     for (const p of scanRomDir(root)) {
       try {
         const st = statSync(p);
-        if (basename(p).toLowerCase() === want && st.isFile() && st.size === size) hits.add(realpathSync(p));
+        if (basename(p).toLowerCase() === want && st.isFile() && st.size === size) hits.set(realpathSync(p), p);
       } catch { /* vanished mid-scan */ }
     }
   }
-  return hits.size === 1 ? [...hits][0] : null;
+  return hits.size === 1 ? [...hits.values()][0] : null;
 }
 
 function scanRomDir(dir: string, depth = 0, consoleKey?: string): string[] {

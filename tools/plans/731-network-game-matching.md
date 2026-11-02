@@ -59,7 +59,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
   - Files: src/gui/electron/emulator/scan.ts, src/gui/electron/emulator/ipc.ts, preload.ts, emusync.d.ts
   - Reuses: scanRomDir (same walker semantics as Python `_scan_rom_dir`).
   - New: name+size filter + channel.
-- [ ] 13. netplay.ts: `linkNetworkGame` takes optional resolved `romPath` (rel path becomes this device's path under `mountRoot`) and PUTs `rom_size` from `statSync`. `rom:autoLinkNetworkGames` links exact rows as today; exact-but-missing and fuzzy rows go through `findRomByNameSize([mount_root], filename, rom_size)` and come back as `proposals: Array<{ slug, console, romPath, mountRoot }>` (additive). New `rom:confirmNetworkMatch(slug, romPath, mountRoot)` refetches `/games/{slug}/network-source` and calls `linkNetworkGame`. preload + d.ts.
+- [x] 13. netplay.ts: `linkNetworkGame` takes optional resolved `romPath` (rel path becomes this device's path under `mountRoot`) and PUTs `rom_size` from `statSync`. `rom:autoLinkNetworkGames` links exact rows as today; exact-but-missing and fuzzy rows go through `findRomByNameSize([mount_root], filename, rom_size)` and come back as `proposals: Array<{ slug, console, romPath, mountRoot }>` (additive). New `rom:confirmNetworkMatch(slug, romPath, mountRoot)` refetches `/games/{slug}/network-source` and calls `linkNetworkGame`. preload + d.ts.
   - Files: src/gui/electron/sync/netplay.ts, preload.ts, emusync.d.ts
   - Reuses: linkNetworkGame, network-source route, setupNetworkPlay body.
   - New: confirm channel - auto-link must not persist fuzzy hits.
@@ -126,3 +126,4 @@ Schema bump: yes (v34). New IPC channel (+ emusync.d.ts): yes (files:size, rom:f
 Step 7: updated test_network_autolink exact key-set assertion here (planned for step 17) to keep the suite green.
 Step 9: _relocated_gd takes the device's console list + console name (not a single row) so the caller passes get_device_consoles output directly; added _rom_missing gate so the server is only asked when the ROM is actually missing.
 Step 11-12: committed together (shared preload/d.ts edits); findRomByNameSize takes no consoleKey (dir ROMs have size 0 and never match, so the dir-pattern lookup is unneeded); the preload/d.ts entries for step 13's rom:confirmNetworkMatch were added here too.
+Step 13: both matchers now return the path as seen under its root (dedupe still by realpath) so a symlinked mount relativizes cleanly.

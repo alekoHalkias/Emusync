@@ -100,7 +100,7 @@ Frontend
 - 10 Types + `addGame` ROM arg. [done]
 - 11 IPC `files:size`. [done]
 - 12 IPC `rom:findByNameSize` over `scanRomDir`. [done]
-- 13 Auto-link: exact silent, fuzzy -> proposals; IPC `rom:confirmNetworkMatch`.
+- 13 Auto-link: exact silent, fuzzy -> proposals; IPC `rom:confirmNetworkMatch`. [done]
 - 14 Refresh: size backfill, moved-ROM relink proposals, size-checked sibling relink.
 - 15 MatchConfirmModal + status-line Review in GameGrid.
 - 16 Import reuses matched game; "N linked to existing games".
@@ -130,7 +130,7 @@ Tests
 - 10 renderer types + addGame rom arg: api.ts, types.ts, useGameList.ts; reuses _fetch. [done]
 - 11 files:size IPC: files.ts, preload.ts, d.ts; new - no size IPC. [done]
 - 12 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, ipc.ts; reuses scanRomDir. [done]
-- 13 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame; new confirm channel.
+- 13 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame; new confirm channel. [done]
 - 14 useBrokenRoms backfill/proposals/size-checked siblings: useBrokenRoms.ts; reuses refresh/sourceFor/updateRom.
 - 15 MatchConfirmModal + GameGrid wiring: new component; reuses LocalToNetworkModal structure, bulkMsg.
 - 16 import dedup: useConsoleImport.ts; reuses addGame/setGameDevice/gamesOverview.
@@ -172,3 +172,4 @@ Tests
 - 2026-11-02 implement: step 10 done (renderer rom_size types and addGame ROM arg)
 - 2026-11-02 implement: step 11 done (files:size IPC)
 - 2026-11-02 implement: step 12 done (files:size and rom:findByNameSize IPC)
+- 2026-11-02 implement: step 13 done (netplay exact/fuzzy proposals and rom:confirmNetworkMatch)
