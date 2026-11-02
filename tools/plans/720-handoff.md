@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #720
 - Branch: feature/720-all-games-list
-- PR: none
-- Status: implemented
+- PR: #721
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
