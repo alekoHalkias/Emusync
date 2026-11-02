@@ -93,7 +93,7 @@ Backend
 - 4 `store.find_game_by_rom` (casefolded basename + size, same console). [done]
 - 5 POST /games returns existing game on ROM match (`matched`); CLI import sends filename/size. [done]
 - 6 netrom upload records size. [done]
-- 7 network-link-candidates adds `match`/`filename`/`rom_size` + fuzzy rows.
+- 7 network-link-candidates adds `match`/`filename`/`rom_size` + fuzzy rows. [done]
 - 8 Python `find_rom_by_name_size` over `_scan_rom_dir`.
 - 9 CLI run finds a moved ROM for this launch only (pure `_relocated_gd`).
 Frontend
@@ -124,7 +124,7 @@ Tests
 - 4 store.find_game_by_rom: store/games.py; new - no ROM-identity lookup exists. [done]
 - 5 POST /games dedup + CLI import: api/games.py, sync_client.py, cli/console.py; reuses add_game route/client/import loop. [done]
 - 6 netrom upload sets rom_size: cli/netrom.py; reuses gd update block. [done]
-- 7 fuzzy candidates: store/games.py; reuses method/route; new second SELECT (GROUP BY would mix rows).
+- 7 fuzzy candidates: store/games.py; reuses method/route; new second SELECT (GROUP BY would mix rows). [done]
 - 8 find_rom_by_name_size: cli/netrom.py; reuses detect._scan_rom_dir.
 - 9 CLI run fallback, not persisted: cli/run.py; reuses _resolve_launch_command, get_device_consoles; new _relocated_gd.
 - 10 renderer types + addGame rom arg: api.ts, types.ts, useGameList.ts; reuses _fetch.
@@ -166,3 +166,4 @@ Tests
 - 2026-11-02 implement: step 4 done (store.find_game_by_rom + rom_basename)
 - 2026-11-02 implement: step 5 done (POST /games reuses existing game on ROM match; CLI import sends filename/size)
 - 2026-11-02 implement: step 6 done (upload_to_network records rom_size)
+- 2026-11-02 implement: step 7 done (fuzzy network-link candidates with match/filename/rom_size)

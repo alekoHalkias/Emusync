@@ -35,7 +35,7 @@ Store each device's ROM file size (schema v34) so games can be matched by casefo
 - [x] 6. `cli/netrom.py:upload_to_network` sets `gd.rom_size` from the uploaded file.
   - Files: src/cli/netrom.py
   - Reuses: existing gd update block.
-- [ ] 7. Candidates: `network_link_candidates` exact query unchanged; rows gain `rom_size`, `filename` (basename of `rom_rel_path`), `match: "exact"`. Second query adds `match: "fuzzy"` rows: other devices' network rows with `rom_size > 0`, console where this device has a `device_network_folder`, no config on this device, slug not already exact; one row per slug (latest rowid), same `mount_root` field.
+- [x] 7. Candidates: `network_link_candidates` exact query unchanged; rows gain `rom_size`, `filename` (basename of `rom_rel_path`), `match: "exact"`. Second query adds `match: "fuzzy"` rows: other devices' network rows with `rom_size > 0`, console where this device has a `device_network_folder`, no config on this device, slug not already exact; one row per slug (latest rowid), same `mount_root` field.
   - Files: src/server/store/games.py
   - Reuses: method, route, `mount_root` join.
   - New: second SELECT - one GROUP BY would mix exact/fuzzy bare columns.
@@ -123,3 +123,4 @@ Schema bump: yes (v34). New IPC channel (+ emusync.d.ts): yes (files:size, rom:f
 - 2026-11-02 bplan: 11 steps written
 - 2026-11-02 fplan: 10 steps written
 - 2026-11-02 merge: 18 steps, 6 conflicts resolved, 0 unresolved
+Step 7: updated test_network_autolink exact key-set assertion here (planned for step 17) to keep the suite green.

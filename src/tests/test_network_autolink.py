@@ -49,7 +49,9 @@ async def test_matching_share_lists_game_with_own_mount(client):
     assert [c["slug"] for c in rows] == [slug]
     c = rows[0]
     assert set(c) == {"slug", "console", "rom_path", "rom_rel_path", "launch_command",
-                      "save_path", "state_path", "share_id", "mount_root"}
+                      "save_path", "state_path", "share_id", "mount_root",
+                      "rom_size", "match", "filename"}
+    assert c["match"] == "exact" and c["filename"] == "Pokemon Emerald.gba"
     assert c["mount_root"] == "/media/deck/nas"
     assert c["rom_rel_path"] == "GBA/Pokemon Emerald.gba"
     assert c["launch_command"] == "retroarch '/mnt/nas/GBA/Pokemon Emerald.gba'"
