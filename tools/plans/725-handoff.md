@@ -79,7 +79,7 @@ Tests: helper + run_game backfill tests.
 ## 10. Ship
 ### Status: shipped
 ### PR: #726
-### Server Sync: pending
+### Server Sync: done
 ### Doc Sync: done
 
 ## 11. Fix Attempts
@@ -103,3 +103,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 implement: F1.2 done (join heartbeat before fork)
 - 2026-11-01 review: 3 findings, blocked=no (2 correctness fixed)
 - 2026-11-01 ship: doc sync updated ARCHITECTURE.md (GOTCHAS.md, CLAUDE.md in step 5)
+- 2026-11-01 ship: server sync done
