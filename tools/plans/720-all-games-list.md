@@ -3,7 +3,7 @@
 Issue: #720
 Branch: feature/720-all-games-list
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal

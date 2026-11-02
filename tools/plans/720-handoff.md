@@ -4,7 +4,7 @@
 - Issue: #720
 - Branch: feature/720-all-games-list
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-01
 - Fix attempts: 0
 
