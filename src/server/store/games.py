@@ -6,6 +6,11 @@ from typing import Optional
 from server.store.models import Game, GameDevice
 
 
+def rom_basename(path: str) -> str:
+    """Casefolded last path segment, splitting on both / and \\ (#731)."""
+    return path.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1].casefold()
+
+
 class GameMixin:
     """Operates on `self._conn`; mixed into Store."""
 
@@ -148,6 +153,25 @@ class GameDeviceMixin:
             (game_slug,),
         ).fetchone()
         return dict(row) if row else None
+
+    def find_game_by_rom(self, console: str, filename: str, size: int) -> Optional[str]:
+        """Slug of an existing game on *console* whose ROM on any device has the
+        same casefolded basename and size (#731), or None. Size 0 never matches.
+        Among several (pre-existing duplicates) the oldest game wins."""
+        if not filename or not size or size <= 0:
+            return None
+        want = rom_basename(filename)
+        rows = self._conn.execute(
+            """SELECT g.slug, gd.rom_path, gd.rom_rel_path, gd.local_rom_path
+               FROM game_devices gd JOIN games g ON g.slug = gd.game_slug
+               WHERE g.console = ? AND gd.rom_size = ?
+               ORDER BY g.rowid""",
+            (console, size),
+        ).fetchall()
+        for r in rows:
+            if want in {rom_basename(r[k]) for k in ("rom_path", "rom_rel_path", "local_rom_path") if r[k]}:
+                return r["slug"]
+        return None
 
     def network_link_candidates(self, device_id: str) -> list[dict]:
         """Network-drive games *device_id* can link itself (issue #729).
