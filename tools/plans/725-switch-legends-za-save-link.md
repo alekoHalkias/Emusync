@@ -25,6 +25,17 @@ A Switch game whose device already has a learned save folder publishes its title
 - [ ] 3. Tests: src/tests/test_switch_save_sync.py - helper returns ID for a 16-hex folder and "" otherwise; run with `save_path` set and blank server ID backfills the ID (real SQLite, existing fixtures in that file); no backfill when ID already stored. No mocks.
 - [ ] 4. Docs: GOTCHAS.md Switch section: one line noting the backfill also runs when save_path is already known.
 
+## Testing
+- **Test File**: src/tests/test_switch_save_sync.py (helper cases); src/tests/test_run_reconcile.py (run_game backfill, reusing its existing run_game harness)
+- **Test Cases**:
+  - helper returns the ID for a 16-hex folder path
+  - run_game with save_path set and blank server title ID calls update_game with the ID
+  - no update when server ID already stored
+- **Edge Cases**:
+  - non-hex folder name (e.g. a path ending in a game name) returns "" and nothing is stored
+  - update_game failure only warns, launch continues
+- **Integration Points**: client.update_game -> PUT /games/{slug} -> store.update_game_switch_title_id
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 

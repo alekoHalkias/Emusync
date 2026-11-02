@@ -47,12 +47,14 @@ src/cli/run_switch.py, src/cli/detect.py, src/gui/electron/switchtitledb.ts, swi
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_switch_save_sync.py, src/tests/test_run_reconcile.py
+### Test Cases: helper returns ID for hex folder; run_game backfills when save_path set and server ID blank; no update when ID stored
+### Edge Cases: non-hex folder name returns ""; update_game failure only warns
+### Integration Points: client.update_game -> PUT /games/{slug} -> store.update_game_switch_title_id
+### Outline:
+Backend: (1) helper _switch_title_id_from_save_path in run_switch.py; (2) backfill in run.py before reconcile; (4) GOTCHAS line.
+Tests: helper + run_game backfill tests.
+### Summary: Publish the Switch title ID to the server when the device already has a learned save folder but the server ID is blank.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -88,3 +90,4 @@ src/cli/run_switch.py, src/cli/detect.py, src/gui/electron/switchtitledb.ts, swi
 - 2026-11-01 issue: workflow initialized
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=4/10, breaking=no
 - 2026-11-01 bplan: 4 steps written, backend_pattern=reuse update_game backfill before reconcile
+- 2026-11-01 tplan: test_file=test_switch_save_sync.py + test_run_reconcile.py, 3 test cases defined
