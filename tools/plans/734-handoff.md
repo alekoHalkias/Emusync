@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #734
 - Branch: feature/734-sync-audit-fixes
-- PR: none
-- Status: implemented
+- PR: #735
+- Status: shipped
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -97,8 +97,8 @@ Tests
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #735
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -122,3 +122,4 @@ Tests
 - 2026-11-02 implement: step 8 done (regression tests for hashing, reconcile, locks, console pulls, state push)
 - 2026-11-02 implement: step 9 done (docs for sync audit fixes)
 - 2026-11-02 implement: all steps done, lint ok, test-changed 165 passed
+- 2026-11-02 ship: make test 708 passed, PR #735 opened

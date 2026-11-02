@@ -2,8 +2,8 @@
 
 Issue: #734
 Branch: feature/734-sync-audit-fixes
-PR: none
-Status: implemented
+PR: #735
+Status: shipped
 Fix attempts: 0
 
 ## Goal
