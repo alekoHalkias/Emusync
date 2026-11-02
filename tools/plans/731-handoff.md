@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #731
 - Branch: feature/731-network-game-matching
-- PR: none
-- Status: implemented
+- PR: #733
+- Status: shipped
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -143,8 +143,8 @@ Tests
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #733
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -179,3 +179,4 @@ Tests
 - 2026-11-02 implement: step 17 done (matching tests: rom_size, POST /games dedup, file search, run fallback, fuzzy candidates)
 - 2026-11-02 implement: step 18 done (docs for ROM identity matching)
 - 2026-11-02 implement: all 18 steps done
+- 2026-11-02 ship: tests pass (724), PR #733 opened

@@ -2,7 +2,7 @@
 
 Source plans: tools/plans/731-network-game-matching-ui.md (fplan, commit dba21778), tools/plans/731-network-game-matching.md (bplan, commit 73855f52)
 Branch: feature/731-network-game-matching
-PR: none
+PR: #733
 Status: implemented
 Fix attempts: 0
 
