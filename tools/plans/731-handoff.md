@@ -149,7 +149,7 @@ Tests
 ### Status: shipped
 ### PR: #733
 ### Server Sync: done
-### Doc Sync: pending
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -186,3 +186,4 @@ Tests
 - 2026-11-02 review: 3 findings, blocked=yes
 - 2026-11-02 implement: steps 19-20 done (review fixes: scan cache, reachable roots)
 - 2026-11-02 ship: server sync done (9d858d6, health ok)
+- 2026-11-02 ship: doc sync updated ARCHITECTURE.md, GOTCHAS.md, CLAUDE.md
