@@ -364,10 +364,14 @@ class SyncClient:
         r.raise_for_status()
         return r.json()
 
-    def add_game(self, name: str, console: str = "", switch_title_id: str = "") -> dict:
+    def add_game(self, name: str, console: str = "", switch_title_id: str = "",
+                 rom_filename: str = "", rom_size: int = 0) -> dict:
+        """Create a game, or get back an existing one with the same ROM (#731):
+        the result carries ``matched`` (True = existing slug returned)."""
         r = self._client.post(
             self._url("/games"),
-            json={"name": name, "console": console, "switch_title_id": switch_title_id},
+            json={"name": name, "console": console, "switch_title_id": switch_title_id,
+                  "rom_filename": rom_filename, "rom_size": rom_size},
             timeout=10,
         )
         r.raise_for_status()

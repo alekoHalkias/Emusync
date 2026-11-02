@@ -466,7 +466,12 @@ def console_import() -> None:
             # depend on every device's local ROM filename still carrying the
             # bracketed tag at launch time (#443).
             title_id = _switch_title_id_from_rom(entry["rom_path"]) if console_def["key"] == "switch" else ""
-            game = client.add_game(entry["name"], console_abbr, title_id)
+            rom_file = next((p for p in (entry["rom_path"], entry.get("local_rom_path", ""))
+                             if p and os.path.isfile(p)), "")
+            rom_size = os.path.getsize(rom_file) if rom_file else 0
+            # A ROM already imported under another name links to that game (#731).
+            game = client.add_game(entry["name"], console_abbr, title_id,
+                                   rom_filename=os.path.basename(entry["rom_path"]), rom_size=rom_size)
             slug = game["slug"]
             if rom_source == "network":
                 gd_cfg = _build_network_game_device(entry, network_root, local_root)
@@ -478,8 +483,9 @@ def console_import() -> None:
                     state_path=entry["state_path"],
                     rom_folder_path=entry["rom_folder_path"],
                 )
+            gd_cfg.rom_size = rom_size
             client.set_game_device(slug, gd_cfg)
-            click.echo("ok")
+            click.echo(f"linked to existing {slug}" if game.get("matched") else "ok")
         except Exception as exc:
             click.echo(f"error ({exc})")
             errors.append(entry["name"])

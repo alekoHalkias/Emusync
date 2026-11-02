@@ -25,6 +25,11 @@ class GameRequest(BaseModel):
     # ROM's bracketed filename tag at import time. Empty leaves the existing
     # value alone on update, same as sgdb_game_id.
     switch_title_id: str = ""
+    # The importing device's ROM (#731): when both are set and an existing game
+    # on the same console has a ROM with this basename and size, POST /games
+    # returns that game instead of creating a duplicate under another name.
+    rom_filename: str = ""
+    rom_size: int = 0
 
 
 class GameDeviceRequest(BaseModel):
@@ -60,9 +65,13 @@ def list_games(device_id: str = Depends(_auth)) -> list[dict]:
 
 @router.post("/games")
 def add_game(req: GameRequest, device_id: str = Depends(_auth)) -> dict:
+    store = _get_store()
+    existing = store.find_game_by_rom(req.console, req.rom_filename, req.rom_size) if req.console else None
+    if existing:
+        return {**_game_dict(store.get_game(existing)), "matched": True}
     slug = re.sub(r"[^a-z0-9]+", "-", req.name.lower()).strip("-")
-    game = _get_store().add_game(slug, req.name, req.console, req.switch_title_id)
-    return _game_dict(game)
+    game = store.add_game(slug, req.name, req.console, req.switch_title_id)
+    return {**_game_dict(game), "matched": False}
 
 
 @router.get("/games/overview")
