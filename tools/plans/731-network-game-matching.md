@@ -1,67 +1,103 @@
-# Plan: #731 Improve network game matching and prevent duplicate games
+# Merged Plan: #731 Improve network game matching and prevent duplicate games
 
-Issue: #731
+Source plans: tools/plans/731-network-game-matching-ui.md (fplan, commit dba21778), tools/plans/731-network-game-matching.md (bplan, commit 73855f52)
 Branch: feature/731-network-game-matching
 PR: none
 Status: planned
 Fix attempts: 0
 
 ## Goal
-Store each device's ROM file size so network games can be matched by filename + size when the share ID or rel path fails, and so a new game reuses an existing one with the same ROM instead of creating a duplicate slug.
+Store each device's ROM file size (schema v34) so games can be matched by casefolded filename + size: network games link silently on an exact share-ID + rel-path match and are proposed for confirmation on a filename + size match; moved local ROMs are proposed for relink; a new game reuses an existing one with the same ROM instead of creating a duplicate slug; CLI `run` finds a moved ROM for the current launch only.
 
-## Design Alignment
-- **Backend Pattern**: Additive column (schema v34) and defaulted request fields, per the guide. Dedup lives in the single game-creation route (`POST /games`), the one choke point every client (GUI import, CLI import, GameConfig) already calls. Fuzzy network candidates extend the existing `/games/network-link-candidates` route rather than adding one. CLI file search reuses `detect._scan_rom_dir`.
-- **Recommendations**: `rom_size` on the device PUT is `Optional[int] = None` meaning preserve the stored value, so older clients (which PUT the whole field set without it) cannot zero it. Added to the guide's API conventions as the scalar form of the existing preserve-on-None rule.
-
-## Matching rules (shared by every step)
-- Match key: ROM basename (casefold, `\` and `/` both separators) + `rom_size`, same console.
-- `rom_size = 0` (unknown, or a folder ROM) never matches.
-- Same filename with a different size is not a match. Never "first ROM in mount".
-- Exactly one hit required where a file search is involved; more than one = no match.
+## Matching rules (every step)
+- Key: ROM basename casefolded (`/` and `\` both separators) + `rom_size`, same console.
+- `rom_size = 0` (unknown or folder ROM) never matches; same name with a different size is not a match.
+- File searches need exactly one hit; never "first ROM in mount".
+- Fuzzy matches are never persisted without user confirmation (GUI) and never persisted by the CLI.
 
 ## Steps
-- [ ] 1. Schema v34: `game_devices.rom_size INTEGER NOT NULL DEFAULT 0`. Observable: fresh DB and a v33 DB both have the column, `user_version = 34`.
+### Backend
+- [ ] 1. Schema v34: `game_devices.rom_size INTEGER NOT NULL DEFAULT 0` in `_SCHEMA`, `_SCHEMA_VERSION = 34`, `if from_version < 34` `_try` ALTER. v34 verified free on all remote branches.
   - Files: src/server/store/schema.py
-  - Reuses: `_try` ALTER pattern, existing `from_version < N` chain (v34 verified free on all remote branches).
-  - New: nothing beyond the column.
-- [ ] 2. Model + store round-trip: add `rom_size: int = 0` to `GameDevice`; include it in `set_game_device` INSERT, `get_game_device` SELECT, `games_overview` (dict key `rom_size`), `list_game_devices_for_device`.
+  - Reuses: `_try` / `_migrate` chain.
+- [ ] 2. Model + store round-trip: `GameDevice.rom_size: int = 0`; add to `set_game_device` INSERT, `get_game_device` SELECT, `games_overview` (`rom_size` key), `list_game_devices_for_device`.
   - Files: src/server/store/models.py, src/server/store/games.py
-  - Reuses: existing inline column lists (guide: edit every literal for the table).
-- [ ] 3. Device API: `GameDeviceRequest.rom_size: Optional[int] = None`; `set_game_device` route keeps the stored value when None; `GET /games/{slug}/device` returns `rom_size`. `sync_client.GameDeviceConfig.rom_size: Optional[int] = None`, read in `get_game_device`, sent in `set_game_device` only when not None.
+  - Reuses: existing inline column lists.
+- [ ] 3. Device API: `GameDeviceRequest.rom_size: Optional[int] = None` (None = keep stored value); `GET /games/{slug}/device` returns it. `sync_client.GameDeviceConfig.rom_size: Optional[int] = None`, read in `get_game_device`, sent only when not None.
   - Files: src/server/api/games.py, src/server/sync_client.py
-  - Reuses: existing route + `store.get_game_device` for the preserve read; guide preserve-on-None rule.
-- [ ] 4. Store lookup `find_game_by_rom(console, filename, size) -> Optional[str]`: rows with `g.console = ?` and `gd.rom_size = ? > 0`, compared in Python on casefolded basename of `rom_path`, `rom_rel_path`, `local_rom_path`; returns the oldest matching slug (lowest `games.rowid`).
+  - Reuses: `set_game_device` route + `store.get_game_device` for the preserve read.
+- [ ] 4. `store.find_game_by_rom(console, filename, size) -> Optional[str]`: rows with `g.console = ?` and `gd.rom_size = ?` (> 0), basename of `rom_path` / `rom_rel_path` / `local_rom_path` compared casefolded in Python; oldest slug (lowest `games.rowid`) wins.
   - Files: src/server/store/games.py
-  - Reuses: nothing does a ROM-identity lookup today (`get_network_source_for_game` is per-slug).
-  - New: one method; basename compare in Python because SQLite has no portable basename for mixed separators.
-- [ ] 5. Dedup at creation: `GameRequest` gains `rom_filename: str = ""`, `rom_size: int = 0`. `POST /games`: when both set and `find_game_by_rom` finds a slug on the same console, return that game with `"matched": true` instead of inserting; otherwise unchanged (`"matched": false`). `sync_client.add_game(..., rom_filename="", rom_size=0)`. CLI `console import` passes basename + `os.path.getsize` (files only) and sets `rom_size` on the `GameDeviceConfig` (local and `_build_network_game_device`); prints "linked to existing <slug>" when matched.
+  - New: method - no ROM-identity lookup exists; Python basename because SQLite has none for mixed separators.
+- [ ] 5. Dedup at creation: `GameRequest.rom_filename: str = ""`, `rom_size: int = 0`; `POST /games` returns the matched game with `"matched": true` when `find_game_by_rom` hits on the same console, else inserts as today with `"matched": false`. `sync_client.add_game(..., rom_filename="", rom_size=0)`. CLI `console import` passes basename + `os.path.getsize` (files only), sets `rom_size` on both `GameDeviceConfig` builds, prints "linked to existing <slug>" when matched.
   - Files: src/server/api/games.py, src/server/sync_client.py, src/cli/console.py
-  - Reuses: existing `add_game` route/client/CLI loop; `client.add_game` result slug already drives the PUT.
-- [ ] 6. `cli/netrom.py:upload_to_network` sets `gd.rom_size` from the uploaded file so network masters carry it.
+  - Reuses: existing route, client method, import loop.
+- [ ] 6. `cli/netrom.py:upload_to_network` sets `gd.rom_size` from the uploaded file.
   - Files: src/cli/netrom.py
-  - Reuses: existing `gd` update block before `client.set_game_device`.
-- [ ] 7. Fuzzy network candidates: `network_link_candidates` keeps its exact query untouched, each row gains `rom_size`, `filename` (basename of `rom_rel_path`) and `match: "exact"`. A second query adds `match: "fuzzy"` rows: other devices' `rom_source='network'` rows with `rom_size > 0`, game console where this device has a `device_network_folder`, no config on this device, slug not already exact. One row per slug (latest rowid). Route unchanged.
+  - Reuses: existing gd update block.
+- [ ] 7. Candidates: `network_link_candidates` exact query unchanged; rows gain `rom_size`, `filename` (basename of `rom_rel_path`), `match: "exact"`. Second query adds `match: "fuzzy"` rows: other devices' network rows with `rom_size > 0`, console where this device has a `device_network_folder`, no config on this device, slug not already exact; one row per slug (latest rowid), same `mount_root` field.
   - Files: src/server/store/games.py
-  - Reuses: existing method, route, and `mount_root` join.
-  - New: second SELECT - folding it into the first would make GROUP BY mix exact/fuzzy rows.
-- [ ] 8. Python matcher `find_rom_by_name_size(roots, filename, size, console_key="") -> Optional[str]`: runs `detect._scan_rom_dir` over each existing root, keeps casefolded basename + `os.path.getsize` equal, returns the single hit or None (0 or >1 hits, or size 0).
+  - Reuses: method, route, `mount_root` join.
+  - New: second SELECT - one GROUP BY would mix exact/fuzzy bare columns.
+- [ ] 8. Python matcher `find_rom_by_name_size(roots, filename, size, console_key="")` in netrom.py over `detect._scan_rom_dir`.
   - Files: src/cli/netrom.py
-  - Reuses: src/cli/detect.py:_scan_rom_dir (depth-limited, ROM-extension aware).
-  - New: thin filter over it; nothing existing filters by name + size.
-- [ ] 9. CLI `run` fallback: in `run_game`, when no external `command` was given and the ROM `_resolve_launch_command` would use does not exist on disk, look up this device's console row (`client.get_device_consoles`, matched on the game's console like `upload_to_network`), search `device_network_folder`, `device_local_folder`, `device_game_folder` and `device_extra_folders` with `find_rom_by_name_size(..., gd.rom_size)`. On a hit, resolve the launch command from a `dataclasses.replace(gd, rom_path=hit, launch_command=<old path replaced>)` copy and print a stderr note naming the path; the stored config is not changed (fuzzy matches are only persisted after GUI confirmation). No hit: existing behavior.
+  - Reuses: src/cli/detect.py:_scan_rom_dir.
+  - New: thin name+size filter.
+- [ ] 9. CLI `run` fallback: no external `command` and the effective ROM is missing on disk -> search this device's console row folders (`device_network_folder`, `device_local_folder`, `device_game_folder`, `device_extra_folders`, via `client.get_device_consoles`) with step 8; on a hit resolve the launch command from a `dataclasses.replace(gd, rom_path=hit, launch_command=<old path replaced>)` copy (`_relocated_gd`), stderr note; stored config untouched.
   - Files: src/cli/run.py
-  - Reuses: `_resolve_launch_command`, `client.get_device_consoles`, step 8 matcher.
-  - New: small `_relocated_gd` helper in run.py - run has no ROM search today.
-- [ ] 10. Tests: src/tests/test_network_matching.py, real SQLite, no mocks. v33->v34 migration; rom_size round-trip and None-preserve on PUT; POST /games match / size mismatch / other console / size 0 / casefold + backslash basename; candidates exact unchanged + fuzzy present, size-0 and already-configured excluded, exact wins; `find_rom_by_name_size` unique / ambiguous / size mismatch on tmp files; `_relocated_gd` hit leaves stored config unchanged.
-- [ ] 11. Docs: CLAUDE.md Rules line (#731 matching key, `rom_size` v34, dedup in POST /games, fuzzy candidates, run fallback not persisted); src/docs/ARCHITECTURE.md for the new request/response fields; GOTCHAS entry on why fuzzy matches are never auto-persisted.
+  - Reuses: `_resolve_launch_command`, `get_device_consoles`, step 8.
+  - New: `_relocated_gd` - run has no ROM search.
+### Frontend (after backend: depends on steps 2, 3, 5, 7)
+- [ ] 10. Types: `GameDeviceConfig.rom_size?: number`; `GameOverview.rom_size: number`; `GameRow.romSize` mapped in useGameList; `addGame(name, console?, rom?: { filename: string; size: number })` posts `rom_filename` / `rom_size` and returns `Game & { matched?: boolean }`.
+  - Files: src/gui/renderer/src/api.ts, src/gui/renderer/src/components/game-list/types.ts, src/gui/renderer/src/components/game-list/useGameList.ts
+  - Reuses: existing types, `_fetch`.
+- [ ] 11. `files:size` IPC (regular file size, else 0) + preload + emusync.d.ts.
+  - Files: src/gui/electron/files.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
+  - Reuses: `files:exists` pattern.
+  - New: channel - nothing exposes size (`files:get-file-hash` reads the whole file).
+- [ ] 12. TS matcher: export `scanRomDir`, add `findRomByNameSize(roots, filename, size, consoleKey?)` in scan.ts; IPC `rom:findByNameSize` + preload + d.ts.
+  - Files: src/gui/electron/emulator/scan.ts, src/gui/electron/emulator/ipc.ts, preload.ts, emusync.d.ts
+  - Reuses: scanRomDir (same walker semantics as Python `_scan_rom_dir`).
+  - New: name+size filter + channel.
+- [ ] 13. netplay.ts: `linkNetworkGame` takes optional resolved `romPath` (rel path becomes this device's path under `mountRoot`) and PUTs `rom_size` from `statSync`. `rom:autoLinkNetworkGames` links exact rows as today; exact-but-missing and fuzzy rows go through `findRomByNameSize([mount_root], filename, rom_size)` and come back as `proposals: Array<{ slug, console, romPath, mountRoot }>` (additive). New `rom:confirmNetworkMatch(slug, romPath, mountRoot)` refetches `/games/{slug}/network-source` and calls `linkNetworkGame`. preload + d.ts.
+  - Files: src/gui/electron/sync/netplay.ts, preload.ts, emusync.d.ts
+  - Reuses: linkNetworkGame, network-source route, setupNetworkPlay body.
+  - New: confirm channel - auto-link must not persist fuzzy hits.
+- [ ] 14. useBrokenRoms: `refresh` backfills `rom_size` for existing local ROMs with `romSize` 0; missing local ROMs with `romSize > 0` searched in the console folders via `rom:findByNameSize` and returned as relink proposals; `relink` sibling probe requires matching `files:size` when `romSize > 0`; `updateRom` sends `rom_size`.
+  - Files: src/gui/renderer/src/components/game-list/useBrokenRoms.ts
+  - Reuses: refresh loop, getDeviceConsoles, sourceFor folder list, updateRom.
+- [ ] 15. `MatchConfirmModal` (network-link and relink rows, checkboxes all checked, Link / Not now, inline per-row errors) and GameGrid wiring: load keeps proposals and shows "N possible game matches found. Review" in the status line; Refresh merges network + relink proposals, adds the count to its message, opens the modal (after LocalToNetworkModal if both apply). Session-declined slugs filtered.
+  - Files: src/gui/renderer/src/components/MatchConfirmModal.tsx (new), src/gui/renderer/src/components/GameGrid.tsx
+  - Reuses: LocalToNetworkModal structure/classes, Modal, `bulkMsg`, `handleRefreshLocations`.
+  - New: component - LocalToNetworkModal's move/upload actions do not apply.
+- [ ] 16. Import dedup: `_runImport` sends `{ filename, size }` (via `files:size`) to `addGame` when `rom.linkedSlug` is unset; `matched` + already configured here (overview `is_local`) -> skip PUT, count as already imported; otherwise PUT with `rom_size`. Done phase shows "N linked to existing games". scanNewRoms unchanged.
+  - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts (+ done-phase view)
+  - Reuses: addGame, setGameDevice, gamesOverview.
+### Verification and docs
+- [ ] 17. Tests: src/tests/test_network_matching.py, real SQLite, no mocks (cases detailed by tplan). GUI: `make build-gui`, `tsc --noEmit` no new errors beyond the known list, manual check of exact link, fuzzy confirm/decline, relink proposal, renamed-duplicate import.
+- [ ] 18. Docs: CLAUDE.md Rules (#731: matching key, v34 `rom_size`, POST /games dedup, fuzzy candidates, run fallback not persisted, files:size / rom:findByNameSize / rom:confirmNetworkMatch, MatchConfirmModal); src/docs/ARCHITECTURE.md (request/response fields, IPC table); src/docs/GOTCHAS.md (why fuzzy matches are never auto-persisted, rom_size 0 rows).
 
 ## Checklist
-Schema bump: yes (v34). New IPC channel (+ emusync.d.ts): no (backend side). New CLI subcommand: no. Config/data file change: no.
+Schema bump: yes (v34). New IPC channel (+ emusync.d.ts): yes (files:size, rom:findByNameSize, rom:confirmNetworkMatch). New CLI subcommand: no. Config/data file change: no.
+
+## Conflicts resolved
+- POST /games body: fplan `{ filename, size }` mapped to bplan field names `rom_filename` / `rom_size` in api.ts (backend wins).
+- network-link-candidates rows: fplan consumes bplan's `filename`, `rom_size`, `match` exactly; no shape change.
+- rom_size on PUT: renderer spreads GET results (now carrying `rom_size`) and server preserves on None, so untouched callers (MoveLocalRomPanel, localToNetwork, etc.) need no change.
+- Docs: CLAUDE.md / ARCHITECTURE.md edits from both plans folded into step 18.
+- Ordering: backend steps 1-9 first; frontend 10-16 depend on 2, 3, 5, 7.
+- Plan file: merged into the single `731-network-game-matching.md`; the `-ui` file removed so `require_plan.py` (takes the first `731-*.md` glob hit) sees one plan.
+
+## Unresolved conflicts
+- none
 
 ## Not in this plan
 - Merging existing duplicates: #732.
-- Backfilling `rom_size` for existing rows: GUI Refresh locations (frontend plan) sends it on re-link/refresh; CLI does not backfill.
-- Content hashing.
+- Persisting declined proposals across launches (display.json key if re-prompting annoys).
+- CLI `rom_size` backfill (GUI Refresh backfills).
+- GameConfig manual add dedup; content hashing.
 
 ## Log
 - 2026-11-02 bplan: 11 steps written
+- 2026-11-02 fplan: 10 steps written
+- 2026-11-02 merge: 18 steps, 6 conflicts resolved, 0 unresolved

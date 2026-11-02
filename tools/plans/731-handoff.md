@@ -71,7 +71,13 @@ User answers (2026-11-02):
 ### Recommendations: GUI must send rom_size on every device PUT and backfill on Refresh locations, else rows stay at 0 and never match. Plan file: tools/plans/731-network-game-matching.md (11 steps).
 
 ## 5. Merged Plan
-### Conflicts Resolved: none
+### Conflicts Resolved:
+- POST /games body: fplan {filename,size} -> rom_filename/rom_size (backend wins).
+- network-link-candidates rows: fplan uses bplan filename/rom_size/match as-is.
+- rom_size PUT preserve-on-None keeps untouched renderer callers safe.
+- Docs from both plans folded into one step.
+- Ordering: backend 1-9 before frontend 10-16.
+- Single plan file tools/plans/731-network-game-matching.md; -ui file removed (require_plan.py reads first glob hit).
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
@@ -90,29 +96,25 @@ User answers (2026-11-02):
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: see tools/plans/731-network-game-matching.md
-- B1 schema v34 rom_size: schema.py; reuses _try/_migrate chain; new column only.
-- B2 model/store round-trip: models.py, store/games.py; reuses inline column lists.
-- B3 device API + sync_client rom_size (None = preserve): api/games.py, sync_client.py; reuses set_game_device route + get_game_device.
-- B4 store.find_game_by_rom: store/games.py; new - no ROM-identity lookup exists (get_network_source_for_game is per-slug).
-- B5 POST /games dedup + CLI console import passes filename/size: api/games.py, sync_client.py, cli/console.py; reuses add_game route/client/import loop.
-- B6 netrom upload_to_network sets rom_size: cli/netrom.py; reuses existing gd update block.
-- B7 fuzzy candidates: store/games.py network_link_candidates; reuses method/route/mount_root join; new second SELECT - single GROUP BY would mix exact/fuzzy rows.
-- B8 find_rom_by_name_size: cli/netrom.py; reuses detect._scan_rom_dir; new thin name+size filter.
-- B9 CLI run fallback, not persisted: cli/run.py; reuses _resolve_launch_command, get_device_consoles, B8; new _relocated_gd helper - run has no ROM search.
-- B10 tests: src/tests/test_network_matching.py (real SQLite).
-- B11 docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
-
-- F1 types (rom_size, romSize, addGame rom arg): api.ts, game-list/types.ts, useGameList.ts, emusync.d.ts; reuses existing types/_fetch.
-- F2 files:size IPC: files.ts, preload.ts, d.ts; reuses files:exists pattern; new - no IPC exposes size (get-file-hash reads whole file).
-- F3 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, emulator/ipc.ts; reuses scanRomDir; new thin name+size filter.
-- F4 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame + network-source; new confirm channel - fuzzy hits must not persist from auto-link.
-- F5 useBrokenRoms size backfill, relink proposals, size-checked siblings: useBrokenRoms.ts; reuses refresh loop/sourceFor/updateRom.
-- F6 MatchConfirmModal: new component; reuses LocalToNetworkModal structure - its move/upload actions do not apply.
-- F7 GameGrid wiring: GameGrid.tsx; reuses bulkMsg + handleRefreshLocations.
-- F8 import dedup via addGame match: useConsoleImport.ts; reuses addGame/setGameDevice/gamesOverview.
-- F9 verify build + tsc + manual.
-- F10 docs: CLAUDE.md, ARCHITECTURE.md.
+### Steps: merged, see tools/plans/731-network-game-matching.md (18 steps)
+- 1 schema v34 rom_size: schema.py; reuses _try/_migrate.
+- 2 model/store round-trip: models.py, store/games.py; reuses inline column lists.
+- 3 device API + sync_client rom_size (None = preserve): api/games.py, sync_client.py; reuses set_game_device route.
+- 4 store.find_game_by_rom: store/games.py; new - no ROM-identity lookup exists.
+- 5 POST /games dedup + CLI import: api/games.py, sync_client.py, cli/console.py; reuses add_game route/client/import loop.
+- 6 netrom upload sets rom_size: cli/netrom.py; reuses gd update block.
+- 7 fuzzy candidates: store/games.py; reuses method/route; new second SELECT (GROUP BY would mix rows).
+- 8 find_rom_by_name_size: cli/netrom.py; reuses detect._scan_rom_dir.
+- 9 CLI run fallback, not persisted: cli/run.py; reuses _resolve_launch_command, get_device_consoles; new _relocated_gd.
+- 10 renderer types + addGame rom arg: api.ts, types.ts, useGameList.ts; reuses _fetch.
+- 11 files:size IPC: files.ts, preload.ts, d.ts; new - no size IPC.
+- 12 findRomByNameSize + rom:findByNameSize: emulator/scan.ts, ipc.ts; reuses scanRomDir.
+- 13 netplay exact/fuzzy + rom:confirmNetworkMatch: sync/netplay.ts; reuses linkNetworkGame; new confirm channel.
+- 14 useBrokenRoms backfill/proposals/size-checked siblings: useBrokenRoms.ts; reuses refresh/sourceFor/updateRom.
+- 15 MatchConfirmModal + GameGrid wiring: new component; reuses LocalToNetworkModal structure, bulkMsg.
+- 16 import dedup: useConsoleImport.ts; reuses addGame/setGameDevice/gamesOverview.
+- 17 tests + GUI verify.
+- 18 docs.
 
 ## 9. Review
 ### Findings: TBD
@@ -135,3 +137,4 @@ User answers (2026-11-02):
 - 2026-11-02 design: scope=backend+ui, plan_target=both, difficulty=7/10, breaking=no; split #732 (merge duplicates)
 - 2026-11-02 bplan: 11 steps written, backend_pattern=additive v34 rom_size + dedup in POST /games + fuzzy candidates on existing route
 - 2026-11-02 fplan: 10 steps written, visual_pattern=LocalToNetworkModal-style MatchConfirmModal + status-line Review
+- 2026-11-02 merge: 6 conflicts resolved, 0 unresolved
