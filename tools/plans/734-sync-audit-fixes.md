@@ -24,7 +24,7 @@ Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocatio
   - Files: src/cli/run_reconcile.py
   - Reuses: `_decide_save_action` (add optional `baseline_hash: Optional[str] = None` param so existing tests/callers keep working); `_reconcile_save` passes the baseline hash it already fetches.
   - New: none.
-- [ ] 3. Locks: expired locks read as unlocked and acquire is atomic.
+- [x] 3. Locks: expired locks read as unlocked and acquire is atomic.
   - Files: src/server/store/locks.py, src/server/store/games.py
   - Reuses: `LOCK_TTL_HOURS`; existing `locks` PRIMARY KEY on game_slug.
   - Change: `get_lock` returns None when `acquired_at` is older than the TTL (covers API, cli/sync.py, cli/watch.py, cli/run.py). `acquire_lock` becomes one `INSERT ... ON CONFLICT(game_slug) DO UPDATE ... WHERE locks.device_id = excluded.device_id OR locks.acquired_at < :cutoff`, then re-reads the holder and raises ValueError if it is not the caller. games.py overview `LEFT JOIN locks` adds `AND l.acquired_at >= :cutoff` so an expired lock doesn't show as running.
