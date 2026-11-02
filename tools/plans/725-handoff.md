@@ -24,12 +24,12 @@ src/cli/run_switch.py, src/cli/detect.py, src/gui/electron/switchtitledb.ts, swi
 - [ ] Regression test.
 
 ## 2. Design
-### Scope: backend (CLI sync path); investigation-first
+### Scope: backend (CLI sync path); investigation-first. Expanded: post-game push detached into a background process (user request).
 ### Backend Changes: Trace why Legends Z-A fails to link. Findings so far: (1) self-heal in cli/run.py only stores the title ID when `switch_title_id` is blank, so a wrong or stale stored ID is never corrected; (2) `_resolve_written_switch_save` skips adoption when more than one title folder was touched in a session; (3) switchtitledb.ts exact-name match may miss a recent title or return a different ID; (4) Eden roots limited to two fixed paths in run_switch.py. Fix will be the smallest change in the shared path (run_switch.py / run.py) once the cause is confirmed on the two devices.
 ### UI Changes: none expected
 ### Plan Target: bplan
 ### Sub-issues: none
-### Difficulty: 4/10
+### Difficulty: 5/10
 ### Backwards Compatibility: No schema, API, config or IPC change expected; no breaking change.
 
 ## 3. Frontend Plan
@@ -54,7 +54,7 @@ src/cli/run_switch.py, src/cli/detect.py, src/gui/electron/switchtitledb.ts, swi
 ### Outline:
 Backend: (1) helper _switch_title_id_from_save_path in run_switch.py; (2) backfill in run.py before reconcile; (4) GOTCHAS line.
 Tests: helper + run_game backfill tests.
-### Summary: Publish the Switch title ID to the server when the device already has a learned save folder but the server ID is blank.
+### Summary: Run the post-game push in a detached background process, and publish the Switch title ID to the server when the device already has a learned save folder but the server ID is blank.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -67,8 +67,9 @@ Tests: helper + run_game backfill tests.
 ### Steps:
 1. helper _switch_title_id_from_save_path - files: src/cli/run_switch.py; reuses title-ID regex pattern; new because existing helper parses ROM filename.
 2. backfill in run_game - files: src/cli/run.py; reuses client.update_game; no new code.
-3. tests - src/tests/test_switch_save_sync.py.
-4. docs - GOTCHAS.md one line.
+3. detach post-game work - files: src/cli/run.py, src/cli/run_offline.py; reuses existing post-launch block and finally path; new _detach_after_game because no fork/daemonize helper exists.
+4. tests - src/tests/test_switch_save_sync.py, test_run_reconcile.py, plus a subprocess fork test.
+5. docs - GOTCHAS.md, CLAUDE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -91,3 +92,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 design: scope=backend, plan_target=bplan, difficulty=4/10, breaking=no
 - 2026-11-01 bplan: 4 steps written, backend_pattern=reuse update_game backfill before reconcile
 - 2026-11-01 tplan: test_file=test_switch_save_sync.py + test_run_reconcile.py, 3 test cases defined
+- 2026-11-01 plan-update: added detached post-game push (fork+setsid, detach flag default off in-process), difficulty 5/10
