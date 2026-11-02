@@ -4,7 +4,7 @@
 - Issue: #727
 - Branch: feature/727-switch-device-profile
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
