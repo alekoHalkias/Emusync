@@ -81,12 +81,33 @@ User answers (2026-11-02):
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_network_matching.py (new); src/tests/test_network_autolink.py (extended, exact key-set assertion updated)
+### Test Cases: 17 (see plan Testing section): v33 migration; rom_size round-trip + None-preserve; POST /games match / no-match x4 / casefold+backslash / rel-path; find_rom_by_name_size x5; _relocated_gd hit + none; candidates exact fields, fuzzy on mismatch, fuzzy on blank, size 0, no own folder, configured, exact wins.
+### Edge Cases: old-client PUT keeps size; oldest slug wins among existing duplicates; folder ROMs (size 0) never match.
+### Integration Points: SyncClient.add_game against live_server; GUI manual script (5 scenarios) since no JS runner.
+### Outline:
+Backend
+- 1 Schema v34 `game_devices.rom_size`.
+- 2 Model/store round-trip incl. overview.
+- 3 Device PUT/GET + sync_client `rom_size` (None = keep).
+- 4 `store.find_game_by_rom` (casefolded basename + size, same console).
+- 5 POST /games returns existing game on ROM match (`matched`); CLI import sends filename/size.
+- 6 netrom upload records size.
+- 7 network-link-candidates adds `match`/`filename`/`rom_size` + fuzzy rows.
+- 8 Python `find_rom_by_name_size` over `_scan_rom_dir`.
+- 9 CLI run finds a moved ROM for this launch only (pure `_relocated_gd`).
+Frontend
+- 10 Types + `addGame` ROM arg.
+- 11 IPC `files:size`.
+- 12 IPC `rom:findByNameSize` over `scanRomDir`.
+- 13 Auto-link: exact silent, fuzzy -> proposals; IPC `rom:confirmNetworkMatch`.
+- 14 Refresh: size backfill, moved-ROM relink proposals, size-checked sibling relink.
+- 15 MatchConfirmModal + status-line Review in GameGrid.
+- 16 Import reuses matched game; "N linked to existing games".
+Tests
+- 17 test_network_matching.py (new) + test_network_autolink.py (extended); build/lint/tsc + manual GUI script.
+- 18 Docs: CLAUDE.md, ARCHITECTURE.md, GOTCHAS.md.
+### Summary: Records ROM size per device so games match across devices by filename + size: exact network links stay automatic, fuzzy ones are confirmed in a modal, imports stop creating duplicate games, and `emusync run` can launch a moved ROM.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -138,3 +159,4 @@ User answers (2026-11-02):
 - 2026-11-02 bplan: 11 steps written, backend_pattern=additive v34 rom_size + dedup in POST /games + fuzzy candidates on existing route
 - 2026-11-02 fplan: 10 steps written, visual_pattern=LocalToNetworkModal-style MatchConfirmModal + status-line Review
 - 2026-11-02 merge: 6 conflicts resolved, 0 unresolved
+- 2026-11-02 tplan: test_file=src/tests/test_network_matching.py (+ test_network_autolink.py), 17 test cases defined
