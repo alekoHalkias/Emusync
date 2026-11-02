@@ -158,3 +158,35 @@ async def test_release_device_locks_frees_all_held_locks(client):
 
         # A second call is a no-op (returns nothing to free).
         assert store.release_device_locks("device-1") == []
+
+
+def _backdate(store, slug: str, hours: float) -> None:
+    t = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    store._conn.execute("UPDATE locks SET acquired_at = ? WHERE game_slug = ?", (t, slug))
+    store._conn.commit()
+
+
+def test_expired_lock_reads_as_unlocked():
+    """#734: a lock past the TTL must not block launches via get_lock or show as running."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("device-1", "PC")
+        store.add_game("test-game", "Test Game")
+        store.acquire_lock("test-game", "device-1")
+        _backdate(store, "test-game", LOCK_TTL_HOURS + 1)
+        assert store.get_lock("test-game") is None
+        overview = {g["slug"]: g for g in store.games_overview("device-1")}
+        assert overview["test-game"]["lock_device_id"] is None
+
+
+def test_fresh_lock_still_blocks_other_device():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = Store(tmpdir)
+        store.ensure_device("device-1", "PC")
+        store.ensure_device("device-2", "Deck")
+        store.add_game("test-game", "Test Game")
+        store.acquire_lock("test-game", "device-1")
+        _backdate(store, "test-game", LOCK_TTL_HOURS - 0.1)
+        with pytest.raises(ValueError):
+            store.acquire_lock("test-game", "device-2")
+        assert store.get_lock("test-game").device_id == "device-1"

@@ -32,3 +32,4 @@ Device-to-device asks reuse `rom_pull_requests` (server-brokered, `kind` column 
 - Archive extraction: always via sync_client._safe_extract_tar (never raw extractall). Upload filenames: reduce to basename, 400 on empty/./..
 - Post-delivery side effects (e.g. recording a pull baseline): attach a `BackgroundTask` to the `FileResponse` so it runs only after the body is fully sent; never before the response (#715). Whole-file downloads go to `<dest>.part` then `os.replace`.
 - ROM identity across devices (#731): casefolded basename + `game_devices.rom_size`, same console; size 0 never matches, >1 hit never matches. Dedup happens in `POST /games` (the single creation choke point); fuzzy matches are proposed, never auto-persisted.
+- Server-side content hashes are always envelope-free (`store/blobs.py:_payload_sha256`, #734); never `hashlib.sha256(file_bytes)` on a stored blob.

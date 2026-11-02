@@ -19,6 +19,7 @@ def _decide_save_action(
     local_hash: Optional[str],
     local_mtime: Optional[datetime],
     server_meta: Optional[dict],
+    baseline_hash: Optional[str] = None,
 ) -> str:
     """Pre-launch save reconciliation policy — returns 'push' | 'pull' | 'noop'.
 
@@ -27,13 +28,23 @@ def _decide_save_action(
     (both sides changed) the newer timestamp wins — the loser is preserved as a
     `.bak` by pull_save's caller — so a newer local save is never clobbered by an
     older server one (issue #5).
+
+    With a `baseline_hash` (this device's last agreed sync point) only one side
+    moving decides the direction outright; mtimes are compared only when both
+    moved, so a skewed clock can't push a stale save over newer progress (#734).
     """
     if local_hash is None:
         return "pull" if server_meta else "noop"
     if not server_meta:
         return "push"  # server has no save — local is authoritative
-    if local_hash == server_meta.get("hash"):
+    server_hash = server_meta.get("hash")
+    if local_hash == server_hash:
         return "noop"  # identical content
+    if baseline_hash is not None:
+        if local_hash == baseline_hash:
+            return "pull"  # only the server moved
+        if server_hash == baseline_hash:
+            return "push"  # only this device moved
     server_time = _parse_iso_utc(server_meta.get("pushed_at"))
     if server_time is None or (local_mtime is not None and local_mtime > server_time):
         return "push"
@@ -88,7 +99,7 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
     server_changed = server_hash_now is not None and server_hash_now != baseline_hash
     diverged = local_changed and server_changed and local_hash != server_hash_now
 
-    action = _decide_save_action(local_hash, local_mtime, meta)
+    action = _decide_save_action(local_hash, local_mtime, meta, baseline_hash)
     if action == "push":
         client.push_save(game_slug, save_path)
         if diverged:

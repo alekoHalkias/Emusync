@@ -213,3 +213,44 @@ def test_init_runs_sweep():
         status = _core.get_integrity_status()
         assert "zelda" in status
         assert status["zelda"]["save"]["status"] == "damaged"
+
+
+# ── envelope-free hashing (#734) ─────────────────────────────────────────────────
+
+def _env(payload: bytes) -> bytes:
+    from server.sync_client import _FMT_RAW, _pack_envelope
+    return _pack_envelope(_FMT_RAW, payload)
+
+
+def test_integrity_ok_for_enveloped_save():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        store.ensure_device("dev-1", "PC")
+        store.add_game("zelda", "Zelda")
+        meta = store.push_save("zelda", "dev-1", _env(b"enveloped save"))
+        assert meta.hash == hashlib.sha256(b"enveloped save").hexdigest()
+        verdict = store.integrity_for_game("zelda")["save"]
+        assert verdict["status"] == "ok", verdict["reasons"]
+        assert verdict["last_good_version_id"] == store._newest_row("saves", "zelda")["id"]
+
+
+def test_restore_records_envelope_free_hash():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        store.ensure_device("dev-1", "PC")
+        store.add_game("zelda", "Zelda")
+        store.push_save("zelda", "dev-1", _env(b"version-one"))
+        v1 = store._newest_row("saves", "zelda")["id"]
+        store.push_save("zelda", "dev-1", _env(b"version-two"))
+        meta = store.restore_save("zelda", v1)
+        assert meta.hash == hashlib.sha256(b"version-one").hexdigest()
+        assert store.integrity_for_game("zelda")["save"]["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_api_enveloped_push_reports_ok(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    r = await client.post("/games/zelda/save", content=_env(b"api save"), headers=AUTH)
+    assert r.json()["hash"] == hashlib.sha256(b"api save").hexdigest()
+    r = await client.get("/games/zelda/integrity", headers=AUTH)
+    assert r.json()["save"]["status"] == "ok"

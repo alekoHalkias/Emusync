@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from server.store.locks import _lock_cutoff
 from server.store.models import Game, GameDevice
 
 
@@ -253,10 +254,10 @@ class GameDeviceMixin:
                       gd.rom_source, gd.rom_rel_path, gd.local_rom_path, gd.rom_size,
                       (gd.game_slug IS NOT NULL) AS is_local
                FROM games g
-               LEFT JOIN locks l        ON l.game_slug = g.slug
+               LEFT JOIN locks l        ON l.game_slug = g.slug AND l.acquired_at >= ?
                LEFT JOIN game_devices gd ON gd.game_slug = g.slug AND gd.device_id = ?
                ORDER BY g.name""",
-            (device_id,),
+            (_lock_cutoff(), device_id),
         ).fetchall()
         result = []
         for r in rows:

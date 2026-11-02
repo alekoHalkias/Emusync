@@ -505,13 +505,22 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
         # merge pull so other games' states in the folder aren't disturbed (#294).
         state_path = gd.state_path
         server_state_hash = None
+        state_pull_failed = False
         if state_path:
-            if shared_state:
-                pulled, server_state_hash = client.pull_state_merge(game_slug, state_path)
-            else:
-                pulled, server_state_hash = client.pull_state(game_slug, state_path)
-            if pulled:
-                click.echo(f"Pulled state for {game_slug}.")
+            try:
+                if shared_state:
+                    pulled, server_state_hash = client.pull_state_merge(game_slug, state_path)
+                else:
+                    pulled, server_state_hash = client.pull_state(game_slug, state_path)
+                if pulled:
+                    click.echo(f"Pulled state for {game_slug}.")
+            except Exception as exc:
+                # A failed state pull must not block the launch (#734). Skip the
+                # post-game state push too: the server's state wasn't read, so
+                # pushing local over it could clobber newer progress.
+                click.echo(f"Warning: couldn't pull state for {game_slug} ({exc}); "
+                           f"launching without state sync this session.", err=True)
+                state_pull_failed = True
 
         # Keep the lock fresh for the whole session so a long play can't have its
         # lock stolen at the TTL by another device (issue #238).
@@ -624,7 +633,7 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
                     _warn_unsafe_save(cfg, save_key, len(local_bytes), server_size)
 
         # Push state if configured
-        if state_path and Path(state_path).exists():
+        if state_path and not state_pull_failed and Path(state_path).exists():
             sp = Path(state_path)
             if shared_state:
                 # Shared sstates folder (PS2): push only THIS game's serial files,
