@@ -74,6 +74,7 @@ from cli.run_switch import (  # noqa: F401 — re-exported for existing callers/
     _resolve_written_switch_save,
     _seed_switch_save,
     _switch_title_id_from_rom,
+    _switch_title_id_from_save_path,
     _sync_switch_mods,
 )
 
@@ -301,7 +302,18 @@ def run_game(game_slug: str, command: tuple[str, ...]) -> None:
     _cache_game_device(cfg, game_slug, gd, game_name=game_name, console=console_abbr)
 
     save_path = gd.save_path
-    shared_memcard = console_abbr in _SHARED_MEMCARD_CONSOLES
+    # Backfill (#725): this device already learned its Eden save folder (e.g.
+    # before #443 existed) but the server has no title ID, so the other
+    # devices can never match or seed this save. Publish it now.
+    if console_abbr == "Switch" and save_path and not switch_title_id:
+        backfill_id = _switch_title_id_from_save_path(save_path)
+        if backfill_id:
+            try:
+                client.update_game(game_slug, game_name, switch_title_id=backfill_id)
+                switch_title_id = resolved_title_id = backfill_id
+            except Exception as exc:
+                click.echo(f"Warning: failed to store the Switch title ID: {exc}", err=True)
+    shared_memcard =console_abbr in _SHARED_MEMCARD_CONSOLES
     save_client = _MemcardClient(client, console_abbr, cfg) if shared_memcard else client
     save_key = console_abbr if shared_memcard else game_slug
     # Whether save states live in a shared, serial-named folder (PS2 sstates/) and

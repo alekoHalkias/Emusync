@@ -18,7 +18,7 @@ Fix attempts: 0
   - Files: src/cli/run_switch.py
   - Reuses: `_SWITCH_TITLE_ID_RE` pattern in src/cli/detect.py (bracket-free variant needed)
   - New: one small helper - existing `_switch_title_id_from_rom` parses a bracketed filename tag, not a folder name.
-- [ ] 2. In `run_game` (after `resolved_title_id`/before reconcile), when `console_abbr == "Switch"` and `not switch_title_id` and `save_path` is set: derive the ID from `save_path` (fall back to `resolved_title_id`), call `client.update_game(game_slug, game_name, switch_title_id=...)` inside try/except warning, and set `switch_title_id`/`resolved_title_id`.
+- [x] 2. In `run_game` (after `resolved_title_id`/before reconcile), when `console_abbr == "Switch"` and `not switch_title_id` and `save_path` is set: derive the ID from `save_path` (fall back to `resolved_title_id`), call `client.update_game(game_slug, game_name, switch_title_id=...)` inside try/except warning, and set `switch_title_id`/`resolved_title_id`.
   - Files: src/cli/run.py
   - Reuses: `client.update_game`, the existing warning pattern at run.py:387
   - New: none
