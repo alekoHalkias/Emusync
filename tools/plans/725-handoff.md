@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #725
 - Branch: feature/725-switch-legends-za-save-link
-- PR: none
-- Status: implemented
+- PR: #726
+- Status: shipped
 - Created: 2026-11-01
 - Fix attempts: 0
 
@@ -77,8 +77,8 @@ Tests: helper + run_game backfill tests.
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #726
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -98,3 +98,4 @@ Tests: helper + run_game backfill tests.
 - 2026-11-01 implement: step 3 done (fork post-game push into a detached session)
 - 2026-11-01 implement: step 4 done (backfill, helper and real-fork detach tests)
 - 2026-11-01 implement: step 5 done (GOTCHAS + CLAUDE.md); all steps complete
+- 2026-11-01 ship: tests pass (671), PR #726 opened

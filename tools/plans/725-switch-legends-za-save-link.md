@@ -2,7 +2,7 @@
 
 Issue: #725
 Branch: feature/725-switch-legends-za-save-link
-PR: none
+PR: #726
 Status: implemented
 Fix attempts: 0
 
