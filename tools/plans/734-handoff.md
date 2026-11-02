@@ -88,7 +88,7 @@ Tests
 - done 5. sync_client.py push_state/_backup_state_files/dup removal; reuses _memcard_payload_bytes rglob pattern.
 - done 6. sync_client.py _write_memcard_raw_bytes; reuses download_transfer .part pattern.
 - done 7. store/blobs.py console history/pull; reuses _prune_history return-ids shape, _unlink_blobs.
-- 8. tests: test_integrity, test_console_memcard, test_run_reconcile, test_locks, test_state_sync, test_memcard_folder_sync.
+- done 8. tests: test_integrity, test_console_memcard, test_run_reconcile, test_locks, test_state_sync, test_memcard_folder_sync.
 - 9. docs: GOTCHAS, CLAUDE.md, design guide.
 
 ## 9. Review
@@ -119,3 +119,4 @@ Tests
 - 2026-11-02 implement: step 5 done (recursive state push, nested state backups, drop duplicate save methods)
 - 2026-11-02 implement: step 6 done (recursive state push, nested backups, atomic raw save write, drop duplicate save methods (steps 5+6))
 - 2026-11-02 implement: step 7 done (console history unlinked after commit, pulls stream immutable history copy)
+- 2026-11-02 implement: step 8 done (regression tests for hashing, reconcile, locks, console pulls, state push)

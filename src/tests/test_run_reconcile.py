@@ -1180,3 +1180,19 @@ def test_switch_stored_bak_save_path_is_rematched_to_live_profile(monkeypatch, t
     with pytest.raises(SystemExit):
         run_mod.run_game.callback(game_slug="pokemon-legends-z-a", command=())
     assert stored and stored[0] == str(live)
+
+
+# ── baseline decides direction (#734) ──────────────────────────────────────────
+
+def test_baseline_pulls_when_only_server_changed_despite_newer_local_mtime():
+    # Local untouched since the last sync, clock ahead of the server: still pull.
+    assert _decide_save_action("base", LATER, _meta("server-new", NOW), "base") == "pull"
+
+
+def test_baseline_pushes_when_only_local_changed_despite_older_local_mtime():
+    assert _decide_save_action("local-new", EARLIER, _meta("base", NOW), "base") == "push"
+
+
+def test_baseline_divergence_falls_back_to_mtime():
+    assert _decide_save_action("local-new", LATER, _meta("server-new", NOW), "base") == "push"
+    assert _decide_save_action("local-new", EARLIER, _meta("server-new", NOW), "base") == "pull"

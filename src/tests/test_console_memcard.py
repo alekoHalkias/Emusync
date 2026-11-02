@@ -352,3 +352,57 @@ def test_memcard_client_report_conflict_delegates_to_console_scoped_endpoint():
     mc.report_conflict("PS2", "dev-a", "dev-b", "hash-a", "hash-b")
 
     assert fake.call == ("PS2", "dev-a", "dev-b", "hash-a", "hash-b")
+
+
+# ── #734: envelope-free restore hash, immutable pull copy, prune after commit ────
+
+def _push_card(store, payload: bytes, dev: str = "dev-1"):
+    up = store.new_upload_path()
+    up.write_bytes(payload)
+    return store.push_console_save_file("PS2", dev, up, hashlib.sha256(payload).hexdigest(), len(payload))
+
+
+def test_console_restore_hash_is_envelope_free():
+    from server.sync_client import _FMT_RAW, _pack_envelope
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        for payload in (b"card-one", b"card-two"):
+            data = _pack_envelope(_FMT_RAW, payload)
+            up = store.new_upload_path()
+            up.write_bytes(data)
+            store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(data))
+        v1 = store.list_console_save_history("PS2")[-1]["id"]
+        meta = store.restore_console_save("PS2", v1)
+        assert meta["hash"] == hashlib.sha256(b"card-one").hexdigest()
+
+
+def test_console_pull_serves_history_copy_not_live_slot():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        _push_card(store, b"card-data")
+        path, meta = store.pull_console_save_path("PS2")
+        assert path != store._blob_path("console_saves", "PS2")
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == meta["hash"]
+
+
+def test_console_pull_falls_back_to_live_slot_without_history():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        _push_card(store, b"legacy-card")
+        store._conn.execute("DELETE FROM console_save_history")  # pre-#480 card
+        store._conn.commit()
+        path, _ = store.pull_console_save_path("PS2")
+        assert path == store._blob_path("console_saves", "PS2")
+        assert path.read_bytes() == b"legacy-card"
+
+
+def test_console_history_prune_unlinks_old_files():
+    from server.store.blobs import HISTORY_LIMIT
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        _push_card(store, b"card-0")
+        oldest = store.list_console_save_history("PS2")[0]["id"]
+        for i in range(1, HISTORY_LIMIT + 1):
+            _push_card(store, f"card-{i}".encode())
+        assert len(store.list_console_save_history("PS2")) == HISTORY_LIMIT
+        assert not store._blob_path("console_save_history", oldest).exists()

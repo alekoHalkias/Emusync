@@ -47,7 +47,7 @@ Overlap note: open PR #733 (#731) edits `cli/run.py` (launch-command / relocatio
   - Reuses: `_prune_history` (returns stale ids, caller unlinks after commit) shape; `_unlink_blobs`.
   - Change: `_prune_console_history` returns stale ids; `_push_console_history_row` returns them; `push_console_save_file` unlinks them after `commit()`. `pull_console_save_path` returns the newest `console_save_history` file whose hash equals the live `console_saves.hash` (falls back to the live `console_saves/<key>` path for cards with no matching history, e.g. pre-#480).
   - New: none.
-- [ ] 8. Tests (no mocks, real SQLite):
+- [x] 8. Tests (no mocks, real SQLite):
   - tests/test_integrity.py: enveloped push via API reports `ok`; restore returns a hash equal to sha256(payload); last-good found for enveloped blobs.
   - tests/test_console_memcard.py: console restore hash envelope-free; pull after push returns content matching hash; history unlink after prune.
   - tests/test_run_reconcile.py: `_decide_save_action` with baseline: local==baseline, server changed, local mtime newer -> pull; local changed, server==baseline, local mtime older -> push; diverged keeps mtime rule.

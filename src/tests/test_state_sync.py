@@ -254,3 +254,33 @@ async def test_state_restore_round_trip_and_unknown_version_404(client):
     r = await client.post("/games/zelda/state/restore", json={"version_id": "nope"}, headers=AUTH)
     assert r.status_code == 404
     assert r.json()["detail"] == "State version not found"
+
+
+# ── #734: recursive state push, atomic raw save write ───────────────────────────
+
+def test_push_state_folder_includes_subfolders_and_skips_bak(live_server, tmp_path):
+    from server.sync_client import SyncClient, _extract_state_folder
+    c = SyncClient(live_server["host"], live_server["port"], "", "dev-1", "PC")
+    c.add_game("Zelda")
+    src = tmp_path / "Zelda"
+    (src / "sub").mkdir(parents=True)
+    (src / "Zelda.state").write_bytes(b"top")
+    (src / "sub" / "Zelda.state1").write_bytes(b"nested")
+    (src / "Zelda.state.bak").write_bytes(b"old")
+    c.push_state("zelda", str(src))
+    r = c._client.get(c._url("/games/zelda/state"))
+    dest = tmp_path / "out" / "Zelda"
+    _extract_state_folder(r.content, dest)
+    assert (dest / "sub" / "Zelda.state1").read_bytes() == b"nested"
+    assert (dest / "Zelda.state").read_bytes() == b"top"
+    assert not (dest / "Zelda.state.bak").exists()
+
+
+def test_write_raw_save_is_atomic_and_keeps_backup(tmp_path):
+    from server.sync_client import _write_memcard_raw_bytes
+    card = tmp_path / "game.srm"
+    card.write_bytes(b"old")
+    _write_memcard_raw_bytes(card, b"new")
+    assert card.read_bytes() == b"new"
+    assert (tmp_path / "game.srm.bak").read_bytes() == b"old"
+    assert not (tmp_path / "game.srm.part").exists()
