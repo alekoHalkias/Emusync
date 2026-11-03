@@ -1,4 +1,4 @@
-# Plan: #737 Unify save, state and memcard storage into one slot model and payload format
+# Plan: #737 Run console memory cards through the shared save store and sync paths
 
 Issue: #737
 Branch: feature/737-save-slot-model
@@ -7,7 +7,7 @@ Status: planned
 Fix attempts: 0
 
 ## Goal
-Make per-game saves/states and shared console memcards run through one store core, one baseline/conflict helper and one pack/unpack pair, so a sync fix lands once, with the smallest migration that gets there.
+Make shared console memcards run through the same store core, baseline/conflict helpers, API handlers and client paths as per-game saves, so a sync fix lands once. Phase B moved to #738; D/E deferred to #739.
 
 ## What the code actually looks like (findings that reshape the issue)
 1. Per-game saves and states are already unified: `store/blobs.py` has a table-parameterized core (`_push_blob_file`, `_pull_blob_path`, `_list_blob_history`, `_restore_blob`, `_classify_blob`) and `api/blobs.py` has `_BlobKind`-parameterized handlers. The duplication is memcards only.
@@ -26,7 +26,7 @@ Make per-game saves/states and shared console memcards run through one store cor
 
 ## Steps
 
-### Phase A - one store core for memcards (candidate sub-issue 1, no wire change)
+### Phase A - one store core for memcards (no wire change)
 - [ ] A1. Parameterize the blob core by owner column: `_newest_row`, `_push_blob_file`, `_prune_history`, `_list_blob_history`, `_restore_blob`, `_classify_blob`, `_last_good_version` take `(table, owner_col, owner_id)`; save/state wrappers pass `("game_slug", slug)`. Observable: no behavior change, existing save/state tests pass.
   - Files: src/server/store/blobs.py
   - Reuses: the existing table-parameterized helpers (only the hardcoded `game_slug` column becomes a parameter)
@@ -52,49 +52,31 @@ Make per-game saves/states and shared console memcards run through one store cor
   - Reuses: `_DEVICE_REFS`
   - New: none
 
-### Phase B - one pack/unpack pair, legacy blobs converted once (candidate sub-issue 2, no wire change)
-- [ ] B1. Schema v36 (or a startup pass gated by a `server_settings` flag): walk every stored blob in `saves`, `states`, `console_save_history`, `switch_mods`; for un-enveloped ones sniff once (tar.gz -> TARGZ, tar -> TAR, else RAW) and rewrite with the envelope via `.part` + `os.replace`. Stored hash is unchanged because it is already envelope-free (`_payload_sha256`). Back up nothing: content bytes are identical, only a 5-byte header is prepended.
-  - Files: src/server/store/schema.py or src/server/store/blobs.py
-  - Reuses: `_pack_envelope`, `_payload_sha256`, the existing sniff logic moved here
-  - New: one-shot converter - the only place the sniff logic should survive
-- [ ] B2. Single client unpacker: `_write_blob(dest, data, mode)` with `mode` in `replace` (saves/memcards/mods), `state` (backup-all then file-wise move) and `merge` (backup only overwritten files). Replaces `_write_memcard`, `_extract_state_folder`, `_merge_extract_state_folder` and the inline branch in `pull_state`. Keeps `_extract_tar_to_tmp`, `_safe_extract_tar`, `.part` + `os.replace`, `CardFormatMismatch`. Un-enveloped input raises instead of sniffing.
-  - Files: src/server/sync_client.py, src/cli/transfer.py (ROM folder receive path calls `_write_memcard`)
-  - Reuses: `_extract_tar_to_tmp`, `_safe_extract_tar`, `_write_memcard_raw_bytes`, `_backup_state_files`
-  - New: dispatcher only - three near-identical extract paths collapse into it
-- [ ] B3. Single client packer: `_pack_path(path, gzip, name_prefix)` used by `memcard_bytes`, `push_state` and transfer.py; hash helper stays `_memcard_payload_bytes` (renamed `_payload_bytes`) so local hashes do not change.
-  - Files: src/server/sync_client.py, src/cli/transfer.py
-  - Reuses: `_memcard_payload_bytes` deterministic tar, `_pack_envelope`
-  - New: none
-- [ ] B4. Compatibility gate: a client must not drop sniff fallbacks while talking to an unconverted server. Add `blob_format: 1` to `/health`; `SyncClient` refuses blob pulls with a clear error if absent. Server PC updates first (it does today via the post-commit sync).
-  - Files: src/server/api/_core.py or health route, src/server/sync_client.py
-  - Reuses: `SyncClient.health`
-  - New: one health field - old servers must be detectable
-
-### Phase C - reconcile client (optional, candidate sub-issue 3)
-- [ ] C1. Give `SyncClient` save methods a slot prefix (`games/{slug}/save` vs `consoles/{key}/memcard`), since the routes now mirror each other after A5. `_MemcardClient` shrinks to the GC Dolphin card-format pre-pull check. Low value on its own; skip if A+B land cleanly.
+### Phase C - reconcile client
+- [ ] C1. Give `SyncClient` save methods a slot prefix (`games/{slug}/save` vs `consoles/{key}/memcard`), since the routes now mirror each other after A5. `_MemcardClient` shrinks to the GC Dolphin card-format pre-pull check.
   - Files: src/server/sync_client.py, src/cli/run_ps2.py, src/cli/run.py, src/cli/console.py
   - Reuses: `_reconcile_save` unchanged
   - New: none
 
 ### Tests and docs
-- [ ] T. Tests, real SQLite, no mocks: A3 migration from a v34 DB with a pre-#480 card (history backfilled, pull returns same bytes and hash); memcard push/pull/history/restore/baseline via routes unchanged (existing `test_console_memcard.py`, 30 tests, is the regression net); integrity sweep includes a console card; B1 converts each legacy shape and the hash is unchanged; B2 rejects un-enveloped input; B4 old-server detection. Existing suites touched: test_console_memcard, test_saves, test_state_sync, test_run_reconcile, test_store_internals, test_memcard_folder_sync, test_restore_safety, test_gc_card_format_mismatch, test_conflicts.
-- [ ] D. Docs: CLAUDE.md "Saves / sync" - drop "keep un-enveloped fallbacks" and "don't add byte sniffers" (after B), replace memcard table list with "console cards use the shared blob core keyed by console_key"; GOTCHAS.md entry for v35/v36; ARCHITECTURE.md blob section; backend design guide gains "blob tables share one core keyed by owner column".
+- [ ] T. Tests, real SQLite, no mocks: A3 migration from a v34 DB with a pre-#480 card (history backfilled, pull returns same bytes and hash); memcard push/pull/history/restore/baseline via routes unchanged (existing `test_console_memcard.py`, 30 tests, is the regression net); integrity sweep includes a console card; C1 GC card-format check still blocks a mismatched pull. Existing suites touched: test_console_memcard, test_saves, test_state_sync, test_run_reconcile, test_store_internals, test_gc_card_format_mismatch, test_conflicts.
+- [ ] D. Docs: CLAUDE.md "Saves / sync" - replace memcard table list with "console cards use the shared blob core keyed by console_key"; GOTCHAS.md entry for v35; ARCHITECTURE.md blob section; backend design guide gains "blob tables share one core keyed by owner column".
 
 ## Sizing
 | Phase | Files | Risk | Migration |
 |---|---|---|---|
 | A | store/blobs.py, store/conflicts.py, store/schema.py, api/blobs.py, (store/devices.py) | low-medium: server only, routes unchanged | v35, additive backfill |
-| B | sync_client.py, cli/transfer.py, schema or blobs.py, health route | medium: touches every pull path on clients | v36, rewrites blob headers in place |
 | C | sync_client.py, cli/run_ps2.py, run.py, console.py | low | none |
 
 ## Checklist
-Schema bump: yes (v35 Phase A, v36 Phase B). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no (blob files rewritten in place in B1).
+Schema bump: yes (v35). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
 ## Not in this plan
-- A single `slots` table replacing saves/states/console tables (see Recommendations).
-- A manifest payload format with per-file hashes (file separately when per-file diff/delta sync is wanted).
+- Legacy blob conversion and single pack/unpack path: #738.
+- Manifest payload format and merged tables: #739 (evaluate later).
 - A state sync baseline (states currently conflict-check by hash only); trivial after A4, separate issue.
 - Any GUI change.
 
 ## Log
 - 2026-11-02 bplan: outline written; awaiting user decision on split (A / B / C as sub-issues) before tplan
+- 2026-11-02 rescope: #737 = Phases A + C; Phase B -> #738; Phases D/E -> #739

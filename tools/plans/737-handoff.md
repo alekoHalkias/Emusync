@@ -1,4 +1,4 @@
-# Handoff: #737 Unify save, state and memcard storage into one slot model and payload format
+# Handoff: #737 Run console memory cards through the shared save store and sync paths
 
 ## Metadata
 - Issue: #737
@@ -41,12 +41,8 @@ Highest fix churn in the codebase (#460, #478, #692, #699, #717, #718, #734). Du
 - Slot-aware `_reconcile_save` in `cli/run_reconcile.py`; remove `_MemcardClient` (`cli/run_ps2.py`).
 ### UI Changes: none. GUI push/pull shells out to CLI (#479); history/restore/conflicts use existing REST routes via `api.ts`, kept as facades. CLI exit codes unchanged.
 ### Plan Target: bplan
-### Sub-issues:
-1. Slot schema + migration + store/API facades (no wire change)
-2. Manifest payload format + single extract path + legacy conversion + legacy upload acceptance
-3. Unified slot reconcile; remove `_MemcardClient`
-4. Docs/rules cleanup
-### Difficulty: 10/10 (8 base + 2 breaking)
+### Sub-issues: rescoped 2026-11-02. #737 = Phases A + C (store core + client). #738 = legacy blob conversion + single pack/unpack. #739 = evaluate manifest format + merged tables (deferred).
+### Difficulty: 6/10 after rescope (was 10/10 for the full rewrite)
 ### Backwards Compatibility: breaking. Lossless one-way schema migration (back up DB + blob dir first). Mixed-version devices: server must accept legacy uploads and serve readable blobs until all clients migrate. No REST, IPC, config or CLI exit-code changes.
 
 ## 3. Frontend Plan
@@ -81,8 +77,7 @@ Highest fix churn in the codebase (#460, #478, #692, #699, #717, #718, #734). Du
 ## 8. Implementation Steps
 ### Steps: see tools/plans/737-save-slot-model.md
 - A1-A6 (Phase A, store core for memcards, v35): store/blobs.py, store/conflicts.py, store/schema.py, api/blobs.py, store/devices.py. Reuses table-parameterized blob core and _BlobKind handlers; only new code is the v35 backfill (only lossless way to retire console_saves).
-- B1-B4 (Phase B, legacy blob conversion + single pack/unpack, v36): sync_client.py, cli/transfer.py, schema/blobs.py, health route. Reuses _pack_envelope, _extract_tar_to_tmp, _safe_extract_tar; new: one-shot converter, _write_blob dispatcher, health field (old servers must be detectable).
-- C1 (optional): slot prefix on SyncClient, shrink _MemcardClient. No new code.
+- C1: slot prefix on SyncClient, shrink _MemcardClient. No new code.
 - T, D: tests (real SQLite) and docs.
 
 ## 9. Review
@@ -105,3 +100,4 @@ Highest fix churn in the codebase (#460, #478, #692, #699, #717, #718, #734). Du
 - 2026-11-02 issue: workflow initialized
 - 2026-11-02 design: scope=backend, plan_target=bplan, difficulty=10/10, breaking=yes
 - 2026-11-02 bplan: 3 phases (A/B/C) + tests/docs written, backend_pattern=owner-column-parameterized blob core; paused for split decision before tplan
+- 2026-11-02 rescope: #737 = A + C (difficulty 6, non-breaking); B -> #738; D/E -> #739
