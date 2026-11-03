@@ -4,7 +4,7 @@
 - Issue: #718
 - Branch: feature/718-card-format-mismatch
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-02
 - Fix attempts: 0
 

@@ -3,7 +3,7 @@
 Issue: #718
 Branch: feature/718-card-format-mismatch
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
