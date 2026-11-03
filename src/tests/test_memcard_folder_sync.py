@@ -12,7 +12,11 @@ import io
 import tarfile
 from pathlib import Path
 
-from server.sync_client import _unpack_envelope, _write_memcard, memcard_bytes
+import pytest
+
+from server.sync_client import (
+    _FMT_RAW, CardFormatMismatch, _pack_envelope, _unpack_envelope, _write_memcard, memcard_bytes,
+)
 
 
 def _make_folder_card(root: Path) -> None:
@@ -128,14 +132,17 @@ def test_write_memcard_legacy_raw_file_fallback(tmp_path):
     assert dest.read_bytes() == b"RAWCARDBYTES"
 
 
-def test_write_memcard_legacy_fallback_does_not_crash_on_directory_target(tmp_path):
-    """A device already using folder-based memcards receiving a raw (non-tar)
-    blob from an old flat-file device must not crash trying to overwrite a
-    directory as if it were a file."""
+@pytest.mark.parametrize("blob", [b"NOT-A-TAR-ARCHIVE", _pack_envelope(_FMT_RAW, b"RAW")])
+def test_write_memcard_raw_onto_directory_raises_mismatch(tmp_path, blob):
+    """A raw blob (legacy or enveloped) onto a folder card raises instead of
+    silently writing nothing and reporting success (#718); the folder is untouched."""
     dest = tmp_path / "Mcd001.ps2"
     (dest / "GAME1").mkdir(parents=True)
+    (dest / "GAME1" / "save.bin").write_bytes(b"LOCAL")
 
-    _write_memcard(dest, b"NOT-A-TAR-ARCHIVE")  # must not raise
+    with pytest.raises(CardFormatMismatch):
+        _write_memcard(dest, blob)
+    assert (dest / "GAME1" / "save.bin").read_bytes() == b"LOCAL"
 
 
 def test_memcard_bytes_round_trips_a_single_file_via_the_envelope(tmp_path):

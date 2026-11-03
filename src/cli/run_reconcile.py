@@ -12,7 +12,7 @@ import click
 
 from cli.common import _mtime, _newest_matching, _parse_iso_utc, _find_touched_path
 from cli.run_conflicts import _warn_save_conflict
-from server.sync_client import _memcard_payload_bytes
+from server.sync_client import CardFormatMismatch, _memcard_payload_bytes
 
 
 def _decide_save_action(
@@ -108,7 +108,17 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
             click.echo(f"Local save is newer — pushed {game_slug} to server.")
         return local_hash
     if action == "pull":
-        pulled, server_hash = client.pull_save(game_slug, save_path)
+        try:
+            pulled, server_hash = client.pull_save(game_slug, save_path)
+        except CardFormatMismatch:
+            # Local folder card vs a single-file server copy (#718): local wins
+            # (the server's copy stays in save history), surfaced as a conflict.
+            pushed_hash = client.push_save(game_slug, save_path)
+            _warn_save_conflict(client, cfg, game_slug, "local", local_hash, meta, msg=(
+                f"Save format mismatch for '{game_slug}': this device's save is a folder but the "
+                "server's copy is a single file — the local folder was kept and pushed; the "
+                "server's previous copy is still in its save history."))
+            return pushed_hash
         if diverged:
             _warn_save_conflict(client, cfg, game_slug, "server", local_hash, meta)
         elif pulled:
