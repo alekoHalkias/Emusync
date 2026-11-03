@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #718
 - Branch: feature/718-card-format-mismatch
-- PR: pending
-- Status: implemented
+- PR: #736
+- Status: shipped
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -71,15 +71,15 @@ Tests
 ### Steps: see tools/plans/718-card-format-mismatch.md (steps 1-4)
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: none (self-review: all other pull callers already catch Exception; _MemcardClient shares the push_save/pull_save interface)
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #736
+### Server Sync: done
+### Doc Sync: done (in step 1 commit)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -99,3 +99,6 @@ Tests
 - 2026-11-02 implement: step 2 done (reconcile resolves mismatch as local wins)
 - 2026-11-02 implement: step 3 done (writer raise test + live_server reconcile regression)
 - 2026-11-02 implement: step 4 done (GOTCHAS/CLAUDE.md updated in the step 1 commit, required by the CLAUDE.md commit hook)
+- 2026-11-02 ship: PR #736, make test 740 passed
+- 2026-11-02 review: 0 findings, blocked=no
+- 2026-11-02 ship: server sync done

@@ -2,8 +2,8 @@
 
 Issue: #718
 Branch: feature/718-card-format-mismatch
-PR: none
-Status: implementing
+PR: #736
+Status: shipped
 Fix attempts: 0
 
 ## Goal
