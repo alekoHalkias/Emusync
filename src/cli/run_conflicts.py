@@ -111,15 +111,18 @@ def _report_conflict_to_server(client, cfg, game_slug: str, winner: str,
         logger.warning("failed to report save conflict for '%s' to server", game_slug, exc_info=True)
 
 
-def _warn_save_conflict(client, cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict]) -> None:
-    """Surface an auto-resolved divergence: stderr + notification + local log + server record."""
-    if winner == "local":
-        detail = ("this device's save is newer, so it was kept and pushed; the server's "
-                  "older copy was replaced (its hash is recorded in save_conflicts.json)")
-    else:
-        detail = ("the server's save is newer, so it was pulled; this device's previous "
-                  "save was backed up to a .bak file next to it")
-    msg = (f"Save conflict for '{game_slug}': both copies changed since the last sync — {detail}.")
+def _warn_save_conflict(client, cfg, game_slug: str, winner: str, local_hash: Optional[str], server_meta: Optional[dict],
+                        msg: str = "") -> None:
+    """Surface an auto-resolved divergence: stderr + notification + local log + server record.
+    *msg* overrides the default divergence text (format mismatch, #718)."""
+    if not msg:
+        if winner == "local":
+            detail = ("this device's save is newer, so it was kept and pushed; the server's "
+                      "older copy was replaced (its hash is recorded in save_conflicts.json)")
+        else:
+            detail = ("the server's save is newer, so it was pulled; this device's previous "
+                      "save was backed up to a .bak file next to it")
+        msg =(f"Save conflict for '{game_slug}': both copies changed since the last sync — {detail}.")
     click.echo(f"⚠ {msg}", err=True)
     _log_save_conflict(cfg, game_slug, winner, local_hash, server_meta)
     _report_conflict_to_server(client, cfg, game_slug, winner, local_hash, server_meta)

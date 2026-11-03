@@ -18,13 +18,13 @@ A raw blob pulled onto a directory card raises a typed error instead of reportin
   - Files: src/server/sync_client.py
   - Reuses: `_write_memcard_raw_bytes`
   - New: `class CardFormatMismatch(ValueError)` - callers must tell a format mismatch apart from other errors.
-- [ ] 2. `_reconcile_save`: wrap the pull in `except CardFormatMismatch`; push the local copy (`client.push_save`), call `_warn_save_conflict(..., "local", ...)` with a format-mismatch message, return the pushed hash. `_warn_save_conflict` gets an optional `msg` override so the "both copies changed" text isn't reused for this case.
+- [x] 2. `_reconcile_save`: wrap the pull in `except CardFormatMismatch`; push the local copy (`client.push_save`), call `_warn_save_conflict(..., "local", ...)` with a format-mismatch message, return the pushed hash. `_warn_save_conflict` gets an optional `msg` override so the "both copies changed" text isn't reused for this case.
   - Files: src/cli/run_reconcile.py, src/cli/run_conflicts.py
   - Reuses: `_warn_save_conflict`, `_log_save_conflict`, `_report_conflict_to_server`, `_notify`
   - New: none
-- [ ] 3. Tests (no mocks, real SQLite).
+- [x] 3. Tests (no mocks, real SQLite).
   - Files: src/tests/test_memcard_folder_sync.py, src/tests/test_run_reconcile.py
-- [ ] 4. Docs: GOTCHAS.md one paragraph under #734's section (replaces the "directory left alone" note); CLAUDE.md Saves/sync line amended. ARCHITECTURE.md: none needed - no new route/IPC/CLI/config.
+- [x] 4. Docs: GOTCHAS.md one paragraph under #734's section (replaces the "directory left alone" note); CLAUDE.md Saves/sync line amended. ARCHITECTURE.md: none needed - no new route/IPC/CLI/config.
 
 ## Testing
 - **Test File**: src/tests/test_memcard_folder_sync.py, src/tests/test_run_reconcile.py
@@ -45,3 +45,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 ## Log
 - 2026-11-02 bplan: plan written
 - 2026-11-02 tplan: testing section added
+Step 4: docs landed with step 1 because the commit hook requires CLAUDE.md alongside sync_client.py.

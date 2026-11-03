@@ -1196,3 +1196,33 @@ def test_baseline_pushes_when_only_local_changed_despite_older_local_mtime():
 def test_baseline_divergence_falls_back_to_mtime():
     assert _decide_save_action("local-new", LATER, _meta("server-new", NOW), "base") == "push"
     assert _decide_save_action("local-new", EARLIER, _meta("server-new", NOW), "base") == "pull"
+
+
+def test_reconcile_folder_card_vs_raw_server_copy_local_wins(tmp_path, live_server):
+    """#718: a single-file server copy pulled onto a folder save used to write
+    nothing yet report success. Now local wins: the folder is pushed, kept
+    untouched, and the mismatch is logged as a conflict."""
+    from server.sync_client import SyncClient, _memcard_payload_bytes
+
+    client_a = SyncClient(live_server["host"], live_server["port"], "", "dev-a", "DeviceA")
+    client_b = SyncClient(live_server["host"], live_server["port"], "", "dev-b", "DeviceB")
+
+    slug = client_a.add_game("Fmt Game")["slug"]
+    save_b = tmp_path / "b" / "SAVEDATA"
+    (save_b / "GAME").mkdir(parents=True)
+    _write_save(save_b / "GAME" / "data.bin", b"FOLDER-PROGRESS", EARLIER)  # older -> decision is pull
+
+    save_a = tmp_path / "a" / "game.sav"
+    save_a.parent.mkdir(parents=True)
+    save_a.write_bytes(b"SINGLE-FILE")
+    client_a.push_save(slug, str(save_a))
+
+    cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-b")
+    returned = _reconcile_save(client_b, cfg, slug, str(save_b))
+
+    folder_hash = hashlib.sha256(_memcard_payload_bytes(save_b)).hexdigest()
+    assert returned == folder_hash
+    assert client_b.get_save_meta(slug)["hash"] == folder_hash
+    assert (save_b / "GAME" / "data.bin").read_bytes() == b"FOLDER-PROGRESS"
+    conflicts = json.loads((tmp_path / "save_conflicts.json").read_text())
+    assert conflicts[0]["winner"] == "local"

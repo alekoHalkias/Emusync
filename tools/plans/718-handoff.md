@@ -4,7 +4,7 @@
 - Issue: #718
 - Branch: feature/718-card-format-mismatch
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -96,3 +96,6 @@ Tests
 - Step 3: src/tests/test_memcard_folder_sync.py, src/tests/test_run_reconcile.py; reuses live_server + SyncClient pattern from test_reconcile_shared_memcard_stale_local_untouched_is_not_a_conflict.
 - Step 4: src/docs/GOTCHAS.md, CLAUDE.md; reuses existing #734 / Dolphin #428 entries.
 - 2026-11-02 implement: step 1 done (CardFormatMismatch raised on directory target)
+- 2026-11-02 implement: step 2 done (reconcile resolves mismatch as local wins)
+- 2026-11-02 implement: step 3 done (writer raise test + live_server reconcile regression)
+- 2026-11-02 implement: step 4 done (GOTCHAS/CLAUDE.md updated in the step 1 commit, required by the CLAUDE.md commit hook)
