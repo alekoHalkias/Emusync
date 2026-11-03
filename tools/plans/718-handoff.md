@@ -95,3 +95,4 @@ Tests
 - Step 2: src/cli/run_reconcile.py, src/cli/run_conflicts.py; reuses _warn_save_conflict (optional message override), client.push_save; no new helper.
 - Step 3: src/tests/test_memcard_folder_sync.py, src/tests/test_run_reconcile.py; reuses live_server + SyncClient pattern from test_reconcile_shared_memcard_stale_local_untouched_is_not_a_conflict.
 - Step 4: src/docs/GOTCHAS.md, CLAUDE.md; reuses existing #734 / Dolphin #428 entries.
+- 2026-11-02 implement: step 1 done (CardFormatMismatch raised on directory target)

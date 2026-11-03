@@ -266,15 +266,21 @@ def _write_memcard_tar_bytes(card: Path, tar_bytes: bytes) -> None:
         raise
 
 
+class CardFormatMismatch(ValueError):
+    """The local save/card is a folder but the server copy is a single file (#718)."""
+
+
 def _write_memcard_raw_bytes(card: Path, raw: bytes) -> None:
     """Write *raw* to *card* (a file-based memcard), backing up whatever was there.
 
     Written to a sibling ``.part`` then ``os.replace``d, so a crash mid-write never
-    truncates the real save (#734). A directory at *card* is left alone on purpose:
-    a folder-card device receiving an old flat-file blob must not crash, and its
-    post-game push then migrates the server to the folder layout."""
+    truncates the real save (#734). A directory at *card* raises CardFormatMismatch
+    (never a silent no-op reported as a successful pull, #718); `emusync run`
+    resolves it as local wins via _reconcile_save."""
     if card.is_dir():
-        return
+        raise CardFormatMismatch(
+            f"local save at {card} is a folder but the server copy is a single file"
+        )
     if card.is_file():
         shutil.copy2(card, card.parent / (card.name + ".bak"))
     card.parent.mkdir(parents=True, exist_ok=True)

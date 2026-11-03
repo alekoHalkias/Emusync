@@ -14,7 +14,7 @@ A raw blob pulled onto a directory card raises a typed error instead of reportin
 - **Recommendations**: none
 
 ## Steps
-- [ ] 1. `_write_memcard_raw_bytes` raises `CardFormatMismatch(ValueError)` ("local card is a folder but the server copy is a single file") when `card.is_dir()`, instead of returning. Atomic `.part` write from #734 unchanged.
+- [x] 1. `_write_memcard_raw_bytes` raises `CardFormatMismatch(ValueError)` ("local card is a folder but the server copy is a single file") when `card.is_dir()`, instead of returning. Atomic `.part` write from #734 unchanged.
   - Files: src/server/sync_client.py
   - Reuses: `_write_memcard_raw_bytes`
   - New: `class CardFormatMismatch(ValueError)` - callers must tell a format mismatch apart from other errors.
