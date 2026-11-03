@@ -22,7 +22,7 @@ Make shared console memcards run through the same store core, baseline/conflict 
 - **Recommendations**:
   - Unify code, not tables. A single `slots` table would need a lossy-risk migration of every save row, lose the `games` FK cascade, and violate the guide's "never rename or drop" rule, for no behavior gain over a parameterized core.
   - Do not introduce a new manifest payload format now. Instead convert legacy un-enveloped blobs once (server migration) and delete the client sniff fallbacks. A manifest (per-file hashes) is worth it only when a feature needs per-file diff or delta sync; file that separately.
-  - Keep `_MemcardClient` but shrink it to the GC format hook, or fold it into a slot prefix on `SyncClient` (Phase C, optional).
+  - Shrink `_MemcardClient` to the GC format hook via a slot prefix on `SyncClient` (Phase C).
 
 ## Steps
 
@@ -31,7 +31,7 @@ Make shared console memcards run through the same store core, baseline/conflict 
   - Files: src/server/store/blobs.py
   - Reuses: the existing table-parameterized helpers (only the hardcoded `game_slug` column becomes a parameter)
   - New: none
-- [ ] A2. Rewrite memcard store methods on the core against `console_save_history` (owner_col `console_key`, extra `card_format` column carried through as an optional field). Current card = newest history row. `push_console_save_file`, `pull_console_save_path`, `get_console_save_meta`, `list_console_save_history`, `restore_console_save` keep their names and return shapes. Delete `_push_console_history_row`, `_prune_console_history`, and (if A0 test confirms dead) `_is_folder_upload`/`_archive_memcard_folder`. Stop writing `console_saves`.
+- [ ] A2. Rewrite memcard store methods on the core against `console_save_history` (owner_col `console_key`, extra `card_format` column carried through as an optional field). Current card = newest history row. `push_console_save_file`, `pull_console_save_path`, `get_console_save_meta`, `list_console_save_history`, `restore_console_save` keep their names and return shapes. Delete `_push_console_history_row`, `_prune_console_history`, and (once a test confirms they are dead code) `_is_folder_upload`/`_archive_memcard_folder`. Stop writing `console_saves`.
   - Files: src/server/store/blobs.py
   - Reuses: A1 core; `restore_console_save` becomes `_restore_blob`
   - New: none
