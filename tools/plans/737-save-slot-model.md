@@ -27,7 +27,7 @@ Make shared console memcards run through the same store core, baseline/conflict 
 ## Steps
 
 ### Phase A - one store core for memcards (no wire change)
-- [ ] A1. Parameterize the blob core by owner column: `_newest_row`, `_push_blob_file`, `_prune_history`, `_list_blob_history`, `_restore_blob`, `_classify_blob`, `_last_good_version` take `(table, owner_col, owner_id)`; save/state wrappers pass `("game_slug", slug)`. Observable: no behavior change, existing save/state tests pass.
+- [x] A1. Parameterize the blob core by owner column: `_newest_row`, `_push_blob_file`, `_prune_history`, `_list_blob_history`, `_restore_blob`, `_classify_blob`, `_last_good_version` take `(table, owner_col, owner_id)`; save/state wrappers pass `("game_slug", slug)`. Observable: no behavior change, existing save/state tests pass.
   - Files: src/server/store/blobs.py
   - Reuses: the existing table-parameterized helpers (only the hardcoded `game_slug` column becomes a parameter)
   - New: none

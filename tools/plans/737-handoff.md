@@ -106,3 +106,4 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - 2026-11-02 rescope: #737 = A + C (difficulty 6, non-breaking); B -> #738; D/E -> #739
 - 2026-11-04 tplan: test_file=src/tests/test_console_memcard.py (+integrity, conflicts), 7 test cases defined
 - 2026-11-04 implement: started, Status=implementing
+- 2026-11-04 implement: step A1 done (blob core helpers take owner_col, default game_slug; console_key rows carry card_format)
