@@ -4,7 +4,7 @@
 - Issue: #737
 - Branch: feature/737-save-slot-model
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-02
 - Fix attempts: 0
 
@@ -114,3 +114,4 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - 2026-11-04 implement: step A6 done (no change needed; console_saves rows persist so _DEVICE_REFS entry kept)
 - 2026-11-04 implement: step C1 done (SyncClient slot helpers shared by game and console methods; _MemcardClient unchanged, deviation logged)
 - 2026-11-04 implement: steps T and D done (tests as listed; docs updated)
+- 2026-11-04 implement: all steps done, Status=implemented
