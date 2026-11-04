@@ -4,7 +4,7 @@
 - Issue: #737
 - Branch: feature/737-save-slot-model
 - PR: none
-- Status: implemented
+- Status: shipped
 - Created: 2026-11-02
 - Fix attempts: 0
 
