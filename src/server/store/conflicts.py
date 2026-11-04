@@ -34,11 +34,17 @@ class ConflictMixin:
         """Record an auto-resolved divergence. Deduped: if an open conflict with the
         same winner/loser hashes already exists for this game, it's returned as-is
         (a re-launch reporting the same resolution shouldn't pile up rows)."""
+        return self._add_conflict("save_conflicts", "game_slug", game_slug,
+                                  winner_device_id, loser_device_id, winner_hash, loser_hash)
+
+    def _add_conflict(self, table: str, owner_col: str, owner: str, winner_device_id: str,
+                      loser_device_id: str, winner_hash: str, loser_hash: str) -> dict:
+        """Shared by the per-game and console-scoped tables (#737)."""
         existing = self._conn.execute(
-            """SELECT id FROM save_conflicts
-               WHERE game_slug = ? AND status = 'open'
-                 AND winner_hash = ? AND loser_hash = ?""",
-            (game_slug, winner_hash, loser_hash),
+            f"""SELECT id FROM {table}
+                WHERE {owner_col} = ? AND status = 'open'
+                  AND winner_hash = ? AND loser_hash = ?""",
+            (owner, winner_hash, loser_hash),
         ).fetchone()
         now = datetime.now(timezone.utc).isoformat()
         if existing:
@@ -46,10 +52,10 @@ class ConflictMixin:
         else:
             cid = str(uuid.uuid4())
             self._conn.execute(
-                """INSERT INTO save_conflicts
-                   (id, game_slug, winner_device_id, loser_device_id, winner_hash, loser_hash, resolved_at, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'open')""",
-                (cid, game_slug, winner_device_id, loser_device_id, winner_hash, loser_hash, now),
+                f"""INSERT INTO {table}
+                    (id, {owner_col}, winner_device_id, loser_device_id, winner_hash, loser_hash, resolved_at, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'open')""",
+                (cid, owner, winner_device_id, loser_device_id, winner_hash, loser_hash, now),
             )
             self._conn.commit()
         return {"id": cid, "resolved_at": now}
@@ -63,25 +69,8 @@ class ConflictMixin:
         loser_hash: str,
     ) -> dict:
         """Console-key equivalent of add_conflict, same dedup rule (#482)."""
-        existing = self._conn.execute(
-            """SELECT id FROM console_save_conflicts
-               WHERE console_key = ? AND status = 'open'
-                 AND winner_hash = ? AND loser_hash = ?""",
-            (console_key, winner_hash, loser_hash),
-        ).fetchone()
-        now = datetime.now(timezone.utc).isoformat()
-        if existing:
-            cid = existing["id"]
-        else:
-            cid = str(uuid.uuid4())
-            self._conn.execute(
-                """INSERT INTO console_save_conflicts
-                   (id, console_key, winner_device_id, loser_device_id, winner_hash, loser_hash, resolved_at, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'open')""",
-                (cid, console_key, winner_device_id, loser_device_id, winner_hash, loser_hash, now),
-            )
-            self._conn.commit()
-        return {"id": cid, "resolved_at": now}
+        return self._add_conflict("console_save_conflicts", "console_key", console_key,
+                                  winner_device_id, loser_device_id, winner_hash, loser_hash)
 
     def list_open_conflicts(self) -> list[dict]:
         """Open conflicts across all games AND shared-memcard consoles, newest

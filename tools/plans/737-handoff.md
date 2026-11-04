@@ -109,3 +109,4 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - 2026-11-04 implement: step A1 done (blob core helpers take owner_col, default game_slug; console_key rows carry card_format)
 - 2026-11-04 implement: step A2 done (memcard store methods on shared core via console_save_history; dead folder-archive helpers removed; console_saves no longer written)
 - 2026-11-04 implement: step A3 done (schema v35 backfills console_saves-only cards into console_save_history; 4 migration tests)
+- 2026-11-04 implement: step A4 done (_set_baseline/_get_baseline and _add_conflict shared by game and console tables)

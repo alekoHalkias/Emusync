@@ -347,17 +347,24 @@ class SaveStateMixin:
         server on for *game_slug* — called by the push/pull API handlers after
         every successful transfer, so it covers `emusync run`, GUI manual
         push/pull, and any future caller uniformly."""
+        self._set_baseline("save_sync_baseline", "game_slug", game_slug, device_id, h, synced_at)
+
+    def get_save_sync_baseline(self, game_slug: str, device_id: str) -> Optional[dict]:
+        return self._get_baseline("save_sync_baseline", "game_slug", game_slug, device_id)
+
+    # One implementation for both baseline tables (game_slug / console_key, #737).
+
+    def _set_baseline(self, table: str, owner_col: str, owner: str, device_id: str, h: str, synced_at: str) -> None:
         self._conn.execute(
-            "INSERT OR REPLACE INTO save_sync_baseline (game_slug, device_id, hash, synced_at) "
-            "VALUES (?, ?, ?, ?)",
-            (game_slug, device_id, h, synced_at),
+            f"INSERT OR REPLACE INTO {table} ({owner_col}, device_id, hash, synced_at) VALUES (?, ?, ?, ?)",
+            (owner, device_id, h, synced_at),
         )
         self._conn.commit()
 
-    def get_save_sync_baseline(self, game_slug: str, device_id: str) -> Optional[dict]:
+    def _get_baseline(self, table: str, owner_col: str, owner: str, device_id: str) -> Optional[dict]:
         row = self._conn.execute(
-            "SELECT hash, synced_at FROM save_sync_baseline WHERE game_slug = ? AND device_id = ?",
-            (game_slug, device_id),
+            f"SELECT hash, synced_at FROM {table} WHERE {owner_col} = ? AND device_id = ?",
+            (owner, device_id),
         ).fetchone()
         return dict(row) if row else None
 
@@ -455,16 +462,7 @@ class SaveStateMixin:
         """Record *h* as the shared-card hash *device_id* is now known to agree
         with the server on for *console_key* — called by the console memcard
         push/pull API handlers after every successful transfer."""
-        self._conn.execute(
-            "INSERT OR REPLACE INTO console_save_sync_baseline (console_key, device_id, hash, synced_at) "
-            "VALUES (?, ?, ?, ?)",
-            (console_key, device_id, h, synced_at),
-        )
-        self._conn.commit()
+        self._set_baseline("console_save_sync_baseline", "console_key", console_key, device_id, h, synced_at)
 
     def get_console_save_sync_baseline(self, console_key: str, device_id: str) -> Optional[dict]:
-        row = self._conn.execute(
-            "SELECT hash, synced_at FROM console_save_sync_baseline WHERE console_key = ? AND device_id = ?",
-            (console_key, device_id),
-        ).fetchone()
-        return dict(row) if row else None
+        return self._get_baseline("console_save_sync_baseline", "console_key", console_key, device_id)
