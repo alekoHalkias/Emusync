@@ -298,6 +298,11 @@ class SaveStateMixin:
             "state": self._classify_blob("states", game_slug),
         }
 
+    def integrity_for_console(self, console_key: str) -> dict:
+        """Integrity verdict for a console's current shared memory card (#737).
+        Not part of sweep_integrity: that dict is keyed by game slug for the GUI."""
+        return self._classify_blob(self._CARD_TABLE, console_key, "console_key")
+
     def sweep_integrity(self) -> dict[str, dict]:
         """Classify every game that has at least one save or state generation."""
         slugs = {

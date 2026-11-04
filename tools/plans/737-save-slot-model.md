@@ -43,7 +43,7 @@ Make shared console memcards run through the same store core, baseline/conflict 
   - Files: src/server/store/blobs.py, src/server/store/conflicts.py
   - Reuses: existing SQL, deduplicated
   - New: none
-- [ ] A5. Fold memcard routes into the `_BlobKind` handlers: add `owner` lookup + optional `X-Card-Format` header to `_BlobKind` so `/consoles/{key}/memcard*` (pull, push, meta, sync-baseline, history, restore) call `_pull/_push/_meta/_history/_restore`. Paths, headers and response shapes unchanged. Integrity sweep covers console cards for free (`_classify_blob`).
+- [x] A5. Fold memcard routes into the `_BlobKind` handlers: add `owner` lookup + optional `X-Card-Format` header to `_BlobKind` so `/consoles/{key}/memcard*` (pull, push, meta, sync-baseline, history, restore) call `_pull/_push/_meta/_history/_restore`. Paths, headers and response shapes unchanged. Integrity sweep covers console cards for free (`_classify_blob`).
   - Files: src/server/api/blobs.py
   - Reuses: `_pull`, `_push`, `_meta`, `_history`, `_restore`, `_stage_upload`
   - New: none
@@ -106,3 +106,4 @@ Schema bump: yes (v35). New IPC channel (+ emusync.d.ts): no. New CLI subcommand
 Step A2: also removed test_archive_memcard_folder_streams (covered only the dead _archive_memcard_folder) and rewrote the two live-slot tests in test_console_memcard.py as planned.
 Step A3: migration helper also returns early when console_saves/console_save_history are absent (test_stuck_at_19 builds a partial DB). Migration tests live in test_console_memcard.py as planned.
 Step A4: no new dedupe test added; existing per-game and console dedupe tests in test_conflicts.py already exercise the shared _add_conflict.
+Step A5: integrity for console cards is NOT free as the plan claimed - sweep_integrity and the integrity endpoints are keyed by game slug for the GUI. Added Store.integrity_for_console (tested) and left sweep/endpoints unchanged; exposing card integrity to the GUI is a separate change.

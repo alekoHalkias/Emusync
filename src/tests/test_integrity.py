@@ -125,6 +125,27 @@ def test_integrity_state_zero_byte():
         assert "zero_byte" in verdict["reasons"]
 
 
+def test_integrity_for_console_card_ok_damaged_and_last_good():
+    """Console memory cards use the same classifier as saves (#737)."""
+    def push(store, payload):
+        up = store.new_upload_path()
+        up.write_bytes(payload)
+        store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        store = Store(tmp)
+        assert store.integrity_for_console("PS2")["status"] == "missing"
+        push(store, b"card generation one")
+        push(store, b"card generation two")
+        assert store.integrity_for_console("PS2")["status"] == "ok"
+        good = store.list_console_save_history("PS2")[1]["id"]  # the older, intact generation
+        row = store._newest_row("console_save_history", "PS2", "console_key")
+        store._blob_path("console_save_history", row["id"]).write_bytes(b"")
+        verdict = store.integrity_for_console("PS2")
+        assert verdict["status"] == "damaged" and "zero_byte" in verdict["reasons"]
+        assert verdict["last_good_version_id"] == good
+
+
 # ── API endpoints ────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
