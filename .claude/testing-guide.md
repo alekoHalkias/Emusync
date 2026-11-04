@@ -60,3 +60,6 @@ Share-dependent code (marker file, ROM copy) is tested against a `tmp_path` dire
 
 ### ROM identity / file-search helpers (#731)
 Write real files of controlled size in `tmp_path` (`write_bytes(b"\0" * n)`) and assert unique-hit / ambiguous / size-mismatch / size-0 cases. CLI fallbacks that need server data take the fetched row as an argument (pure helper) so they are tested like `_resolve_launch_command` with a `SimpleNamespace` gd. When a route's response shape grows, update any exact key-set assertion in the same PR.
+
+### Blob-core refactors (#737)
+When a store core is generalized (owner column), the existing per-feature suites (`test_saves`, `test_console_memcard`, `test_state_sync`) are the regression net: they must pass unchanged, and tests that assert retired internals (e.g. a live-slot file path) are rewritten, not deleted. Backfill migrations are tested by building the old-shaped row plus blob file under `tmp_path`, calling `schema._migrate(conn, from_version=N, blob_dir)` twice (idempotence), and comparing pulled bytes and hash before and after.

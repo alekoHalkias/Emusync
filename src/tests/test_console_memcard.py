@@ -376,24 +376,27 @@ def test_console_restore_hash_is_envelope_free():
         assert meta["hash"] == hashlib.sha256(b"card-one").hexdigest()
 
 
-def test_console_pull_serves_history_copy_not_live_slot():
+def test_console_pull_serves_history_generation_and_no_live_slot_is_written():
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(tmp)
         _push_card(store, b"card-data")
         path, meta = store.pull_console_save_path("PS2")
-        assert path != store._blob_path("console_saves", "PS2")
+        newest = store.list_console_save_history("PS2")[0]["id"]
+        assert path == store._blob_path("console_save_history", newest)
         assert hashlib.sha256(path.read_bytes()).hexdigest() == meta["hash"]
+        # #737: console_saves is retired; nothing writes the live row or file.
+        assert store._conn.execute("SELECT COUNT(*) FROM console_saves").fetchone()[0] == 0
+        assert not store._blob_path("console_saves", "PS2").exists()
 
 
-def test_console_pull_falls_back_to_live_slot_without_history():
+def test_console_pull_without_history_is_none():
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(tmp)
-        _push_card(store, b"legacy-card")
-        store._conn.execute("DELETE FROM console_save_history")  # pre-#480 card
+        _push_card(store, b"card")
+        store._conn.execute("DELETE FROM console_save_history")
         store._conn.commit()
-        path, _ = store.pull_console_save_path("PS2")
-        assert path == store._blob_path("console_saves", "PS2")
-        assert path.read_bytes() == b"legacy-card"
+        assert store.pull_console_save_path("PS2") == (None, None)
+        assert store.get_console_save_meta("PS2") is None
 
 
 def test_console_history_prune_unlinks_old_files():
@@ -406,3 +409,78 @@ def test_console_history_prune_unlinks_old_files():
             _push_card(store, f"card-{i}".encode())
         assert len(store.list_console_save_history("PS2")) == HISTORY_LIMIT
         assert not store._blob_path("console_save_history", oldest).exists()
+
+
+# ── v35 backfill: console_saves -> console_save_history (#737) ─────────────────────
+
+def _old_card_db(tmp_path, with_history_hash=None, write_file=True):
+    """A v34-shaped DB holding one pre-#480 PS2 card in console_saves only."""
+    import sqlite3
+    tmp_path.mkdir(exist_ok=True)
+    conn = sqlite3.connect(str(tmp_path / "emusync.db"))  # the filename Store opens
+    conn.row_factory = sqlite3.Row
+    conn.execute("""CREATE TABLE console_saves (console_key TEXT PRIMARY KEY, device_id TEXT NOT NULL,
+        hash TEXT NOT NULL, pushed_at TEXT NOT NULL, size INTEGER NOT NULL, card_format TEXT NOT NULL DEFAULT '')""")
+    conn.execute("""CREATE TABLE console_save_history (id TEXT PRIMARY KEY, console_key TEXT NOT NULL,
+        device_id TEXT NOT NULL, hash TEXT NOT NULL, pushed_at TEXT NOT NULL, size INTEGER NOT NULL DEFAULT 0,
+        card_format TEXT NOT NULL DEFAULT '')""")
+    data = b"pre-480 card"
+    h = hashlib.sha256(data).hexdigest()
+    conn.execute("INSERT INTO console_saves VALUES ('PS2', 'dev-1', ?, '2026-01-01T00:00:00+00:00', ?, 'MemoryCard')",
+                 (h, len(data)))
+    blobs = tmp_path / "blobs"
+    (blobs / "console_saves").mkdir(parents=True)
+    if write_file:
+        (blobs / "console_saves" / "PS2").write_bytes(data)
+    if with_history_hash:
+        conn.execute("INSERT INTO console_save_history VALUES ('h1', 'PS2', 'dev-1', ?, '2026-01-01', 1, '')",
+                     (with_history_hash,))
+    conn.execute("PRAGMA user_version = 34")
+    conn.commit()
+    return conn, blobs, data, h
+
+
+def test_v35_backfills_pre_480_card_into_history(tmp_path):
+    from server.store import schema
+    conn, blobs, data, h = _old_card_db(tmp_path)
+    schema._migrate(conn, from_version=34, blob_dir=blobs)
+    rows = conn.execute("SELECT * FROM console_save_history").fetchall()
+    assert len(rows) == 1
+    assert (rows[0]["hash"], rows[0]["size"], rows[0]["card_format"], rows[0]["device_id"]) == (h, len(data), "MemoryCard", "dev-1")
+    assert (blobs / "console_save_history" / rows[0]["id"]).read_bytes() == data
+    # retired table and file are left in place
+    assert conn.execute("SELECT COUNT(*) FROM console_saves").fetchone()[0] == 1
+    assert (blobs / "console_saves" / "PS2").exists()
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == schema._SCHEMA_VERSION
+
+
+def test_v35_backfill_is_idempotent_and_skips_cards_with_history(tmp_path):
+    from server.store import schema
+    conn, blobs, _, _ = _old_card_db(tmp_path / "a")
+    schema._migrate(conn, from_version=34, blob_dir=blobs)
+    schema._migrate(conn, from_version=34, blob_dir=blobs)  # second run is a no-op
+    assert conn.execute("SELECT COUNT(*) FROM console_save_history").fetchone()[0] == 1
+
+    # A card that already has a history generation with its hash gets no duplicate.
+    conn2, blobs2, _, h2 = _old_card_db(tmp_path / "b", with_history_hash=hashlib.sha256(b"pre-480 card").hexdigest())
+    schema._migrate(conn2, from_version=34, blob_dir=blobs2)
+    assert conn2.execute("SELECT COUNT(*) FROM console_save_history").fetchone()[0] == 1
+
+
+def test_v35_skips_card_whose_blob_file_is_missing(tmp_path):
+    from server.store import schema
+    conn, blobs, _, _ = _old_card_db(tmp_path, write_file=False)
+    schema._migrate(conn, from_version=34, blob_dir=blobs)
+    assert conn.execute("SELECT COUNT(*) FROM console_save_history").fetchone()[0] == 0
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == schema._SCHEMA_VERSION
+
+
+def test_store_serves_backfilled_card_with_same_bytes_and_hash(tmp_path):
+    """End to end: a DB left at v34 with a console_saves-only card opens in Store
+    and the card pulls with the same bytes and hash."""
+    conn, blobs, data, h = _old_card_db(tmp_path / "x")
+    conn.close()
+    store = Store(str(tmp_path / "x"))
+    path, meta = store.pull_console_save_path("PS2")
+    assert path is not None and path.read_bytes() == data
+    assert meta["hash"] == h and meta["card_format"] == "MemoryCard"

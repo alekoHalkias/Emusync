@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 34
+_SCHEMA_VERSION = 35
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -593,4 +593,48 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # This device's ROM file size; with the basename it identifies the same
         # ROM across devices for network matching and duplicate prevention (#731).
         _try(conn, "ALTER TABLE game_devices ADD COLUMN rom_size INTEGER NOT NULL DEFAULT 0")
+    if from_version < 35:
+        # Console memory cards now live only in console_save_history (#737); give any
+        # card that only existed in the retired console_saves table a history row.
+        if blob_dir is not None:
+            _backfill_console_cards(conn, blob_dir)
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+
+
+def _backfill_console_cards(conn: sqlite3.Connection, blob_dir) -> None:
+    """Copy each console_saves card with no matching console_save_history
+    generation into history (#737). Idempotent: a card whose hash already has a
+    history row is skipped, and the console_saves row/file are left untouched
+    (the table is retired, never dropped). A card whose blob file is gone is
+    skipped rather than failing startup."""
+    import shutil
+    import uuid
+    from pathlib import Path
+
+    have = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('console_saves', 'console_save_history')"
+    )}
+    if have != {"console_saves", "console_save_history"}:
+        return  # nothing to backfill (partial/synthetic DB)
+    hist_dir = Path(blob_dir) / "console_save_history"
+    for card in conn.execute(
+        "SELECT console_key, device_id, hash, pushed_at, size, card_format FROM console_saves"
+    ).fetchall():
+        if conn.execute(
+            "SELECT 1 FROM console_save_history WHERE console_key = ? AND hash = ?",
+            (card["console_key"], card["hash"]),
+        ).fetchone():
+            continue
+        src = Path(blob_dir) / "console_saves" / card["console_key"]
+        if not src.is_file():
+            continue
+        blob_id = str(uuid.uuid4())
+        hist_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, hist_dir / blob_id)
+        conn.execute(
+            "INSERT INTO console_save_history (id, console_key, device_id, hash, pushed_at, size, card_format) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (blob_id, card["console_key"], card["device_id"], card["hash"], card["pushed_at"],
+             card["size"], card["card_format"] or ""),
+        )
+    conn.commit()
