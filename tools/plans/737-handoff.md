@@ -84,14 +84,17 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - T, D: tests (real SQLite) and docs.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings:
+1. correctness (PLAUSIBLE, operational): after v35 nothing writes console_saves; rolling the server back to pre-v35 code serves a stale card. Mitigation: restore emusync.db and blobs/ together if rolling back.
+2. docs-stale: src/server/store/blobs.py module docstring still says only saves/states share the core.
+3. docs-stale: comments at sync_client.py:47, :299 and store/switch_mods.py:9 still describe console_saves as live.
+### Blocked: no (finding 1 is a deployment caveat, not fixable in code without reintroducing dual writes; awaiting user decision)
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
 ### PR: #740
-### Server Sync: pending
+### Server Sync: pending (paused: one-way v35 migration on the server PC, awaiting user confirmation)
 ### Doc Sync: pending
 
 ## 11. Fix Attempts
@@ -116,3 +119,4 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - 2026-11-04 implement: steps T and D done (tests as listed; docs updated)
 - 2026-11-04 implement: all steps done, Status=implemented
 - 2026-11-04 ship: PR #740 opened, tests pass
+- 2026-11-04 review: 3 findings, blocked=no
