@@ -376,24 +376,27 @@ def test_console_restore_hash_is_envelope_free():
         assert meta["hash"] == hashlib.sha256(b"card-one").hexdigest()
 
 
-def test_console_pull_serves_history_copy_not_live_slot():
+def test_console_pull_serves_history_generation_and_no_live_slot_is_written():
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(tmp)
         _push_card(store, b"card-data")
         path, meta = store.pull_console_save_path("PS2")
-        assert path != store._blob_path("console_saves", "PS2")
+        newest = store.list_console_save_history("PS2")[0]["id"]
+        assert path == store._blob_path("console_save_history", newest)
         assert hashlib.sha256(path.read_bytes()).hexdigest() == meta["hash"]
+        # #737: console_saves is retired; nothing writes the live row or file.
+        assert store._conn.execute("SELECT COUNT(*) FROM console_saves").fetchone()[0] == 0
+        assert not store._blob_path("console_saves", "PS2").exists()
 
 
-def test_console_pull_falls_back_to_live_slot_without_history():
+def test_console_pull_without_history_is_none():
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(tmp)
-        _push_card(store, b"legacy-card")
-        store._conn.execute("DELETE FROM console_save_history")  # pre-#480 card
+        _push_card(store, b"card")
+        store._conn.execute("DELETE FROM console_save_history")
         store._conn.commit()
-        path, _ = store.pull_console_save_path("PS2")
-        assert path == store._blob_path("console_saves", "PS2")
-        assert path.read_bytes() == b"legacy-card"
+        assert store.pull_console_save_path("PS2") == (None, None)
+        assert store.get_console_save_meta("PS2") is None
 
 
 def test_console_history_prune_unlinks_old_files():

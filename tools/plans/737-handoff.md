@@ -107,3 +107,4 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - 2026-11-04 tplan: test_file=src/tests/test_console_memcard.py (+integrity, conflicts), 7 test cases defined
 - 2026-11-04 implement: started, Status=implementing
 - 2026-11-04 implement: step A1 done (blob core helpers take owner_col, default game_slug; console_key rows carry card_format)
+- 2026-11-04 implement: step A2 done (memcard store methods on shared core via console_save_history; dead folder-archive helpers removed; console_saves no longer written)

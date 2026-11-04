@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import tarfile
 
 import pytest
 
@@ -92,13 +91,3 @@ async def test_pull_request_bad_body(client, body):
     assert r.status_code == 400
 
 
-def test_archive_memcard_folder_streams(tmp_path):
-    store = Store(str(tmp_path))
-    folder = tmp_path / "card"
-    (folder / "sub").mkdir(parents=True)
-    (folder / "sub" / "a.bin").write_bytes(b"data")
-    path, h, size = store._archive_memcard_folder(folder)
-    assert h == hashlib.sha256(path.read_bytes()).hexdigest()
-    assert size == path.stat().st_size
-    with tarfile.open(path, "r:gz") as tf:
-        assert "sub/a.bin" in tf.getnames()

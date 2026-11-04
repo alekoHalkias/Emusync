@@ -31,7 +31,7 @@ Make shared console memcards run through the same store core, baseline/conflict 
   - Files: src/server/store/blobs.py
   - Reuses: the existing table-parameterized helpers (only the hardcoded `game_slug` column becomes a parameter)
   - New: none
-- [ ] A2. Rewrite memcard store methods on the core against `console_save_history` (owner_col `console_key`, extra `card_format` column carried through as an optional field). Current card = newest history row. `push_console_save_file`, `pull_console_save_path`, `get_console_save_meta`, `list_console_save_history`, `restore_console_save` keep their names and return shapes. Delete `_push_console_history_row`, `_prune_console_history`, and (once a test confirms they are dead code) `_is_folder_upload`/`_archive_memcard_folder`. Stop writing `console_saves`.
+- [x] A2. Rewrite memcard store methods on the core against `console_save_history` (owner_col `console_key`, extra `card_format` column carried through as an optional field). Current card = newest history row. `push_console_save_file`, `pull_console_save_path`, `get_console_save_meta`, `list_console_save_history`, `restore_console_save` keep their names and return shapes. Delete `_push_console_history_row`, `_prune_console_history`, and (once a test confirms they are dead code) `_is_folder_upload`/`_archive_memcard_folder`. Stop writing `console_saves`.
   - Files: src/server/store/blobs.py
   - Reuses: A1 core; `restore_console_save` becomes `_restore_blob`
   - New: none
@@ -103,3 +103,4 @@ Schema bump: yes (v35). New IPC channel (+ emusync.d.ts): no. New CLI subcommand
 - 2026-11-02 bplan: outline written; awaiting user decision on split (A / B / C as sub-issues) before tplan
 - 2026-11-02 rescope: #737 = Phases A + C; Phase B -> #738; Phases D/E -> #739
 - 2026-11-04 tplan: 7 test cases + 5 edge cases defined; 2 existing tests need updating
+Step A2: also removed test_archive_memcard_folder_streams (covered only the dead _archive_memcard_folder) and rewrote the two live-slot tests in test_console_memcard.py as planned.

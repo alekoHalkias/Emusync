@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -387,202 +386,64 @@ class SaveStateMixin:
 
     # ── console-scoped shared save (one memory card per console, issue #295) ─────
     #
-    # PS2 uses a single memory card shared across every game on the console, which
-    # doesn't fit the per-game save model. It's stored once per console_key, single
-    # generation (overwrite), bytes on disk under blobs/console_saves/<key>.
-    #
-    # console_save_history (issue #480) is a separate, additive generation log —
-    # console_saves keeps meaning "the current card" (its shape/callers are
-    # unchanged), while every push also records a retained copy in history,
-    # mirroring saves/states' per-game HISTORY_LIMIT-generation model.
+    # PS2/DC/GC/PSP/3DS use one memory card shared across every game on the
+    # console, keyed by console_key. Since #737 it runs on the same blob core as
+    # saves/states (owner_col="console_key", table console_save_history): the
+    # current card is the newest history row, HISTORY_LIMIT generations are kept,
+    # and the pre-#737 console_saves table is no longer written (v35 backfills any
+    # card that only lived there). Folder cards arrive already tarred by the client
+    # (envelope), so the server stores the bytes as-is.
 
-    # ── console memcard helpers ─────────────────────────────────────────────────
-    # Detect file vs folder uploads (issue #241) — Dolphin uses tar archives for
-    # folder-based memcards ("GCIFolder" format), while files are used for other
-    # card formats. We handle both by storing folders as tar.zst archives and
-    # rehydrating them on pull via _write_memcard (#239).
-
-    # ── console memcard helpers ─────────────────────────────────────────────────
-    _CONSOLE_MEMCARD_ARCH_EXT = ".memcard.tar.zst"
-
-    def _is_folder_upload(self, src: Path) -> bool:
-        """Detect folder-based memcards (tar archives from Dolphin's GCIFolder format)."""
-        return src.suffix.lower() in (".tar", ".tar.gz", ".tgz", ".tar.zst")
-
-    def _archive_memcard_folder(self, folder: Path) -> tuple[Path, str, int]:
-        """Tar and compress a memcard folder to a single archive.
-
-        Returns (path, hash, size). The tar is streamed straight to a temp file
-        (never held in memory, #704) and the hash is of the archived bytes.
-        """
-        import tarfile
-
-        tmp = self.new_upload_path()
-        try:
-            with tarfile.open(tmp, mode="w:gz") as tf:
-                for item in sorted(folder.iterdir()):
-                    tf.add(item, arcname=(item.relative_to(folder)).as_posix())
-            hasher = hashlib.sha256()
-            with open(tmp, "rb") as f:
-                while chunk := f.read(1024 * 1024):
-                    hasher.update(chunk)
-        except BaseException:
-            tmp.unlink(missing_ok=True)
-            raise
-        return tmp, hasher.hexdigest(), tmp.stat().st_size
-
-    # ── console memcard push (file or folder) ───────────────────────────────────
+    _CARD_TABLE = "console_save_history"
 
     def push_console_save_file(self, console_key: str, device_id: str, src: Path, h: str, size: int,
                                 card_format: str = "") -> dict:
-        """Store a console's shared memory card, overwriting the previous copy.
-
-        Supports both file uploads (MemoryCard format) and folder uploads
-        (GCIFolder format from Dolphin). Folder uploads are archived to tar.zst
-        before storage (#241).
+        """Store a console's shared memory card as a new generation (deduped).
 
         `card_format` is the pushing device's configured memory-card storage
         format (e.g. Dolphin's "MemoryCard"/"GCIFolder" — issue #428), recorded
         so a pulling device can detect a mismatch before merging incompatible
         card layouts together. Empty for consoles without multiple formats.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        m = self._push_blob_file(self._CARD_TABLE, console_key, device_id, src, h, size,
+                                 "console_key", card_format)
+        return self._card_meta(console_key, m)
 
-        # Archive folder-based uploads
-        is_folder = self._is_folder_upload(src)
-        if is_folder:
-            src, h, size = self._archive_memcard_folder(src)
-
-        row = self._conn.execute(
-            "SELECT device_id, hash, pushed_at, size, card_format FROM console_saves WHERE console_key = ?",
-            (console_key,),
-        ).fetchone()
-        if row and row["hash"] == h:
-            Path(src).unlink(missing_ok=True)  # staged upload is redundant (#701)
-            return dict(row)  # identical content — return existing metadata
-
-        # Record in history before moving into live slot
-        stale = self._push_console_history_row(console_key, device_id, h, size, now, card_format, src)
-
-        dest = self._blob_path("console_saves", console_key)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(src, dest)
-
-        self._conn.execute(
-            "INSERT INTO console_saves (console_key, device_id, hash, pushed_at, size, card_format) "
-            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(console_key) DO UPDATE SET "
-            "device_id=excluded.device_id, hash=excluded.hash, pushed_at=excluded.pushed_at, "
-            "size=excluded.size, card_format=excluded.card_format",
-            (console_key, device_id, h, now, size, card_format),
-        )
-        self._conn.commit()
-        self._unlink_blobs("console_save_history", stale)  # after commit (#704, #734)
-        return {"device_id": device_id, "hash": h, "pushed_at": now, "size": size, "card_format": card_format}
+    def _card_meta(self, console_key: str, m: SaveMeta) -> dict:
+        """SaveMeta -> the dict shape console callers use. card_format comes from
+        the row, since a dedupe hit returns the existing generation's metadata."""
+        row = self._newest_row(self._CARD_TABLE, console_key, "console_key")
+        return {"device_id": m.device_id, "hash": m.hash, "pushed_at": m.pushed_at, "size": m.size,
+                "card_format": (row["card_format"] if row else "") or ""}
 
     def pull_console_save_path(self, console_key: str) -> tuple[Optional[Path], Optional[dict]]:
         """The console's shared card as (path, meta), or (None, None).
 
-        Prefers the newest history generation with the live hash: history files
-        are written once and never replaced, so a push landing mid-download
-        can't swap the bytes under a streaming response (#734). Cards with no
-        matching history (pre-#480) fall back to the live slot.
-        """
-        meta = self.get_console_save_meta(console_key)
-        if meta is None:
+        Served from the newest history row: generation files are written once and
+        never replaced, so a push landing mid-download can't swap the bytes under
+        a streaming response (#734)."""
+        path, m = self._pull_blob_path(self._CARD_TABLE, console_key, "console_key")
+        if path is None:
             return None, None
-        row = self._conn.execute(
-            "SELECT id FROM console_save_history WHERE console_key = ? AND hash = ? "
-            "ORDER BY rowid DESC LIMIT 1",
-            (console_key, meta["hash"]),
-        ).fetchone()
-        if row:
-            hist = self._blob_path("console_save_history", row["id"])
-            if hist.exists():
-                return hist, meta
-        dest = self._blob_path("console_saves", console_key)
-        if not dest.exists():
-            return None, None
-        return dest, meta
+        return path, self._card_meta(console_key, m)
 
     def get_console_save_meta(self, console_key: str) -> Optional[dict]:
-        row = self._conn.execute(
-            "SELECT device_id, hash, pushed_at, size, card_format FROM console_saves WHERE console_key = ?",
-            (console_key,),
-        ).fetchone()
-        return dict(row) if row else None
-
-    # ── console-scoped shared save history (issue #480) ──────────────────────────
-
-    def _push_console_history_row(self, console_key: str, device_id: str, h: str, size: int, now: str,
-                                    card_format: str, src: Path) -> list[str]:
-        """Record a new history generation, deduping against the newest one —
-        mirrors _push_blob. *src* is copied (not moved): the caller still needs
-        it intact to move into the live console_saves slot afterward."""
-        current = self._conn.execute(
-            "SELECT hash FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC LIMIT 1",
-            (console_key,),
-        ).fetchone()
-        if current and current["hash"] == h:
-            return []
-        blob_id = str(uuid.uuid4())
-        hist_path = self._blob_path("console_save_history", blob_id)
-        hist_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, hist_path)
-        self._conn.execute(
-            "INSERT INTO console_save_history (id, console_key, device_id, hash, pushed_at, size, card_format) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (blob_id, console_key, device_id, h, now, size, card_format),
-        )
-        return self._prune_console_history(console_key)
-
-    def _prune_console_history(self, console_key: str) -> list[str]:
-        """Delete all but the newest HISTORY_LIMIT generation rows; return the
-        pruned ids. Files are unlinked by the caller after commit (#704, #734)."""
-        ids = [
-            r["id"] for r in self._conn.execute(
-                "SELECT id FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC", (console_key,)
-            ).fetchall()
-        ]
-        self._conn.execute(
-            """DELETE FROM console_save_history
-                WHERE console_key = ? AND rowid NOT IN (
-                    SELECT rowid FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC LIMIT ?
-                )""",
-            (console_key, console_key, HISTORY_LIMIT),
-        )
-        return ids[HISTORY_LIMIT:]
+        row = self._newest_row(self._CARD_TABLE, console_key, "console_key")
+        if row is None:
+            return None
+        return {"device_id": row["device_id"], "hash": row["hash"], "pushed_at": row["pushed_at"],
+                "size": row["size"], "card_format": row["card_format"] or ""}
 
     def list_console_save_history(self, console_key: str) -> list[dict]:
-        """Every retained generation of a console's shared card, newest first."""
-        rows = self._conn.execute(
-            """SELECT id, device_id, hash, pushed_at, size, card_format
-                FROM console_save_history WHERE console_key = ? ORDER BY rowid DESC""",
-            (console_key,),
-        ).fetchall()
-        return [dict(r) for r in rows]
+        """Every retained generation of a console's shared card, newest first (#480)."""
+        return self._list_blob_history(self._CARD_TABLE, console_key, "console_key")
 
     def restore_console_save(self, console_key: str, version_id: str) -> Optional[dict]:
-        """Make a past generation of a console's shared card current, by
-        re-pushing its bytes through push_console_save_file — subject to the
-        same dedupe/prune/history rules as a normal push, so restoring never
-        destroys history; the timeline just keeps growing forward (mirrors
-        _restore_blob's per-game behavior). None if the version doesn't exist."""
-        row = self._conn.execute(
-            "SELECT device_id, card_format FROM console_save_history WHERE id = ? AND console_key = ?",
-            (version_id, console_key),
-        ).fetchone()
-        if not row:
-            return None
-        src = self._blob_path("console_save_history", version_id)
-        if not src.exists():
-            return None
-        data = src.read_bytes()
-        tmp = self.new_upload_path()
-        tmp.write_bytes(data)
-        h = _payload_sha256(data)
-        return self.push_console_save_file(
-            console_key, row["device_id"], tmp, h, len(data), row["card_format"] or ""
-        )
+        """Make a past generation current by re-pushing its bytes (same dedupe /
+        prune rules as a normal push; history is never destroyed). The restored
+        generation keeps its card_format. None if the version doesn't exist."""
+        m = self._restore_blob(self._CARD_TABLE, console_key, version_id, "console_key")
+        return self._card_meta(console_key, m) if m else None
 
     # ── console-scoped save-sync baseline (issue #481) ───────────────────────────
     # Console-key equivalent of save_sync_baseline (#460) — see that section for
