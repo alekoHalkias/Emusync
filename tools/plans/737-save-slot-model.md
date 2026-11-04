@@ -2,7 +2,7 @@
 
 Issue: #737
 Branch: feature/737-save-slot-model
-PR: none
+PR: #740
 Status: implemented
 Fix attempts: 0
 
