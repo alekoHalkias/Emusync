@@ -35,7 +35,7 @@ Make shared console memcards run through the same store core, baseline/conflict 
   - Files: src/server/store/blobs.py
   - Reuses: A1 core; `restore_console_save` becomes `_restore_blob`
   - New: none
-- [ ] A3. Schema v35 migration: for each `console_saves` row whose hash has no matching `console_save_history` row (pre-#480 cards), insert a history row and copy `blobs/console_saves/<key>` to `blobs/console_save_history/<id>`. `console_saves` table is left in place, unused (guide: never drop). Bump `_SCHEMA_VERSION` to 35 (checked free on all remote branches 2026-11-02).
+- [x] A3. Schema v35 migration: for each `console_saves` row whose hash has no matching `console_save_history` row (pre-#480 cards), insert a history row and copy `blobs/console_saves/<key>` to `blobs/console_save_history/<id>`. `console_saves` table is left in place, unused (guide: never drop). Bump `_SCHEMA_VERSION` to 35 (checked free on all remote branches 2026-11-02).
   - Files: src/server/store/schema.py
   - Reuses: `_try`, existing `from_version < N` pattern
   - New: one migration block - backfill is the only lossless way to retire the live table
@@ -104,3 +104,4 @@ Schema bump: yes (v35). New IPC channel (+ emusync.d.ts): no. New CLI subcommand
 - 2026-11-02 rescope: #737 = Phases A + C; Phase B -> #738; Phases D/E -> #739
 - 2026-11-04 tplan: 7 test cases + 5 edge cases defined; 2 existing tests need updating
 Step A2: also removed test_archive_memcard_folder_streams (covered only the dead _archive_memcard_folder) and rewrote the two live-slot tests in test_console_memcard.py as planned.
+Step A3: migration helper also returns early when console_saves/console_save_history are absent (test_stuck_at_19 builds a partial DB). Migration tests live in test_console_memcard.py as planned.
