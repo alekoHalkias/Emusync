@@ -60,12 +60,15 @@ Highest fix churn in the codebase (#460, #478, #692, #699, #717, #718, #734). Du
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_console_memcard.py (extend), test_integrity.py, test_conflicts.py; no new file
+### Test Cases: A3 backfill migration (+idempotent, +skips cards with history), shared baseline/conflict helper dedupe, route headers/shapes unchanged, pull baseline after body delivered, console card integrity classification, SyncClient slot prefix via live_server, GC mismatch tests unchanged
+### Edge Cases: no history and no live file, missing blob file during migration, same id string across owner types, restore keeps card_format, game delete still cascades save_conflicts
+### Integration Points: Store init runs _migrate with blob_dir; _DEVICE_REFS; two existing tests rewritten (live-slot assertions); manual dev-server run for GUI paths
+### Outline:
+Backend: A1 parameterize blob core by owner column; A2 memcard store methods on the core; A3 v35 backfill of pre-#480 cards; A4 shared baseline/conflict helpers; A5 memcard routes via _BlobKind handlers; A6 device-merge refs; C1 slot prefix on SyncClient, shrink _MemcardClient.
+Tests: extend test_console_memcard/test_integrity/test_conflicts; rewrite two live-slot tests.
+Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend design guide.
+### Summary: Console memory cards run on the same store core, handlers and client paths as per-game saves, with an additive v35 backfill and no external API change.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -101,3 +104,4 @@ Highest fix churn in the codebase (#460, #478, #692, #699, #717, #718, #734). Du
 - 2026-11-02 design: scope=backend, plan_target=bplan, difficulty=10/10, breaking=yes
 - 2026-11-02 bplan: 3 phases (A/B/C) + tests/docs written, backend_pattern=owner-column-parameterized blob core; paused for split decision before tplan
 - 2026-11-02 rescope: #737 = A + C (difficulty 6, non-breaking); B -> #738; D/E -> #739
+- 2026-11-04 tplan: test_file=src/tests/test_console_memcard.py (+integrity, conflicts), 7 test cases defined

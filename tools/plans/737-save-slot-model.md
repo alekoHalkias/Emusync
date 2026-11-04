@@ -68,6 +68,28 @@ Make shared console memcards run through the same store core, baseline/conflict 
 | A | store/blobs.py, store/conflicts.py, store/schema.py, api/blobs.py, (store/devices.py) | low-medium: server only, routes unchanged | v35, additive backfill |
 | C | sync_client.py, cli/run_ps2.py, run.py, console.py | low | none |
 
+## Testing
+- **Test File**: extend `src/tests/test_console_memcard.py` (store + route cases, 30 existing tests are the regression net), `src/tests/test_integrity.py` (console card integrity), `src/tests/test_conflicts.py` (shared baseline/conflict helper); migration case in `src/tests/test_console_memcard.py` using the `schema._migrate(conn, from_version=34, blob_dir)` pattern from `test_network_matching.py:test_v33_migration_adds_rom_size`. No new test file.
+- **Test Cases**:
+  - A2 push/pull/history/restore/prune on the shared core: existing memcard tests pass unchanged (card_format round-trip, dedupe, prune unlinks files, restore envelope-free hash).
+  - A3 migration: build a v34 DB with a `console_saves` row and blob file but no history row; run `_migrate`; assert a history row exists with the same hash/size/card_format, `pull_console_save_path` returns identical bytes, `user_version == _SCHEMA_VERSION`, original `console_saves` row and file untouched, second run is a no-op (idempotent).
+  - A3 migration skips a card that already has a matching history row (no duplicate generation).
+  - A4 baseline/conflict wrappers: existing `test_conflicts.py` and baseline tests (game + console) pass unchanged; add one case that both families dedupe an identical open conflict through the shared helper.
+  - A5 routes: `/consoles/{key}/memcard*` status codes, `X-Save-Hash`/`X-Pushed-At`/`X-Device-Id`/`X-Card-Format` headers and JSON shapes identical (existing route tests); pull baseline recorded only after body delivered (extend the `resp.background()` pattern from `test_transfer_dataloss_715.py`).
+  - A5 integrity: `integrity_for_game`-style classification works for a console card (ok, zero_byte, hash_mismatch, last_good_version_id) via the generalized `_classify_blob`; sweep includes console keys.
+  - C1 `SyncClient` slot prefix hits `/games/{slug}/save` vs `/consoles/{key}/memcard` (use `live_server` with a real client); GC format-mismatch tests in `test_gc_card_format_mismatch.py` pass unchanged.
+- **Edge Cases**:
+  - Console card with no history and no `console_saves` file: pull returns 204/None, no crash.
+  - Pre-#480 card whose blob file is missing: migration skips it without failing startup.
+  - Two consoles and one game with the same id string: owner column keeps rows separate.
+  - Restoring a console version keeps `card_format`.
+  - Game delete still cascades `save_conflicts`; console conflicts are unaffected.
+- **Existing tests that must change** (they assert the retired live-slot behavior): `test_console_pull_serves_history_copy_not_live_slot` (drop the live-slot path assertion) and `test_console_pull_falls_back_to_live_slot_without_history` (becomes the A3 migration case: history is backfilled, so pull serves the history copy). Check `test_store_internals.py` and `test_new_consoles.py` for direct `console_saves` queries.
+- **Integration Points**:
+  - `Store` init runs `_migrate(conn, db_version, blob_dir)` so the backfill runs on a real data dir.
+  - `devices.py:_DEVICE_REFS` still lists the console tables for device merge (`test_device_merge`-style case if A6 changes it).
+  - GUI is unaffected: no JS test runner exists; verified by running `make test-changed` plus a manual push/pull of a PS2 card and a GC folder card against `make dev-server`.
+
 ## Checklist
 Schema bump: yes (v35). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
@@ -80,3 +102,4 @@ Schema bump: yes (v35). New IPC channel (+ emusync.d.ts): no. New CLI subcommand
 ## Log
 - 2026-11-02 bplan: outline written; awaiting user decision on split (A / B / C as sub-issues) before tplan
 - 2026-11-02 rescope: #737 = Phases A + C; Phase B -> #738; Phases D/E -> #739
+- 2026-11-04 tplan: 7 test cases + 5 edge cases defined; 2 existing tests need updating
