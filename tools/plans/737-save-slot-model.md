@@ -53,14 +53,14 @@ Make shared console memcards run through the same store core, baseline/conflict 
   - New: none
 
 ### Phase C - reconcile client
-- [ ] C1. Give `SyncClient` save methods a slot prefix (`games/{slug}/save` vs `consoles/{key}/memcard`), since the routes now mirror each other after A5. `_MemcardClient` shrinks to the GC Dolphin card-format pre-pull check.
+- [x] C1. Give `SyncClient` save methods a slot prefix (`games/{slug}/save` vs `consoles/{key}/memcard`), since the routes now mirror each other after A5. `_MemcardClient` shrinks to the GC Dolphin card-format pre-pull check.
   - Files: src/server/sync_client.py, src/cli/run_ps2.py, src/cli/run.py, src/cli/console.py
   - Reuses: `_reconcile_save` unchanged
   - New: none
 
 ### Tests and docs
-- [ ] T. Tests, real SQLite, no mocks: A3 migration from a v34 DB with a pre-#480 card (history backfilled, pull returns same bytes and hash); memcard push/pull/history/restore/baseline via routes unchanged (existing `test_console_memcard.py`, 30 tests, is the regression net); integrity sweep includes a console card; C1 GC card-format check still blocks a mismatched pull. Existing suites touched: test_console_memcard, test_saves, test_state_sync, test_run_reconcile, test_store_internals, test_gc_card_format_mismatch, test_conflicts.
-- [ ] D. Docs: CLAUDE.md "Saves / sync" - replace memcard table list with "console cards use the shared blob core keyed by console_key"; GOTCHAS.md entry for v35; ARCHITECTURE.md blob section; backend design guide gains "blob tables share one core keyed by owner column".
+- [x] T. Tests, real SQLite, no mocks: A3 migration from a v34 DB with a pre-#480 card (history backfilled, pull returns same bytes and hash); memcard push/pull/history/restore/baseline via routes unchanged (existing `test_console_memcard.py`, 30 tests, is the regression net); integrity sweep includes a console card; C1 GC card-format check still blocks a mismatched pull. Existing suites touched: test_console_memcard, test_saves, test_state_sync, test_run_reconcile, test_store_internals, test_gc_card_format_mismatch, test_conflicts.
+- [x] D. Docs: CLAUDE.md "Saves / sync" - replace memcard table list with "console cards use the shared blob core keyed by console_key"; GOTCHAS.md entry for v35; ARCHITECTURE.md blob section; backend design guide gains "blob tables share one core keyed by owner column".
 
 ## Sizing
 | Phase | Files | Risk | Migration |
@@ -108,3 +108,5 @@ Step A3: migration helper also returns early when console_saves/console_save_his
 Step A4: no new dedupe test added; existing per-game and console dedupe tests in test_conflicts.py already exercise the shared _add_conflict.
 Step A5: integrity for console cards is NOT free as the plan claimed - sweep_integrity and the integrity endpoints are keyed by game slug for the GUI. Added Store.integrity_for_console (tested) and left sweep/endpoints unchanged; exposing card integrity to the GUI is a separate change.
 Step A6: no code change. console_saves keeps its legacy rows after v35 (retired, not dropped), so its _DEVICE_REFS entry stays to keep merged device ids consistent.
+Step C1: HTTP duplication removed (shared _pull_slot/_push_slot/_get_json_or_none/_post_conflict; console_* methods are one-line wrappers, names unchanged). _MemcardClient left as-is: it is the slug-ignoring adapter _reconcile_save needs plus the GC format check; removing it means changing _reconcile_save's signature, not in this plan.
+Step T: no new test file; coverage as planned - v35 backfill (4 tests), console card integrity (1), route/header/baseline-after-body/GC mismatch/live_server client paths covered by the existing suites, which pass unchanged except the two rewritten live-slot tests. Step D: CLAUDE.md, GOTCHAS.md (2 entries), ARCHITECTURE.md (table list), backend design guide updated.

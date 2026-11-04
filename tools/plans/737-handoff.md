@@ -112,3 +112,5 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - 2026-11-04 implement: step A4 done (_set_baseline/_get_baseline and _add_conflict shared by game and console tables)
 - 2026-11-04 implement: step A5 done (memcard routes use _pull/_push/_meta/_history/_restore via _BlobKind _CARD; new _sync_baseline handler; integrity_for_console added, deviation logged)
 - 2026-11-04 implement: step A6 done (no change needed; console_saves rows persist so _DEVICE_REFS entry kept)
+- 2026-11-04 implement: step C1 done (SyncClient slot helpers shared by game and console methods; _MemcardClient unchanged, deviation logged)
+- 2026-11-04 implement: steps T and D done (tests as listed; docs updated)

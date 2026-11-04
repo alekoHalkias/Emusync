@@ -577,68 +577,61 @@ class SyncClient:
         Folder-based saves (Dolphin GC/Wii, PPSSPP, PCSX2 memcards) arrive as a
         plain tar archive; file-based saves arrive as raw bytes. _write_memcard
         detects which and handles both (#431)."""
-        r = self._client.get(self._url(f"/games/{slug}/save"), timeout=_TRANSFER_TIMEOUT)
+        return self._pull_slot(f"/games/{slug}/save", save_path)
+
+    def push_save(self, slug: str, save_path: str) -> str:
+        return self._push_slot(f"/games/{slug}/save", save_path)
+
+    # Save "slot" helpers (#737): a game's save and a console's shared card are the
+    # same blob API under a different path prefix (/games/{slug}/save vs
+    # /consoles/{key}/memcard), so one implementation serves both.
+
+    def _pull_slot(self, path: str, dest: str) -> tuple[bool, Optional[str]]:
+        r = self._client.get(self._url(path), timeout=_TRANSFER_TIMEOUT)
         if r.status_code == 204:
             return False, None
         r.raise_for_status()
-        _write_memcard(Path(save_path), r.content)
+        _write_memcard(Path(dest), r.content)
         return True, r.headers.get("X-Save-Hash")
 
-    def push_save(self, slug: str, save_path: str) -> str:
-        data = memcard_bytes(Path(save_path))
+    def _push_slot(self, path: str, src: str, extra_headers: Optional[dict] = None) -> str:
         r = self._client.post(
-            self._url(f"/games/{slug}/save"),
-            content=data,
-            headers={"Content-Type": "application/octet-stream"},
+            self._url(path),
+            content=memcard_bytes(Path(src)),
+            headers={"Content-Type": "application/octet-stream", **(extra_headers or {})},
             timeout=_TRANSFER_TIMEOUT,
         )
         r.raise_for_status()
         return r.json()["hash"]
+
+    def _get_json_or_none(self, path: str) -> Optional[dict]:
+        r = self._client.get(self._url(path), timeout=10)
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
 
     # ── console-scoped shared memory card (issue #295) ──────────────────────────
     # PS2's single card, shared across all the console's games. Mirrors the save
-    # methods but keyed by console_key so _reconcile_save works against it.
+    # methods but keyed by console_key so _reconcile_save works against it. Thin
+    # wrappers over the shared slot helpers above (#737).
 
     def get_console_memcard_meta(self, console_key: str) -> Optional[dict]:
-        r = self._client.get(self._url(f"/consoles/{console_key}/memcard/meta"), timeout=10)
-        if r.status_code == 204:
-            return None
-        r.raise_for_status()
-        return r.json()
+        return self._get_json_or_none(f"/consoles/{console_key}/memcard/meta")
 
     def pull_console_memcard(self, console_key: str, card_path: str) -> tuple[bool, Optional[str]]:
         """Write the server's shared card to disk (backing up any existing one).
-
-        Folder-based memcards arrive as a plain tar archive; file-based cards
-        arrive as raw bytes. _write_memcard detects which and handles both.
-        """
-        r = self._client.get(self._url(f"/consoles/{console_key}/memcard"), timeout=_TRANSFER_TIMEOUT)
-        if r.status_code == 204:
-            return False, None
-        r.raise_for_status()
-        _write_memcard(Path(card_path), r.content)
-        return True, r.headers.get("X-Save-Hash")
+        Folder cards arrive as a tar, file cards as raw bytes; _write_memcard
+        handles both."""
+        return self._pull_slot(f"/consoles/{console_key}/memcard", card_path)
 
     def push_console_memcard(self, console_key: str, card_path: str, card_format: str = "") -> str:
-        data = memcard_bytes(Path(card_path))
-        r = self._client.post(
-            self._url(f"/consoles/{console_key}/memcard"),
-            content=data,
-            headers={"Content-Type": "application/octet-stream", "X-Card-Format": card_format},
-            timeout=_TRANSFER_TIMEOUT,
-        )
-        r.raise_for_status()
-        return r.json()["hash"]
+        return self._push_slot(f"/consoles/{console_key}/memcard", card_path, {"X-Card-Format": card_format})
 
     def get_console_save_sync_baseline(self, console_key: str) -> Optional[dict]:
         """The shared-card hash this device last agreed with the server on for
-        CONSOLE_KEY, or None if it never has (issue #481, console-scoped
-        equivalent of get_save_sync_baseline)."""
-        r = self._client.get(self._url(f"/consoles/{console_key}/memcard/sync-baseline"), timeout=10)
-        if r.status_code == 204:
-            return None
-        r.raise_for_status()
-        return r.json()
+        CONSOLE_KEY, or None if it never has (issue #481)."""
+        return self._get_json_or_none(f"/consoles/{console_key}/memcard/sync-baseline")
 
     # ── communal Switch mod pool (issue #444) ────────────────────────────────────
     # Keyed by title ID, not game slug — shared across every device with the game.
@@ -772,20 +765,12 @@ class SyncClient:
         r.raise_for_status()
 
     def get_save_meta(self, slug: str) -> Optional[dict]:
-        r = self._client.get(self._url(f"/games/{slug}/save/meta"), timeout=10)
-        if r.status_code == 204:
-            return None
-        r.raise_for_status()
-        return r.json()
+        return self._get_json_or_none(f"/games/{slug}/save/meta")
 
     def get_save_sync_baseline(self, slug: str) -> Optional[dict]:
         """The save hash this device last agreed with the server on for *slug*,
         or None if it never has (issue #460)."""
-        r = self._client.get(self._url(f"/games/{slug}/save/sync-baseline"), timeout=10)
-        if r.status_code == 204:
-            return None
-        r.raise_for_status()
-        return r.json()
+        return self._get_json_or_none(f"/games/{slug}/save/sync-baseline")
 
     def _list_history(self, kind: str, slug: str) -> list[dict]:
         """Return every retained generation of `kind` ('save'/'state') for a game."""
@@ -802,25 +787,20 @@ class SyncClient:
     def report_conflict(self, slug: str, winner_device_id: str, loser_device_id: str,
                         winner_hash: str, loser_hash: str) -> dict:
         """Record an auto-resolved save divergence on the server (issue #243)."""
-        r = self._client.post(
-            self._url(f"/games/{slug}/conflicts"),
-            json={
-                "winner_device_id": winner_device_id,
-                "loser_device_id": loser_device_id,
-                "winner_hash": winner_hash or "",
-                "loser_hash": loser_hash or "",
-            },
-            timeout=10,
-        )
-        r.raise_for_status()
-        return r.json()
+        return self._post_conflict(f"/games/{slug}/conflicts", winner_device_id, loser_device_id,
+                                   winner_hash, loser_hash)
 
     def report_console_conflict(self, console_key: str, winner_device_id: str, loser_device_id: str,
                                 winner_hash: str, loser_hash: str) -> dict:
         """Console-key equivalent of report_conflict for a shared-memcard
         console's card (issue #482)."""
+        return self._post_conflict(f"/consoles/{console_key}/conflicts", winner_device_id, loser_device_id,
+                                   winner_hash, loser_hash)
+
+    def _post_conflict(self, path: str, winner_device_id: str, loser_device_id: str,
+                       winner_hash: str, loser_hash: str) -> dict:
         r = self._client.post(
-            self._url(f"/consoles/{console_key}/conflicts"),
+            self._url(path),
             json={
                 "winner_device_id": winner_device_id,
                 "loser_device_id": loser_device_id,
