@@ -47,7 +47,7 @@ Make shared console memcards run through the same store core, baseline/conflict 
   - Files: src/server/api/blobs.py
   - Reuses: `_pull`, `_push`, `_meta`, `_history`, `_restore`, `_stage_upload`
   - New: none
-- [ ] A6. Device-merge refs: drop `console_saves` from `_DEVICE_REFS` only if A3 leaves it empty-and-unused; otherwise keep (harmless).
+- [x] A6. Device-merge refs: drop `console_saves` from `_DEVICE_REFS` only if A3 leaves it empty-and-unused; otherwise keep (harmless).
   - Files: src/server/store/devices.py
   - Reuses: `_DEVICE_REFS`
   - New: none
@@ -107,3 +107,4 @@ Step A2: also removed test_archive_memcard_folder_streams (covered only the dead
 Step A3: migration helper also returns early when console_saves/console_save_history are absent (test_stuck_at_19 builds a partial DB). Migration tests live in test_console_memcard.py as planned.
 Step A4: no new dedupe test added; existing per-game and console dedupe tests in test_conflicts.py already exercise the shared _add_conflict.
 Step A5: integrity for console cards is NOT free as the plan claimed - sweep_integrity and the integrity endpoints are keyed by game slug for the GUI. Added Store.integrity_for_console (tested) and left sweep/endpoints unchanged; exposing card integrity to the GUI is a separate change.
+Step A6: no code change. console_saves keeps its legacy rows after v35 (retired, not dropped), so its _DEVICE_REFS entry stays to keep merged device ids consistent.
