@@ -94,7 +94,7 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 ## 10. Ship
 ### Status: pending
 ### PR: #740
-### Server Sync: pending (paused: one-way v35 migration on the server PC, awaiting user confirmation)
+### Server Sync: done (backup ~/.local/share/emusync-backup-pre737-20261105-124031 on server PC; DB now v35)
 ### Doc Sync: pending
 
 ## 11. Fix Attempts
@@ -120,3 +120,4 @@ Docs: CLAUDE.md memcard rule, GOTCHAS v35, ARCHITECTURE blob section, backend de
 - 2026-11-04 implement: all steps done, Status=implemented
 - 2026-11-04 ship: PR #740 opened, tests pass
 - 2026-11-04 review: 3 findings, blocked=no
+- 2026-11-05 ship: server sync done after backup of emusync.db and blobs/
