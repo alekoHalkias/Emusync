@@ -36,6 +36,16 @@ src/gui/electron/game.ts (game:stop-external), src/cli/run_offline.py (_detach_a
 ### Backend Pattern: optional OS helper, swallow failures
 ### Recommendations: none
 
+## 6. Testing Plan
+### Test File: src/tests/test_run_detach.py
+### Test Cases: no_busctl no-op; cgroup changes (skipif no user bus); existing fork test
+### Edge Cases: busctl present, bus unreachable
+### Integration Points: _detach_after_game child path
+### Outline
+Backend: 1 add _escape_steam_scope + call in detach child; 3 docs (GOTCHAS, CLAUDE.md)
+Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new infra)
+### Summary: Detached post-game push moves itself into a systemd user scope so Steam's teardown cannot kill it.
+
 ## 8. Implementation Steps
 - Plan file: tools/plans/742-steam-stop-push-killed.md (3 steps)
 - Step 1: touches run_offline.py; reuses _detach_after_game; new _escape_steam_scope (nothing talks to systemd)
@@ -46,3 +56,4 @@ src/gui/electron/game.ts (game:stop-external), src/cli/run_offline.py (_detach_a
 - 2026-11-08 issue: workflow initialized
 - 2026-11-08 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-08 bplan: 3 steps written, backend_pattern=best-effort systemd scope escape in detach child
+- 2026-11-08 tplan: test_file=src/tests/test_run_detach.py, 3 test cases defined

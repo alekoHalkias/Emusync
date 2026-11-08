@@ -27,6 +27,17 @@ Move the detached post-game child into its own systemd user scope so Steam teari
   - Reuses: existing #725 text
   - New: none
 
+## Testing
+- **Test File**: src/tests/test_run_detach.py (extends the existing real-fork subprocess test)
+- **Test Cases**:
+  - no_busctl: `_escape_steam_scope()` returns without raising when PATH has no busctl
+  - scope_escape: child's /proc/self/cgroup differs after the call (skipif no user bus)
+  - existing fork test still passes
+- **Edge Cases**:
+  - busctl present but user bus unreachable: swallowed, push continues
+- **Integration Points**:
+  - `_detach_after_game` child path; run_game's push/release unchanged
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
 
