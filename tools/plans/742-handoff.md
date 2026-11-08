@@ -6,7 +6,7 @@
 - PR: #743
 - Status: implementing
 - Created: 2026-11-08
-- Fix attempts: 0
+- Fix attempts: 2
 
 ## 1. Issue
 ### Summary
@@ -63,3 +63,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 ship: server sync done; doc sync done (GOTCHAS.md, CLAUDE.md in step 3)
 - 2026-11-08 fix attempt 1 planned: SIGTERM-then-kill grace in _sigterm_handler and stop-external
 - 2026-11-08 implement: F1.1-F1.4 done (SIGTERM + grace in handler and stop-external, tests, docs)
+- 2026-11-08 fix attempt 2 planned: delay SIGTERM forward (RetroArch _exits on 2nd SIGTERM); GUI stop signals emusync only

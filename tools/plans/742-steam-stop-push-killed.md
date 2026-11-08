@@ -64,3 +64,17 @@ Cause: `_sigterm_handler` calls `child.kill()` (SIGKILL), so RetroArch never wri
   - New: new file - none exists for the handler
 - [x] F1.4 Docs: GOTCHAS.md + CLAUDE.md note (SIGTERM first, SIGKILL after grace; #742).
   - Files: src/docs/GOTCHAS.md, CLAUDE.md
+
+## Fix attempt 2
+Failure: manual test, Steam "Exit game": `.srm` and `.state.auto` not rewritten (last written 16:19:32, later sessions logged "Pushed state" only), so the push uploads an unchanged save.
+Cause: RetroArch's SIGTERM handler starts a clean shutdown on the first signal and calls `_exit(1)` on the second (frontend/drivers/platform_unix.c), skipping SRAM/autosave writes. Steam's reaper SIGTERMs the whole tree (RetroArch and `emusync run`), and `_sigterm_handler` immediately forwards a second SIGTERM. `game:stop-external` does the same (signals both pids).
+- [ ] F2.1 `_sigterm_handler`: don't signal the child immediately. A daemon timer after `_FORWARD_DELAY_SECONDS` (3s) sends SIGTERM only if the child is still alive; the existing `_STOP_GRACE_SECONDS` timer still SIGKILLs. Repeat SIGTERMs to emusync must not start more timers (guard with a module flag reset in `_launch_and_wait`... or simply check `child.poll()` and a `_stopping` flag).
+  - Files: src/cli/run.py
+  - Reuses: existing handler, threading.Timer
+  - New: `_FORWARD_DELAY_SECONDS` constant
+- [ ] F2.2 `game:stop-external`: signal only the emusync pid (the CLI forwards one SIGTERM to the emulator); drop the direct emulator SIGTERM.
+  - Files: src/gui/electron/game.ts
+- [ ] F2.3 Tests: child that, like RetroArch, exits cleanly on the first SIGTERM and writes "dirty" on a second: signaling both child and parent ends with a clean marker; child that ignores SIGTERM still gets forwarded SIGTERM then SIGKILL.
+  - Files: src/tests/test_run_sigterm.py
+- [ ] F2.4 Docs: GOTCHAS.md + CLAUDE.md: never double-SIGTERM RetroArch (second signal = `_exit` with no save).
+  - Files: src/docs/GOTCHAS.md, CLAUDE.md
