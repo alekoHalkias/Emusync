@@ -71,3 +71,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 ship: test_sigterm_handler_kills_child_without_exiting failed (expects sync terminate); fix step F3.1
 - 2026-11-08 implement: F3.1 done (test waits for delayed terminate)
 - 2026-11-08 ship: tests pass (749 passed)
+- 2026-11-08 ship: server sync done; doc sync done (F2.4)
