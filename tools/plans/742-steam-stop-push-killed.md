@@ -72,7 +72,7 @@ Cause: RetroArch's SIGTERM handler starts a clean shutdown on the first signal a
   - Files: src/cli/run.py
   - Reuses: existing handler, threading.Timer
   - New: `_FORWARD_DELAY_SECONDS` constant
-- [ ] F2.2 `game:stop-external`: signal only the emusync pid (the CLI forwards one SIGTERM to the emulator); drop the direct emulator SIGTERM.
+- [x] F2.2 `game:stop-external`: signal only the emusync pid (the CLI forwards one SIGTERM to the emulator); drop the direct emulator SIGTERM.
   - Files: src/gui/electron/game.ts
 - [ ] F2.3 Tests: child that, like RetroArch, exits cleanly on the first SIGTERM and writes "dirty" on a second: signaling both child and parent ends with a clean marker; child that ignores SIGTERM still gets forwarded SIGTERM then SIGKILL.
   - Files: src/tests/test_run_sigterm.py
