@@ -90,6 +90,6 @@ Change requested: drop the timing guess. The handler never sends SIGTERM to the 
   - Files: src/cli/run.py
 - [x] F4.2 `game:stop-external`: SIGTERM the emulator pid directly (like Steam does), plus the emusync pid (arms the fallback).
   - Files: src/gui/electron/game.ts
-- [ ] F4.3 Tests: drop forward-delay patches; handler sends nothing before the grace and SIGKILLs a hung child after it; Steam-style test (emulator signaled directly) still saves.
+- [x] F4.3 Tests: drop forward-delay patches; handler sends nothing before the grace and SIGKILLs a hung child after it; Steam-style test (emulator signaled directly) still saves.
   - Files: src/tests/test_run_sigterm.py, src/tests/test_run_reconcile.py
 - [ ] F4.4 Docs: GOTCHAS.md + CLAUDE.md.

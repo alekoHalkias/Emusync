@@ -1,4 +1,4 @@
-"""SIGTERM stops the emulator gracefully, SIGKILL only after a grace (#742). Real processes."""
+"""emusync run never re-sends SIGTERM to the emulator; SIGKILL only after a grace (#742). Real processes."""
 from __future__ import annotations
 
 import os
@@ -22,35 +22,18 @@ def _spawn(body: str) -> subprocess.Popen:
 
 
 @pytest.fixture(autouse=True)
-def _clear_child(monkeypatch):
-    monkeypatch.setattr(run_mod, "_FORWARD_DELAY_SECONDS", 0.1)
+def _clear_child():
     yield
     run_offline._child_proc = None
 
 
-def test_sigterm_lets_the_emulator_save_before_exiting(tmp_path):
-    marker = tmp_path / "saved"
-    proc = _spawn(f"""
-        import signal, sys, time
-        from pathlib import Path
-        def bye(*_):
-            Path({str(marker)!r}).write_text("sram")
-            sys.exit(0)
-        signal.signal(signal.SIGTERM, bye)
-        print("ready", flush=True)
-        time.sleep(30)
-    """)
-    run_offline._child_proc = proc
-    run_mod._sigterm_handler()
-    assert proc.wait(timeout=5) == 0
-    assert marker.read_text() == "sram"
-
-
-def test_emulator_ignoring_sigterm_is_killed_after_the_grace(tmp_path, monkeypatch):
+def test_handler_never_sigterms_the_emulator_and_kills_after_grace(tmp_path, monkeypatch):
     monkeypatch.setattr(run_mod, "_STOP_GRACE_SECONDS", 0.5)
-    proc = _spawn("""
+    marker = tmp_path / "sigterm"
+    proc = _spawn(f"""
         import signal, time
-        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        from pathlib import Path
+        signal.signal(signal.SIGTERM, lambda *_: Path({str(marker)!r}).write_text("got"))
         print("ready", flush=True)
         time.sleep(30)
     """)
@@ -59,11 +42,11 @@ def test_emulator_ignoring_sigterm_is_killed_after_the_grace(tmp_path, monkeypat
     run_mod._sigterm_handler()
     assert proc.wait(timeout=5) == -9
     assert time.monotonic() - start >= 0.4
+    assert not marker.exists()
 
 
-def test_already_signaled_emulator_gets_no_second_sigterm(tmp_path, monkeypatch):
+def test_already_signaled_emulator_gets_no_second_sigterm(tmp_path):
     """Steam SIGTERMs the whole tree; RetroArch _exit()s unsaved on a second one."""
-    monkeypatch.setattr(run_mod, "_FORWARD_DELAY_SECONDS", 1.0)
     marker = tmp_path / "exit"
     proc = _spawn(f"""
         import os, signal, time
@@ -84,6 +67,6 @@ def test_already_signaled_emulator_gets_no_second_sigterm(tmp_path, monkeypatch)
     run_offline._child_proc = proc
     os.kill(proc.pid, signal.SIGTERM)  # Steam's signal to the emulator
     run_mod._sigterm_handler()          # Steam's signal to emusync run
-    run_mod._sigterm_handler()          # repeats must not stack either
+    run_mod._sigterm_handler()          # repeats must not signal either
     assert proc.wait(timeout=5) == 0
     assert marker.read_text() == "saved"
