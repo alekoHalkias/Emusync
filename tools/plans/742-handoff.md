@@ -4,7 +4,7 @@
 - Issue: #742
 - Branch: feature/742-steam-stop-push-killed
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-08
 - Fix attempts: 0
 
