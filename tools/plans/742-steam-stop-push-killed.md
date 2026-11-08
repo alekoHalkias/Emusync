@@ -68,7 +68,7 @@ Cause: `_sigterm_handler` calls `child.kill()` (SIGKILL), so RetroArch never wri
 ## Fix attempt 2
 Failure: manual test, Steam "Exit game": `.srm` and `.state.auto` not rewritten (last written 16:19:32, later sessions logged "Pushed state" only), so the push uploads an unchanged save.
 Cause: RetroArch's SIGTERM handler starts a clean shutdown on the first signal and calls `_exit(1)` on the second (frontend/drivers/platform_unix.c), skipping SRAM/autosave writes. Steam's reaper SIGTERMs the whole tree (RetroArch and `emusync run`), and `_sigterm_handler` immediately forwards a second SIGTERM. `game:stop-external` does the same (signals both pids).
-- [ ] F2.1 `_sigterm_handler`: don't signal the child immediately. A daemon timer after `_FORWARD_DELAY_SECONDS` (3s) sends SIGTERM only if the child is still alive; the existing `_STOP_GRACE_SECONDS` timer still SIGKILLs. Repeat SIGTERMs to emusync must not start more timers (guard with a module flag reset in `_launch_and_wait`... or simply check `child.poll()` and a `_stopping` flag).
+- [x] F2.1 `_sigterm_handler`: don't signal the child immediately. A daemon timer after `_FORWARD_DELAY_SECONDS` (3s) sends SIGTERM only if the child is still alive; the existing `_STOP_GRACE_SECONDS` timer still SIGKILLs. Repeat SIGTERMs to emusync must not start more timers (guard with a module flag reset in `_launch_and_wait`... or simply check `child.poll()` and a `_stopping` flag).
   - Files: src/cli/run.py
   - Reuses: existing handler, threading.Timer
   - New: `_FORWARD_DELAY_SECONDS` constant

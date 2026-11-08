@@ -146,14 +146,17 @@ def _relocated_gd(gd, consoles: list[dict], console_name: str):
 
 # Grace before an emulator that ignored SIGTERM is SIGKILLed (#742).
 _STOP_GRACE_SECONDS = 10
+# Wait before forwarding SIGTERM, in case the emulator was already signaled (#742).
+_FORWARD_DELAY_SECONDS = 3
 
 
 def _sigterm_handler(*_) -> None:
     """Stop the emulator child on SIGTERM (Steam Gaming Mode sends this when a
     game is closed from its UI) — and then get out of the way.
 
-    The child gets SIGTERM, not SIGKILL, so RetroArch can write its SRAM and
-    autosave state on the way out; a timer SIGKILLs it if it hangs (#742).
+    The child gets exactly one SIGTERM (delayed, and skipped if it already
+    exited), not SIGKILL, so RetroArch can write its SRAM and autosave state on
+    the way out; a timer SIGKILLs it if it hangs (#742).
 
     Deliberately does NOT sys.exit() here: SystemExit isn't an Exception, so
     it would skip straight past run_game's `except Exception` and land in its
@@ -165,10 +168,15 @@ def _sigterm_handler(*_) -> None:
     as it would on a normal, non-signaled exit: push runs, lock releases.
     """
     child = _run_offline_mod._child_proc
-    if child is not None and child.poll() is None:
-        child.terminate()
-        timer = threading.Timer(
-            _STOP_GRACE_SECONDS, lambda: child.poll() is None and child.kill())
+    if child is None or child.poll() is not None or getattr(child, "_emusync_stopping", False):
+        return
+    child._emusync_stopping = True  # repeat signals must not stack more SIGTERMs
+    # The forwarded SIGTERM waits _FORWARD_DELAY_SECONDS: Steam signals the whole
+    # tree, so the emulator usually has one already, and RetroArch _exit()s
+    # without saving on a second SIGTERM (#742).
+    for delay, stop in ((_FORWARD_DELAY_SECONDS, child.terminate),
+                        (_STOP_GRACE_SECONDS, child.kill)):
+        timer = threading.Timer(delay, lambda s=stop: child.poll() is None and s())
         timer.daemon = True
         timer.start()
 
