@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #742
 - Branch: feature/742-steam-stop-push-killed
-- PR: none
-- Status: implemented
+- PR: #743
+- Status: shipped
 - Created: 2026-11-08
 - Fix attempts: 0
 
@@ -59,3 +59,5 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 tplan: test_file=src/tests/test_run_detach.py, 3 test cases defined
 - 2026-11-08 implement: step 1 done (_escape_steam_scope in run_offline, called after setsid)
 - 2026-11-08 implement: steps 2-3 done (tests, docs)
+- 2026-11-08 review: 0 findings, blocked=no
+- 2026-11-08 ship: server sync done; doc sync done (GOTCHAS.md, CLAUDE.md in step 3)
