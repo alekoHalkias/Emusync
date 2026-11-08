@@ -144,9 +144,16 @@ def _relocated_gd(gd, consoles: list[dict], console_name: str):
     return moved
 
 
+# Grace before an emulator that ignored SIGTERM is SIGKILLed (#742).
+_STOP_GRACE_SECONDS = 10
+
+
 def _sigterm_handler(*_) -> None:
-    """Kill the emulator child on SIGTERM (Steam Gaming Mode sends this when a
+    """Stop the emulator child on SIGTERM (Steam Gaming Mode sends this when a
     game is closed from its UI) — and then get out of the way.
+
+    The child gets SIGTERM, not SIGKILL, so RetroArch can write its SRAM and
+    autosave state on the way out; a timer SIGKILLs it if it hangs (#742).
 
     Deliberately does NOT sys.exit() here: SystemExit isn't an Exception, so
     it would skip straight past run_game's `except Exception` and land in its
@@ -159,7 +166,11 @@ def _sigterm_handler(*_) -> None:
     """
     child = _run_offline_mod._child_proc
     if child is not None and child.poll() is None:
-        child.kill()
+        child.terminate()
+        timer = threading.Timer(
+            _STOP_GRACE_SECONDS, lambda: child.poll() is None and child.kill())
+        timer.daemon = True
+        timer.start()
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)

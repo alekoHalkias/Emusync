@@ -965,8 +965,11 @@ def test_sigterm_handler_kills_child_without_exiting(monkeypatch):
         def poll(self):
             return None  # still running
 
-        def kill(self):
+        def terminate(self):  # SIGTERM first so the emulator can save (#742)
             self.killed = True
+
+        def kill(self):
+            pass
 
     fake_child = _FakeChild()
     monkeypatch.setattr(run_offline_mod, "_child_proc", fake_child)
