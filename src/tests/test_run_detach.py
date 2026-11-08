@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -39,3 +40,34 @@ def test_parent_exits_at_once_and_child_finishes_in_background(tmp_path):
     assert marker.read_text() == "ok"
     assert "child done" in log.read_text()
     assert proc.stdout == b""  # child output went to the log, not the launcher's pipe
+
+
+def _cgroup_script(extra: str) -> str:
+    return textwrap.dedent(f"""
+        import sys, time
+        sys.path.insert(0, {str(SRC)!r})
+        from cli.run_offline import _escape_steam_scope
+        before = open('/proc/self/cgroup').read()
+        {extra}
+        _escape_steam_scope()
+        time.sleep(0.3)
+        print(before != open('/proc/self/cgroup').read())
+    """)
+
+
+def test_escape_scope_is_a_noop_without_busctl():
+    proc = subprocess.run(
+        [sys.executable, "-c", _cgroup_script("import os; os.environ['PATH'] = '/nonexistent'")],
+        capture_output=True, timeout=10)
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == b"False"
+
+
+@pytest.mark.skipif(
+    subprocess.run(["busctl", "--user", "status"], capture_output=True).returncode != 0
+    if shutil.which("busctl") else True,
+    reason="needs a systemd user bus")
+def test_escape_scope_changes_cgroup():
+    proc = subprocess.run([sys.executable, "-c", _cgroup_script("")], capture_output=True, timeout=10)
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == b"True"

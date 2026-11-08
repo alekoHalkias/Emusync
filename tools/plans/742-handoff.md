@@ -4,7 +4,7 @@
 - Issue: #742
 - Branch: feature/742-steam-stop-push-killed
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-08
 - Fix attempts: 0
 
@@ -58,3 +58,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 bplan: 3 steps written, backend_pattern=best-effort systemd scope escape in detach child
 - 2026-11-08 tplan: test_file=src/tests/test_run_detach.py, 3 test cases defined
 - 2026-11-08 implement: step 1 done (_escape_steam_scope in run_offline, called after setsid)
+- 2026-11-08 implement: steps 2-3 done (tests, docs)

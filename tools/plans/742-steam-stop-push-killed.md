@@ -18,11 +18,11 @@ Move the detached post-game child into its own systemd user scope so Steam teari
   - Files: src/cli/run_offline.py
   - Reuses: `_detach_after_game` (existing fork/setsid child path), stdlib `subprocess`/`shutil.which`
   - New: `_escape_steam_scope` - no existing helper talks to systemd
-- [ ] 2. Tests: extend `src/tests/test_run_detach.py`: (a) helper is a no-op returning cleanly with `PATH` lacking busctl; (b) skipif no user bus: after the call `/proc/self/cgroup` of the child differs from before. Existing fork test must still pass.
+- [x] 2. Tests: extend `src/tests/test_run_detach.py`: (a) helper is a no-op returning cleanly with `PATH` lacking busctl; (b) skipif no user bus: after the call `/proc/self/cgroup` of the child differs from before. Existing fork test must still pass.
   - Files: src/tests/test_run_detach.py
   - Reuses: its subprocess-based fork pattern
   - New: none
-- [ ] 3. Docs: update the #725 paragraph in src/docs/GOTCHAS.md (scope escape added, limit "setsid does not survive a cgroup-wide kill" now conditional on systemd) and the #725 bullet in CLAUDE.md.
+- [x] 3. Docs: update the #725 paragraph in src/docs/GOTCHAS.md (scope escape added, limit "setsid does not survive a cgroup-wide kill" now conditional on systemd) and the #725 bullet in CLAUDE.md.
   - Files: src/docs/GOTCHAS.md, CLAUDE.md
   - Reuses: existing #725 text
   - New: none
