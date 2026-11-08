@@ -51,9 +51,11 @@ export function registerGameIpc(): void {
       if (existsSync(gamePidFile)) {
         const lines = readFileSync(gamePidFile, "utf-8").trim().split("\n");
         const emusyncPid = parseInt(lines[0], 10);
-        // Signal only emusync: its handler forwards exactly one SIGTERM to the
-        // emulator (a second one makes RetroArch exit without saving) and
-        // SIGKILLs after a grace (#742).
+        const childPid = lines[1] ? parseInt(lines[1], 10) : NaN;
+        // One SIGTERM to the emulator, as Steam does, so it saves on exit; the
+        // emusync handler never re-sends it (a second makes RetroArch exit
+        // without saving) and only SIGKILLs after a grace (#742).
+        if (childPid) try { process.kill(childPid, "SIGTERM"); } catch {}
         if (emusyncPid) try { process.kill(emusyncPid, "SIGTERM"); } catch {}
       }
     } catch {}

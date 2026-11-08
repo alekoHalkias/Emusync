@@ -74,3 +74,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 ship: server sync done; doc sync done (F2.4)
 - 2026-11-08 fix attempt 4 planned: handler never forwards SIGTERM; GUI signals emulator directly
 - 2026-11-08 implement: F4.1 done (handler arms SIGKILL fallback only)
+- 2026-11-08 implement: F4.2 done (stop-external SIGTERMs the emulator directly)
