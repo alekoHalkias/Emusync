@@ -86,7 +86,7 @@ Failure: test_run_reconcile.py::test_sigterm_handler_kills_child_without_exiting
 
 ## Fix attempt 4
 Change requested: drop the timing guess. The handler never sends SIGTERM to the emulator, so it can never be the second one.
-- [ ] F4.1 `_sigterm_handler`: no SIGTERM forward; only arm the once-per-child `_STOP_GRACE_SECONDS` SIGKILL fallback. Remove `_FORWARD_DELAY_SECONDS`.
+- [x] F4.1 `_sigterm_handler`: no SIGTERM forward; only arm the once-per-child `_STOP_GRACE_SECONDS` SIGKILL fallback. Remove `_FORWARD_DELAY_SECONDS`.
   - Files: src/cli/run.py
 - [ ] F4.2 `game:stop-external`: SIGTERM the emulator pid directly (like Steam does), plus the emusync pid (arms the fallback).
   - Files: src/gui/electron/game.ts
