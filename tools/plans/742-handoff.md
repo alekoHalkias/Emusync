@@ -4,7 +4,7 @@
 - Issue: #742
 - Branch: feature/742-steam-stop-push-killed
 - PR: #743
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-08
 - Fix attempts: 2
 
@@ -67,3 +67,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 implement: F2.1 done (delayed single SIGTERM forward in _sigterm_handler)
 - 2026-11-08 implement: F2.2 done (stop-external signals emusync only)
 - 2026-11-08 implement: F2.3 done (double-SIGTERM regression test)
+- 2026-11-08 implement: F2.4 done (docs: single SIGTERM rule)
