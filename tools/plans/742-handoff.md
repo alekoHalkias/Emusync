@@ -66,3 +66,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 fix attempt 2 planned: delay SIGTERM forward (RetroArch _exits on 2nd SIGTERM); GUI stop signals emusync only
 - 2026-11-08 implement: F2.1 done (delayed single SIGTERM forward in _sigterm_handler)
 - 2026-11-08 implement: F2.2 done (stop-external signals emusync only)
+- 2026-11-08 implement: F2.3 done (double-SIGTERM regression test)
