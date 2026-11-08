@@ -78,3 +78,8 @@ Cause: RetroArch's SIGTERM handler starts a clean shutdown on the first signal a
   - Files: src/tests/test_run_sigterm.py
 - [x] F2.4 Docs: GOTCHAS.md + CLAUDE.md: never double-SIGTERM RetroArch (second signal = `_exit` with no save).
   - Files: src/docs/GOTCHAS.md, CLAUDE.md
+
+## Fix attempt 3
+Failure: test_run_reconcile.py::test_sigterm_handler_kills_child_without_exiting asserts terminate() ran synchronously; F2.1 deliberately delays it.
+- [ ] F3.1 Test sets `_FORWARD_DELAY_SECONDS` to 0 and waits for the timer before asserting.
+  - Files: src/tests/test_run_reconcile.py
