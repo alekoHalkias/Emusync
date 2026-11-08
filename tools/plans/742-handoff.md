@@ -4,7 +4,7 @@
 - Issue: #742
 - Branch: feature/742-steam-stop-push-killed
 - PR: #743
-- Status: shipped
+- Status: implementing
 - Created: 2026-11-08
 - Fix attempts: 0
 
@@ -61,3 +61,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 implement: steps 2-3 done (tests, docs)
 - 2026-11-08 review: 0 findings, blocked=no
 - 2026-11-08 ship: server sync done; doc sync done (GOTCHAS.md, CLAUDE.md in step 3)
+- 2026-11-08 fix attempt 1 planned: SIGTERM-then-kill grace in _sigterm_handler and stop-external

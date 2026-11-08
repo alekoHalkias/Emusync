@@ -46,3 +46,21 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 - Non-systemd Linux or Windows escape.
 
 ## Log
+
+## Fix attempt 1
+Failure: manual test on Steam gamescope session: Steam stop leaves the old save/state; next launch pulls it. launch.log shows pushes completing, so the push child is not the problem.
+Cause: `_sigterm_handler` calls `child.kill()` (SIGKILL), so RetroArch never writes its SRAM/autosave state on exit; the push uploads unchanged data. `game:stop-external` also SIGKILLs the emulator.
+- [ ] F1.1 `_sigterm_handler`: `child.terminate()` then a daemon `threading.Timer` (10s) that `kill()`s if still alive.
+  - Files: src/cli/run.py
+  - Reuses: existing handler, `threading` (already imported)
+  - New: `_STOP_GRACE_SECONDS` constant - the grace window
+- [ ] F1.2 `game:stop-external`: SIGTERM (not SIGKILL) to the emulator pid; the handler's timer is the hard-kill fallback.
+  - Files: src/gui/electron/game.ts
+  - Reuses: existing handler
+  - New: none
+- [ ] F1.3 Tests: real child that traps SIGTERM and writes a marker (graceful exit gets the marker); real child that ignores SIGTERM is killed after the grace window.
+  - Files: src/tests/test_run_sigterm.py
+  - Reuses: real-subprocess pattern from test_run_detach.py
+  - New: new file - none exists for the handler
+- [ ] F1.4 Docs: GOTCHAS.md + CLAUDE.md note (SIGTERM first, SIGKILL after grace; #742).
+  - Files: src/docs/GOTCHAS.md, CLAUDE.md
