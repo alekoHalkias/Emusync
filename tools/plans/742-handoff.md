@@ -4,7 +4,7 @@
 - Issue: #742
 - Branch: feature/742-steam-stop-push-killed
 - PR: #743
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-08
 - Fix attempts: 0
 
@@ -76,3 +76,5 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 implement: F4.1 done (handler arms SIGKILL fallback only)
 - 2026-11-08 implement: F4.2 done (stop-external SIGTERMs the emulator directly)
 - 2026-11-08 implement: F4.3 done (tests: no SIGTERM from handler, SIGKILL after grace)
+- 2026-11-08 implement: F4.4 done (docs)
+- 2026-11-08 ship: tests pass (748 passed); server sync done

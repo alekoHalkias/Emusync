@@ -92,4 +92,4 @@ Change requested: drop the timing guess. The handler never sends SIGTERM to the 
   - Files: src/gui/electron/game.ts
 - [x] F4.3 Tests: drop forward-delay patches; handler sends nothing before the grace and SIGKILLs a hung child after it; Steam-style test (emulator signaled directly) still saves.
   - Files: src/tests/test_run_sigterm.py, src/tests/test_run_reconcile.py
-- [ ] F4.4 Docs: GOTCHAS.md + CLAUDE.md.
+- [x] F4.4 Docs: GOTCHAS.md + CLAUDE.md.
