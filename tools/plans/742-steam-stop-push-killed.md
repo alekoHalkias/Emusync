@@ -81,5 +81,5 @@ Cause: RetroArch's SIGTERM handler starts a clean shutdown on the first signal a
 
 ## Fix attempt 3
 Failure: test_run_reconcile.py::test_sigterm_handler_kills_child_without_exiting asserts terminate() ran synchronously; F2.1 deliberately delays it.
-- [ ] F3.1 Test sets `_FORWARD_DELAY_SECONDS` to 0 and waits for the timer before asserting.
+- [x] F3.1 Test sets `_FORWARD_DELAY_SECONDS` to 0 and waits for the timer before asserting.
   - Files: src/tests/test_run_reconcile.py

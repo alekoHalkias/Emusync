@@ -974,8 +974,13 @@ def test_sigterm_handler_kills_child_without_exiting(monkeypatch):
     fake_child = _FakeChild()
     monkeypatch.setattr(run_offline_mod, "_child_proc", fake_child)
 
+    monkeypatch.setattr(run_mod, "_FORWARD_DELAY_SECONDS", 0)
     run_mod._sigterm_handler()  # must not raise SystemExit
 
+    import time
+    deadline = time.monotonic() + 2  # SIGTERM is forwarded from a timer (#742)
+    while not fake_child.killed and time.monotonic() < deadline:
+        time.sleep(0.01)
     assert fake_child.killed
 
 
