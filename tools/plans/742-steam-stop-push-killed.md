@@ -83,3 +83,13 @@ Cause: RetroArch's SIGTERM handler starts a clean shutdown on the first signal a
 Failure: test_run_reconcile.py::test_sigterm_handler_kills_child_without_exiting asserts terminate() ran synchronously; F2.1 deliberately delays it.
 - [x] F3.1 Test sets `_FORWARD_DELAY_SECONDS` to 0 and waits for the timer before asserting.
   - Files: src/tests/test_run_reconcile.py
+
+## Fix attempt 4
+Change requested: drop the timing guess. The handler never sends SIGTERM to the emulator, so it can never be the second one.
+- [ ] F4.1 `_sigterm_handler`: no SIGTERM forward; only arm the once-per-child `_STOP_GRACE_SECONDS` SIGKILL fallback. Remove `_FORWARD_DELAY_SECONDS`.
+  - Files: src/cli/run.py
+- [ ] F4.2 `game:stop-external`: SIGTERM the emulator pid directly (like Steam does), plus the emusync pid (arms the fallback).
+  - Files: src/gui/electron/game.ts
+- [ ] F4.3 Tests: drop forward-delay patches; handler sends nothing before the grace and SIGKILLs a hung child after it; Steam-style test (emulator signaled directly) still saves.
+  - Files: src/tests/test_run_sigterm.py, src/tests/test_run_reconcile.py
+- [ ] F4.4 Docs: GOTCHAS.md + CLAUDE.md.
