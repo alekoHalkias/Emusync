@@ -14,7 +14,7 @@ Move the detached post-game child into its own systemd user scope so Steam teari
 - **Recommendations**: none. Rejected: re-exec of the whole run in a scope (also moves the emulator out of Steam's cleanup); delaying parent exit (undoes #725).
 
 ## Steps
-- [ ] 1. Add `_escape_steam_scope()` to `run_offline.py`; call it in the child of `_detach_after_game` right after `os.setsid()`. It runs `busctl --user call org.freedesktop.systemd1 /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager StartTransientUnit ssa(sv)a(sa(sv)) emusync-push-<pid>.scope fail 1 PIDs au 1 <pid> 0` with a short timeout; all failures (no busctl, no user bus, non-systemd, Windows) are swallowed so the fork-only behavior remains. Leave the `ponytail:` note in the docstring updated.
+- [x] 1. Add `_escape_steam_scope()` to `run_offline.py`; call it in the child of `_detach_after_game` right after `os.setsid()`. It runs `busctl --user call org.freedesktop.systemd1 /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager StartTransientUnit ssa(sv)a(sa(sv)) emusync-push-<pid>.scope fail 1 PIDs au 1 <pid> 0` with a short timeout; all failures (no busctl, no user bus, non-systemd, Windows) are swallowed so the fork-only behavior remains. Leave the `ponytail:` note in the docstring updated.
   - Files: src/cli/run_offline.py
   - Reuses: `_detach_after_game` (existing fork/setsid child path), stdlib `subprocess`/`shutil.which`
   - New: `_escape_steam_scope` - no existing helper talks to systemd

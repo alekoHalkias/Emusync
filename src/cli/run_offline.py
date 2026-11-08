@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import signal
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -35,6 +36,27 @@ def _launch_and_wait(command: tuple[str, ...], game_pid_file: Path) -> int:
     return code
 
 
+def _escape_steam_scope() -> None:
+    """Move this process into its own systemd user scope (#742) so Steam ending
+    the game's cgroup/process tree can't kill the post-game push. Best effort:
+    no busctl, no user bus or no systemd leaves the process where it is.
+    """
+    busctl = shutil.which("busctl")
+    if not busctl:
+        return
+    try:
+        subprocess.run(
+            [busctl, "--user", "call", "org.freedesktop.systemd1",
+             "/org/freedesktop/systemd1", "org.freedesktop.systemd1.Manager",
+             "StartTransientUnit", "ssa(sv)a(sa(sv))",
+             f"emusync-push-{os.getpid()}.scope", "fail",
+             "1", "PIDs", "au", "1", str(os.getpid()), "0"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, timeout=5, check=False)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
 def _detach_after_game(exit_code: int, log_path: Path) -> None:
     """Fork the post-game push/lock release into its own background session (#725).
 
@@ -43,7 +65,8 @@ def _detach_after_game(exit_code: int, log_path: Path) -> None:
     closed immediately and can't cut the push short. The child returns and runs
     the rest of run_game unchanged, with stdio on *log_path* so no pipe Steam
     holds keeps it attached. No os.fork (Windows): returns, push runs inline.
-    ponytail: setsid escapes the process group, not a cgroup-wide kill.
+    The child also moves into its own systemd scope (_escape_steam_scope), since
+    setsid alone escapes the process group, not a cgroup-wide kill (#742).
     """
     if not hasattr(os, "fork"):
         return
@@ -52,6 +75,7 @@ def _detach_after_game(exit_code: int, log_path: Path) -> None:
     if os.fork() > 0:
         os._exit(exit_code)
     os.setsid()
+    _escape_steam_scope()
     if hasattr(signal, "SIGHUP"):
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
     try:

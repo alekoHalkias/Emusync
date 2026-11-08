@@ -57,3 +57,4 @@ Tests: 2 extend test_run_detach.py (reuses its subprocess fork pattern, no new i
 - 2026-11-08 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-08 bplan: 3 steps written, backend_pattern=best-effort systemd scope escape in detach child
 - 2026-11-08 tplan: test_file=src/tests/test_run_detach.py, 3 test cases defined
+- 2026-11-08 implement: step 1 done (_escape_steam_scope in run_offline, called after setsid)
