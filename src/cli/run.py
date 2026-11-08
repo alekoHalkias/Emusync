@@ -144,22 +144,36 @@ def _relocated_gd(gd, consoles: list[dict], console_name: str):
     return moved
 
 
+# Grace before an emulator that ignored SIGTERM is SIGKILLed (#742).
+_STOP_GRACE_SECONDS = 10
+
+
 def _sigterm_handler(*_) -> None:
-    """Kill the emulator child on SIGTERM (Steam Gaming Mode sends this when a
-    game is closed from its UI) — and then get out of the way.
+    """On SIGTERM (Steam "Exit game", GUI stop) let the emulator finish its own
+    shutdown, and SIGKILL it only if it is still running after
+    _STOP_GRACE_SECONDS (#742).
+
+    Never sends the emulator SIGTERM: whoever stops the game (Steam signals the
+    whole process tree; game:stop-external signals the emulator pid) already
+    did, and RetroArch _exit()s without writing SRAM/auto state on a second
+    SIGTERM. Repeat signals don't arm another timer.
 
     Deliberately does NOT sys.exit() here: SystemExit isn't an Exception, so
     it would skip straight past run_game's `except Exception` and land in its
     outer `finally`, meaning the entire post-launch save/state push block
     would never run for a game closed this way (issue #472). Returning
     normally instead lets the interrupted `child.wait()` call in
-    _launch_and_wait retry (PEP 475) — it completes as soon as the child we
-    just killed actually exits, and control flows back into run_game exactly
-    as it would on a normal, non-signaled exit: push runs, lock releases.
+    _launch_and_wait retry (PEP 475) — it completes as soon as the emulator
+    exits, and control flows back into run_game exactly as it would on a
+    normal, non-signaled exit: push runs, lock releases.
     """
     child = _run_offline_mod._child_proc
-    if child is not None and child.poll() is None:
-        child.kill()
+    if child is None or child.poll() is not None or getattr(child, "_emusync_stopping", False):
+        return
+    child._emusync_stopping = True
+    timer = threading.Timer(_STOP_GRACE_SECONDS, lambda: child.poll() is None and child.kill())
+    timer.daemon = True
+    timer.start()
 
 
 signal.signal(signal.SIGTERM, _sigterm_handler)
