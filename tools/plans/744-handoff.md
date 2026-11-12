@@ -59,12 +59,21 @@ Out of scope: standalone emulator install (#745).
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_emulator_suggestions.py (new) + manual script in plan
+### Test Cases: suggestion_links_cover_all_suggestions; core_libs_are_buildbot_safe; manual steps 1-6 (install, link, error, standalone-only, flatpak)
+### Edge Cases: forged lib/coresDir rejected; buildbot 404; missing cores dir
+### Integration Points: both detect call sites in useConsoleImport; shared art.ts:download unchanged
+### Outline:
+Frontend
+- 1 detect.ts/ipc.ts: coreInstallTargets (Linux x86_64 only) returned as detect `install`
+- 2 installCore.ts + emulator:installCore: buildbot download -> python zipfile extract -> .part + rename into coresDir, validated against detected targets
+- 3 preload.ts / emusync.d.ts: new channel + detect type
+- 4 useConsoleImport.ts: store install, installCore re-runs detection
+- 5 EmulatorStep.tsx: suggestion links + Install rows with spinner/inline error
+- 7 Docs: ARCHITECTURE.md, CLAUDE.md, design guide
+Tests
+- 6 test_emulator_suggestions.py (2 cases) + lint/tsc + manual script
+### Summary: The import wizard's no-emulator state links every suggestion and installs missing RetroArch cores in one click on Linux x86_64.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -103,3 +112,4 @@ Out of scope: standalone emulator install (#745).
 - 2026-11-12 issue: workflow initialized; standalone install split to #745
 - 2026-11-12 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
 - 2026-11-12 fplan: 7 steps written, visual_pattern=existing empty state + link list + ghost Install rows
+- 2026-11-12 tplan: test_file=src/tests/test_emulator_suggestions.py, 2 test cases defined + manual script

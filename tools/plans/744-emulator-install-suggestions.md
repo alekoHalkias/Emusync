@@ -32,9 +32,32 @@ The import wizard's "No compatible emulator found" state links every suggestion 
   - Files: src/gui/renderer/src/components/console-import/EmulatorStep.tsx
   - Reuses: existing empty-state markup, `btn btn-ghost`, `spinner` class, window open handler
   - New: URL table. Suggestions are free-text strings in `console_defs` and changing that schema just for links is not worth it.
-- [ ] 6. Tests: defined by /tplan.
+- [ ] 6. Tests: new `src/tests/test_emulator_suggestions.py`: (a) every `suggestions` entry in `_IMPORT_CONSOLES` contains at least one keyword from the `SUGGESTION_LINKS` table in EmulatorStep.tsx (source read as text, as in test_paths.py:122); (b) every `_IMPORT_SYSTEMS` core `lib` matches `^[a-z0-9_]+_libretro$` (the buildbot URL and the installCore validation depend on it). Then `make lint`, both `tsc` projects (no new errors beyond the known list), and the manual script in Testing.
+  - Files: src/tests/test_emulator_suggestions.py (new)
+  - Reuses: test_paths.py source-read pattern, `cli.consoles_data` imports as in test_core_detection.py
+  - New: test file. No existing test covers suggestions or core lib naming.
 - [ ] 7. Docs: ARCHITECTURE.md (new IPC `emulator:installCore`, detect `install` field, installCore.ts module); CLAUDE.md GUI rule line (core install: Linux x86_64 buildbot, validated against detected targets, `.part` + rename, zip via Python stdlib); design guide line from Design Alignment.
   - Files: src/docs/ARCHITECTURE.md, CLAUDE.md, .claude/frontend-design-guide.md
+
+## Testing
+- **Test File**: src/tests/test_emulator_suggestions.py (+ manual script; no JS runner exists, per testing guide)
+- **Test Cases**:
+  - suggestion_links_cover_all_suggestions: every console suggestion maps to a link keyword in EmulatorStep.tsx
+  - core_libs_are_buildbot_safe: every seeded core lib matches `^[a-z0-9_]+_libretro$`
+- **Manual script** (Linux x86_64, dev GUI against dev server):
+  1. Move `snes9x_libretro.so` (and any other SNES core) out of the RetroArch cores dir. Import SNES: the empty state shows a RetroArch link plus one Install row per seeded SNES core.
+  2. Click the RetroArch link: it opens in the system browser and the app does not navigate.
+  3. Install Snes9x: spinner, then the wizard advances to emulator selection with "RetroArch · Snes9x". `<coresDir>/snes9x_libretro.so` exists and no `.part` file is left.
+  4. Disconnect the network and install another core: an inline error appears, no file is added to the cores dir, and the mkdtemp dir is removed.
+  5. Import PS2 with PCSX2 absent: a PCSX2 link only, no install rows.
+  6. With Flatpak RetroArch also installed: rows are labeled per target, and the install lands in the Flatpak cores dir.
+- **Edge Cases**:
+  - Renderer sends an arbitrary lib or coresDir: rejected by installCore validation against coreInstallTargets.
+  - HTTP 404 from buildbot (core not built for the platform): error shown, nothing written.
+  - Cores dir missing: created with mkdirSync recursive.
+- **Integration Points**:
+  - `emulator:detect` consumers: the initial auto-detect and `detectEmulators` in useConsoleImport both read the new `install` field.
+  - `art.ts:download` is shared with artwork fetches and stays unchanged.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes (`emulator:installCore`). New CLI subcommand: no. Config/data file change: no.
