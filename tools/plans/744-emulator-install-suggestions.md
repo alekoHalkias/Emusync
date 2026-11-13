@@ -32,7 +32,7 @@ The import wizard's "No compatible emulator found" state links every suggestion 
   - Files: src/gui/renderer/src/components/console-import/EmulatorStep.tsx
   - Reuses: existing empty-state markup, `btn btn-ghost`, `spinner` class, window open handler
   - New: URL table. Suggestions are free-text strings in `console_defs` and changing that schema just for links is not worth it.
-- [ ] 6. Tests: new `src/tests/test_emulator_suggestions.py`: (a) every `suggestions` entry in `_IMPORT_CONSOLES` contains at least one keyword from the `SUGGESTION_LINKS` table in EmulatorStep.tsx (source read as text, as in test_paths.py:122); (b) every `_IMPORT_SYSTEMS` core `lib` matches `^[a-z0-9_]+_libretro$` (the buildbot URL and the installCore validation depend on it). Then `make lint`, both `tsc` projects (no new errors beyond the known list), and the manual script in Testing.
+- [x] 6. Tests: new `src/tests/test_emulator_suggestions.py`: (a) every `suggestions` entry in `_IMPORT_CONSOLES` contains at least one keyword from the `SUGGESTION_LINKS` table in EmulatorStep.tsx (source read as text, as in test_paths.py:122); (b) every `_IMPORT_SYSTEMS` core `lib` matches `^[a-z0-9_-]+_libretro$` (the buildbot URL and the installCore validation depend on it). Then `make lint`, both `tsc` projects (no new errors beyond the known list), and the manual script in Testing.
   - Files: src/tests/test_emulator_suggestions.py (new)
   - Reuses: test_paths.py source-read pattern, `cli.consoles_data` imports as in test_core_detection.py
   - New: test file. No existing test covers suggestions or core lib naming.
@@ -43,7 +43,7 @@ The import wizard's "No compatible emulator found" state links every suggestion 
 - **Test File**: src/tests/test_emulator_suggestions.py (+ manual script; no JS runner exists, per testing guide)
 - **Test Cases**:
   - suggestion_links_cover_all_suggestions: every console suggestion maps to a link keyword in EmulatorStep.tsx
-  - core_libs_are_buildbot_safe: every seeded core lib matches `^[a-z0-9_]+_libretro$`
+  - core_libs_are_buildbot_safe: every seeded core lib matches `^[a-z0-9_-]+_libretro$`
 - **Manual script** (Linux x86_64, dev GUI against dev server):
   1. Move `snes9x_libretro.so` (and any other SNES core) out of the RetroArch cores dir. Import SNES: the empty state shows a RetroArch link plus one Install row per seeded SNES core.
   2. Click the RetroArch link: it opens in the system browser and the app does not navigate.
@@ -69,3 +69,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (`emulator:installCore`).
 
 ## Log
 Step 5: SUGGESTION_LINKS keyed by the suggestion's first word (every suggestion starts with its download target), not substring keyword search; PPSSPP/melonDS/Flycast entries dropped since they only appear as RetroArch cores.
+Step 6: core lib regex allows hyphens (mesen-s_libretro is a real buildbot name). Verified the buildbot zip extracts to <lib>.so at root via python -m zipfile.

@@ -72,7 +72,7 @@ Frontend
 - [done] 5 EmulatorStep.tsx: suggestion links + Install rows with spinner/inline error Deviation: links keyed by first word.
 - 7 Docs: ARCHITECTURE.md, CLAUDE.md, design guide
 Tests
-- 6 test_emulator_suggestions.py (2 cases) + lint/tsc + manual script
+- [done] 6 test_emulator_suggestions.py (2 cases) + lint/tsc + manual script Deviation: regex allows hyphens.
 ### Summary: The import wizard's no-emulator state links every suggestion and installs missing RetroArch cores in one click on Linux x86_64.
 
 ## 7. Test Design
@@ -89,7 +89,7 @@ Tests
 - [done] 3 preload.ts, emusync.d.ts: channel + detect type. Reuses emulator namespace.
 - [done] 4 useConsoleImport.ts: store install, installCore -> re-run detectEmulators. Reuses detectEmulators.
 - [done] 5 EmulatorStep.tsx: links via keyword URL table + install rows. Reuses empty state markup, window open handler. New URL table: suggestions are free text in console_defs, schema change not justified. Deviation: links keyed by first word.
-- 6 Tests: per tplan.
+- [done] 6 Tests: per tplan. Deviation: regex allows hyphens.
 - 7 Docs: ARCHITECTURE.md, CLAUDE.md, design guide.
 
 ## 9. Review
@@ -118,3 +118,4 @@ Tests
 - 2026-11-12 implement: step 3 done (preload + emusync.d.ts)
 - 2026-11-12 implement: step 4 done (wizard install state + installCore re-detect)
 - 2026-11-12 implement: step 5 done (suggestion links + core install rows)
+- 2026-11-12 implement: step 6 done (test_emulator_suggestions.py, 2 passing)
