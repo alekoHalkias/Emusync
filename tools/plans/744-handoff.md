@@ -4,7 +4,7 @@
 - Issue: #744
 - Branch: feature/744-emulator-install-suggestions
 - PR: #746
-- Status: shipped
+- Status: implementing
 - Created: 2026-11-12
 - Fix attempts: 0
 
@@ -93,9 +93,9 @@ Tests
 - [done] 7 Docs: ARCHITECTURE.md, CLAUDE.md, design guide.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: 1. correctness (PLAUSIBLE) installCore.ts:24 - art.ts:download is https.get without timeout; stalled download hangs the wizard; GOTCHAS says main process uses fetch.
+### Blocked: yes
+### Blockers: finding 1 (fix step R1)
 
 ## 10. Ship
 ### Status: shipped
@@ -121,3 +121,4 @@ Tests
 - 2026-11-12 implement: step 6 done (test_emulator_suggestions.py, 2 passing)
 - 2026-11-12 implement: step 7 done (ARCHITECTURE.md, design guide; CLAUDE.md in step 3)
 - 2026-11-13 ship: make test 750 passed, PR #746 opened
+- 2026-11-13 review: 1 findings, blocked=yes

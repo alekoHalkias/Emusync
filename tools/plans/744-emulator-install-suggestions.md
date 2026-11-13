@@ -3,7 +3,7 @@
 Issue: #744
 Branch: feature/744-emulator-install-suggestions
 PR: #746
-Status: shipped
+Status: implementing
 Fix attempts: 0
 
 ## Goal
@@ -38,6 +38,11 @@ The import wizard's "No compatible emulator found" state links every suggestion 
   - New: test file. No existing test covers suggestions or core lib naming.
 - [x] 7. Docs: ARCHITECTURE.md (new IPC `emulator:installCore`, detect `install` field, installCore.ts module); CLAUDE.md GUI rule line (core install: Linux x86_64 buildbot, validated against detected targets, `.part` + rename, zip via Python stdlib); design guide line from Design Alignment.
   - Files: src/docs/ARCHITECTURE.md, CLAUDE.md, .claude/frontend-design-guide.md
+
+## Review fix
+- [ ] R1. installCore downloads with `fetch` + `AbortSignal.timeout(120_000)` and writes the body with `writeFileSync`, replacing `art.ts:download` (no timeout, Node https.get; GOTCHAS: main process uses fetch). Non-OK status throws `HTTP <code>`.
+  - Files: src/gui/electron/emulator/installCore.ts
+  - Reuses: fetch + AbortSignal.timeout pattern from art.ts:168
 
 ## Testing
 - **Test File**: src/tests/test_emulator_suggestions.py (+ manual script; no JS runner exists, per testing guide)
