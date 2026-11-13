@@ -3,8 +3,9 @@ import { ipcMain } from "electron";
 import { homedir } from "os";
 import { rt } from "../runtime";
 import { loadConsoleDefinitionsIfNeeded } from "./console-defs";
-import { detectEmulatorsForConsole } from "./detect";
+import { coreInstallTargets, detectEmulatorsForConsole, type CoreInstallTargets } from "./detect";
 import { findRomByNameSize, runEmulatorScan } from "./scan";
+import { installCore } from "./installCore";
 import { scanLibraryFolders, type LibraryFolderMatch } from "./library";
 import type { DetectedEmulatorOption, EmulatorScanResult } from "./types";
 
@@ -20,13 +21,20 @@ export function registerEmulatorIpc(): void {
   ipcMain.handle("emulator:detect", async (_event, consoleKey: string): Promise<{
     options: DetectedEmulatorOption[];
     suggestions: string[];
+    install: CoreInstallTargets;
   }> => {
     await loadConsoleDefinitionsIfNeeded();
     const consoleDef = rt.cachedConsoleDefs?.[consoleKey];
     return {
       options: detectEmulatorsForConsole(homedir(), consoleKey),
       suggestions: consoleDef?.suggestions ?? [],
+      install: coreInstallTargets(homedir(), consoleKey),
     };
+  });
+
+  ipcMain.handle("emulator:installCore", async (_event, consoleKey: string, coresDir: string, lib: string) => {
+    await loadConsoleDefinitionsIfNeeded();
+    return installCore(homedir(), consoleKey, coresDir, lib);
   });
 
   ipcMain.handle("emulator:scan", async (_event, params: {

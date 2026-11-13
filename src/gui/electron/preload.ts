@@ -69,7 +69,10 @@ contextBridge.exposeInMainWorld("emusync", {
     detect: (consoleKey: string): Promise<{
       options: import("./emulator/types").DetectedEmulatorOption[];
       suggestions: string[];
+      install: import("./emulator/detect").CoreInstallTargets;
     }> => ipcRenderer.invoke("emulator:detect", consoleKey),
+    installCore: (consoleKey: string, coresDir: string, lib: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("emulator:installCore", consoleKey, coresDir, lib),
     scan: (
       consoleKey: string,
       emulatorOption: import("./emulator/types").DetectedEmulatorOption,
