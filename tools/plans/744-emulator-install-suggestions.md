@@ -3,7 +3,7 @@
 Issue: #744
 Branch: feature/744-emulator-install-suggestions
 PR: #746
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -40,7 +40,7 @@ The import wizard's "No compatible emulator found" state links every suggestion 
   - Files: src/docs/ARCHITECTURE.md, CLAUDE.md, .claude/frontend-design-guide.md
 
 ## Review fix
-- [ ] R1. installCore downloads with `fetch` + `AbortSignal.timeout(120_000)` and writes the body with `writeFileSync`, replacing `art.ts:download` (no timeout, Node https.get; GOTCHAS: main process uses fetch). Non-OK status throws `HTTP <code>`.
+- [x] R1. installCore downloads with `fetch` + `AbortSignal.timeout(120_000)` and writes the body with `writeFileSync`, replacing the art.ts download helper (no timeout, Node https.get; GOTCHAS: main process uses fetch). Non-OK status throws `HTTP <code>`.
   - Files: src/gui/electron/emulator/installCore.ts
   - Reuses: fetch + AbortSignal.timeout pattern from art.ts:168
 

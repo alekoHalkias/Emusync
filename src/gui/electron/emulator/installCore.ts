@@ -1,10 +1,9 @@
 // Install a missing RetroArch core from the libretro buildbot (#744).
-import { copyFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, statSync } from "fs";
+import { copyFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { tmpdir } from "os";
 import { join } from "path";
-import { download } from "../art";
 import { PYTHON } from "../runtime";
 import { coreInstallTargets } from "./detect";
 
@@ -21,7 +20,9 @@ export async function installCore(
   const tmp = mkdtempSync(join(tmpdir(), "emusync-core-"));
   try {
     const zip = join(tmp, `${lib}.so.zip`);
-    await download(`${BUILDBOT}/${lib}.so.zip`, zip);
+    const res = await fetch(`${BUILDBOT}/${lib}.so.zip`, { signal: AbortSignal.timeout(120_000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    writeFileSync(zip, Buffer.from(await res.arrayBuffer()));
     // Stdlib unzip via the bundled Python; adm-zip was removed (#679).
     await promisify(execFile)(PYTHON, ["-m", "zipfile", "-e", zip, tmp], { timeout: 60_000 });
     const so = join(tmp, `${lib}.so`);

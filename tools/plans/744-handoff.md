@@ -4,7 +4,7 @@
 - Issue: #744
 - Branch: feature/744-emulator-install-suggestions
 - PR: #746
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-12
 - Fix attempts: 0
 
@@ -94,7 +94,7 @@ Tests
 
 ## 9. Review
 ### Findings: 1. correctness (PLAUSIBLE) installCore.ts:24 - art.ts:download is https.get without timeout; stalled download hangs the wizard; GOTCHAS says main process uses fetch.
-### Blocked: yes
+### Blocked: no (fixed in R1)
 ### Blockers: finding 1 (fix step R1)
 
 ## 10. Ship
@@ -122,3 +122,4 @@ Tests
 - 2026-11-12 implement: step 7 done (ARCHITECTURE.md, design guide; CLAUDE.md in step 3)
 - 2026-11-13 ship: make test 750 passed, PR #746 opened
 - 2026-11-13 review: 1 findings, blocked=yes
+- 2026-11-13 implement: step R1 done (fetch + 120s timeout for core download)
