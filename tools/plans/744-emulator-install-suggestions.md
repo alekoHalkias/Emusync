@@ -3,7 +3,7 @@
 Issue: #744
 Branch: feature/744-emulator-install-suggestions
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal

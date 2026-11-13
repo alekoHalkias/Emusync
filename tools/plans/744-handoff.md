@@ -4,7 +4,7 @@
 - Issue: #744
 - Branch: feature/744-emulator-install-suggestions
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-12
 - Fix attempts: 0
 
