@@ -25,7 +25,7 @@ The import wizard's "No compatible emulator found" state links every suggestion 
 - [x] 3. Preload + types. Add `emulator.installCore(consoleKey, coresDir, lib)` to preload.ts and emusync.d.ts. Extend the `detect` return type with `install: { retroarch: {type,label,coresDir}[]; cores: {lib,folder}[] }`.
   - Files: src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: existing `emulator` preload namespace
-- [ ] 4. Wizard state. `useConsoleImport.ts` stores `install` from both detect calls (initial auto-detect and `detectEmulators`), resets it on `backToConsole`, and exposes `installCore(coresDir, lib)`. That function calls the IPC and, on ok, calls `detectEmulators()` so the wizard advances; on failure it returns the error.
+- [x] 4. Wizard state. `useConsoleImport.ts` stores `install` from both detect calls (initial auto-detect and `detectEmulators`), resets it on `backToConsole`, and exposes `installCore(coresDir, lib)`. That function calls the IPC and, on ok, calls `detectEmulators()` so the wizard advances; on failure it returns the error.
   - Files: src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: detectEmulators, existing setSuggestions pattern
 - [ ] 5. Empty-state UI. In `EmulatorStep.tsx`, map each suggestion to a URL via a small keyword table (`RetroArch`, `mGBA`, `Dolphin`, `PCSX2`, `PPSSPP`, `Azahar`, `Eden`, `melonDS`, `Flycast`; first matching standalone keyword wins, else RetroArch) and render it as a link. When `install.retroarch` is non-empty, render an "Install a core" list: one row per core x RetroArch target (label includes "(Flatpak)" when there are two targets), each with an Install button, a per-row spinner and an inline error. When RetroArch is absent, show only the links.

@@ -19,6 +19,9 @@ import { autoPush, backfillSwitchTitleIds, prefetchArt, pullFromServerIfNewer } 
 import { resolveImportPaths } from "./resolveRomPaths";
 import { useNetworkShare } from "./useNetworkShare";
 import { filterIgnored, saveIgnoredRoms } from "./ignoredRoms";
+import type { CoreInstallTargets } from "../../emusync";
+
+const NO_INSTALL: CoreInstallTargets = { retroarch: [], cores: [] };
 import type {
   ConsoleOption,
   EmulatorOption,
@@ -45,6 +48,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   const [consoleSel, setConsoleSel] = useState(initialConsole ?? "");
   const [emulators, setEmulators] = useState<EmulatorOption[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [install, setInstall] = useState<CoreInstallTargets>(NO_INSTALL);
   const [emuSel, setEmuSel]       = useState<EmulatorOption | null>(null);
   const [extraPaths, setExtraPaths] = useState<string[]>([]);
   const [romDirs, setRomDirs]     = useState<string[]>([]);
@@ -94,13 +98,14 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     if (initialConsole && consoleSel && phase === "detecting") {
       (async () => {
         try {
-          const [{ options, suggestions: sugg }, saved, cfg] = await Promise.all([
+          const [{ options, suggestions: sugg, install: inst }, saved, cfg] = await Promise.all([
             emusync.emulator.detect(consoleSel),
             emusync.config.getRecentFolders(consoleSel),
             emusync.config.load(),
           ]);
           setEmulators(options);
           setSuggestions(sugg);
+          setInstall(inst ?? NO_INSTALL);
           // A caller-provided folder (bulk-library import, #462) takes over
           // scanning entirely — union with unrelated recent folders would
           // silently widen the scan to leftovers from a past single-console import.
@@ -123,13 +128,14 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   async function detectEmulators(): Promise<void> {
     setPhase("detecting");
     try {
-      const [{ options, suggestions: sugg }, saved, cfg] = await Promise.all([
+      const [{ options, suggestions: sugg, install: inst }, saved, cfg] = await Promise.all([
         emusync.emulator.detect(consoleSel),
         emusync.config.getRecentFolders(consoleSel),
         emusync.config.load(),
       ]);
       setEmulators(options);
       setSuggestions(sugg);
+      setInstall(inst ?? NO_INSTALL);
       setSavedFolders(saved);
       setExtraPaths(saved);
       // Remember the last network + local folder per console (issues #255, #644).
@@ -506,7 +512,15 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   }
 
   function backToConsole(): void {
-    setEmulators([]); setEmuSel(null); setSuggestions([]); setPhase("console");
+    setEmulators([]); setEmuSel(null); setSuggestions([]); setInstall(NO_INSTALL); setPhase("console");
+  }
+
+  // Install a missing RetroArch core, then re-detect so the wizard advances (#744).
+  async function installCore(coresDir: string, lib: string): Promise<string | null> {
+    const res = await emusync.emulator.installCore(consoleSel, coresDir, lib);
+    if (!res.ok) return res.error ?? "Install failed";
+    await detectEmulators();
+    return null;
   }
 
   function backToEmulator(): void {
@@ -526,7 +540,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
   return {
     onClose, onImported,
     // state
-    phase, consoles, consoleSel, emulators, suggestions, emuSel,
+    phase, consoles, consoleSel, emulators, suggestions, install, emuSel,
     extraPaths, removedDirs, roms, selected, names, error, progress,
     importErrors, romMatched, pushResults, pushSaves, pushStates, artProgress,
     romSource, networkRoot, localRomRoot, nameWarnings, share, linkedCount, ignoredCount: ignored.size,
@@ -536,7 +550,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     setConsoleSel, setEmuSel, setPushSaves, setPushStates, setName,
     pickLocalRomRoot, pickNetworkRoot, clearLocalRoot, clearNetworkRoot,
     // handlers
-    detectEmulators, scanRoms, ignoreRoms, addExtraPath, removeExtraPath, removeRomDir,
+    detectEmulators, installCore, scanRoms, ignoreRoms, addExtraPath, removeExtraPath, removeRomDir,
     toggleRom, toggleAll, doImport, forceImport, dismissNameWarnings,
     backToConsole, backToEmulator,
   };
