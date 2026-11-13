@@ -37,6 +37,7 @@
 - Card grid: `game-grid-cards` div, CSS grid layout
 - Section label: `game-grid-section-label` — small text divider between "On this device" and "On other devices"
 - Empty state: `empty-state` div with padding and centered text
+- Empty state with actions (#744): links as plain `<a target="_blank">` (window.ts routes http(s) to the browser); action rows = label + `btn btn-ghost` button, `spinner` while busy, 12px danger error under the row
 
 ## Toast / Status
 - Inline status line: `<div>` with `fontSize: 12`, `padding: "4px 16px"`, color by `isError`

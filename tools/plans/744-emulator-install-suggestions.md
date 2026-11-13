@@ -3,7 +3,7 @@
 Issue: #744
 Branch: feature/744-emulator-install-suggestions
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -36,7 +36,7 @@ The import wizard's "No compatible emulator found" state links every suggestion 
   - Files: src/tests/test_emulator_suggestions.py (new)
   - Reuses: test_paths.py source-read pattern, `cli.consoles_data` imports as in test_core_detection.py
   - New: test file. No existing test covers suggestions or core lib naming.
-- [ ] 7. Docs: ARCHITECTURE.md (new IPC `emulator:installCore`, detect `install` field, installCore.ts module); CLAUDE.md GUI rule line (core install: Linux x86_64 buildbot, validated against detected targets, `.part` + rename, zip via Python stdlib); design guide line from Design Alignment.
+- [x] 7. Docs: ARCHITECTURE.md (new IPC `emulator:installCore`, detect `install` field, installCore.ts module); CLAUDE.md GUI rule line (core install: Linux x86_64 buildbot, validated against detected targets, `.part` + rename, zip via Python stdlib); design guide line from Design Alignment.
   - Files: src/docs/ARCHITECTURE.md, CLAUDE.md, .claude/frontend-design-guide.md
 
 ## Testing
@@ -70,3 +70,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (`emulator:installCore`).
 ## Log
 Step 5: SUGGESTION_LINKS keyed by the suggestion's first word (every suggestion starts with its download target), not substring keyword search; PPSSPP/melonDS/Flycast entries dropped since they only appear as RetroArch cores.
 Step 6: core lib regex allows hyphens (mesen-s_libretro is a real buildbot name). Verified the buildbot zip extracts to <lib>.so at root via python -m zipfile.
+Step 7: CLAUDE.md rule line landed with step 3 (commit hook required it alongside preload.ts).
