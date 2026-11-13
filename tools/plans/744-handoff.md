@@ -4,7 +4,7 @@
 - Issue: #744
 - Branch: feature/744-emulator-install-suggestions
 - PR: #746
-- Status: implemented
+- Status: shipped
 - Created: 2026-11-12
 - Fix attempts: 0
 
@@ -100,8 +100,8 @@ Tests
 ## 10. Ship
 ### Status: shipped
 ### PR: #746
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -123,3 +123,6 @@ Tests
 - 2026-11-13 ship: make test 750 passed, PR #746 opened
 - 2026-11-13 review: 1 findings, blocked=yes
 - 2026-11-13 implement: step R1 done (fetch + 120s timeout for core download)
+- 2026-11-13 ship: review fix R1 pushed, make test 750 passed
+- 2026-11-13 ship: server sync done
+- 2026-11-13 ship: doc sync updated ARCHITECTURE.md, CLAUDE.md (GOTCHAS.md unchanged)
