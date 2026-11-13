@@ -22,7 +22,7 @@ The import wizard's "No compatible emulator found" state links every suggestion 
   - Files: src/gui/electron/emulator/installCore.ts (new), src/gui/electron/emulator/ipc.ts
   - Reuses: art.ts:download (https to `.tmp` + rename), runtime.ts:PYTHON (stdlib zipfile; adm-zip was removed in #679), coreInstallTargets from step 1
   - New: installCore.ts. No existing zip-extract or core-install code; it gets its own module to keep ipc.ts small.
-- [ ] 3. Preload + types. Add `emulator.installCore(consoleKey, coresDir, lib)` to preload.ts and emusync.d.ts. Extend the `detect` return type with `install: { retroarch: {type,label,coresDir}[]; cores: {lib,folder}[] }`.
+- [x] 3. Preload + types. Add `emulator.installCore(consoleKey, coresDir, lib)` to preload.ts and emusync.d.ts. Extend the `detect` return type with `install: { retroarch: {type,label,coresDir}[]; cores: {lib,folder}[] }`.
   - Files: src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: existing `emulator` preload namespace
 - [ ] 4. Wizard state. `useConsoleImport.ts` stores `install` from both detect calls (initial auto-detect and `detectEmulators`), resets it on `backToConsole`, and exposes `installCore(coresDir, lib)`. That function calls the IPC and, on ok, calls `detectEmulators()` so the wizard advances; on failure it returns the error.
