@@ -69,7 +69,7 @@ Frontend
 - [done] 2 installCore.ts + emulator:installCore: buildbot download -> python zipfile extract -> .part + rename into coresDir, validated against detected targets
 - [done] 3 preload.ts / emusync.d.ts: new channel + detect type
 - [done] 4 useConsoleImport.ts: store install, installCore re-runs detection
-- 5 EmulatorStep.tsx: suggestion links + Install rows with spinner/inline error
+- [done] 5 EmulatorStep.tsx: suggestion links + Install rows with spinner/inline error Deviation: links keyed by first word.
 - 7 Docs: ARCHITECTURE.md, CLAUDE.md, design guide
 Tests
 - 6 test_emulator_suggestions.py (2 cases) + lint/tsc + manual script
@@ -88,7 +88,7 @@ Tests
 - [done] 2 installCore.ts (new) + ipc.ts: emulator:installCore. Reuses art.ts:download, runtime PYTHON (stdlib zipfile). New module: no existing extract/install code.
 - [done] 3 preload.ts, emusync.d.ts: channel + detect type. Reuses emulator namespace.
 - [done] 4 useConsoleImport.ts: store install, installCore -> re-run detectEmulators. Reuses detectEmulators.
-- 5 EmulatorStep.tsx: links via keyword URL table + install rows. Reuses empty state markup, window open handler. New URL table: suggestions are free text in console_defs, schema change not justified.
+- [done] 5 EmulatorStep.tsx: links via keyword URL table + install rows. Reuses empty state markup, window open handler. New URL table: suggestions are free text in console_defs, schema change not justified. Deviation: links keyed by first word.
 - 6 Tests: per tplan.
 - 7 Docs: ARCHITECTURE.md, CLAUDE.md, design guide.
 
@@ -117,3 +117,4 @@ Tests
 - 2026-11-12 implement: step 2 done (installCore.ts + emulator:installCore IPC)
 - 2026-11-12 implement: step 3 done (preload + emusync.d.ts)
 - 2026-11-12 implement: step 4 done (wizard install state + installCore re-detect)
+- 2026-11-12 implement: step 5 done (suggestion links + core install rows)
