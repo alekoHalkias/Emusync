@@ -65,7 +65,7 @@ Out of scope: standalone emulator install (#745).
 ### Integration Points: both detect call sites in useConsoleImport; shared art.ts:download unchanged
 ### Outline:
 Frontend
-- 1 detect.ts/ipc.ts: coreInstallTargets (Linux x86_64 only) returned as detect `install`
+- [done] 1 detect.ts/ipc.ts: coreInstallTargets (Linux x86_64 only) returned as detect `install`
 - 2 installCore.ts + emulator:installCore: buildbot download -> python zipfile extract -> .part + rename into coresDir, validated against detected targets
 - 3 preload.ts / emusync.d.ts: new channel + detect type
 - 4 useConsoleImport.ts: store install, installCore re-runs detection
@@ -84,7 +84,7 @@ Tests
 
 ## 8. Implementation Steps
 ### Steps: see tools/plans/744-emulator-install-suggestions.md
-- 1 detect.ts/ipc.ts: coreInstallTargets + detect `install` field. Reuses detectRetroArch, systemDefs core walk. New fn: nothing returns RA targets without an installed core.
+- [done] 1 detect.ts/ipc.ts: coreInstallTargets + detect `install` field. Reuses detectRetroArch, systemDefs core walk. New fn: nothing returns RA targets without an installed core.
 - 2 installCore.ts (new) + ipc.ts: emulator:installCore. Reuses art.ts:download, runtime PYTHON (stdlib zipfile). New module: no existing extract/install code.
 - 3 preload.ts, emusync.d.ts: channel + detect type. Reuses emulator namespace.
 - 4 useConsoleImport.ts: store install, installCore -> re-run detectEmulators. Reuses detectEmulators.
@@ -113,3 +113,4 @@ Tests
 - 2026-11-12 design: scope=ui, plan_target=fplan, difficulty=4/10, breaking=no
 - 2026-11-12 fplan: 7 steps written, visual_pattern=existing empty state + link list + ghost Install rows
 - 2026-11-12 tplan: test_file=src/tests/test_emulator_suggestions.py, 2 test cases defined + manual script
+- 2026-11-12 implement: step 1 done (coreInstallTargets + detect install field)

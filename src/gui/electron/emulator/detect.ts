@@ -249,3 +249,25 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
 
   return options;
 }
+
+export interface CoreInstallTargets {
+  retroarch: Array<{ type: "native" | "flatpak"; label: string; coresDir: string }>;
+  cores: Array<{ lib: string; folder: string }>;
+}
+
+/** RetroArch installs and seeded cores a missing core could be installed into (#744).
+ *  ponytail: Linux x86_64 only; detection is .so-only, so a Windows .dll would never be found. */
+export function coreInstallTargets(home: string, consoleKey: string): CoreInstallTargets {
+  const consoleDef = rt.cachedConsoleDefs?.[consoleKey];
+  if (!consoleDef || process.platform !== "linux" || process.arch !== "x64") return { retroarch: [], cores: [] };
+  const cores: CoreInstallTargets["cores"] = [];
+  for (const sysKey of consoleDef.systemKeys ?? []) {
+    for (const core of rt.cachedSystemDefs?.[sysKey]?.cores ?? []) {
+      const lib = core.libName || core.lib;
+      if (lib && !cores.some(c => c.lib === lib)) cores.push({ lib, folder: core.folderName || core.folder });
+    }
+  }
+  if (!cores.length) return { retroarch: [], cores: [] };
+  const retroarch = detectRetroArch(home).map(ra => ({ type: ra.type, label: ra.label, coresDir: ra.coresDir }));
+  return { retroarch, cores };
+}

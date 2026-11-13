@@ -14,7 +14,7 @@ The import wizard's "No compatible emulator found" state links every suggestion 
 - **Recommendations**: Add one guide line under Layout, "Empty state with actions", describing link + install rows.
 
 ## Steps
-- [ ] 1. Detection returns install targets. Export `coreInstallTargets(home, consoleKey)` from `detect.ts`: on `process.platform === "linux" && process.arch === "x64"`, return `{ retroarch: [{ type, label, coresDir }], cores: [{ lib, folder }] }`, built from `detectRetroArch(home)` and the console's `systemKeys` -> `rt.cachedSystemDefs[sys].cores` (dedupe by lib). Otherwise return empty arrays. `emulator:detect` adds an `install` field holding this value.
+- [x] 1. Detection returns install targets. Export `coreInstallTargets(home, consoleKey)` from `detect.ts`: on `process.platform === "linux" && process.arch === "x64"`, return `{ retroarch: [{ type, label, coresDir }], cores: [{ lib, folder }] }`, built from `detectRetroArch(home)` and the console's `systemKeys` -> `rt.cachedSystemDefs[sys].cores` (dedupe by lib). Otherwise return empty arrays. `emulator:detect` adds an `install` field holding this value.
   - Files: src/gui/electron/emulator/detect.ts, src/gui/electron/emulator/ipc.ts
   - Reuses: detect.ts:detectRetroArch, the core-list walk already used in detectEmulatorsForConsole
   - New: small exported fn. Nothing existing returns RetroArch targets without an installed core.
