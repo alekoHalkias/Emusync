@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #744
 - Branch: feature/744-emulator-install-suggestions
-- PR: none
-- Status: implemented
+- PR: #746
+- Status: shipped
 - Created: 2026-11-12
 - Fix attempts: 0
 
@@ -98,8 +98,8 @@ Tests
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #746
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -120,3 +120,4 @@ Tests
 - 2026-11-12 implement: step 5 done (suggestion links + core install rows)
 - 2026-11-12 implement: step 6 done (test_emulator_suggestions.py, 2 passing)
 - 2026-11-12 implement: step 7 done (ARCHITECTURE.md, design guide; CLAUDE.md in step 3)
+- 2026-11-13 ship: make test 750 passed, PR #746 opened

@@ -2,8 +2,8 @@
 
 Issue: #744
 Branch: feature/744-emulator-install-suggestions
-PR: none
-Status: implemented
+PR: #746
+Status: shipped
 Fix attempts: 0
 
 ## Goal
