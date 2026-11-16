@@ -4,7 +4,7 @@
 - Issue: #745
 - Branch: feature/745-install-standalone-emulators
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -79,7 +79,7 @@ Docs
 - [done] Step 2: installFlatpak.ts (new), ipc.ts, preload.ts, emusync.d.ts - reuses installCore.ts shape; new file because nothing runs flatpak today.
 - [done] Step 3: EmulatorStep.tsx, useConsoleImport.ts - generalises CoreInstallList rows; installFlatpak hook fn mirrors installCore.
 - [done] Step 4: test_emulator_suggestions.py - flatpak_id format check; reuses existing test module.
-- Step 5: CLAUDE.md, ARCHITECTURE.md - docs only.
+- [done] Step 5: CLAUDE.md, ARCHITECTURE.md - docs only.
 
 ## 9. Review
 ### Findings: TBD
@@ -106,3 +106,4 @@ Docs
 - 2026-11-16 implement: step 2 done (emulator:installFlatpak IPC)
 - 2026-11-16 implement: step 3 done (shared InstallList for cores and Flatpak emulators); deviation: CoreInstallList replaced by InstallList + InstallOptions; Flatpak block shown above cores
 - 2026-11-16 implement: step 4 done (flatpak_id app-id format test)
+- 2026-11-16 implement: step 5 done (ARCHITECTURE.md IPC entry); deviation: CLAUDE.md part landed in step 2's commit (commit hook requires it when preload.ts changes)

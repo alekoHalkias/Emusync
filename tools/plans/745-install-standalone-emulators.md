@@ -3,7 +3,7 @@
 Issue: #745
 Branch: feature/745-install-standalone-emulators
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -27,7 +27,7 @@ On Linux with Flatpak, the import wizard's no-emulator state offers a one-click 
   - Reuses: `CoreInstallList` busy/error state and row markup (generalise it into a small `InstallRow`-style list that takes `{key,label,run}` items, used for both cores and standalones, instead of duplicating); `installCore` in the hook as the template for `installFlatpak` (re-run `detectEmulators` on success).
   - New: `installFlatpak` in the hook - one-line twin of `installCore` for the new channel. Heading "Install an emulator (Flatpak)", button text "Install"; the core list keeps its heading.
 - [x] 4. Tests: src/tests/test_emulator_suggestions.py - every standalone `flatpak_id` in `consoles_data.py` matches a reverse-DNS app-id regex `^[A-Za-z][\w-]*(\.[A-Za-z_][\w-]*)+$` (it is passed as an argv to flatpak; validation in step 2 relies on these values). No TS test runner exists; manual check: `make build-gui` compiles.
-- [ ] 5. Docs: CLAUDE.md "Missing emulator (#744)" bullet: replace "Standalone emulator install: #745." with the `install.standalones` field + `emulator:installFlatpak` (user-level Flathub, validated against the console's standalones, Linux only). ARCHITECTURE.md IPC list: add `emulator:installFlatpak`.
+- [x] 5. Docs: CLAUDE.md "Missing emulator (#744)" bullet: replace "Standalone emulator install: #745." with the `install.standalones` field + `emulator:installFlatpak` (user-level Flathub, validated against the console's standalones, Linux only). ARCHITECTURE.md IPC list: add `emulator:installFlatpak`.
 
 ## Testing
 - **Test File**: src/tests/test_emulator_suggestions.py (extend; same module guards consoles_data -> EmulatorStep/installCore contracts)
@@ -54,3 +54,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. 
 - 2026-11-16 tplan: 1 automated test case + manual script
 Step 1: flatpak list not memoised at module scope (would go stale after install); new uncached flatpakApps() helper shared by both functions
 Step 3: CoreInstallList replaced by InstallList + InstallOptions; Flatpak block shown above cores
+Step 5: CLAUDE.md part landed in step 2's commit (commit hook requires it when preload.ts changes)
