@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #738
 - Branch: feature/738-convert-legacy-blobs
-- PR: none
-- Status: implemented
+- PR: #749
+- Status: shipped
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -93,10 +93,10 @@ Docs
 ### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #749
+### Server Sync: done (v36 ran on real data: ~100 s, 211 files enveloped, 129 rows hash-identical; backup ~/emusync-backup-pre738-20261116-1421)
+### Doc Sync: done in implement (CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -116,3 +116,7 @@ Docs
 - 2026-11-16 implement: step 6 done (GOTCHAS + ARCHITECTURE envelope docs); deviation: CLAUDE.md rule landed with steps 1 and 4 (commit hook); removed stale envelope.ts reference in ARCHITECTURE.md
 - 2026-11-16 review: 1 finding (correctness, mods staging leak), fix step R1
 - 2026-11-16 implement: step R1 done (mods staging cleanup)
+- 2026-11-16 ship: tests 765 passed; dry run on hardlinked copy of server data clean; PR #749 opened, mergeable
+- 2026-11-16 ship: server sync done
+- 2026-11-16 ship: doc sync done in implement steps
+- note: server saves dir has ~45 orphan blob files with no row (pruning leftovers), out of scope

@@ -2,8 +2,8 @@
 
 Issue: #738
 Branch: feature/738-convert-legacy-blobs
-PR: none
-Status: implemented
+PR: #749
+Status: shipped
 Fix attempts: 0
 
 ## Goal
