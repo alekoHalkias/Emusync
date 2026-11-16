@@ -82,9 +82,11 @@ Docs
 - [done] Step 5: CLAUDE.md, ARCHITECTURE.md - docs only.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings:
+- Low, EmulatorStep.tsx:21 - busy state per list; a Flatpak and a core install can run concurrently (both re-detect, same data). Accepted.
+- Low, detect.ts:270 - flatpak list runs twice per emulator:detect (blocking execSync, tens of ms). Accepted.
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -107,3 +109,4 @@ Docs
 - 2026-11-16 implement: step 3 done (shared InstallList for cores and Flatpak emulators); deviation: CoreInstallList replaced by InstallList + InstallOptions; Flatpak block shown above cores
 - 2026-11-16 implement: step 4 done (flatpak_id app-id format test)
 - 2026-11-16 implement: step 5 done (ARCHITECTURE.md IPC entry); deviation: CLAUDE.md part landed in step 2's commit (commit hook requires it when preload.ts changes)
+- 2026-11-16 review: 2 findings, blocked=no
