@@ -21,7 +21,7 @@ import { useNetworkShare } from "./useNetworkShare";
 import { filterIgnored, saveIgnoredRoms } from "./ignoredRoms";
 import type { CoreInstallTargets } from "../../emusync";
 
-const NO_INSTALL: CoreInstallTargets = { retroarch: [], cores: [] };
+const NO_INSTALL: CoreInstallTargets = { retroarch: [], cores: [], standalones: [] };
 import type {
   ConsoleOption,
   EmulatorOption,
@@ -523,6 +523,14 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     return null;
   }
 
+  // Install a missing standalone emulator Flatpak, then re-detect (#745).
+  async function installFlatpak(flatpakId: string): Promise<string | null> {
+    const res = await emusync.emulator.installFlatpak(consoleSel, flatpakId);
+    if (!res.ok) return res.error ?? "Install failed";
+    await detectEmulators();
+    return null;
+  }
+
   function backToEmulator(): void {
     setRoms([]); setNames({}); setExtraPaths(savedFolders); setRomDirs([]); setRemovedDirs(new Set()); setPhase("emulator");
   }
@@ -550,7 +558,7 @@ export function useConsoleImport({ onClose, onImported, initialConsole, initialR
     setConsoleSel, setEmuSel, setPushSaves, setPushStates, setName,
     pickLocalRomRoot, pickNetworkRoot, clearLocalRoot, clearNetworkRoot,
     // handlers
-    detectEmulators, installCore, scanRoms, ignoreRoms, addExtraPath, removeExtraPath, removeRomDir,
+    detectEmulators, installCore, installFlatpak, scanRoms, ignoreRoms, addExtraPath, removeExtraPath, removeRomDir,
     toggleRom, toggleAll, doImport, forceImport, dismissNameWarnings,
     backToConsole, backToEmulator,
   };

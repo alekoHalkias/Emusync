@@ -6,6 +6,7 @@ import { loadConsoleDefinitionsIfNeeded } from "./console-defs";
 import { coreInstallTargets, detectEmulatorsForConsole, type CoreInstallTargets } from "./detect";
 import { findRomByNameSize, runEmulatorScan } from "./scan";
 import { installCore } from "./installCore";
+import { installFlatpak } from "./installFlatpak";
 import { scanLibraryFolders, type LibraryFolderMatch } from "./library";
 import type { DetectedEmulatorOption, EmulatorScanResult } from "./types";
 
@@ -35,6 +36,11 @@ export function registerEmulatorIpc(): void {
   ipcMain.handle("emulator:installCore", async (_event, consoleKey: string, coresDir: string, lib: string) => {
     await loadConsoleDefinitionsIfNeeded();
     return installCore(homedir(), consoleKey, coresDir, lib);
+  });
+
+  ipcMain.handle("emulator:installFlatpak", async (_event, consoleKey: string, flatpakId: string) => {
+    await loadConsoleDefinitionsIfNeeded();
+    return installFlatpak(homedir(), consoleKey, flatpakId);
   });
 
   ipcMain.handle("emulator:scan", async (_event, params: {
