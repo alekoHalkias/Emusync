@@ -3,7 +3,7 @@
 Issue: #745
 Branch: feature/745-install-standalone-emulators
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
