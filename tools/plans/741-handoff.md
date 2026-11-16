@@ -71,7 +71,7 @@ Tests:
 
 ## 8. Implementation Steps
 ### Steps: see tools/plans/741-runtime-venv-python-version.md
-- 1. Launcher probe + rebuild + clear error. Files: src/emusync. Reuses: venv search loop, preflight import list, bundled requirements.txt. New: bash block, because Steam shortcuts run the launcher without Electron.
+- [x] 1. Launcher probe + rebuild + clear error. Files: src/emusync. Reuses: venv search loop, preflight import list, bundled requirements.txt. New: bash block, because Steam shortcuts run the launcher without Electron.
 - 2. ensureRuntime probe -> rm venv + hash stamp -> existing rebuild. Files: runtimeSetup.ts, runtime.ts, server.ts. Reuses: run(), create/pip/stamp flow. New: PY_DEPS_PROBE const shared with server:preflight.
 - 3. Tests: src/tests/test_launcher.py (healthy, broken+rebuild-fails, no venv). New file: nothing covers the launcher.
 - 4. Docs: GOTCHAS #677 section, ARCHITECTURE runtime line, CLAUDE.md Ops bullet.
@@ -97,3 +97,4 @@ Tests:
 - 2026-11-16 design: scope=backend+electron-main, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-16 bplan: 4 steps written, backend_pattern=import-probe staleness check shared by ensureRuntime and launcher
 - 2026-11-16 tplan: test_file=src/tests/test_launcher.py, 4 test cases defined
+- 2026-11-16 implement: step 1 done (launcher import probe + rebuild + clear error)
