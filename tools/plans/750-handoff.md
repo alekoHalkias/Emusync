@@ -77,7 +77,7 @@ Docs
 ## 8. Implementation Steps
 ### Steps: see tools/plans/750-orphaned-blob-files.md
 - [done] Step 1: store/devices.py, api/_core.py - reuses ensure_device/_auth; new REMOVED_DEVICE_ID constant (FK needs a device row).
-- Step 2: store/devices.py, store/blobs.py - reuses merge_devices, _DEVICE_REFS, _unlink_blobs; new _prune_removed_generations (newest-1 per owner for one device, unlike _prune_history).
+- [done] Step 2: store/devices.py, store/blobs.py - reuses merge_devices, _DEVICE_REFS, _unlink_blobs; new _prune_removed_generations (newest-1 per owner for one device, unlike _prune_history).
 - Step 3: store/schema.py - reuses _migrate blob_dir hook; new _quarantine_orphan_blobs (nothing compares dirs with rows).
 - Step 4: tests in test_devices.py + new test for v37.
 - Step 5: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
@@ -104,3 +104,4 @@ Docs
 - 2026-11-16 bplan: 5 steps written, backend_pattern=merge into placeholder + v37 quarantine
 - 2026-11-16 tplan: test_file=src/tests/test_devices.py + test_orphan_blobs.py, 10 test cases defined
 - 2026-11-16 implement: step 1 done (REMOVED_DEVICE_ID placeholder hidden and reserved)
+- 2026-11-16 implement: step 2 done (remove_device merges into placeholder, keeps newest per owner); deviation: per-device rows listed once in new _DEVICE_ONLY_REFS tuple next to _DEVICE_REFS; unknown device id is a no-op

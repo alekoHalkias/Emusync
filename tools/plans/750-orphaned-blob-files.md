@@ -18,7 +18,7 @@ Removing a device keeps its newest save/state/card generation per owner (credite
   - Files: src/server/store/devices.py, src/server/api/_core.py
   - Reuses: `ensure_device` (creates it on demand), existing `_auth` header validation.
   - New: the constant - nothing models "no longer paired" today and the FK requires a device row.
-- [ ] 2. `remove_device(device_id)` rewritten: (a) delete this device's per-device rows: `game_devices`, `consoles`, `locks`, `rom_transfers` (from/to), `rom_pull_requests` (from/to), `save_sync_baseline`, `console_save_sync_baseline`; (b) `ensure_device(REMOVED_DEVICE_ID, ...)` then `merge_devices(device_id, REMOVED_DEVICE_ID)` re-keys everything else in `_DEVICE_REFS` (saves, states, console_save_history, console_saves, switch_mods, events, conflicts) and drops the device row in the same commit; (c) `_prune_removed_generations()`: for `saves`/`states` (owner `game_slug`) and `console_save_history` (owner `console_key`), delete placeholder rows that are not the placeholder's newest row for that owner, commit, then `_unlink_blobs` their files. A device id equal to the placeholder is a no-op. `clear_devices()` becomes `remove_device` for every device except the placeholder.
+- [x] 2. `remove_device(device_id)` rewritten: (a) delete this device's per-device rows: `game_devices`, `consoles`, `locks`, `rom_transfers` (from/to), `rom_pull_requests` (from/to), `save_sync_baseline`, `console_save_sync_baseline`; (b) `ensure_device(REMOVED_DEVICE_ID, ...)` then `merge_devices(device_id, REMOVED_DEVICE_ID)` re-keys everything else in `_DEVICE_REFS` (saves, states, console_save_history, console_saves, switch_mods, events, conflicts) and drops the device row in the same commit; (c) `_prune_removed_generations()`: for `saves`/`states` (owner `game_slug`) and `console_save_history` (owner `console_key`), delete placeholder rows that are not the placeholder's newest row for that owner, commit, then `_unlink_blobs` their files. A device id equal to the placeholder is a no-op. `clear_devices()` becomes `remove_device` for every device except the placeholder.
   - Files: src/server/store/devices.py (+ the prune helper in src/server/store/blobs.py next to `_prune_history`)
   - Reuses: `merge_devices`, `_DEVICE_REFS`, `_unlink_blobs`, `_blob_path`.
   - New: `_prune_removed_generations` - `_prune_history` keeps the newest N across all devices; this keeps the newest 1 for one device id.
@@ -61,3 +61,4 @@ Schema bump: yes (v37, file moves only, no DDL). New IPC channel (+ emusync.d.ts
 ## Log
 - 2026-11-16 bplan: plan written
 - 2026-11-16 tplan: 10 test cases + edge cases
+Step 2: per-device rows listed once in new _DEVICE_ONLY_REFS tuple next to _DEVICE_REFS; unknown device id is a no-op

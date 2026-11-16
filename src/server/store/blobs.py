@@ -192,6 +192,26 @@ class SaveStateMixin:
         )
         return stale
 
+    def _prune_removed_generations(self, device_id: str) -> None:
+        """Keep only *device_id*'s newest generation per game / console in each blob
+        history table; delete the rest and unlink their files after commit (#750,
+        #704). Never touches another device's rows, so the current blob survives:
+        if it is this device's, it is this device's newest for that owner."""
+        stale: dict[str, list[str]] = {}
+        for table, owner in (("saves", "game_slug"), ("states", "game_slug"),
+                             ("console_save_history", "console_key")):
+            ids = [r["id"] for r in self._conn.execute(
+                f"""SELECT id FROM {table} t WHERE device_id = ? AND rowid < (
+                        SELECT MAX(rowid) FROM {table} WHERE device_id = ? AND {owner} = t.{owner})""",
+                (device_id, device_id),
+            ).fetchall()]
+            for blob_id in ids:
+                self._conn.execute(f"DELETE FROM {table} WHERE id = ?", (blob_id,))
+            stale[table] = ids
+        self._conn.commit()
+        for table, ids in stale.items():
+            self._unlink_blobs(table, ids)
+
     def _meta_from_row(self, game_slug: str, row) -> SaveMeta:
         return SaveMeta(
             game_slug=game_slug, device_id=row["device_id"],
