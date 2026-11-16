@@ -3,7 +3,7 @@
 Issue: #738
 Branch: feature/738-convert-legacy-blobs
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -58,7 +58,7 @@ Every stored blob carries the #478 envelope (converted once on the server, wrapp
   - Server PC after ship: re-run the legacy count script; expect legacy=0 in every table.
 
 ## Review fixes
-- [ ] R1. `api/mods.py:push_switch_mod`: unlink the staged upload when `_store_it` raises (mirrors `api/blobs.py:_push`, #701/#704).
+- [x] R1. `api/mods.py:push_switch_mod`: unlink the staged upload when `_store_it` raises (mirrors `api/blobs.py:_push`, #701/#704).
   - Files: src/server/api/mods.py
   - Reuses: `_push`'s try/except unlink pattern.
 

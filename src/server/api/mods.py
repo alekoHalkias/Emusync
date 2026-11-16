@@ -58,7 +58,10 @@ async def push_switch_mod(title_id: str, mod_name: str, request: Request, device
         wrapped = _envelope_file_in_place(tmp, states=False)  # pre-#478 client upload (#738)
         return store.add_switch_mod(title_id, mod_name, device_id, tmp, size + (_ENVELOPE_HEADER_LEN if wrapped else 0))
 
-    added = await asyncio.to_thread(_store_it)
+    try:
+        added = await asyncio.to_thread(_store_it)
+    finally:
+        tmp.unlink(missing_ok=True)  # moved into place on success; never leak a staged upload (#704)
     if added:
         _print_activity(f"mod pushed: {mod_name} ({title_id}) from {_device_label(device_id)}")
     return {"added": added}

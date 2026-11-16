@@ -4,7 +4,7 @@
 - Issue: #738
 - Branch: feature/738-convert-legacy-blobs
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -115,3 +115,4 @@ Docs
 - 2026-11-16 implement: step 5 done (test_legacy_blob_conversion.py, 11 tests); deviation: legacy-fallback test updates landed in steps 2-4 to keep each commit green
 - 2026-11-16 implement: step 6 done (GOTCHAS + ARCHITECTURE envelope docs); deviation: CLAUDE.md rule landed with steps 1 and 4 (commit hook); removed stale envelope.ts reference in ARCHITECTURE.md
 - 2026-11-16 review: 1 finding (correctness, mods staging leak), fix step R1
+- 2026-11-16 implement: step R1 done (mods staging cleanup)
