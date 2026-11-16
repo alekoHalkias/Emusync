@@ -19,6 +19,8 @@ export const USE_RUNTIME_DIR = !process.env.EMUSYNC_SCRIPT && app.isPackaged && 
 export const SCRIPT = process.env.EMUSYNC_SCRIPT
   ?? (USE_RUNTIME_DIR ? join(RUNTIME_DIR, "src/emusync.py") : join(__dirname, "../../../emusync.py"));
 export const LAUNCHER = join(dirname(SCRIPT), "emusync");
+// Can the venv import the CLI/server deps? Shared by server:preflight, ensureRuntime and the src/emusync launcher (#741).
+export const PY_DEPS_PROBE = "import fastapi, uvicorn, click, tomlkit, zeroconf, httpx";
 export const PYTHON = process.env.EMUSYNC_PYTHON ?? (() => {
   const win = process.platform === "win32";
   const venv = join(dirname(SCRIPT), "../.cache/.venv", win ? "Scripts" : "bin", win ? "python.exe" : "python");

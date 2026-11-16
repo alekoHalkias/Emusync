@@ -6,7 +6,7 @@ import { join } from "path";
 import { networkInterfaces } from "os";
 import { dataDir } from "./paths";
 import { parse as parseTOML } from "smol-toml";
-import { CONFIG_PATH, SCRIPT, PYTHON, rt } from "./runtime";
+import { CONFIG_PATH, PY_DEPS_PROBE, SCRIPT, PYTHON, rt } from "./runtime";
 import { writeConfig } from "./config-store";
 import { ensureRuntime } from "./runtimeSetup";
 
@@ -169,7 +169,7 @@ export function registerServerIpc(): void {
     const ready = await ensureRuntime();
     if (!ready.ok) return ready;
     return new Promise<{ ok: boolean; error?: string }>((resolve) => {
-      const proc = spawn(PYTHON, ["-c", "import fastapi, uvicorn, click, tomlkit, zeroconf, httpx"], { stdio: ["ignore", "ignore", "pipe"] });
+      const proc = spawn(PYTHON, ["-c", PY_DEPS_PROBE], { stdio: ["ignore", "ignore", "pipe"] });
       let err = "";
       proc.stderr?.on("data", (c: Buffer) => { err += c.toString(); });
       proc.on("exit", (code) => resolve(code === 0 ? { ok: true } : {

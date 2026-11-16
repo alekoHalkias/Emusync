@@ -7,7 +7,7 @@ import { spawn } from "child_process";
 import { createHash } from "crypto";
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { RUNTIME_DIR, USE_RUNTIME_DIR } from "./runtime";
+import { PY_DEPS_PROBE, RUNTIME_DIR, USE_RUNTIME_DIR } from "./runtime";
 
 type Result = { ok: boolean; error?: string };
 
@@ -39,6 +39,12 @@ async function provision(): Promise<Result> {
 
   const reqs = join(RUNTIME_DIR, "src/requirements.txt");
   const hash = createHash("sha256").update(readFileSync(reqs)).digest("hex");
+  // #741: bin/python symlinks to system python3, so a minor upgrade orphans the old
+  // site-packages. A venv that can't import its deps is rebuilt from scratch.
+  if (existsSync(VENV_PYTHON) && (await run(VENV_PYTHON, ["-c", PY_DEPS_PROBE])).code !== 0) {
+    rmSync(VENV, { recursive: true, force: true });
+    rmSync(HASH_STAMP, { force: true });
+  }
   if (existsSync(VENV_PYTHON) && read(HASH_STAMP) === hash) return { ok: true };
 
   if (!existsSync(VENV_PYTHON)) {
