@@ -83,9 +83,9 @@ Docs
 - [done] Step 5: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings: none
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -108,3 +108,4 @@ Docs
 - 2026-11-16 implement: step 3 done (schema v37 quarantines orphan blob files); deviation: v36 tests in test_legacy_blob_conversion.py now call _envelope_legacy_blobs directly (their row-less seed files would be quarantined by v37) and compare user_version to _SCHEMA_VERSION
 - 2026-11-16 implement: step 4 done (test_device_removal.py, 9 tests); deviation: tests in a new test_device_removal.py (test_devices.py is already 648 lines) including the v37 cases instead of a separate test_orphan_blobs.py; the missing-table test caught v37 quarantining a whole dir when its row query fails, fixed in schema.py to skip the table as the plan specified
 - 2026-11-16 implement: step 5 done (CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md)
+- 2026-11-16 review: 0 findings, blocked=no
