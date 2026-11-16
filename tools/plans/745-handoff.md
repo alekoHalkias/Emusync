@@ -4,7 +4,7 @@
 - Issue: #745
 - Branch: feature/745-install-standalone-emulators
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -37,9 +37,9 @@ Linux with Flatpak: `flatpak install --user flathub <app-id>`, re-run detection,
 ### Backwards Compatibility: non-breaking; additive IPC field and channel only.
 
 ## 3. Frontend Plan
-### Design Alignment: TBD
-### Visual Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: fits "Empty state with actions (#744)"; no guide change.
+### Visual Pattern: label + btn btn-ghost Install rows, spinner while busy, 12px danger error; shares markup with CoreInstallList.
+### Recommendations: none
 
 ## 4. Backend Plan
 ### Design Alignment: n/a
@@ -66,7 +66,12 @@ Linux with Flatpak: `flatpak install --user flathub <app-id>`, re-run detection,
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/745-install-standalone-emulators.md
+- Step 1: detect.ts, emusync.d.ts, useConsoleImport.ts - reuses coreInstallTargets + hoisted getFlatpakList; no new code.
+- Step 2: installFlatpak.ts (new), ipc.ts, preload.ts, emusync.d.ts - reuses installCore.ts shape; new file because nothing runs flatpak today.
+- Step 3: EmulatorStep.tsx, useConsoleImport.ts - generalises CoreInstallList rows; installFlatpak hook fn mirrors installCore.
+- Step 4: test_emulator_suggestions.py - flatpak_id format check; reuses existing test module.
+- Step 5: CLAUDE.md, ARCHITECTURE.md - docs only.
 
 ## 9. Review
 ### Findings: TBD
@@ -87,3 +92,4 @@ Linux with Flatpak: `flatpak install --user flathub <app-id>`, re-run detection,
 ## 12. Log
 - 2026-11-16 issue: workflow initialized (existing issue #745)
 - 2026-11-16 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
+- 2026-11-16 fplan: 5 steps written, visual_pattern=empty-state action rows (#744)
