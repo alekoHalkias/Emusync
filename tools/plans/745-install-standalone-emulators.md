@@ -29,6 +29,18 @@ On Linux with Flatpak, the import wizard's no-emulator state offers a one-click 
 - [ ] 4. Tests: src/tests/test_emulator_suggestions.py - every standalone `flatpak_id` in `consoles_data.py` matches a reverse-DNS app-id regex `^[A-Za-z][\w-]*(\.[A-Za-z_][\w-]*)+$` (it is passed as an argv to flatpak; validation in step 2 relies on these values). No TS test runner exists; manual check: `make build-gui` compiles.
 - [ ] 5. Docs: CLAUDE.md "Missing emulator (#744)" bullet: replace "Standalone emulator install: #745." with the `install.standalones` field + `emulator:installFlatpak` (user-level Flathub, validated against the console's standalones, Linux only). ARCHITECTURE.md IPC list: add `emulator:installFlatpak`.
 
+## Testing
+- **Test File**: src/tests/test_emulator_suggestions.py (extend; same module guards consoles_data -> EmulatorStep/installCore contracts)
+- **Test Cases**:
+  - test_flatpak_ids_are_app_ids: every standalone `flatpak_id` in `_IMPORT_CONSOLES` matches the reverse-DNS app-id regex (they are passed as flatpak argv and are the allowlist installFlatpak.ts validates against)
+- **Edge Cases**:
+  - Standalone without `flatpak_id` (Eden): never listed, keeps its SUGGESTION_LINKS link (manual)
+  - flatpak not on PATH / non-Linux: `standalones` empty, links only (manual)
+  - Renderer passes an id not in the console's standalones: `{ok:false}` (manual, devtools `window.emusync.emulator.installFlatpak("ps2","org.evil.App")`)
+- **Integration Points**:
+  - Manual script: dev GUI on Linux with flatpak, `flatpak uninstall --user io.mgba.mGBA` if present, open import wizard for GBA with RetroArch absent, Install mGBA, wizard advances to emulator select listing "mGBA (Flatpak)". Then `flatpak uninstall --user io.mgba.mGBA`.
+  - `make lint` + both tsc projects show no new errors beyond the known pre-existing list.
+
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. Config/data file change: no.
 
@@ -39,3 +51,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. 
 
 ## Log
 - 2026-11-16 fplan: plan written
+- 2026-11-16 tplan: 1 automated test case + manual script

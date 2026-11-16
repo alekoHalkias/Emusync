@@ -51,12 +51,20 @@ Linux with Flatpak: `flatpak install --user flathub <app-id>`, re-run detection,
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_emulator_suggestions.py
+### Test Cases: test_flatpak_ids_are_app_ids (flatpak_id allowlist format)
+### Edge Cases: no flatpak_id (Eden), flatpak missing / non-Linux, rejected renderer id (manual)
+### Integration Points: manual wizard install of mGBA Flatpak on Linux; make lint + tsc
+### Outline:
+Frontend
+- 1. detect.ts: install.standalones (Flatpak-installable, not yet installed) via hoisted getFlatpakList; types + NO_INSTALL updated
+- 2. installFlatpak.ts + IPC emulator:installFlatpak: allowlisted id, user-level flathub remote-add + install, no shell/sudo
+- 3. EmulatorStep.tsx: shared install-row list for cores and Flatpak emulators; hook installFlatpak re-detects on success
+Tests
+- 4. test_emulator_suggestions.py: flatpak_id format check; manual wizard script
+Docs
+- 5. CLAUDE.md #744 bullet + ARCHITECTURE.md IPC list
+### Summary: The import wizard can install a missing standalone emulator as a user-level Flathub Flatpak on Linux and continue; everything else keeps the download links.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -93,3 +101,4 @@ Linux with Flatpak: `flatpak install --user flathub <app-id>`, re-run detection,
 - 2026-11-16 issue: workflow initialized (existing issue #745)
 - 2026-11-16 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-11-16 fplan: 5 steps written, visual_pattern=empty-state action rows (#744)
+- 2026-11-16 tplan: test_file=src/tests/test_emulator_suggestions.py, 1 test case defined
