@@ -3,7 +3,7 @@
 Issue: #738
 Branch: feature/738-convert-legacy-blobs
 PR: none
-Status: implemented
+Status: implementing
 Fix attempts: 0
 
 ## Goal
@@ -56,6 +56,11 @@ Every stored blob carries the #478 envelope (converted once on the server, wrapp
   - any other test feeding raw bytes to client unpackers: wrap with `_pack_envelope` (found by the full run)
 - **Integration Points**:
   - Server PC after ship: re-run the legacy count script; expect legacy=0 in every table.
+
+## Review fixes
+- [ ] R1. `api/mods.py:push_switch_mod`: unlink the staged upload when `_store_it` raises (mirrors `api/blobs.py:_push`, #701/#704).
+  - Files: src/server/api/mods.py
+  - Reuses: `_push`'s try/except unlink pattern.
 
 ## Checklist
 Schema bump: yes (v36, data-only, no DDL). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: yes (stored blob files rewritten once, hashes unchanged).

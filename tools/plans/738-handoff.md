@@ -4,7 +4,7 @@
 - Issue: #738
 - Branch: feature/738-convert-legacy-blobs
 - PR: none
-- Status: implemented
+- Status: implementing
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -87,9 +87,10 @@ Docs
 - [done] Step 6: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings:
+- correctness, api/mods.py:58 - staged mod upload leaks if _store_it raises; fix step R1 added.
+### Blocked: no (fixed in R1)
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -113,3 +114,4 @@ Docs
 - 2026-11-16 implement: step 4 done (client sniff fallbacks removed, _require_envelope); deviation: also cli/transfer.py: bare rom-folder transfer tars (GUI rom:push sends plain tar -cf) are declared _FMT_TAR before _write_memcard, by transfer kind not sniffing; state extracts open tar with r:* (TARGZ or TAR); legacy client tests flipped to raises / enveloped inputs here to keep the commit green
 - 2026-11-16 implement: step 5 done (test_legacy_blob_conversion.py, 11 tests); deviation: legacy-fallback test updates landed in steps 2-4 to keep each commit green
 - 2026-11-16 implement: step 6 done (GOTCHAS + ARCHITECTURE envelope docs); deviation: CLAUDE.md rule landed with steps 1 and 4 (commit hook); removed stale envelope.ts reference in ARCHITECTURE.md
+- 2026-11-16 review: 1 finding (correctness, mods staging leak), fix step R1
