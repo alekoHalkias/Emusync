@@ -54,12 +54,21 @@ Server migration wraps legacy blobs (hashes unchanged, idempotent, crash-safe); 
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_legacy_blob_conversion.py (new) + updates to 4 existing test files
+### Test Cases: converter shapes (5) + already-enveloped; v36 migration all tables; idempotency; end-to-end pull bytes/hash; upload wrap (save, mod); client raise (3 paths)
+### Edge Cases: missing dir, vanished file, stray .part, raw-that-parses-as-tar
+### Integration Points: server PC legacy count = 0 after ship
+### Outline:
+Backend
+- 1. _envelope_legacy (sync_client.py) + _envelope_file_in_place (store/blobs.py)
+- 2. schema v36: wrap every legacy file in the five blob dirs, idempotent, .part + os.replace
+- 3. upload routes (_push, push_switch_mod) wrap pre-#478 uploads
+- 4. client: _require_envelope raises; four sniff fallbacks deleted
+Tests
+- 5. test_legacy_blob_conversion.py + legacy-fallback tests flipped to "raises"
+Docs
+- 6. CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md envelope rules
+### Summary: The server converts all pre-#478 blobs to the enveloped format once (v36) and wraps old uploads, so clients drop every sniff fallback and fail clearly on un-enveloped data; hashes do not change.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -97,3 +106,4 @@ Server migration wraps legacy blobs (hashes unchanged, idempotent, crash-safe); 
 - 2026-11-16 issue: workflow initialized (existing issue #738)
 - 2026-11-16 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-16 bplan: 6 steps written, backend_pattern=v36 data migration + shared converter
+- 2026-11-16 tplan: test_file=src/tests/test_legacy_blob_conversion.py, 7 test case groups defined
