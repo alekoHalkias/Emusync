@@ -11,7 +11,7 @@ import tempfile
 import pytest
 
 from server.store import Store
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import AUTH, _device_auth, raw_env
 
 
 # ── store level ──────────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ async def test_memcard_push_and_pull(client):
 
     r = await client.get("/consoles/PS2/memcard", headers=AUTH)
     assert r.status_code == 200
-    assert r.content == card
+    assert r.content == raw_env(card)
     assert r.headers["x-save-hash"] == hashlib.sha256(card).hexdigest()
 
 
@@ -103,7 +103,7 @@ async def test_memcard_meta_after_push(client):
     assert r.status_code == 200
     meta = r.json()
     assert meta["hash"] == hashlib.sha256(card).hexdigest()
-    assert meta["size"] == len(card)
+    assert meta["size"] == len(raw_env(card))
 
 
 @pytest.mark.asyncio
@@ -117,7 +117,7 @@ async def test_memcard_is_shared_across_devices(client):
 
     r = await client.get("/consoles/PS2/memcard", headers=auth_b)
     assert r.status_code == 200
-    assert r.content == card
+    assert r.content == raw_env(card)
 
 
 @pytest.mark.asyncio
@@ -250,7 +250,7 @@ async def test_memcard_history_route_accumulates_and_restores(client):
     assert r.json()["hash"] == hashlib.sha256(b"good-card").hexdigest()
 
     pulled = await client.get("/consoles/PS2/memcard", headers=AUTH)
-    assert pulled.content == b"good-card"
+    assert pulled.content == raw_env(b"good-card")
 
 
 @pytest.mark.asyncio

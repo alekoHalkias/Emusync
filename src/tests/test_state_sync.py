@@ -6,6 +6,8 @@ import tarfile
 
 import pytest
 
+from tests.conftest import raw_env
+
 
 def _make_state_archive(files: dict[str, bytes]) -> bytes:
     buf = io.BytesIO()
@@ -249,7 +251,7 @@ async def test_state_restore_round_trip_and_unknown_version_404(client):
 
     r = await client.post("/games/zelda/state/restore", json={"version_id": good["id"]}, headers=AUTH)
     assert r.status_code == 200
-    assert (await client.get("/games/zelda/state", headers=AUTH)).content == b"good-state"
+    assert (await client.get("/games/zelda/state", headers=AUTH)).content == raw_env(b"good-state")
 
     r = await client.post("/games/zelda/state/restore", json={"version_id": "nope"}, headers=AUTH)
     assert r.status_code == 404

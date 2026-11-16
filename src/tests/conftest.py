@@ -43,6 +43,12 @@ AUTH = {
 }
 
 
+def raw_env(data: bytes) -> bytes:
+    """*data* as the server stores an un-enveloped (pre-#478) raw upload: wrapped
+    in the transfer envelope with the raw format byte (#738)."""
+    return b"ES1\0\x00" + data
+
+
 def _device_auth(device_id: str, device_name: str, pin: str = MASTER_PIN) -> dict:
     """Build auth headers for a specific device."""
     return {

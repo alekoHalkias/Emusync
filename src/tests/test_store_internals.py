@@ -6,6 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from server.store import Store, GameDevice
+from tests.conftest import raw_env
 
 
 # ── thread safety (issue #200) ──────────────────────────────────────────────
@@ -197,9 +198,9 @@ def test_v7_to_v8_migration_moves_blobs_to_disk():
         assert "data" not in cols and "size" in cols
 
         blob_file = Path(tmpdir) / "blobs" / "saves" / "v1"
-        assert blob_file.read_bytes() == b"legacy-save-bytes"
+        assert blob_file.read_bytes() == raw_env(b"legacy-save-bytes")  # v36 wraps it (#738)
         data, meta = store.pull_save("zelda")
-        assert data == b"legacy-save-bytes"
+        assert data == raw_env(b"legacy-save-bytes")
         assert meta.size == len(b"legacy-save-bytes")
 
 

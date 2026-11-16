@@ -22,7 +22,7 @@ Every stored blob carries the #478 envelope (converted once on the server, wrapp
   - Files: src/server/store/schema.py
   - Reuses: `_migrate(conn, from_version, blob_dir)` hook and v35's skip-on-missing pattern; `_envelope_file_in_place`.
   - New: `_envelope_legacy_blobs` - small loop, mirrors `_backfill_console_cards`.
-- [ ] 3. Wrap un-enveloped uploads (pre-#478 clients): in `api/blobs.py:_push._store_it` call `_envelope_file_in_place(tmp, states=kind is _STATE)` before `push_*_file`, and in `api/mods.py:push_switch_mod._store_it` with `states=False`, adding 5 to `size` when it returns True. The hash is unchanged (already payload-only in `_stage_upload`; mods hash is not stored).
+- [x] 3. Wrap un-enveloped uploads (pre-#478 clients): in `api/blobs.py:_push._store_it` call `_envelope_file_in_place(tmp, states=kind is _STATE)` before `push_*_file`, and in `api/mods.py:push_switch_mod._store_it` with `states=False`, adding 5 to `size` when it returns True. The hash is unchanged (already payload-only in `_stage_upload`; mods hash is not stored).
   - Files: src/server/api/blobs.py, src/server/api/mods.py
   - Reuses: `_envelope_file_in_place`; existing `asyncio.to_thread(_store_it)` offload.
   - New: none.
@@ -69,3 +69,4 @@ Schema bump: yes (v36, data-only, no DDL). New IPC channel (+ emusync.d.ts): no.
 - 2026-11-16 bplan: plan written
 - 2026-11-16 tplan: test plan added (7 case groups)
 Step 2: step 1 converter reworked to stream (_legacy_format sniffs from the file, copyfileobj behind the header) since server blobs reach 1.5 GB; two v35 tests updated here (expected envelope) to keep the commit green
+Step 3: existing API tests pushing raw bytes now expect the RAW envelope back (new conftest.raw_env helper); stored size includes the 5-byte header, matching enveloped pushes

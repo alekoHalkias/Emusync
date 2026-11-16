@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from server.api import _core, transfers
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import AUTH, _device_auth, raw_env
 
 
 @pytest.mark.asyncio
@@ -45,7 +45,7 @@ async def test_valid_mod_roundtrip(client):
     r = await client.get("/switch/0100000000010000/mods", headers=AUTH)
     assert [m["mod_name"] for m in r.json()] == ["My Mod"]
     r = await client.get("/switch/0100000000010000/mods/My Mod", headers=AUTH)
-    assert r.content == b"tar"
+    assert r.content == raw_env(b"tar")
 
 
 def test_safe_segment_direct():

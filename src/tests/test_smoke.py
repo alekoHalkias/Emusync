@@ -5,7 +5,7 @@ import hashlib
 
 import pytest
 
-from tests.conftest import AUTH, DEVICE_ID
+from tests.conftest import AUTH, DEVICE_ID, raw_env
 
 
 # ── schema smoke test ─────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ async def test_full_flow(client):
     assert r.json()["hash"] == hashlib.sha256(save).hexdigest()
 
     r = await client.get("/games/metroid-fusion/save", headers=AUTH)
-    assert r.content == save
+    assert r.content == raw_env(save)
 
     await client.post("/games/metroid-fusion/lock", headers=AUTH)
     r = await client.get("/games/metroid-fusion/lock", headers=AUTH)
