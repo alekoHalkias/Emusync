@@ -83,7 +83,7 @@ Docs
 - [done] Step 2: schema.py - reuses _migrate blob_dir hook (v35 pattern); new _envelope_legacy_blobs loop.
 - [done] Step 3: api/blobs.py, api/mods.py - reuses _envelope_file_in_place in existing _store_it offloads.
 - [done] Step 4: sync_client.py - new _require_envelope replaces four sniff branches.
-- Step 5: tests - extend test_state_sync.py, test_memcard_folder_sync.py, test_restore_safety.py, test_saves.py.
+- [done] Step 5: tests - extend test_state_sync.py, test_memcard_folder_sync.py, test_restore_safety.py, test_saves.py.
 - Step 6: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
 
 ## 9. Review
@@ -111,3 +111,4 @@ Docs
 - 2026-11-16 implement: step 2 done (schema v36 wraps legacy blob files); deviation: step 1 converter reworked to stream (_legacy_format sniffs from the file, copyfileobj behind the header) since server blobs reach 1.5 GB; two v35 tests updated here (expected envelope) to keep the commit green
 - 2026-11-16 implement: step 3 done (upload routes wrap pre-#478 uploads); deviation: existing API tests pushing raw bytes now expect the RAW envelope back (new conftest.raw_env helper); stored size includes the 5-byte header, matching enveloped pushes
 - 2026-11-16 implement: step 4 done (client sniff fallbacks removed, _require_envelope); deviation: also cli/transfer.py: bare rom-folder transfer tars (GUI rom:push sends plain tar -cf) are declared _FMT_TAR before _write_memcard, by transfer kind not sniffing; state extracts open tar with r:* (TARGZ or TAR); legacy client tests flipped to raises / enveloped inputs here to keep the commit green
+- 2026-11-16 implement: step 5 done (test_legacy_blob_conversion.py, 11 tests); deviation: legacy-fallback test updates landed in steps 2-4 to keep each commit green
