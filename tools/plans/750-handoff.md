@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #750
 - Branch: feature/750-orphaned-blob-files
-- PR: none
-- Status: implemented
+- PR: #751
+- Status: shipped
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -88,10 +88,10 @@ Docs
 ### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #751
+### Server Sync: done (v37 moved 63 files, 10.79 GB, to blobs/.orphaned; 129 rows hash-identical)
+### Doc Sync: done in implement (CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -109,3 +109,6 @@ Docs
 - 2026-11-16 implement: step 4 done (test_device_removal.py, 9 tests); deviation: tests in a new test_device_removal.py (test_devices.py is already 648 lines) including the v37 cases instead of a separate test_orphan_blobs.py; the missing-table test caught v37 quarantining a whole dir when its row query fails, fixed in schema.py to skip the table as the plan specified
 - 2026-11-16 implement: step 5 done (CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md)
 - 2026-11-16 review: 0 findings, blocked=no
+- 2026-11-16 ship: tests 774 passed; dry run on hardlinked live copy clean; PR #751 opened, mergeable
+- 2026-11-16 ship: server sync done
+- 2026-11-16 ship: doc sync done in implement steps

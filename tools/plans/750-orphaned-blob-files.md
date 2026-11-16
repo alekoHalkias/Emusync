@@ -2,8 +2,8 @@
 
 Issue: #750
 Branch: feature/750-orphaned-blob-files
-PR: none
-Status: implemented
+PR: #751
+Status: shipped
 Fix attempts: 0
 
 ## Goal
