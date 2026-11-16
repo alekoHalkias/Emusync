@@ -4,7 +4,7 @@
 - Issue: #741
 - Branch: feature/741-runtime-venv-python-version
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -57,7 +57,7 @@ Build the runtime venv under Python X.Y, upgrade system python3 to X.(Y+1), run 
 Backend:
 - 1. src/emusync: import probe; on failure `venv --clear` + pip install + re-probe; clear error and exit 1 instead of silent bare-python3 fallback when a venv exists.
 - 2. runtimeSetup.ts: same probe on an existing venv; failure removes venv + hash stamp so the existing rebuild runs. Probe list hoisted to runtime.ts and shared with server:preflight.
-- 4. Docs: GOTCHAS #677 section, ARCHITECTURE runtime line, CLAUDE.md Ops bullet.
+- [x] 4. Docs: GOTCHAS #677 section, ARCHITECTURE runtime line, CLAUDE.md Ops bullet.
 Tests:
 - 3. src/tests/test_launcher.py: 4 cases + 2 edge assertions with interpreter stubs in a tmp checkout layout.
 ### Summary: A runtime venv orphaned by a system Python upgrade is detected by a dependency import probe and rebuilt automatically, from both the Electron startup path and the Steam-invoked launcher, with a clear error instead of a silent fallback when rebuilding fails.
@@ -100,3 +100,4 @@ Tests:
 - 2026-11-16 implement: step 1 done (launcher import probe + rebuild + clear error)
 - 2026-11-16 implement: step 2 done (ensureRuntime probes venv, rebuilds on failure; PY_DEPS_PROBE shared with preflight)
 - 2026-11-16 implement: step 3 done (test_launcher.py, 4 tests; 2 fail on the old launcher)
+- 2026-11-16 implement: step 4 done (GOTCHAS, ARCHITECTURE, CLAUDE.md)

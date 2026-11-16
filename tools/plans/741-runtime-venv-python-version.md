@@ -3,7 +3,7 @@
 Issue: #741
 Branch: feature/741-runtime-venv-python-version
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -27,7 +27,7 @@ A venv that can no longer import its dependencies (system Python minor upgrade) 
   - Files: src/tests/test_launcher.py
   - Reuses: pytest `tmp_path`, `subprocess`.
   - New: test file, nothing existing covers the launcher. TS probe branch is not unit-testable (no TS test harness); noted in PR.
-- [ ] 4. Docs: src/docs/GOTCHAS.md "AppImage runtime (#677)" section: add the Python-upgrade line and the launcher self-heal/no-silent-fallback rule (#741). src/docs/ARCHITECTURE.md line ~194: mention the import probe as a venv staleness trigger. CLAUDE.md Ops AppImage bullet: append "a venv that fails the dependency import probe is rebuilt by `ensureRuntime()` and the `src/emusync` launcher (#741)".
+- [x] 4. Docs: src/docs/GOTCHAS.md "AppImage runtime (#677)" section: add the Python-upgrade line and the launcher self-heal/no-silent-fallback rule (#741). src/docs/ARCHITECTURE.md line ~194: mention the import probe as a venv staleness trigger. CLAUDE.md Ops AppImage bullet: append "a venv that fails the dependency import probe is rebuilt by `ensureRuntime()` and the `src/emusync` launcher (#741)".
   - Files: src/docs/GOTCHAS.md, src/docs/ARCHITECTURE.md, CLAUDE.md
 
 ## Testing
