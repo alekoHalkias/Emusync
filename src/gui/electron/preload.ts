@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld("emusync", {
     }> => ipcRenderer.invoke("emulator:detect", consoleKey),
     installCore: (consoleKey: string, coresDir: string, lib: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("emulator:installCore", consoleKey, coresDir, lib),
+    installFlatpak: (consoleKey: string, flatpakId: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("emulator:installFlatpak", consoleKey, flatpakId),
     scan: (
       consoleKey: string,
       emulatorOption: import("./emulator/types").DetectedEmulatorOption,

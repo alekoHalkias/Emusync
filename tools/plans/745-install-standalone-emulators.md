@@ -18,7 +18,7 @@ On Linux with Flatpak, the import wizard's no-emulator state offers a one-click 
   - Files: src/gui/electron/emulator/detect.ts, src/gui/renderer/src/emusync.d.ts, src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: `coreInstallTargets` (add `standalones: Array<{ label: string; flatpakId: string }>` to `CoreInstallTargets`); the `flatpak list --app --columns=application` probe already in `detectEmulatorsForConsole` (hoist the memoised `getFlatpakList` to module scope so both use it; empty string = flatpak missing). Linux only (any arch: Flathub serves aarch64 too), so the early return for non-x64 must only gate cores. Include a standalone only when it has `flatpak_id`, flatpak is available, and the id is not already in the list. `NO_INSTALL` in `useConsoleImport.ts` and the `.d.ts` interface get `standalones: []`.
   - New: none.
-- [ ] 2. IPC `emulator:installFlatpak(consoleKey, flatpakId)`.
+- [x] 2. IPC `emulator:installFlatpak(consoleKey, flatpakId)`.
   - Files: src/gui/electron/emulator/installFlatpak.ts (new), src/gui/electron/emulator/ipc.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: `installCore.ts` shape (validate against `coreInstallTargets`, return `{ok:true}|{ok:false,error}`); `execFile` + `promisify` as in installCore.
   - New: `installFlatpak.ts` - core install is a download+unzip, nothing existing runs flatpak. Validates `flatpakId` is in `coreInstallTargets(home, consoleKey).standalones`; runs `flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo` then `flatpak install --user -y --noninteractive flathub <id>` (no shell, no sudo, 15 min timeout, `maxBuffer` 10 MB); error = last stderr line.

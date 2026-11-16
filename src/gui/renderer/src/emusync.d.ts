@@ -72,6 +72,7 @@ export interface EmusyncBridge {
     detect: (consoleKey: string) => Promise<{ options: any[]; suggestions: string[]; install?: CoreInstallTargets }>;
     // Missing RetroArch core install from the libretro buildbot (#744); Linux x86_64 only.
     installCore: (consoleKey: string, coresDir: string, lib: string) => Promise<{ ok: boolean; error?: string }>;
+    installFlatpak: (consoleKey: string, flatpakId: string) => Promise<{ ok: boolean; error?: string }>;
     scan: (consoleKey: string, emulatorOption: any, extraPaths: string[]) => Promise<{ emulators: any[]; romDirs: string[]; roms: any[] }>;
     // Bulk-library import (#462): non-recursive scan of a library root's
     // immediate subfolders, each tagged with a matched console key (or null).
