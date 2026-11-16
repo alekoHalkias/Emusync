@@ -4,7 +4,7 @@
 - Issue: #741
 - Branch: feature/741-runtime-venv-python-version
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -40,9 +40,9 @@ Build the runtime venv under Python X.Y, upgrade system python3 to X.(Y+1), run 
 ### Recommendations: TBD
 
 ## 4. Backend Plan
-### Design Alignment: TBD
-### Backend Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: Fits the #677 runtime model (checkout layout, failure-writes-no-stamp). Deviation: staleness is detected by an import probe of the venv interpreter (the `server:preflight` dependency list) instead of a Python-version stamp; it tests the actual failure and adds no state.
+### Backend Pattern: Shared probe const in runtime.ts used by runtimeSetup.ts and server:preflight; launcher mirrors it in bash and self-heals via `venv --clear` + pip.
+### Recommendations: GOTCHAS line on the symlinked interpreter orphaning lib/pythonX.Y; never silently fall back to bare python3 when a venv exists.
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
@@ -64,7 +64,11 @@ Build the runtime venv under Python X.Y, upgrade system python3 to X.(Y+1), run 
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/741-runtime-venv-python-version.md
+- 1. Launcher probe + rebuild + clear error. Files: src/emusync. Reuses: venv search loop, preflight import list, bundled requirements.txt. New: bash block, because Steam shortcuts run the launcher without Electron.
+- 2. ensureRuntime probe -> rm venv + hash stamp -> existing rebuild. Files: runtimeSetup.ts, runtime.ts, server.ts. Reuses: run(), create/pip/stamp flow. New: PY_DEPS_PROBE const shared with server:preflight.
+- 3. Tests: src/tests/test_launcher.py (healthy, broken+rebuild-fails, no venv). New file: nothing covers the launcher.
+- 4. Docs: GOTCHAS #677 section, ARCHITECTURE runtime line, CLAUDE.md Ops bullet.
 
 ## 9. Review
 ### Findings: TBD
@@ -85,3 +89,4 @@ Build the runtime venv under Python X.Y, upgrade system python3 to X.(Y+1), run 
 ## 12. Log
 - 2026-11-16 issue: workflow initialized
 - 2026-11-16 design: scope=backend+electron-main, plan_target=bplan, difficulty=3/10, breaking=no
+- 2026-11-16 bplan: 4 steps written, backend_pattern=import-probe staleness check shared by ensureRuntime and launcher
