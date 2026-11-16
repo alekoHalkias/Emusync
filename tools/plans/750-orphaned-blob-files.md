@@ -22,7 +22,7 @@ Removing a device keeps its newest save/state/card generation per owner (credite
   - Files: src/server/store/devices.py (+ the prune helper in src/server/store/blobs.py next to `_prune_history`)
   - Reuses: `merge_devices`, `_DEVICE_REFS`, `_unlink_blobs`, `_blob_path`.
   - New: `_prune_removed_generations` - `_prune_history` keeps the newest N across all devices; this keeps the newest 1 for one device id.
-- [ ] 3. Schema v37 quarantine: bump `_SCHEMA_VERSION` to 37; `if from_version < 37 and blob_dir is not None: _quarantine_orphan_blobs(conn, blob_dir)`. Known names: ids from `saves`, `states`, `console_save_history`; `console_key` from `console_saves`; `<title_id>/<mod_name>.tar` from `switch_mods` (same layout as `SwitchModMixin._mod_blob_path`). Each regular file under those five dirs (recursive for mods) whose relative path is not known and does not end in `.part` is moved with `os.replace` to `blob_dir/.orphaned/<table>/<relpath>`; count + bytes logged to stderr. Missing table or dir is skipped; a move error is logged and skipped. Nothing is deleted.
+- [x] 3. Schema v37 quarantine: bump `_SCHEMA_VERSION` to 37; `if from_version < 37 and blob_dir is not None: _quarantine_orphan_blobs(conn, blob_dir)`. Known names: ids from `saves`, `states`, `console_save_history`; `console_key` from `console_saves`; `<title_id>/<mod_name>.tar` from `switch_mods` (same layout as `SwitchModMixin._mod_blob_path`). Each regular file under those five dirs (recursive for mods) whose relative path is not known and does not end in `.part` is moved with `os.replace` to `blob_dir/.orphaned/<table>/<relpath>`; count + bytes logged to stderr. Missing table or dir is skipped; a move error is logged and skipped. Nothing is deleted.
   - Files: src/server/store/schema.py
   - Reuses: `_migrate(conn, from_version, blob_dir)` hook, v36 walk shape.
   - New: `_quarantine_orphan_blobs` - no existing code compares blob dirs with rows.
@@ -62,3 +62,4 @@ Schema bump: yes (v37, file moves only, no DDL). New IPC channel (+ emusync.d.ts
 - 2026-11-16 bplan: plan written
 - 2026-11-16 tplan: 10 test cases + edge cases
 Step 2: per-device rows listed once in new _DEVICE_ONLY_REFS tuple next to _DEVICE_REFS; unknown device id is a no-op
+Step 3: v36 tests in test_legacy_blob_conversion.py now call _envelope_legacy_blobs directly (their row-less seed files would be quarantined by v37) and compare user_version to _SCHEMA_VERSION

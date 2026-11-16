@@ -87,9 +87,8 @@ def _seed_blobs(blob_dir):
 def test_v36_converts_every_table_once(tmp_path):
     blobs = tmp_path / "blobs"
     files = _seed_blobs(blobs)
-    conn = sqlite3.connect(":memory:")
-    schema._migrate(conn, from_version=35, blob_dir=blobs)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 36 == schema._SCHEMA_VERSION
+    # The v36 step alone: v37 would quarantine these row-less seed files (#750).
+    schema._envelope_legacy_blobs(blobs)
 
     expected = {"saves/s1": _FMT_RAW, "states/t1": _FMT_TARGZ, "console_save_history/h1": _FMT_TAR,
                 "console_saves/PS2": _FMT_RAW, "switch_mods/0100ABF008968000/mod.tar": _FMT_TAR}
@@ -99,14 +98,14 @@ def test_v36_converts_every_table_once(tmp_path):
     assert (blobs / "saves/s3.part").read_bytes() == b"crashed-write"  # not a blob
 
     before = {p: p.read_bytes() for p in blobs.rglob("*") if p.is_file()}
-    schema._migrate(conn, from_version=35, blob_dir=blobs)  # idempotent
+    schema._envelope_legacy_blobs(blobs)  # idempotent
     assert {p: p.read_bytes() for p in blobs.rglob("*") if p.is_file()} == before
 
 
 def test_v36_skips_missing_dirs(tmp_path):
     conn = sqlite3.connect(":memory:")
     schema._migrate(conn, from_version=35, blob_dir=tmp_path / "nothing-here")
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 36
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == schema._SCHEMA_VERSION
 
 
 @pytest.mark.asyncio
