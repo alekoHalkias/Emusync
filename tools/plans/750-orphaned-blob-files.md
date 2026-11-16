@@ -14,7 +14,7 @@ Removing a device keeps its newest save/state/card generation per owner (credite
 - **Recommendations**: none.
 
 ## Steps
-- [ ] 1. Placeholder device: `REMOVED_DEVICE_ID = "removed-device"` (name "Removed device") in `src/server/store/devices.py`; `list_devices` excludes it; `api/_core.py:_auth` returns 400 for it as `X-Device-ID`.
+- [x] 1. Placeholder device: `REMOVED_DEVICE_ID = "removed-device"` (name "Removed device") in `src/server/store/devices.py`; `list_devices` excludes it; `api/_core.py:_auth` returns 400 for it as `X-Device-ID`.
   - Files: src/server/store/devices.py, src/server/api/_core.py
   - Reuses: `ensure_device` (creates it on demand), existing `_auth` header validation.
   - New: the constant - nothing models "no longer paired" today and the FK requires a device row.

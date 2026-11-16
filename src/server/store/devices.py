@@ -17,6 +17,11 @@ _TOUCH_THROTTLE_SECONDS = 30
 # never merged back and forth (#656).
 _MERGE_MIN_IDLE_SECONDS = 5 * 60
 
+# A removed device's save/state/card generations and mods are re-credited to this
+# hidden row (saves.device_id etc. are NOT NULL FKs), never deleted outright (#750).
+REMOVED_DEVICE_ID = "removed-device"
+REMOVED_DEVICE_NAME = "Removed device"
+
 
 # Every (table, column) that holds a device id, for merge_devices (#656). Keep in
 # sync with schema.py when a table gains a device column.
@@ -74,7 +79,7 @@ class DeviceMixin:
 
     def list_devices(self) -> list[Device]:
         rows = self._conn.execute(
-            "SELECT id, name, last_ip, last_seen_at FROM devices"
+            "SELECT id, name, last_ip, last_seen_at FROM devices WHERE id != ?", (REMOVED_DEVICE_ID,)
         ).fetchall()
         return [Device(**dict(r)) for r in rows]
 
