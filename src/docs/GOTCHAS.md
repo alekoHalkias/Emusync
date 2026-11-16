@@ -116,6 +116,13 @@ Import leaves `save_path` blank; it's adopted after a session from whichever sin
 - Clients sharing one source MAC (Docker bridge, NAT) are merged into one device.
 - `device_id` backup (`<data_dir>/device_id`) is best-effort; on Windows config and data share a folder, so it only covers toml loss.
 
+## Device removal and orphaned blobs (#750)
+
+- Pre-#750 `remove_device`/`clear_devices` ran `DELETE FROM saves/states WHERE device_id = ?` without unlinking files, leaking 45 save files (10.8 GB) and 18 state files on the server PC, and dropped every generation the removed device pushed (possibly a game's current save). Pruning and `remove_game` were checked and never leaked: both unlink.
+- Now: per-device rows (`_DEVICE_ONLY_REFS`) are deleted, then `merge_devices(id, REMOVED_DEVICE_ID)` re-keys the rest of `_DEVICE_REFS` to the hidden placeholder (`saves.device_id` etc. are NOT NULL FKs), then `_prune_removed_generations` keeps only the placeholder's newest generation per game / console and unlinks the others after commit (#704). A second removed device for the same game therefore leaves one placeholder generation, not two. `clear_devices` is `remove_device` per device, so it no longer wipes server saves.
+- `REMOVED_DEVICE_ID` is excluded from `list_devices` and rejected by `_auth` (400). A new device-only table goes in `_DEVICE_ONLY_REFS` as well as `_DEVICE_REFS`.
+- Schema v37 moved files with no row into `blobs/.orphaned/<table>/` (never deleted; `.part` and `.uploads` skipped). A table whose row query fails is skipped, never quarantined wholesale. Delete `.orphaned` by hand once nothing in it is wanted.
+
 ## Network upload requests (#660)
 
 - Reuses `rom_pull_requests` with `kind="network-upload"`; a decline or failure is stored as `failed` (no new status). Repeat requests for the same game/owner return the existing pending id.

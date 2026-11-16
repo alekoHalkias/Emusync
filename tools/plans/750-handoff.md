@@ -4,7 +4,7 @@
 - Issue: #750
 - Branch: feature/750-orphaned-blob-files
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -80,7 +80,7 @@ Docs
 - [done] Step 2: store/devices.py, store/blobs.py - reuses merge_devices, _DEVICE_REFS, _unlink_blobs; new _prune_removed_generations (newest-1 per owner for one device, unlike _prune_history).
 - [done] Step 3: store/schema.py - reuses _migrate blob_dir hook; new _quarantine_orphan_blobs (nothing compares dirs with rows).
 - [done] Step 4: tests in test_devices.py + new test for v37.
-- Step 5: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
+- [done] Step 5: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -107,3 +107,4 @@ Docs
 - 2026-11-16 implement: step 2 done (remove_device merges into placeholder, keeps newest per owner); deviation: per-device rows listed once in new _DEVICE_ONLY_REFS tuple next to _DEVICE_REFS; unknown device id is a no-op
 - 2026-11-16 implement: step 3 done (schema v37 quarantines orphan blob files); deviation: v36 tests in test_legacy_blob_conversion.py now call _envelope_legacy_blobs directly (their row-less seed files would be quarantined by v37) and compare user_version to _SCHEMA_VERSION
 - 2026-11-16 implement: step 4 done (test_device_removal.py, 9 tests); deviation: tests in a new test_device_removal.py (test_devices.py is already 648 lines) including the v37 cases instead of a separate test_orphan_blobs.py; the missing-table test caught v37 quarantining a whole dir when its row query fails, fixed in schema.py to skip the table as the plan specified
+- 2026-11-16 implement: step 5 done (CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md)

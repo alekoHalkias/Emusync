@@ -3,7 +3,7 @@
 Issue: #750
 Branch: feature/750-orphaned-blob-files
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -27,7 +27,7 @@ Removing a device keeps its newest save/state/card generation per owner (credite
   - Reuses: `_migrate(conn, from_version, blob_dir)` hook, v36 walk shape.
   - New: `_quarantine_orphan_blobs` - no existing code compares blob dirs with rows.
 - [x] 4. Tests (real SQLite; see Testing): extend src/tests/test_devices.py (store-level removal, existing `test_remove_device_with_games_and_saves` / `test_clear_devices_removes_all` patterns) and add v37 cases to src/tests/test_legacy_blob_conversion.py-style new file src/tests/test_orphan_blobs.py (migration over a seeded blob_dir).
-- [ ] 5. Docs: CLAUDE.md Config/paths/DB bullet on device dedupe: device removal merges into `REMOVED_DEVICE_ID`, keeps newest generation per owner, unlinks the rest; v37 quarantines orphans to `blobs/.orphaned/`. GOTCHAS.md entry (#750) with the investigation result. ARCHITECTURE.md `server/store/` row: placeholder device and `.orphaned`.
+- [x] 5. Docs: CLAUDE.md Config/paths/DB bullet on device dedupe: device removal merges into `REMOVED_DEVICE_ID`, keeps newest generation per owner, unlinks the rest; v37 quarantines orphans to `blobs/.orphaned/`. GOTCHAS.md entry (#750) with the investigation result. ARCHITECTURE.md `server/store/` row: placeholder device and `.orphaned`.
 
 ## Testing
 - **Test File**: src/tests/test_devices.py (removal), src/tests/test_orphan_blobs.py (new, v37 quarantine; no existing module owns blob-dir vs row checks)
