@@ -26,7 +26,7 @@ On Linux with Flatpak, the import wizard's no-emulator state offers a one-click 
   - Files: src/gui/renderer/src/components/console-import/EmulatorStep.tsx, src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: `CoreInstallList` busy/error state and row markup (generalise it into a small `InstallRow`-style list that takes `{key,label,run}` items, used for both cores and standalones, instead of duplicating); `installCore` in the hook as the template for `installFlatpak` (re-run `detectEmulators` on success).
   - New: `installFlatpak` in the hook - one-line twin of `installCore` for the new channel. Heading "Install an emulator (Flatpak)", button text "Install"; the core list keeps its heading.
-- [ ] 4. Tests: src/tests/test_emulator_suggestions.py - every standalone `flatpak_id` in `consoles_data.py` matches a reverse-DNS app-id regex `^[A-Za-z][\w-]*(\.[A-Za-z_][\w-]*)+$` (it is passed as an argv to flatpak; validation in step 2 relies on these values). No TS test runner exists; manual check: `make build-gui` compiles.
+- [x] 4. Tests: src/tests/test_emulator_suggestions.py - every standalone `flatpak_id` in `consoles_data.py` matches a reverse-DNS app-id regex `^[A-Za-z][\w-]*(\.[A-Za-z_][\w-]*)+$` (it is passed as an argv to flatpak; validation in step 2 relies on these values). No TS test runner exists; manual check: `make build-gui` compiles.
 - [ ] 5. Docs: CLAUDE.md "Missing emulator (#744)" bullet: replace "Standalone emulator install: #745." with the `install.standalones` field + `emulator:installFlatpak` (user-level Flathub, validated against the console's standalones, Linux only). ARCHITECTURE.md IPC list: add `emulator:installFlatpak`.
 
 ## Testing

@@ -33,3 +33,11 @@ def test_core_libs_are_buildbot_safe():
     bad = sorted({core["lib"] for sys in _IMPORT_SYSTEMS.values() for core in sys.get("cores", [])
                   if not re.fullmatch(r"[a-z0-9_-]+_libretro", core["lib"])})
     assert not bad, f"core libs not matching buildbot naming: {bad}"
+
+
+def test_flatpak_ids_are_app_ids():
+    # Passed as flatpak argv and used as installFlatpak.ts's allowlist (#745).
+    bad = sorted({s["flatpak_id"] for c in _IMPORT_CONSOLES for s in c.get("standalones", [])
+                  if s.get("flatpak_id")
+                  and not re.fullmatch(r"[A-Za-z][\w-]*(\.[A-Za-z_][\w-]*)+", s["flatpak_id"])})
+    assert not bad, f"flatpak_id not a valid app id: {bad}"
