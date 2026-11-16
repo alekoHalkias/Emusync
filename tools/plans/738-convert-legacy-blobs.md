@@ -26,7 +26,7 @@ Every stored blob carries the #478 envelope (converted once on the server, wrapp
   - Files: src/server/api/blobs.py, src/server/api/mods.py
   - Reuses: `_envelope_file_in_place`; existing `asyncio.to_thread(_store_it)` offload.
   - New: none.
-- [ ] 4. Client fallbacks removed: `_require_envelope(data) -> (fmt, payload)` in `sync_client.py` raises `ValueError("server blob has no format header; update the EmuSync server (#738)")` when `_unpack_envelope` returns None fmt. Use it in `_write_memcard`, `_extract_state_folder`, `_merge_extract_state_folder` and `pull_state`'s inline file branch; delete each legacy sniff branch. Keep `_unpack_envelope` (server and the converter use it). Temp-dir swap, `.part` writes, `_safe_extract_tar`, and `.bak` behavior per mode unchanged.
+- [x] 4. Client fallbacks removed: `_require_envelope(data) -> (fmt, payload)` in `sync_client.py` raises `ValueError("server blob has no format header; update the EmuSync server (#738)")` when `_unpack_envelope` returns None fmt. Use it in `_write_memcard`, `_extract_state_folder`, `_merge_extract_state_folder` and `pull_state`'s inline file branch; delete each legacy sniff branch. Keep `_unpack_envelope` (server and the converter use it). Temp-dir swap, `.part` writes, `_safe_extract_tar`, and `.bak` behavior per mode unchanged.
   - Files: src/server/sync_client.py
   - Reuses: `_unpack_envelope`.
   - New: `_require_envelope` - one shared raise instead of four.
@@ -70,3 +70,4 @@ Schema bump: yes (v36, data-only, no DDL). New IPC channel (+ emusync.d.ts): no.
 - 2026-11-16 tplan: test plan added (7 case groups)
 Step 2: step 1 converter reworked to stream (_legacy_format sniffs from the file, copyfileobj behind the header) since server blobs reach 1.5 GB; two v35 tests updated here (expected envelope) to keep the commit green
 Step 3: existing API tests pushing raw bytes now expect the RAW envelope back (new conftest.raw_env helper); stored size includes the 5-byte header, matching enveloped pushes
+Step 4: also cli/transfer.py: bare rom-folder transfer tars (GUI rom:push sends plain tar -cf) are declared _FMT_TAR before _write_memcard, by transfer kind not sniffing; state extracts open tar with r:* (TARGZ or TAR); legacy client tests flipped to raises / enveloped inputs here to keep the commit green

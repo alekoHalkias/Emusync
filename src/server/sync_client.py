@@ -41,13 +41,20 @@ def _pack_envelope(fmt: int, payload: bytes) -> bytes:
 
 
 def _unpack_envelope(data: bytes) -> tuple[Optional[int], bytes]:
-    """(format, payload) if *data* has the envelope header, else (None, data) —
-    the None case means "no envelope; blob predates #478" and callers should
-    fall back to their old sniff-by-parsing logic so already-stored blobs
-    (existing saves, save history, console_saves) keep working unchanged."""
+    """(format, payload) if *data* has the envelope header, else (None, data)."""
     if data[:4] == _ENVELOPE_MAGIC:
         return data[4], data[5:]
     return None, data
+
+
+def _require_envelope(data: bytes) -> tuple[int, bytes]:
+    """(format, payload) of a pulled blob. Every stored blob is enveloped since
+    schema v36 (#738), so a missing header means an un-upgraded server: raise
+    rather than guess and possibly mis-write a save."""
+    fmt, payload = _unpack_envelope(data)
+    if fmt is None:
+        raise ValueError("server blob has no format header; update the EmuSync server (#738)")
+    return fmt, payload
 
 
 def _legacy_format(f, states: bool) -> int:
@@ -98,23 +105,13 @@ def _extract_state_folder(content: bytes, folder: Path) -> None:
     is kept and it works on Windows (where ``Path.rename`` errors if the target
     exists). ``.bak`` files are skipped when backing up so they don't recurse.
     """
+    fmt, payload = _require_envelope(content)
     folder.mkdir(parents=True, exist_ok=True)
-    fmt, payload = _unpack_envelope(content)
     if fmt == _FMT_RAW:
         _backup_state_files(folder)
         (folder / f"{folder.name}.state").write_bytes(payload)
         return
-    if fmt == _FMT_TARGZ:
-        tmp = _extract_tar_to_tmp(payload, "r:gz", folder.parent)
-    else:
-        # No envelope (blob predates #478) - sniff like before.
-        try:
-            tmp = _extract_tar_to_tmp(content, "r:gz", folder.parent)
-        except tarfile.TarError:
-            # Legacy: server stored a raw state file; write it as <FolderName>.state.
-            _backup_state_files(folder)
-            (folder / f"{folder.name}.state").write_bytes(content)
-            return
+    tmp = _extract_tar_to_tmp(payload, "r:*", folder.parent)
     try:
         _backup_state_files(folder)
         for src in tmp.rglob("*"):  # file-wise: a subdir may already exist in folder
@@ -140,18 +137,13 @@ def _merge_extract_state_folder(content: bytes, folder: Path) -> None:
     SHARED states directory — PCSX2's `sstates/`, which holds every PS2 game's
     states — so a pull for one game must not disturb other games' state files
     (issue #294)."""
-    folder.mkdir(parents=True, exist_ok=True)
-    fmt, payload = _unpack_envelope(content)
+    fmt, payload = _require_envelope(content)
     if fmt == _FMT_RAW:
         # A shared folder has no single canonical filename, so a raw blob
         # can't be placed safely - ignore it (PS2 states are always tar archives).
         return
-    try:
-        tmp = _extract_tar_to_tmp(payload if fmt == _FMT_TARGZ else content, "r:gz", folder.parent)
-    except tarfile.TarError:
-        if fmt == _FMT_TARGZ:
-            raise
-        return  # legacy blob that is not a tar: nothing to merge
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = _extract_tar_to_tmp(payload, "r:*", folder.parent)
     try:
         for src in tmp.rglob("*"):
             if not src.is_file():
@@ -315,21 +307,12 @@ def _write_memcard_raw_bytes(card: Path, raw: bytes) -> None:
 
 def _write_memcard(card: Path, data: bytes) -> None:
     """Write received memcard bytes to disk — folder-based or file-based,
-    dispatched on the transfer envelope's declared format (#478). Blobs that
-    predate the envelope (already-stored saves/history/console_saves) have no
-    magic header, so they fall back to the old sniff-by-parsing-as-tar logic.
-    """
-    fmt, payload = _unpack_envelope(data)
-    if fmt == _FMT_TAR:
-        _write_memcard_tar_bytes(card, payload)
-        return
+    dispatched on the transfer envelope's declared format (#478, #738)."""
+    fmt, payload = _require_envelope(data)
     if fmt == _FMT_RAW:
         _write_memcard_raw_bytes(card, payload)
-        return
-    try:
-        _write_memcard_tar_bytes(card, data)
-    except tarfile.TarError:
-        _write_memcard_raw_bytes(card, data)
+    else:  # TAR, or TARGZ for a converted legacy gzip'd card (#738)
+        _write_memcard_tar_bytes(card, payload)
 
 
 class SyncClient:
@@ -692,7 +675,7 @@ class SyncClient:
             # .bak of every file it overwrites (non-destructive).
             _extract_state_folder(r.content, p)
         else:
-            _, payload = _unpack_envelope(r.content)  # None-fmt legacy blobs are already raw
+            _, payload = _require_envelope(r.content)
             if p.exists():
                 shutil.copy2(p, p.with_suffix(p.suffix + ".bak"))
             p.parent.mkdir(parents=True, exist_ok=True)

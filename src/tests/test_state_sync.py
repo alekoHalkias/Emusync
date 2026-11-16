@@ -10,13 +10,15 @@ from tests.conftest import raw_env
 
 
 def _make_state_archive(files: dict[str, bytes]) -> bytes:
+    """An enveloped tar.gz state blob, as every stored state is since v36 (#738)."""
+    from server.sync_client import _FMT_TARGZ, _pack_envelope
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for name, payload in files.items():
             info = tarfile.TarInfo(name=name)
             info.size = len(payload)
             tar.addfile(info, io.BytesIO(payload))
-    return buf.getvalue()
+    return _pack_envelope(_FMT_TARGZ, buf.getvalue())
 
 
 # ── state pull keeps backups (#204) ────────────────────────────────────────────
@@ -53,14 +55,19 @@ def test_extract_state_folder_keeps_single_backup_generation(tmp_path):
     assert (folder / "game.state.bak").read_bytes() == b"v2"  # one generation
 
 
-def test_extract_state_folder_legacy_raw_blob(tmp_path):
-    """A non-tar (legacy) blob is written as <FolderName>.state, not exploded."""
-    from server.sync_client import _extract_state_folder
+def test_extract_state_folder_rejects_unenveloped_blob(tmp_path):
+    """An un-enveloped blob means an un-upgraded server: raise, never guess,
+    and leave the folder untouched (#738)."""
+    from server.sync_client import _extract_state_folder, _merge_extract_state_folder
 
     folder = tmp_path / "states" / "Zelda"
     folder.mkdir(parents=True)
-    _extract_state_folder(b"not-a-tar-archive", folder)
-    assert (folder / "Zelda.state").read_bytes() == b"not-a-tar-archive"
+    (folder / "Zelda.state").write_bytes(b"LOCAL")
+    for fn in (_extract_state_folder, _merge_extract_state_folder):
+        with pytest.raises(ValueError, match="no format header"):
+            fn(b"not-a-tar-archive", folder)
+    assert [p.name for p in folder.iterdir()] == ["Zelda.state"]
+    assert (folder / "Zelda.state").read_bytes() == b"LOCAL"
 
 
 # ── transfer envelope (#478) ────────────────────────────────────────────────
@@ -92,7 +99,7 @@ def test_extract_state_folder_reads_enveloped_targz(tmp_path):
 
     folder = tmp_path / "states" / "Metroid"
     folder.mkdir(parents=True)
-    enveloped = _pack_envelope(_FMT_TARGZ, _make_state_archive({"game.state": b"NEW"}))
+    enveloped = _make_state_archive({"game.state": b"NEW"})  # already enveloped
 
     _extract_state_folder(enveloped, folder)
 
@@ -118,7 +125,7 @@ def test_merge_extract_reads_enveloped_targz(tmp_path):
 
     sstates = tmp_path / "sstates"
     sstates.mkdir()
-    enveloped = _pack_envelope(_FMT_TARGZ, _make_state_archive({"SLUS-20062 (1B2E).00.p2s": b"gameA-new"}))
+    enveloped = _make_state_archive({"SLUS-20062 (1B2E).00.p2s": b"gameA-new"})  # already enveloped
 
     _merge_extract_state_folder(enveloped, sstates)
 
