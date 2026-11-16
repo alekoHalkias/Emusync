@@ -23,12 +23,27 @@ A venv that can no longer import its dependencies (system Python minor upgrade) 
   - Files: src/gui/electron/runtimeSetup.ts, src/gui/electron/runtime.ts, src/gui/electron/server.ts
   - Reuses: `run()`, existing venv create + pip install + stamp flow, failure-writes-no-stamp retry semantics.
   - New: one const + a 3-line probe branch. Covers GUI Play, which spawns `PYTHON` directly and relies on `ensureRuntime()` at startup (sync daemon / server start).
-- [ ] 3. Tests: `src/tests/test_launcher.py` (new; bash launcher has no existing test). Build a temp layout `tmp/src/{emusync,emusync.py,requirements.txt}` + `tmp/.cache/.venv/bin/python`, with `emusync.py` printing a marker. Cases: (a) healthy venv (`bin/python` = small script exec'ing `sys.executable`, which has the deps) -> marker printed, exit 0; (b) broken venv (`bin/python` exits 1 on the probe) and `python3` on PATH a stub whose `-m venv` fails -> exit 1, stderr names the venv, marker NOT printed (no silent bare-python3 fallback); (c) no venv dir -> falls back to `python3` from PATH (stub runs the script) as before. Skip on Windows. No mocks of app logic; process-level stubs only, no SQLite involved.
+- [ ] 3. Tests: `src/tests/test_launcher.py`, 4 cases + 2 edge assertions as listed under Testing. No SQLite; process-level interpreter stubs only.
   - Files: src/tests/test_launcher.py
   - Reuses: pytest `tmp_path`, `subprocess`.
   - New: test file, nothing existing covers the launcher. TS probe branch is not unit-testable (no TS test harness); noted in PR.
 - [ ] 4. Docs: src/docs/GOTCHAS.md "AppImage runtime (#677)" section: add the Python-upgrade line and the launcher self-heal/no-silent-fallback rule (#741). src/docs/ARCHITECTURE.md line ~194: mention the import probe as a venv staleness trigger. CLAUDE.md Ops AppImage bullet: append "a venv that fails the dependency import probe is rebuilt by `ensureRuntime()` and the `src/emusync` launcher (#741)".
   - Files: src/docs/GOTCHAS.md, src/docs/ARCHITECTURE.md, CLAUDE.md
+
+## Testing
+- **Test File**: src/tests/test_launcher.py (new; no existing test exercises the bash launcher). Module-level `pytestmark = skipif(sys.platform == "win32" or no bash)`.
+- **Fixture approach**: a `layout(tmp_path)` helper copies the real `src/emusync` into `tmp/src/`, writes `tmp/src/emusync.py` (prints `RAN` + its argv), an empty `tmp/src/requirements.txt`, and optionally `tmp/.cache/.venv/bin/python` as a small sh stub. A `tmp/bin` dir prepended to PATH holds a stub `python3`. Run via `subprocess.run(["bash", launcher, ...], env=...)`. Stubs are process-level fixtures for the system interpreter, not mocks of app logic; no SQLite involved.
+- **Test Cases**:
+  - healthy venv: venv `bin/python` stub execs `sys.executable` (has all deps) -> exit 0, stdout `RAN`, PATH `python3` stub never called (it writes a sentinel file if invoked).
+  - stale venv, rebuild succeeds: venv stub exits 1 on `-c import ...`; PATH `python3` stub handles `-m venv --clear <dir>` by writing a healthy `bin/python` stub (which exits 0 on `-m pip ...`, else execs `sys.executable`) -> exit 0, stdout `RAN`, stderr contains `rebuilding`.
+  - stale venv, rebuild fails: PATH `python3` stub exits 1 on `-m venv` -> exit 1, stderr names the venv path, stdout has no `RAN` (regression for the silent bare-python3 fallback).
+  - no venv: no `.cache/.venv` -> PATH `python3` stub execs `sys.executable` -> stdout `RAN` (existing fallback preserved).
+- **Edge Cases**:
+  - argv passthrough: run with `run "Pokemon Amethyst"` in the healthy case; `RAN` line shows the arg intact (quoting through probe/exec).
+  - probe noise: the failing probe's traceback must not reach stderr (stderr in rebuild-success case contains no `ModuleNotFoundError`).
+- **Integration Points**:
+  - runtimeSetup.ts probe branch: no TS harness (testing-guide "Electron main"). Manual script in PR: on a packaged AppImage, `python3 -m venv --clear ~/.cache/emusync/runtime/.cache/.venv` (leaves an empty venv with the hash stamp intact), start the app, confirm the venv is rebuilt and the sync daemon starts; `npx tsc --noEmit` on both projects shows no new errors.
+  - `make test-changed` / `make test` pick the new file up automatically.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: no.
@@ -40,3 +55,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. C
 
 ## Log
 - 2026-11-16 bplan: plan written
+- 2026-11-16 tplan: Testing section added (4 cases, 2 edge cases)

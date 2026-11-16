@@ -49,12 +49,18 @@ Build the runtime venv under Python X.Y, upgrade system python3 to X.(Y+1), run 
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_launcher.py (new)
+### Test Cases: healthy venv execs via venv; stale venv + rebuild succeeds -> runs; stale venv + rebuild fails -> exit 1 with clear error, no bare-python3 run; no venv -> bare python3 fallback kept.
+### Edge Cases: argv with spaces passes through intact; failed probe traceback not leaked to stderr.
+### Integration Points: runtimeSetup.ts probe verified manually (venv --clear on packaged AppImage, app rebuilds) + tsc; make test-changed picks up the file.
+### Outline:
+Backend:
+- 1. src/emusync: import probe; on failure `venv --clear` + pip install + re-probe; clear error and exit 1 instead of silent bare-python3 fallback when a venv exists.
+- 2. runtimeSetup.ts: same probe on an existing venv; failure removes venv + hash stamp so the existing rebuild runs. Probe list hoisted to runtime.ts and shared with server:preflight.
+- 4. Docs: GOTCHAS #677 section, ARCHITECTURE runtime line, CLAUDE.md Ops bullet.
+Tests:
+- 3. src/tests/test_launcher.py: 4 cases + 2 edge assertions with interpreter stubs in a tmp checkout layout.
+### Summary: A runtime venv orphaned by a system Python upgrade is detected by a dependency import probe and rebuilt automatically, from both the Electron startup path and the Steam-invoked launcher, with a clear error instead of a silent fallback when rebuilding fails.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -90,3 +96,4 @@ Build the runtime venv under Python X.Y, upgrade system python3 to X.(Y+1), run 
 - 2026-11-16 issue: workflow initialized
 - 2026-11-16 design: scope=backend+electron-main, plan_target=bplan, difficulty=3/10, breaking=no
 - 2026-11-16 bplan: 4 steps written, backend_pattern=import-probe staleness check shared by ensureRuntime and launcher
+- 2026-11-16 tplan: test_file=src/tests/test_launcher.py, 4 test cases defined
