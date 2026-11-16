@@ -52,12 +52,20 @@ Push from A and B, remove A, compare `blobs/saves/` with `SELECT id FROM saves`.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_devices.py, src/tests/test_orphan_blobs.py (new)
+### Test Cases: keep-newest per game (save+state), removed device's current save survives, console card + mod pusher removal (FK), placeholder hidden + auth reject, clear_devices keeps saves with no orphans, existing removal tests, v37 quarantine + idempotency
+### Edge Cases: remove placeholder id, unknown/double removal, second removed device for same game, missing table in v37
+### Integration Points: server PC orphan count 0 outside .orphaned after ship
+### Outline:
+Backend
+- 1. REMOVED_DEVICE_ID placeholder: hidden from list_devices, rejected by _auth
+- 2. remove_device: delete per-device config rows, merge_devices into placeholder, keep newest generation per game/console, unlink the rest after commit; clear_devices = remove_device for all
+- 3. schema v37: move files with no row to blobs/.orphaned/<table>/ (skip .uploads, .part)
+Tests
+- 4. test_devices.py removal cases; test_orphan_blobs.py v37 cases
+Docs
+- 5. CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md
+### Summary: Removing a device no longer drops saves or leaks files: its newest generation per game is kept under a hidden "Removed device" placeholder and older ones are deleted cleanly, and v37 moves today's orphaned blob files into blobs/.orphaned/.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -94,3 +102,4 @@ Push from A and B, remove A, compare `blobs/saves/` with `SELECT id FROM saves`.
 - 2026-11-16 issue: workflow initialized
 - 2026-11-16 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-16 bplan: 5 steps written, backend_pattern=merge into placeholder + v37 quarantine
+- 2026-11-16 tplan: test_file=src/tests/test_devices.py + test_orphan_blobs.py, 10 test cases defined

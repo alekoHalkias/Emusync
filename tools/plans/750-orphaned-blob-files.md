@@ -26,8 +26,29 @@ Removing a device keeps its newest save/state/card generation per owner (credite
   - Files: src/server/store/schema.py
   - Reuses: `_migrate(conn, from_version, blob_dir)` hook, v36 walk shape.
   - New: `_quarantine_orphan_blobs` - no existing code compares blob dirs with rows.
-- [ ] 4. Tests (real SQLite; see Testing).
+- [ ] 4. Tests (real SQLite; see Testing): extend src/tests/test_devices.py (store-level removal, existing `test_remove_device_with_games_and_saves` / `test_clear_devices_removes_all` patterns) and add v37 cases to src/tests/test_legacy_blob_conversion.py-style new file src/tests/test_orphan_blobs.py (migration over a seeded blob_dir).
 - [ ] 5. Docs: CLAUDE.md Config/paths/DB bullet on device dedupe: device removal merges into `REMOVED_DEVICE_ID`, keeps newest generation per owner, unlinks the rest; v37 quarantines orphans to `blobs/.orphaned/`. GOTCHAS.md entry (#750) with the investigation result. ARCHITECTURE.md `server/store/` row: placeholder device and `.orphaned`.
+
+## Testing
+- **Test File**: src/tests/test_devices.py (removal), src/tests/test_orphan_blobs.py (new, v37 quarantine; no existing module owns blob-dir vs row checks)
+- **Test Cases**:
+  - remove keeps newest per game: device A pushes 3 save generations and 2 state generations for a game, device B pushes 1 save after; remove A -> A's newest save + newest state remain, credited to `REMOVED_DEVICE_ID`; A's older rows gone and their files unlinked; B's row untouched; current save (B's) unchanged
+  - remove keeps a current save pushed by the removed device: only A pushed -> after removal the game still pulls the same bytes/hash
+  - console card: A pushes 2 `console_save_history` generations for PS2 -> removal succeeds (no FK error) and keeps only the newest, file of the other unlinked
+  - mod pusher: A pushed a Switch mod -> removal succeeds, mod row `pushed_by` = placeholder, file intact
+  - placeholder hidden: `list_devices()` never includes it after removal; `GET /devices` via `client` neither
+  - `_auth` rejects `X-Device-ID: removed-device` (400)
+  - clear_devices: two devices with saves -> `list_devices()` empty, saves kept (one per device per game), no orphan files (every file under blobs/saves has a row)
+  - existing `test_remove_device_with_games_and_saves`, `test_clear_devices_removes_all`, `test_delete_device_endpoint_with_configured_game` still pass
+  - v37: seeded blob_dir with one row-backed file and one orphan per table (saves, states, console_save_history, console_saves, nested switch_mods) plus `.uploads/x` and `saves/y.part` -> orphans moved to `.orphaned/<table>/<relpath>` byte-identical, row-backed files and `.uploads`/`.part` untouched, `user_version == 37`
+  - v37 idempotent: second run moves nothing
+- **Edge Cases**:
+  - removing the placeholder id itself: no-op
+  - removing a device twice / unknown id: no error
+  - second removed device for the same game: earlier placeholder generation is pruned so only the newest placeholder generation remains (documented consequence of keep-newest)
+  - v37 with a table missing (partial DB): skipped
+- **Integration Points**:
+  - Server PC after ship: re-run the orphan count; expect 0 outside `.orphaned`, 45 saves + 18 states files inside it; row hash audit unchanged.
 
 ## Checklist
 Schema bump: yes (v37, file moves only, no DDL). New IPC channel (+ emusync.d.ts): no. New CLI subcommand: no. Config/data file change: yes (orphan files moved once).
@@ -39,3 +60,4 @@ Schema bump: yes (v37, file moves only, no DDL). New IPC channel (+ emusync.d.ts
 
 ## Log
 - 2026-11-16 bplan: plan written
+- 2026-11-16 tplan: 10 test cases + edge cases
