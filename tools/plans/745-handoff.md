@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #745
 - Branch: feature/745-install-standalone-emulators
-- PR: none
-- Status: implemented
+- PR: #748
+- Status: shipped
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -89,10 +89,10 @@ Docs
 ### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #748
+### Server Sync: done
+### Doc Sync: done (CLAUDE.md + ARCHITECTURE.md in steps 2 and 5; GOTCHAS.md not needed)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -110,3 +110,6 @@ Docs
 - 2026-11-16 implement: step 4 done (flatpak_id app-id format test)
 - 2026-11-16 implement: step 5 done (ARCHITECTURE.md IPC entry); deviation: CLAUDE.md part landed in step 2's commit (commit hook requires it when preload.ts changes)
 - 2026-11-16 review: 2 findings, blocked=no
+- 2026-11-16 ship: tests 755 passed, PR #748 opened, mergeable
+- 2026-11-16 ship: server sync done
+- 2026-11-16 ship: doc sync done in implement steps; no further changes
