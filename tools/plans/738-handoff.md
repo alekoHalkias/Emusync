@@ -4,7 +4,7 @@
 - Issue: #738
 - Branch: feature/738-convert-legacy-blobs
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -45,9 +45,9 @@ Server migration wraps legacy blobs (hashes unchanged, idempotent, crash-safe); 
 ### Recommendations: n/a
 
 ## 4. Backend Plan
-### Design Alignment: TBD
-### Backend Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: one-time data fix in _migrate (v36, blob_dir like v35); .part + os.replace; envelope-free hashes.
+### Backend Pattern: shared converter in sync_client.py + _envelope_file_in_place in store/blobs.py used by migration and both upload routes.
+### Recommendations: scope cuts per section 2.
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
@@ -69,7 +69,13 @@ Server migration wraps legacy blobs (hashes unchanged, idempotent, crash-safe); 
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/738-convert-legacy-blobs.md
+- Step 1: sync_client.py, store/blobs.py - reuses _pack/_unpack_envelope; new _envelope_legacy + _envelope_file_in_place because the sniff only exists inline in the fallbacks being deleted.
+- Step 2: schema.py - reuses _migrate blob_dir hook (v35 pattern); new _envelope_legacy_blobs loop.
+- Step 3: api/blobs.py, api/mods.py - reuses _envelope_file_in_place in existing _store_it offloads.
+- Step 4: sync_client.py - new _require_envelope replaces four sniff branches.
+- Step 5: tests - extend test_state_sync.py, test_memcard_folder_sync.py, test_restore_safety.py, test_saves.py.
+- Step 6: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -90,3 +96,4 @@ Server migration wraps legacy blobs (hashes unchanged, idempotent, crash-safe); 
 ## 12. Log
 - 2026-11-16 issue: workflow initialized (existing issue #738)
 - 2026-11-16 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
+- 2026-11-16 bplan: 6 steps written, backend_pattern=v36 data migration + shared converter
