@@ -4,7 +4,7 @@
 - Issue: #741
 - Branch: feature/741-runtime-venv-python-version
 - PR: none
-- Status: implemented
+- Status: implementing
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -77,9 +77,11 @@ Tests:
 - 4. Docs: GOTCHAS #677 section, ARCHITECTURE runtime line, CLAUDE.md Ops bullet.
 
 ## 9. Review
-### Findings: TBD
-### Blocked: TBD
-### Blockers: TBD
+### Findings:
+1. Medium, src/emusync:8: full server-deps probe adds ~235 ms to every launcher call and blocks offline launches when only a server package is missing. Fix: probe `import click` only (R1).
+2. Low, src/emusync:13: dev-checkout rebuild installs runtime requirements only, dropping pytest. Fix: prefer requirements-dev.txt when present (R1).
+### Blocked: no
+### Blockers: none
 
 ## 10. Ship
 ### Status: pending
@@ -101,3 +103,4 @@ Tests:
 - 2026-11-16 implement: step 2 done (ensureRuntime probes venv, rebuilds on failure; PY_DEPS_PROBE shared with preflight)
 - 2026-11-16 implement: step 3 done (test_launcher.py, 4 tests; 2 fail on the old launcher)
 - 2026-11-16 implement: step 4 done (GOTCHAS, ARCHITECTURE, CLAUDE.md)
+- 2026-11-16 review: 2 findings, blocked=no; fix step R1 added
