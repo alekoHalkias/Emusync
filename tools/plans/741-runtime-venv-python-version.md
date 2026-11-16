@@ -23,7 +23,7 @@ A venv that can no longer import its dependencies (system Python minor upgrade) 
   - Files: src/gui/electron/runtimeSetup.ts, src/gui/electron/runtime.ts, src/gui/electron/server.ts
   - Reuses: `run()`, existing venv create + pip install + stamp flow, failure-writes-no-stamp retry semantics.
   - New: one const + a 3-line probe branch. Covers GUI Play, which spawns `PYTHON` directly and relies on `ensureRuntime()` at startup (sync daemon / server start).
-- [ ] 3. Tests: `src/tests/test_launcher.py`, 4 cases + 2 edge assertions as listed under Testing. No SQLite; process-level interpreter stubs only.
+- [x] 3. Tests: `src/tests/test_launcher.py`, 4 cases + 2 edge assertions as listed under Testing. No SQLite; process-level interpreter stubs only.
   - Files: src/tests/test_launcher.py
   - Reuses: pytest `tmp_path`, `subprocess`.
   - New: test file, nothing existing covers the launcher. TS probe branch is not unit-testable (no TS test harness); noted in PR.
