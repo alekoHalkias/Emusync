@@ -4,7 +4,7 @@
 - Issue: #750
 - Branch: feature/750-orphaned-blob-files
 - PR: none
-- Status: designed
+- Status: planned
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -43,9 +43,9 @@ Push from A and B, remove A, compare `blobs/saves/` with `SELECT id FROM saves`.
 ### Recommendations: TBD
 
 ## 4. Backend Plan
-### Design Alignment: TBD
-### Backend Pattern: TBD
-### Recommendations: TBD
+### Design Alignment: reuse merge_devices/_DEVICE_REFS (#656) for re-keying; unlink after commit (#704); v37 data fix via _migrate blob_dir (v35/v36 pattern).
+### Backend Pattern: remove = delete per-device config rows + merge into placeholder + prune placeholder to newest generation per owner.
+### Recommendations: none
 
 ## 5. Merged Plan
 ### Conflicts Resolved: none
@@ -67,7 +67,12 @@ Push from A and B, remove A, compare `blobs/saves/` with `SELECT id FROM saves`.
 ### Implementation Checklist: TBD
 
 ## 8. Implementation Steps
-### Steps: TBD (written by /plan skills)
+### Steps: see tools/plans/750-orphaned-blob-files.md
+- Step 1: store/devices.py, api/_core.py - reuses ensure_device/_auth; new REMOVED_DEVICE_ID constant (FK needs a device row).
+- Step 2: store/devices.py, store/blobs.py - reuses merge_devices, _DEVICE_REFS, _unlink_blobs; new _prune_removed_generations (newest-1 per owner for one device, unlike _prune_history).
+- Step 3: store/schema.py - reuses _migrate blob_dir hook; new _quarantine_orphan_blobs (nothing compares dirs with rows).
+- Step 4: tests in test_devices.py + new test for v37.
+- Step 5: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -88,3 +93,4 @@ Push from A and B, remove A, compare `blobs/saves/` with `SELECT id FROM saves`.
 ## 12. Log
 - 2026-11-16 issue: workflow initialized
 - 2026-11-16 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
+- 2026-11-16 bplan: 5 steps written, backend_pattern=merge into placeholder + v37 quarantine
