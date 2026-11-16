@@ -11,7 +11,7 @@ import pytest
 from cli.run_switch import _local_switch_mods, _switch_load_root_for, _sync_switch_mods
 from server.store import Store
 from server.sync_client import SyncClient
-from tests.conftest import AUTH
+from tests.conftest import AUTH, raw_env
 
 
 # ── store ────────────────────────────────────────────────────────────────────
@@ -143,11 +143,11 @@ async def test_switch_mods_push_list_pull_roundtrip(client):
     mods = r.json()
     assert len(mods) == 1
     assert mods[0]["mod_name"] == "Cool Mod"
-    assert mods[0]["size"] == len(b"mod tar bytes")
+    assert mods[0]["size"] == len(raw_env(b"mod tar bytes"))
 
     r = await client.get("/switch/0100000011D90000/mods/Cool%20Mod", headers=AUTH)
     assert r.status_code == 200
-    assert r.content == b"mod tar bytes"
+    assert r.content == raw_env(b"mod tar bytes")
 
 
 @pytest.mark.asyncio
@@ -166,7 +166,7 @@ async def test_switch_mods_second_push_is_a_noop(client):
     assert r.json()["added"] is False
 
     r = await client.get("/switch/0100000011D90000/mods/Cool%20Mod", headers=AUTH)
-    assert r.content == b"original"  # untouched by the second push
+    assert r.content == raw_env(b"original")  # untouched by the second push
 
 
 # ── SyncClient (real sockets, mirrors test_transfer_wizard.py's live_server) ───

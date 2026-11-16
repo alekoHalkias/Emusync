@@ -11,7 +11,7 @@ import tempfile
 import pytest
 
 from server.store import Store
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import AUTH, _device_auth, raw_env
 
 
 # ── store level ──────────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ async def test_memcard_push_and_pull(client):
 
     r = await client.get("/consoles/PS2/memcard", headers=AUTH)
     assert r.status_code == 200
-    assert r.content == card
+    assert r.content == raw_env(card)
     assert r.headers["x-save-hash"] == hashlib.sha256(card).hexdigest()
 
 
@@ -103,7 +103,7 @@ async def test_memcard_meta_after_push(client):
     assert r.status_code == 200
     meta = r.json()
     assert meta["hash"] == hashlib.sha256(card).hexdigest()
-    assert meta["size"] == len(card)
+    assert meta["size"] == len(raw_env(card))
 
 
 @pytest.mark.asyncio
@@ -117,7 +117,7 @@ async def test_memcard_is_shared_across_devices(client):
 
     r = await client.get("/consoles/PS2/memcard", headers=auth_b)
     assert r.status_code == 200
-    assert r.content == card
+    assert r.content == raw_env(card)
 
 
 @pytest.mark.asyncio
@@ -250,7 +250,7 @@ async def test_memcard_history_route_accumulates_and_restores(client):
     assert r.json()["hash"] == hashlib.sha256(b"good-card").hexdigest()
 
     pulled = await client.get("/consoles/PS2/memcard", headers=AUTH)
-    assert pulled.content == b"good-card"
+    assert pulled.content == raw_env(b"good-card")
 
 
 @pytest.mark.asyncio
@@ -447,7 +447,8 @@ def test_v35_backfills_pre_480_card_into_history(tmp_path):
     rows = conn.execute("SELECT * FROM console_save_history").fetchall()
     assert len(rows) == 1
     assert (rows[0]["hash"], rows[0]["size"], rows[0]["card_format"], rows[0]["device_id"]) == (h, len(data), "MemoryCard", "dev-1")
-    assert (blobs / "console_save_history" / rows[0]["id"]).read_bytes() == data
+    # v36 then gives the backfilled card the #478 envelope (#738); payload unchanged
+    assert (blobs / "console_save_history" / rows[0]["id"]).read_bytes() == b"ES1\0\x00" + data
     # retired table and file are left in place
     assert conn.execute("SELECT COUNT(*) FROM console_saves").fetchone()[0] == 1
     assert (blobs / "console_saves" / "PS2").exists()
@@ -477,10 +478,10 @@ def test_v35_skips_card_whose_blob_file_is_missing(tmp_path):
 
 def test_store_serves_backfilled_card_with_same_bytes_and_hash(tmp_path):
     """End to end: a DB left at v34 with a console_saves-only card opens in Store
-    and the card pulls with the same bytes and hash."""
+    and the card pulls with the same payload (now enveloped, #738) and hash."""
     conn, blobs, data, h = _old_card_db(tmp_path / "x")
     conn.close()
     store = Store(str(tmp_path / "x"))
     path, meta = store.pull_console_save_path("PS2")
-    assert path is not None and path.read_bytes() == data
+    assert path is not None and path.read_bytes() == b"ES1\0\x00" + data
     assert meta["hash"] == h and meta["card_format"] == "MemoryCard"

@@ -9,6 +9,7 @@ import pytest
 
 from tests.conftest import AUTH
 from server.sync_client import (
+    _FMT_RAW,
     _FMT_TARGZ,
     _extract_state_folder,
     _merge_extract_state_folder,
@@ -99,9 +100,9 @@ def test_state_extract_success_backs_up(tmp_path):
     assert _no_temp(tmp_path)
 
 
-def test_state_extract_legacy_raw_blob(tmp_path):
+def test_state_extract_enveloped_raw_blob(tmp_path):
     folder = tmp_path / "Game"
-    _extract_state_folder(b"RAWSTATE", folder)
+    _extract_state_folder(_pack_envelope(_FMT_RAW, b"RAWSTATE"), folder)
     assert (folder / "Game.state").read_bytes() == b"RAWSTATE"
 
 

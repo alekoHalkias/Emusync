@@ -5,7 +5,7 @@ import hashlib
 
 import pytest
 
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import AUTH, _device_auth, raw_env
 
 
 # ── save push / pull ──────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ async def test_push_and_pull_save(client):
 
     r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
     assert r.status_code == 200
-    assert r.content == save_v1
+    assert r.content == raw_env(save_v1)
     assert r.headers["x-save-hash"] == pushed_hash
 
 
@@ -55,7 +55,7 @@ async def test_push_save_updates_version(client):
     await client.post("/games/pokemon-emerald/save", content=save_v2, headers=AUTH)
 
     r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
-    assert r.content == save_v2
+    assert r.content == raw_env(save_v2)
     assert r.headers["x-save-hash"] == hashlib.sha256(save_v2).hexdigest()
 
 
@@ -96,7 +96,7 @@ async def test_push_save_twice_keeps_only_latest(client):
     await client.post("/games/pokemon-emerald/save", content=b"version two", headers=AUTH)
 
     r = await client.get("/games/pokemon-emerald/save", headers=AUTH)
-    assert r.content == b"version two"
+    assert r.content == raw_env(b"version two")
 
 
 # ── two-device save sync ──────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ async def test_two_device_save_sync(client):
     # Device B pulls and verifies hash matches
     r = await client.get("/games/pokemon-emerald/save", headers=auth_b)
     assert r.status_code == 200
-    assert r.content == save_v1
+    assert r.content == raw_env(save_v1)
     assert r.headers["x-save-hash"] == hash_v1
 
     # Device B pushes v2
@@ -130,7 +130,7 @@ async def test_two_device_save_sync(client):
 
     # Device A pulls and gets v2
     r = await client.get("/games/pokemon-emerald/save", headers=auth_a)
-    assert r.content == save_v2
+    assert r.content == raw_env(save_v2)
     assert r.headers["x-save-hash"] == hash_v2
 
 
@@ -194,7 +194,7 @@ async def test_save_history_accumulates_generations(client):
     assert len(history) == 3
     # Newest first; size reported.
     assert history[0]["hash"] == hashlib.sha256(b"gen-three").hexdigest()
-    assert history[0]["size"] == len(b"gen-three")
+    assert history[0]["size"] == len(raw_env(b"gen-three"))
     assert history[-1]["hash"] == hashlib.sha256(b"gen-one").hexdigest()
 
 
@@ -223,7 +223,7 @@ async def test_restore_save_makes_old_version_current(client):
 
     # Pulling now returns the restored content.
     pulled = await client.get("/games/zelda/save", headers=AUTH)
-    assert pulled.content == b"good-save"
+    assert pulled.content == raw_env(b"good-save")
     # Restore added a forward generation rather than dropping anything.
     assert len(history) == 2
 

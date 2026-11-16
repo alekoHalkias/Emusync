@@ -20,6 +20,7 @@ from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
 from ..store import SaveMeta
+from ..store.blobs import _envelope_file_in_place
 from ..sync_client import _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC
 from ._core import (
     _auth, _get_store, _print_activity, _device_label, _game_label,
@@ -100,6 +101,9 @@ async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) ->
 
     def _store_it():
         store = _get_store()
+        nonlocal size
+        if _envelope_file_in_place(tmp, states=kind is _STATE):
+            size += _ENVELOPE_HEADER_LEN  # pre-#478 client upload, wrapped (#738); hash is payload-only
         m = getattr(store, f"push_{kind.noun}_file")(slug, device_id, tmp, h, size, *extra)
         if kind.synced_event:
             store.log_event(kind.synced_event, slug, device_id)

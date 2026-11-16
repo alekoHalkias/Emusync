@@ -125,16 +125,20 @@ def test_write_memcard_gci_folder_round_trips_and_backs_up_whole_tree(tmp_path):
     assert (bak / "USA" / "Card A" / "GALE01" / "01-GALE-ZeldaWW.gci").read_bytes() == b"old-gci-save"
 
 
-def test_write_memcard_legacy_raw_file_fallback(tmp_path):
-    """A file-based memcard (non-tar bytes) still writes as a plain file."""
+def test_write_memcard_rejects_unenveloped_blob(tmp_path):
+    """No sniff fallback any more (#738): an un-enveloped card raises and the
+    existing card is untouched."""
     dest = tmp_path / "Mcd001.ps2"
-    _write_memcard(dest, b"RAWCARDBYTES")
-    assert dest.read_bytes() == b"RAWCARDBYTES"
+    dest.write_bytes(b"LOCAL")
+    with pytest.raises(ValueError, match="no format header"):
+        _write_memcard(dest, b"RAWCARDBYTES")
+    assert dest.read_bytes() == b"LOCAL"
+    assert not (tmp_path / "Mcd001.ps2.bak").exists()
 
 
-@pytest.mark.parametrize("blob", [b"NOT-A-TAR-ARCHIVE", _pack_envelope(_FMT_RAW, b"RAW")])
+@pytest.mark.parametrize("blob", [_pack_envelope(_FMT_RAW, b"RAW")])
 def test_write_memcard_raw_onto_directory_raises_mismatch(tmp_path, blob):
-    """A raw blob (legacy or enveloped) onto a folder card raises instead of
+    """A raw blob onto a folder card raises instead of
     silently writing nothing and reporting success (#718); the folder is untouched."""
     dest = tmp_path / "Mcd001.ps2"
     (dest / "GAME1").mkdir(parents=True)
