@@ -18,7 +18,7 @@ Every stored blob carries the #478 envelope (converted once on the server, wrapp
   - Files: src/server/sync_client.py, src/server/store/blobs.py
   - Reuses: `_pack_envelope`, `_unpack_envelope`, `_ENVELOPE_MAGIC`, `tarfile.open` probe as in the existing fallbacks.
   - New: both functions - the sniff logic exists only inline in four client fallbacks that this issue deletes; it must live once, server-side.
-- [ ] 2. Schema v36 migration: bump `_SCHEMA_VERSION` to 36; `if from_version < 36 and blob_dir is not None: _envelope_legacy_blobs(blob_dir)` which, for each of `saves`, `console_save_history`, `console_saves`, `switch_mods` (`states=False`) and `states` (`states=True`), calls `_envelope_file_in_place` on every regular file under `blob_dir/<table>/` (skip names ending `.part`; missing dir = skip). A file that fails to read is logged to stderr and skipped, never fails startup. DB rows untouched.
+- [x] 2. Schema v36 migration: bump `_SCHEMA_VERSION` to 36; `if from_version < 36 and blob_dir is not None: _envelope_legacy_blobs(blob_dir)` which, for each of `saves`, `console_save_history`, `console_saves`, `switch_mods` (`states=False`) and `states` (`states=True`), calls `_envelope_file_in_place` on every regular file under `blob_dir/<table>/` (skip names ending `.part`; missing dir = skip). A file that fails to read is logged to stderr and skipped, never fails startup. DB rows untouched.
   - Files: src/server/store/schema.py
   - Reuses: `_migrate(conn, from_version, blob_dir)` hook and v35's skip-on-missing pattern; `_envelope_file_in_place`.
   - New: `_envelope_legacy_blobs` - small loop, mirrors `_backfill_console_cards`.
@@ -68,3 +68,4 @@ Schema bump: yes (v36, data-only, no DDL). New IPC channel (+ emusync.d.ts): no.
 ## Log
 - 2026-11-16 bplan: plan written
 - 2026-11-16 tplan: test plan added (7 case groups)
+Step 2: step 1 converter reworked to stream (_legacy_format sniffs from the file, copyfileobj behind the header) since server blobs reach 1.5 GB; two v35 tests updated here (expected envelope) to keep the commit green

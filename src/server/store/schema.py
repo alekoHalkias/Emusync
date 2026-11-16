@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 35
+_SCHEMA_VERSION = 36
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -598,7 +598,36 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # card that only existed in the retired console_saves table a history row.
         if blob_dir is not None:
             _backfill_console_cards(conn, blob_dir)
+    if from_version < 36:
+        # Every stored blob gets the #478 envelope so clients never sniff (#738).
+        # Runs after v35 so backfilled console cards are converted too.
+        if blob_dir is not None:
+            _envelope_legacy_blobs(blob_dir)
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+
+
+def _envelope_legacy_blobs(blob_dir) -> None:
+    """Wrap each un-enveloped blob file once (#738). Idempotent (enveloped files
+    are skipped), crash-safe (``.part`` + ``os.replace``), DB rows untouched since
+    hashes are envelope-free. A missing dir or unreadable file is skipped, never
+    failing startup."""
+    import sys
+    from pathlib import Path
+    from server.store.blobs import _envelope_file_in_place
+
+    tables = {"saves": False, "console_save_history": False, "console_saves": False,
+              "switch_mods": False, "states": True}
+    for table, states in tables.items():
+        d = Path(blob_dir) / table
+        if not d.is_dir():
+            continue
+        for f in sorted(d.rglob("*")):
+            if not f.is_file() or f.name.endswith(".part"):
+                continue
+            try:
+                _envelope_file_in_place(f, states)
+            except OSError as e:
+                print(f"emusync: v36 could not convert {f}: {e}", file=sys.stderr)
 
 
 def _backfill_console_cards(conn: sqlite3.Connection, blob_dir) -> None:

@@ -447,7 +447,8 @@ def test_v35_backfills_pre_480_card_into_history(tmp_path):
     rows = conn.execute("SELECT * FROM console_save_history").fetchall()
     assert len(rows) == 1
     assert (rows[0]["hash"], rows[0]["size"], rows[0]["card_format"], rows[0]["device_id"]) == (h, len(data), "MemoryCard", "dev-1")
-    assert (blobs / "console_save_history" / rows[0]["id"]).read_bytes() == data
+    # v36 then gives the backfilled card the #478 envelope (#738); payload unchanged
+    assert (blobs / "console_save_history" / rows[0]["id"]).read_bytes() == b"ES1\0\x00" + data
     # retired table and file are left in place
     assert conn.execute("SELECT COUNT(*) FROM console_saves").fetchone()[0] == 1
     assert (blobs / "console_saves" / "PS2").exists()
@@ -477,10 +478,10 @@ def test_v35_skips_card_whose_blob_file_is_missing(tmp_path):
 
 def test_store_serves_backfilled_card_with_same_bytes_and_hash(tmp_path):
     """End to end: a DB left at v34 with a console_saves-only card opens in Store
-    and the card pulls with the same bytes and hash."""
+    and the card pulls with the same payload (now enveloped, #738) and hash."""
     conn, blobs, data, h = _old_card_db(tmp_path / "x")
     conn.close()
     store = Store(str(tmp_path / "x"))
     path, meta = store.pull_console_save_path("PS2")
-    assert path is not None and path.read_bytes() == data
+    assert path is not None and path.read_bytes() == b"ES1\0\x00" + data
     assert meta["hash"] == h and meta["card_format"] == "MemoryCard"

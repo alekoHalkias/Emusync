@@ -80,7 +80,7 @@ Docs
 ## 8. Implementation Steps
 ### Steps: see tools/plans/738-convert-legacy-blobs.md
 - [done] Step 1: sync_client.py, store/blobs.py - reuses _pack/_unpack_envelope; new _envelope_legacy + _envelope_file_in_place because the sniff only exists inline in the fallbacks being deleted.
-- Step 2: schema.py - reuses _migrate blob_dir hook (v35 pattern); new _envelope_legacy_blobs loop.
+- [done] Step 2: schema.py - reuses _migrate blob_dir hook (v35 pattern); new _envelope_legacy_blobs loop.
 - Step 3: api/blobs.py, api/mods.py - reuses _envelope_file_in_place in existing _store_it offloads.
 - Step 4: sync_client.py - new _require_envelope replaces four sniff branches.
 - Step 5: tests - extend test_state_sync.py, test_memcard_folder_sync.py, test_restore_safety.py, test_saves.py.
@@ -108,3 +108,4 @@ Docs
 - 2026-11-16 bplan: 6 steps written, backend_pattern=v36 data migration + shared converter
 - 2026-11-16 tplan: test_file=src/tests/test_legacy_blob_conversion.py, 7 test case groups defined
 - 2026-11-16 implement: step 1 done (_envelope_legacy + _envelope_file_in_place)
+- 2026-11-16 implement: step 2 done (schema v36 wraps legacy blob files); deviation: step 1 converter reworked to stream (_legacy_format sniffs from the file, copyfileobj behind the header) since server blobs reach 1.5 GB; two v35 tests updated here (expected envelope) to keep the commit green

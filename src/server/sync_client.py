@@ -50,22 +50,24 @@ def _unpack_envelope(data: bytes) -> tuple[Optional[int], bytes]:
     return None, data
 
 
-def _envelope_legacy(data: bytes, states: bool) -> bytes:
-    """Wrap a pre-#478 un-enveloped blob in the envelope, sniffing its shape once.
-
-    Server-side only (v36 conversion and old-client uploads, #738); clients never
-    sniff. Mirrors the retired client fallbacks: states were tar.gz or a raw file;
-    saves/cards/mods were a tar (any compression) or raw bytes. Already-enveloped
-    input is returned unchanged. A raw save that happens to parse as a tar is
-    classified as a tar, exactly as the old client fallback did."""
-    if data[:len(_ENVELOPE_MAGIC)] == _ENVELOPE_MAGIC:
-        return data
+def _legacy_format(f, states: bool) -> int:
+    """Envelope format for a pre-#478 un-enveloped blob read from seekable binary
+    file *f*, sniffed once (#738). Server-side only (v36 conversion and old-client
+    uploads); clients never sniff. Mirrors the retired client fallbacks: states
+    were tar.gz or a raw file; saves/cards/mods a tar (any compression) or raw. A
+    raw save that happens to parse as a tar is a tar, as the old fallback had it.
+    Streams: tar headers are read from *f*, never the whole blob into memory."""
+    f.seek(0)
+    gz = f.read(2) == b"\x1f\x8b"
+    f.seek(0)
     try:
-        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz" if states else "r:*") as tar:
+        with tarfile.open(fileobj=f, mode="r:gz" if states else "r:*") as tar:
             tar.getmembers()
     except (tarfile.TarError, EOFError, OSError):
-        return _pack_envelope(_FMT_RAW, data)
-    return _pack_envelope(_FMT_TARGZ if data[:2] == b"\x1f\x8b" else _FMT_TAR, data)
+        return _FMT_RAW
+    finally:
+        f.seek(0)
+    return _FMT_TARGZ if gz else _FMT_TAR
 
 
 def _extract_tar_to_tmp(data: bytes, mode: str, parent: Path) -> Path:
