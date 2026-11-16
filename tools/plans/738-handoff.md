@@ -79,7 +79,7 @@ Docs
 
 ## 8. Implementation Steps
 ### Steps: see tools/plans/738-convert-legacy-blobs.md
-- Step 1: sync_client.py, store/blobs.py - reuses _pack/_unpack_envelope; new _envelope_legacy + _envelope_file_in_place because the sniff only exists inline in the fallbacks being deleted.
+- [done] Step 1: sync_client.py, store/blobs.py - reuses _pack/_unpack_envelope; new _envelope_legacy + _envelope_file_in_place because the sniff only exists inline in the fallbacks being deleted.
 - Step 2: schema.py - reuses _migrate blob_dir hook (v35 pattern); new _envelope_legacy_blobs loop.
 - Step 3: api/blobs.py, api/mods.py - reuses _envelope_file_in_place in existing _store_it offloads.
 - Step 4: sync_client.py - new _require_envelope replaces four sniff branches.
@@ -107,3 +107,4 @@ Docs
 - 2026-11-16 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
 - 2026-11-16 bplan: 6 steps written, backend_pattern=v36 data migration + shared converter
 - 2026-11-16 tplan: test_file=src/tests/test_legacy_blob_conversion.py, 7 test case groups defined
+- 2026-11-16 implement: step 1 done (_envelope_legacy + _envelope_file_in_place)

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 from server.store.models import SaveMeta
-from server.sync_client import _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC
+from server.sync_client import _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC, _envelope_legacy
 
 # How many generations to retain per game, per blob table. Older rows (and their
 # on-disk files) are pruned on every push.
@@ -47,6 +47,27 @@ def _payload_sha256(data: bytes) -> str:
     if data[:len(_ENVELOPE_MAGIC)] == _ENVELOPE_MAGIC:
         data = data[_ENVELOPE_HEADER_LEN:]
     return hashlib.sha256(data).hexdigest()
+
+
+def _envelope_file_in_place(path: Path, states: bool) -> bool:
+    """Give a stored/staged blob file the #478 envelope if it lacks one (#738).
+
+    Returns True if the file was rewritten. Written via ``.part`` + ``os.replace``
+    so a crash never leaves a half-written blob (#734). The payload, and so
+    ``_payload_sha256``, is unchanged."""
+    path = Path(path)
+    with open(path, "rb") as f:
+        if f.read(len(_ENVELOPE_MAGIC)) == _ENVELOPE_MAGIC:
+            return False
+    wrapped = _envelope_legacy(path.read_bytes(), states)
+    part = path.with_name(path.name + ".part")
+    try:
+        part.write_bytes(wrapped)
+        os.replace(part, path)
+    except BaseException:
+        part.unlink(missing_ok=True)
+        raise
+    return True
 
 
 class SaveStateMixin:

@@ -50,6 +50,24 @@ def _unpack_envelope(data: bytes) -> tuple[Optional[int], bytes]:
     return None, data
 
 
+def _envelope_legacy(data: bytes, states: bool) -> bytes:
+    """Wrap a pre-#478 un-enveloped blob in the envelope, sniffing its shape once.
+
+    Server-side only (v36 conversion and old-client uploads, #738); clients never
+    sniff. Mirrors the retired client fallbacks: states were tar.gz or a raw file;
+    saves/cards/mods were a tar (any compression) or raw bytes. Already-enveloped
+    input is returned unchanged. A raw save that happens to parse as a tar is
+    classified as a tar, exactly as the old client fallback did."""
+    if data[:len(_ENVELOPE_MAGIC)] == _ENVELOPE_MAGIC:
+        return data
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz" if states else "r:*") as tar:
+            tar.getmembers()
+    except (tarfile.TarError, EOFError, OSError):
+        return _pack_envelope(_FMT_RAW, data)
+    return _pack_envelope(_FMT_TARGZ if data[:2] == b"\x1f\x8b" else _FMT_TAR, data)
+
+
 def _extract_tar_to_tmp(data: bytes, mode: str, parent: Path) -> Path:
     """Extract tar *data* into a fresh temp dir under *parent* (same filesystem,
     so callers can ``os.replace`` out of it) and return it. Any failure removes
