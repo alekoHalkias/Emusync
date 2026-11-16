@@ -24,6 +24,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..store import Store
+from ..store.devices import REMOVED_DEVICE_ID
 
 app = FastAPI(title="EmuSync")
 
@@ -269,6 +270,8 @@ def _auth(
     x_device_id = _clean_header(x_device_id)
     if not x_device_id:
         raise HTTPException(status_code=401, detail="Missing X-Device-ID header")
+    if x_device_id == REMOVED_DEVICE_ID:
+        raise HTTPException(status_code=400, detail="Reserved X-Device-ID")  # placeholder (#750)
     store = _get_store()
     device, is_new = store.ensure_device(x_device_id, _clean_header(x_device_name) or x_device_id)
     ip = request.client.host if request.client else "unknown"

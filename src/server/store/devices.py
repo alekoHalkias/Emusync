@@ -17,6 +17,11 @@ _TOUCH_THROTTLE_SECONDS = 30
 # never merged back and forth (#656).
 _MERGE_MIN_IDLE_SECONDS = 5 * 60
 
+# A removed device's save/state/card generations and mods are re-credited to this
+# hidden row (saves.device_id etc. are NOT NULL FKs), never deleted outright (#750).
+REMOVED_DEVICE_ID = "removed-device"
+REMOVED_DEVICE_NAME = "Removed device"
+
 
 # Every (table, column) that holds a device id, for merge_devices (#656). Keep in
 # sync with schema.py when a table gains a device column.
@@ -30,6 +35,14 @@ _DEVICE_REFS = (
     ("console_save_sync_baseline", "device_id"),
     ("save_conflicts", "winner_device_id"), ("save_conflicts", "loser_device_id"),
     ("console_save_conflicts", "winner_device_id"), ("console_save_conflicts", "loser_device_id"),
+)
+
+# Rows that only make sense for a live device: deleted on removal, not re-keyed.
+_DEVICE_ONLY_REFS = (
+    ("game_devices", "device_id"), ("consoles", "device_id"), ("locks", "device_id"),
+    ("rom_transfers", "from_device_id"), ("rom_transfers", "to_device_id"),
+    ("rom_pull_requests", "from_device_id"), ("rom_pull_requests", "to_device_id"),
+    ("save_sync_baseline", "device_id"), ("console_save_sync_baseline", "device_id"),
 )
 
 
@@ -62,19 +75,14 @@ class DeviceMixin:
         return Device(id=id, name=name), False
 
     def clear_devices(self) -> None:
-        """Remove all devices (forces re-pair). Clears device-referencing rows
-        first for the same FK reason as remove_device; per-device game configs
-        and saves are re-created when devices reconnect."""
-        c = self._conn
-        for table in ("game_devices", "consoles", "saves", "states", "locks",
-                      "rom_transfers", "rom_pull_requests"):
-            c.execute(f"DELETE FROM {table}")
-        c.execute("DELETE FROM devices")
-        c.commit()
+        """Remove all devices (forces re-pair). Each goes through remove_device, so
+        server saves survive under the placeholder instead of being wiped (#750)."""
+        for d in self.list_devices():
+            self.remove_device(d.id)
 
     def list_devices(self) -> list[Device]:
         rows = self._conn.execute(
-            "SELECT id, name, last_ip, last_seen_at FROM devices"
+            "SELECT id, name, last_ip, last_seen_at FROM devices WHERE id != ?", (REMOVED_DEVICE_ID,)
         ).fetchall()
         return [Device(**dict(r)) for r in rows]
 
@@ -135,29 +143,23 @@ class DeviceMixin:
         return dupes
 
     def remove_device(self, device_id: str) -> None:
-        """Remove a device and every row that references it.
+        """Remove a device without losing the saves it pushed (#750).
 
-        `foreign_keys` is ON for every connection (see connection.py) and the
-        referencing tables (game_devices, saves, locks, …) do NOT declare
-        `ON DELETE CASCADE`, so deleting the device row directly raises
-        `FOREIGN KEY constraint failed` for any device that has configured a
-        game or pushed a save. Clear the dependents first, in one transaction.
+        Per-device config rows (game configs, consoles, locks, transfers, pull
+        requests, sync baselines) are deleted. Everything else that references the
+        device (save/state/card generations, mods, conflicts, events) is re-keyed to
+        the hidden REMOVED_DEVICE_ID via merge_devices, since those device columns
+        are NOT NULL FKs. Then only that placeholder's newest generation per game /
+        console is kept; older ones are deleted and their files unlinked after the
+        commit (#704), so nothing is orphaned.
         """
+        if device_id == REMOVED_DEVICE_ID:
+            return
+        if self._conn.execute("SELECT 1 FROM devices WHERE id = ?", (device_id,)).fetchone() is None:
+            return
+        self.ensure_device(REMOVED_DEVICE_ID, REMOVED_DEVICE_NAME)
         c = self._conn
-        c.execute("DELETE FROM game_devices WHERE device_id = ?", (device_id,))
-        c.execute("DELETE FROM consoles WHERE device_id = ?", (device_id,))
-        c.execute("DELETE FROM saves WHERE device_id = ?", (device_id,))
-        c.execute("DELETE FROM states WHERE device_id = ?", (device_id,))
-        c.execute("DELETE FROM locks WHERE device_id = ?", (device_id,))
-        c.execute(
-            "DELETE FROM rom_transfers WHERE from_device_id = ? OR to_device_id = ?",
-            (device_id, device_id),
-        )
-        c.execute(
-            "DELETE FROM rom_pull_requests WHERE from_device_id = ? OR to_device_id = ?",
-            (device_id, device_id),
-        )
-        # `events` rows are intentionally kept: no FK, they carry their own device_name,
-        # and they're bounded by EVENT_LIMIT.
-        c.execute("DELETE FROM devices WHERE id = ?", (device_id,))
-        c.commit()
+        for table, col in _DEVICE_ONLY_REFS:
+            c.execute(f"DELETE FROM {table} WHERE {col} = ?", (device_id,))
+        self.merge_devices(device_id, REMOVED_DEVICE_ID)  # commits
+        self._prune_removed_generations(REMOVED_DEVICE_ID)

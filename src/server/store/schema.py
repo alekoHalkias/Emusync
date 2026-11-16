@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 36
+_SCHEMA_VERSION = 37
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -603,7 +603,60 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # Runs after v35 so backfilled console cards are converted too.
         if blob_dir is not None:
             _envelope_legacy_blobs(blob_dir)
+    if from_version < 37:
+        # Files no row references (leaked by pre-#750 device removal) move aside once.
+        if blob_dir is not None:
+            _quarantine_orphan_blobs(conn, blob_dir)
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
+
+
+def _quarantine_orphan_blobs(conn: sqlite3.Connection, blob_dir) -> None:
+    """Move blob files with no matching row to ``blob_dir/.orphaned/<table>/`` (#750).
+
+    Nothing is deleted: they may hold a save a past device removal dropped. Skips
+    ``.part`` files and anything outside the five blob tables (``.uploads``
+    staging). Idempotent; a missing table/dir or a failed move is skipped."""
+    import os
+    import sys
+    from pathlib import Path
+
+    def names(sql: str):
+        try:
+            return {r[0] for r in conn.execute(sql)}
+        except sqlite3.OperationalError:
+            return None  # table absent/unreadable: skip it, never treat all files as orphans
+
+    known = {
+        "saves": names("SELECT id FROM saves"),
+        "states": names("SELECT id FROM states"),
+        "console_save_history": names("SELECT id FROM console_save_history"),
+        "console_saves": names("SELECT console_key FROM console_saves"),
+        # same layout as SwitchModMixin._mod_blob_path
+        "switch_mods": names("SELECT title_id || '/' || mod_name || '.tar' FROM switch_mods"),
+    }
+    root = Path(blob_dir)
+    moved = size = 0
+    for table, keep in known.items():
+        d = root / table
+        if keep is None or not d.is_dir():
+            continue
+        for f in sorted(d.rglob("*")):
+            rel = f.relative_to(d).as_posix()
+            if not f.is_file() or rel in keep or f.name.endswith(".part"):
+                continue
+            dest = root / ".orphaned" / table / rel
+            try:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                n = f.stat().st_size
+                os.replace(f, dest)
+            except OSError as e:
+                print(f"emusync: v37 could not quarantine {f}: {e}", file=sys.stderr)
+                continue
+            moved += 1
+            size += n
+    if moved:
+        print(f"emusync: v37 moved {moved} orphaned blob file(s), {size / 1e9:.2f} GB, to {root / '.orphaned'}",
+              file=sys.stderr)
 
 
 def _envelope_legacy_blobs(blob_dir) -> None:
