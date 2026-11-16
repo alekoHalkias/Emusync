@@ -4,7 +4,7 @@
 - Issue: #750
 - Branch: feature/750-orphaned-blob-files
 - PR: none
-- Status: planned
+- Status: implementing
 - Created: 2026-11-16
 - Fix attempts: 0
 

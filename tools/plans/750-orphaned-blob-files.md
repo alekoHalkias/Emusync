@@ -3,7 +3,7 @@
 Issue: #750
 Branch: feature/750-orphaned-blob-files
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
