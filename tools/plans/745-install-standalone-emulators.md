@@ -14,7 +14,7 @@ On Linux with Flatpak, the import wizard's no-emulator state offers a one-click 
 - **Recommendations**: none; no guide change needed.
 
 ## Steps
-- [ ] 1. `emulator:detect`'s `install` payload lists installable Flatpak standalones.
+- [x] 1. `emulator:detect`'s `install` payload lists installable Flatpak standalones.
   - Files: src/gui/electron/emulator/detect.ts, src/gui/renderer/src/emusync.d.ts, src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: `coreInstallTargets` (add `standalones: Array<{ label: string; flatpakId: string }>` to `CoreInstallTargets`); the `flatpak list --app --columns=application` probe already in `detectEmulatorsForConsole` (hoist the memoised `getFlatpakList` to module scope so both use it; empty string = flatpak missing). Linux only (any arch: Flathub serves aarch64 too), so the early return for non-x64 must only gate cores. Include a standalone only when it has `flatpak_id`, flatpak is available, and the id is not already in the list. `NO_INSTALL` in `useConsoleImport.ts` and the `.d.ts` interface get `standalones: []`.
   - New: none.
@@ -52,3 +52,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. 
 ## Log
 - 2026-11-16 fplan: plan written
 - 2026-11-16 tplan: 1 automated test case + manual script
+Step 1: flatpak list not memoised at module scope (would go stale after install); new uncached flatpakApps() helper shared by both functions

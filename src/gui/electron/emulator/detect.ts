@@ -6,6 +6,13 @@ import { rt } from "../runtime";
 import retroarchPaths from "../../../shared/retroarch_paths.json";
 import type { EmulatorInfo, DetectedEmulatorOption, StandaloneDef } from "./types";
 
+/** Installed Flatpak app ids, or null when flatpak is unavailable. Never cached:
+ *  the wizard re-detects right after an install (#745). */
+export function flatpakApps(): string | null {
+  try { return execSync("flatpak list --app --columns=application 2>/dev/null", { timeout: 5000 }).toString(); }
+  catch { return null; }
+}
+
 export function parseRetroArchCfg(cfgPath: string, home: string): Record<string, string> {
   const out: Record<string, string> = {};
   if (!existsSync(cfgPath)) return out;
@@ -189,12 +196,7 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
 
   // ── Standalone emulators ──────────────────────────────────────────────────
   let flatpakList: string | null = null;
-  const getFlatpakList = () => {
-    if (flatpakList !== null) return flatpakList;
-    try { flatpakList = execSync("flatpak list --app --columns=application 2>/dev/null", { timeout: 5000 }).toString(); }
-    catch { flatpakList = ""; }
-    return flatpakList;
-  };
+  const getFlatpakList = () => (flatpakList ??= flatpakApps() ?? "");
 
   // Standalone defs come from the server as JSON (issue #292): snake_case fields,
   // `native_bins` is a string[], and `dirs` carries `~`-templated save/state/
@@ -253,21 +255,31 @@ export function detectEmulatorsForConsole(home: string, consoleKey: string): Det
 export interface CoreInstallTargets {
   retroarch: Array<{ type: "native" | "flatpak"; label: string; coresDir: string }>;
   cores: Array<{ lib: string; folder: string }>;
+  standalones: Array<{ label: string; flatpakId: string }>;
 }
 
 /** RetroArch installs and seeded cores a missing core could be installed into (#744).
- *  ponytail: Linux x86_64 only; detection is .so-only, so a Windows .dll would never be found. */
+ *  ponytail: cores Linux x86_64 only (detection is .so-only); standalones Linux + Flatpak only, else download links. */
 export function coreInstallTargets(home: string, consoleKey: string): CoreInstallTargets {
+  const none: CoreInstallTargets = { retroarch: [], cores: [], standalones: [] };
   const consoleDef = rt.cachedConsoleDefs?.[consoleKey];
-  if (!consoleDef || process.platform !== "linux" || process.arch !== "x64") return { retroarch: [], cores: [] };
+  if (!consoleDef || process.platform !== "linux") return none;
+  // Standalone Flatpaks not yet installed (#745); any arch, Flathub serves aarch64 too.
+  const withFlatpak = ((consoleDef.standalones ?? []) as StandaloneDef[]).filter(s => s.flatpak_id);
+  const apps = withFlatpak.length ? flatpakApps() : null;
+  const standalones = apps === null ? [] : withFlatpak
+    .filter(s => !apps.split("\n").includes(s.flatpak_id!))
+    .map(s => ({ label: s.label, flatpakId: s.flatpak_id! }));
   const cores: CoreInstallTargets["cores"] = [];
-  for (const sysKey of consoleDef.systemKeys ?? []) {
-    for (const core of rt.cachedSystemDefs?.[sysKey]?.cores ?? []) {
-      const lib = core.libName || core.lib;
-      if (lib && !cores.some(c => c.lib === lib)) cores.push({ lib, folder: core.folderName || core.folder });
+  if (process.arch === "x64") {
+    for (const sysKey of consoleDef.systemKeys ?? []) {
+      for (const core of rt.cachedSystemDefs?.[sysKey]?.cores ?? []) {
+        const lib = core.libName || core.lib;
+        if (lib && !cores.some(c => c.lib === lib)) cores.push({ lib, folder: core.folderName || core.folder });
+      }
     }
   }
-  if (!cores.length) return { retroarch: [], cores: [] };
+  if (!cores.length) return { ...none, standalones };
   const retroarch = detectRetroArch(home).map(ra => ({ type: ra.type, label: ra.label, coresDir: ra.coresDir }));
-  return { retroarch, cores };
+  return { retroarch, cores, standalones };
 }

@@ -75,7 +75,7 @@ Docs
 
 ## 8. Implementation Steps
 ### Steps: see tools/plans/745-install-standalone-emulators.md
-- Step 1: detect.ts, emusync.d.ts, useConsoleImport.ts - reuses coreInstallTargets + hoisted getFlatpakList; no new code.
+- [done] Step 1: detect.ts, emusync.d.ts, useConsoleImport.ts - reuses coreInstallTargets + hoisted getFlatpakList; no new code.
 - Step 2: installFlatpak.ts (new), ipc.ts, preload.ts, emusync.d.ts - reuses installCore.ts shape; new file because nothing runs flatpak today.
 - Step 3: EmulatorStep.tsx, useConsoleImport.ts - generalises CoreInstallList rows; installFlatpak hook fn mirrors installCore.
 - Step 4: test_emulator_suggestions.py - flatpak_id format check; reuses existing test module.
@@ -102,3 +102,4 @@ Docs
 - 2026-11-16 design: scope=ui, plan_target=fplan, difficulty=3/10, breaking=no
 - 2026-11-16 fplan: 5 steps written, visual_pattern=empty-state action rows (#744)
 - 2026-11-16 tplan: test_file=src/tests/test_emulator_suggestions.py, 1 test case defined
+- 2026-11-16 implement: step 1 done (install.standalones from coreInstallTargets); deviation: flatpak list not memoised at module scope (would go stale after install); new uncached flatpakApps() helper shared by both functions

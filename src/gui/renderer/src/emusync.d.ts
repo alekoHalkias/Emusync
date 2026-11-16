@@ -26,6 +26,7 @@ export interface LocalBak {
 export interface CoreInstallTargets {
   retroarch: { type: "native" | "flatpak"; label: string; coresDir: string }[];
   cores: { lib: string; folder: string }[];
+  standalones: { label: string; flatpakId: string }[];
 }
 
 export interface EmusyncBridge {

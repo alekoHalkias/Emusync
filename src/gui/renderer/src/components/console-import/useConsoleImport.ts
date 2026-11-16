@@ -21,7 +21,7 @@ import { useNetworkShare } from "./useNetworkShare";
 import { filterIgnored, saveIgnoredRoms } from "./ignoredRoms";
 import type { CoreInstallTargets } from "../../emusync";
 
-const NO_INSTALL: CoreInstallTargets = { retroarch: [], cores: [] };
+const NO_INSTALL: CoreInstallTargets = { retroarch: [], cores: [], standalones: [] };
 import type {
   ConsoleOption,
   EmulatorOption,
