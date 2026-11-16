@@ -4,7 +4,7 @@
 - Issue: #750
 - Branch: feature/750-orphaned-blob-files
 - PR: none
-- Status: created
+- Status: designed
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -24,13 +24,18 @@ Push from A and B, remove A, compare `blobs/saves/` with `SELECT id FROM saves`.
 - [ ] Real-SQLite regression tests
 
 ## 2. Design
-### Scope: TBD
-### Backend Changes: TBD
-### UI Changes: TBD
-### Plan Target: TBD (bplan / fplan / both)
-### Sub-issues: TBD
-### Difficulty: TBD
-### Backwards Compatibility: TBD
+### Scope: backend only
+### Backend Changes:
+- Investigation: prune and remove_game are clean; leaks are remove_device/clear_devices (rows deleted, files kept). remove_device also misses most _DEVICE_REFS tables (FK failure for card/mod pushers).
+- Placeholder device REMOVED_DEVICE_ID ("Removed device"), created on demand, hidden from list_devices, rejected by _auth.
+- remove_device + clear_devices share one path over _DEVICE_REFS: saves/states/console_save_history/switch_mods/console_saves re-credited to the placeholder; per game/console keep only the removed device's newest generation, delete its older ones, unlink files after commit (#704); other refs deleted.
+- Schema v37: move orphan files (no row) under blobs/{saves,states,console_save_history,console_saves,switch_mods} to blobs/.orphaned/<table>/; skip .uploads and .part; log; delete nothing.
+### UI Changes: none
+### Plan Target: bplan
+### Sub-issues: none
+### Difficulty: 5/10
+### Backwards Compatibility: non-breaking; clear-devices no longer wipes server saves (intended).
+### User decisions (2026-11-16): keep removed device's saves credited to a placeholder, but only its newest generation per game; quarantine orphans instead of deleting.
 
 ## 3. Frontend Plan
 ### Design Alignment: TBD
@@ -82,3 +87,4 @@ Push from A and B, remove A, compare `blobs/saves/` with `SELECT id FROM saves`.
 
 ## 12. Log
 - 2026-11-16 issue: workflow initialized
+- 2026-11-16 design: scope=backend, plan_target=bplan, difficulty=5/10, breaking=no
