@@ -3,7 +3,7 @@
 Issue: #738
 Branch: feature/738-convert-legacy-blobs
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -31,7 +31,7 @@ Every stored blob carries the #478 envelope (converted once on the server, wrapp
   - Reuses: `_unpack_envelope`.
   - New: `_require_envelope` - one shared raise instead of four.
 - [x] 5. Tests (real files, real SQLite; see Testing). New file src/tests/test_legacy_blob_conversion.py for converter + v36 + upload wrap (cross-cutting; no existing module owns all three). Update the existing legacy-fallback tests to the new contract.
-- [ ] 6. Docs: CLAUDE.md Saves/sync envelope rule ("keep un-enveloped fallbacks for old blobs" -> server converts once in v36 and wraps old uploads; client raises on missing envelope; update server before clients). GOTCHAS.md #478 entry: replace "fallbacks are load-bearing, keep them" with the v36 conversion and rollout order. ARCHITECTURE.md: envelope section mention of v36 conversion.
+- [x] 6. Docs: CLAUDE.md Saves/sync envelope rule ("keep un-enveloped fallbacks for old blobs" -> server converts once in v36 and wraps old uploads; client raises on missing envelope; update server before clients). GOTCHAS.md #478 entry: replace "fallbacks are load-bearing, keep them" with the v36 conversion and rollout order. ARCHITECTURE.md: envelope section mention of v36 conversion.
 
 ## Testing
 - **Test File**: src/tests/test_legacy_blob_conversion.py (new); updates in test_state_sync.py, test_memcard_folder_sync.py, test_restore_safety.py, test_console_memcard.py
@@ -72,3 +72,4 @@ Step 2: step 1 converter reworked to stream (_legacy_format sniffs from the file
 Step 3: existing API tests pushing raw bytes now expect the RAW envelope back (new conftest.raw_env helper); stored size includes the 5-byte header, matching enveloped pushes
 Step 4: also cli/transfer.py: bare rom-folder transfer tars (GUI rom:push sends plain tar -cf) are declared _FMT_TAR before _write_memcard, by transfer kind not sniffing; state extracts open tar with r:* (TARGZ or TAR); legacy client tests flipped to raises / enveloped inputs here to keep the commit green
 Step 5: legacy-fallback test updates landed in steps 2-4 to keep each commit green
+Step 6: CLAUDE.md rule landed with steps 1 and 4 (commit hook); removed stale envelope.ts reference in ARCHITECTURE.md

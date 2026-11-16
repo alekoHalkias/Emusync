@@ -4,7 +4,7 @@
 - Issue: #738
 - Branch: feature/738-convert-legacy-blobs
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -84,7 +84,7 @@ Docs
 - [done] Step 3: api/blobs.py, api/mods.py - reuses _envelope_file_in_place in existing _store_it offloads.
 - [done] Step 4: sync_client.py - new _require_envelope replaces four sniff branches.
 - [done] Step 5: tests - extend test_state_sync.py, test_memcard_folder_sync.py, test_restore_safety.py, test_saves.py.
-- Step 6: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
+- [done] Step 6: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md.
 
 ## 9. Review
 ### Findings: TBD
@@ -112,3 +112,4 @@ Docs
 - 2026-11-16 implement: step 3 done (upload routes wrap pre-#478 uploads); deviation: existing API tests pushing raw bytes now expect the RAW envelope back (new conftest.raw_env helper); stored size includes the 5-byte header, matching enveloped pushes
 - 2026-11-16 implement: step 4 done (client sniff fallbacks removed, _require_envelope); deviation: also cli/transfer.py: bare rom-folder transfer tars (GUI rom:push sends plain tar -cf) are declared _FMT_TAR before _write_memcard, by transfer kind not sniffing; state extracts open tar with r:* (TARGZ or TAR); legacy client tests flipped to raises / enveloped inputs here to keep the commit green
 - 2026-11-16 implement: step 5 done (test_legacy_blob_conversion.py, 11 tests); deviation: legacy-fallback test updates landed in steps 2-4 to keep each commit green
+- 2026-11-16 implement: step 6 done (GOTCHAS + ARCHITECTURE envelope docs); deviation: CLAUDE.md rule landed with steps 1 and 4 (commit hook); removed stale envelope.ts reference in ARCHITECTURE.md
