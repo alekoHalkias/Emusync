@@ -63,3 +63,6 @@ Write real files of controlled size in `tmp_path` (`write_bytes(b"\0" * n)`) and
 
 ### Blob-core refactors (#737)
 When a store core is generalized (owner column), the existing per-feature suites (`test_saves`, `test_console_memcard`, `test_state_sync`) are the regression net: they must pass unchanged, and tests that assert retired internals (e.g. a live-slot file path) are rewritten, not deleted. Backfill migrations are tested by building the old-shaped row plus blob file under `tmp_path`, calling `schema._migrate(conn, from_version=N, blob_dir)` twice (idempotence), and comparing pulled bytes and hash before and after.
+
+### Shell launcher (#741)
+`src/emusync` is tested by copying it into a `tmp_path` checkout layout and running it with `bash` under a PATH whose `python3` (and the venv's `bin/python`) are small sh stubs that exec `sys.executable` or fail on cue. Assert exit code, stdout marker from a stub `emusync.py`, and stderr text. Skip on Windows.
