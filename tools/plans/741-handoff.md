@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #741
 - Branch: feature/741-runtime-venv-python-version
-- PR: none
-- Status: implemented
+- PR: #747
+- Status: shipped
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -84,10 +84,10 @@ Tests:
 ### Blockers: none
 
 ## 10. Ship
-### Status: pending
-### PR: none
-### Server Sync: pending
-### Doc Sync: pending
+### Status: shipped
+### PR: #747
+### Server Sync: done
+### Doc Sync: done (GOTCHAS, ARCHITECTURE, CLAUDE.md updated in steps 4 and R1)
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -105,3 +105,6 @@ Tests:
 - 2026-11-16 implement: step 4 done (GOTCHAS, ARCHITECTURE, CLAUDE.md)
 - 2026-11-16 review: 2 findings, blocked=no; fix step R1 added
 - 2026-11-16 implement: step R1 done (launcher probes click only, dev checkout rebuilds from requirements-dev.txt)
+- 2026-11-16 ship: make test 754 passed, PR #747 opened, mergeable
+- 2026-11-16 ship: server sync done
+- 2026-11-16 ship: doc sync updated ARCHITECTURE.md, GOTCHAS.md, CLAUDE.md

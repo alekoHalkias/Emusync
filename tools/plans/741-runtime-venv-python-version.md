@@ -2,8 +2,8 @@
 
 Issue: #741
 Branch: feature/741-runtime-venv-python-version
-PR: none
-Status: implemented
+PR: #747
+Status: shipped
 Fix attempts: 0
 
 ## Goal
