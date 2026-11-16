@@ -3,7 +3,7 @@
 Issue: #738
 Branch: feature/738-convert-legacy-blobs
 PR: none
-Status: planned
+Status: implementing
 Fix attempts: 0
 
 ## Goal
