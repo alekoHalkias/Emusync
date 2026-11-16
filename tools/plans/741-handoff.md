@@ -4,7 +4,7 @@
 - Issue: #741
 - Branch: feature/741-runtime-venv-python-version
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-16
 - Fix attempts: 0
 
@@ -104,3 +104,4 @@ Tests:
 - 2026-11-16 implement: step 3 done (test_launcher.py, 4 tests; 2 fail on the old launcher)
 - 2026-11-16 implement: step 4 done (GOTCHAS, ARCHITECTURE, CLAUDE.md)
 - 2026-11-16 review: 2 findings, blocked=no; fix step R1 added
+- 2026-11-16 implement: step R1 done (launcher probes click only, dev checkout rebuilds from requirements-dev.txt)

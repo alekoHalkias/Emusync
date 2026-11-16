@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Same list as PY_DEPS_PROBE in gui/electron/runtime.ts.
-PROBE="import fastapi, uvicorn, click, tomlkit, zeroconf, httpx"
+# Cheap venv health check (#741): a Python upgrade orphans every package, so click is enough.
+PROBE="import click"
+REQS="$SCRIPT_DIR/requirements.txt"
+[ -f "$SCRIPT_DIR/requirements-dev.txt" ] && REQS="$SCRIPT_DIR/requirements-dev.txt"  # dev checkout
 # venv lives at the repo root (install.sh: .venv, Makefile: .cache/.venv) since #611
 for v in "$SCRIPT_DIR/../.cache/.venv" "$SCRIPT_DIR/../.venv" "$SCRIPT_DIR/.venv"; do
     [ -x "$v/bin/python" ] || continue
@@ -11,7 +13,7 @@ for v in "$SCRIPT_DIR/../.cache/.venv" "$SCRIPT_DIR/../.venv" "$SCRIPT_DIR/.venv
     # ponytail: no lock around the rebuild; add flock on "$v.lock" if concurrent launches race.
     echo "EmuSync: Python environment at $v is unusable (system Python changed?), rebuilding..." >&2
     if python3 -m venv --clear "$v" >&2 \
-        && "$v/bin/python" -m pip install -q -r "$SCRIPT_DIR/requirements.txt" >&2 \
+        && "$v/bin/python" -m pip install -q -r "$REQS" >&2 \
         && "$v/bin/python" -c "$PROBE" 2>/dev/null; then
         exec "$v/bin/python" "$SCRIPT_DIR/emusync.py" "$@"
     fi

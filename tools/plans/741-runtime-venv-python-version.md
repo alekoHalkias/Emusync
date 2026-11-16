@@ -3,7 +3,7 @@
 Issue: #741
 Branch: feature/741-runtime-venv-python-version
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -31,7 +31,7 @@ A venv that can no longer import its dependencies (system Python minor upgrade) 
   - Files: src/docs/GOTCHAS.md, src/docs/ARCHITECTURE.md, CLAUDE.md
 
 ## Review fixes
-- [ ] R1. Launcher probes `import click` only (28 ms vs 235 ms for the full list; a minor Python upgrade orphans every package, so click is enough) and rebuilds from `requirements-dev.txt` when present (dev checkout), else `requirements.txt` (runtime dir). Update the GOTCHAS line that says the launcher copies PY_DEPS_PROBE.
+- [x] R1. Launcher probes `import click` only (28 ms vs 235 ms for the full list; a minor Python upgrade orphans every package, so click is enough) and rebuilds from `requirements-dev.txt` when present (dev checkout), else `requirements.txt` (runtime dir). Update the GOTCHAS line that says the launcher copies PY_DEPS_PROBE.
   - Files: src/emusync, src/docs/GOTCHAS.md, src/docs/ARCHITECTURE.md, CLAUDE.md
 
 ## Testing
