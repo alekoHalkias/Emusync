@@ -620,11 +620,11 @@ def _quarantine_orphan_blobs(conn: sqlite3.Connection, blob_dir) -> None:
     import sys
     from pathlib import Path
 
-    def names(sql: str) -> set[str]:
+    def names(sql: str):
         try:
             return {r[0] for r in conn.execute(sql)}
         except sqlite3.OperationalError:
-            return set()  # table absent (partial DB)
+            return None  # table absent/unreadable: skip it, never treat all files as orphans
 
     known = {
         "saves": names("SELECT id FROM saves"),
@@ -638,7 +638,7 @@ def _quarantine_orphan_blobs(conn: sqlite3.Connection, blob_dir) -> None:
     moved = size = 0
     for table, keep in known.items():
         d = root / table
-        if not d.is_dir():
+        if keep is None or not d.is_dir():
             continue
         for f in sorted(d.rglob("*")):
             rel = f.relative_to(d).as_posix()

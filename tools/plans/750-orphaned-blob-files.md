@@ -26,7 +26,7 @@ Removing a device keeps its newest save/state/card generation per owner (credite
   - Files: src/server/store/schema.py
   - Reuses: `_migrate(conn, from_version, blob_dir)` hook, v36 walk shape.
   - New: `_quarantine_orphan_blobs` - no existing code compares blob dirs with rows.
-- [ ] 4. Tests (real SQLite; see Testing): extend src/tests/test_devices.py (store-level removal, existing `test_remove_device_with_games_and_saves` / `test_clear_devices_removes_all` patterns) and add v37 cases to src/tests/test_legacy_blob_conversion.py-style new file src/tests/test_orphan_blobs.py (migration over a seeded blob_dir).
+- [x] 4. Tests (real SQLite; see Testing): extend src/tests/test_devices.py (store-level removal, existing `test_remove_device_with_games_and_saves` / `test_clear_devices_removes_all` patterns) and add v37 cases to src/tests/test_legacy_blob_conversion.py-style new file src/tests/test_orphan_blobs.py (migration over a seeded blob_dir).
 - [ ] 5. Docs: CLAUDE.md Config/paths/DB bullet on device dedupe: device removal merges into `REMOVED_DEVICE_ID`, keeps newest generation per owner, unlinks the rest; v37 quarantines orphans to `blobs/.orphaned/`. GOTCHAS.md entry (#750) with the investigation result. ARCHITECTURE.md `server/store/` row: placeholder device and `.orphaned`.
 
 ## Testing
@@ -63,3 +63,4 @@ Schema bump: yes (v37, file moves only, no DDL). New IPC channel (+ emusync.d.ts
 - 2026-11-16 tplan: 10 test cases + edge cases
 Step 2: per-device rows listed once in new _DEVICE_ONLY_REFS tuple next to _DEVICE_REFS; unknown device id is a no-op
 Step 3: v36 tests in test_legacy_blob_conversion.py now call _envelope_legacy_blobs directly (their row-less seed files would be quarantined by v37) and compare user_version to _SCHEMA_VERSION
+Step 4: tests in a new test_device_removal.py (test_devices.py is already 648 lines) including the v37 cases instead of a separate test_orphan_blobs.py; the missing-table test caught v37 quarantining a whole dir when its row query fails, fixed in schema.py to skip the table as the plan specified
