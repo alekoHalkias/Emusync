@@ -22,7 +22,7 @@ On Linux with Flatpak, the import wizard's no-emulator state offers a one-click 
   - Files: src/gui/electron/emulator/installFlatpak.ts (new), src/gui/electron/emulator/ipc.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: `installCore.ts` shape (validate against `coreInstallTargets`, return `{ok:true}|{ok:false,error}`); `execFile` + `promisify` as in installCore.
   - New: `installFlatpak.ts` - core install is a download+unzip, nothing existing runs flatpak. Validates `flatpakId` is in `coreInstallTargets(home, consoleKey).standalones`; runs `flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo` then `flatpak install --user -y --noninteractive flathub <id>` (no shell, no sudo, 15 min timeout, `maxBuffer` 10 MB); error = last stderr line.
-- [ ] 3. Wizard UI: "Install with Flatpak" rows.
+- [x] 3. Wizard UI: "Install with Flatpak" rows.
   - Files: src/gui/renderer/src/components/console-import/EmulatorStep.tsx, src/gui/renderer/src/components/console-import/useConsoleImport.ts
   - Reuses: `CoreInstallList` busy/error state and row markup (generalise it into a small `InstallRow`-style list that takes `{key,label,run}` items, used for both cores and standalones, instead of duplicating); `installCore` in the hook as the template for `installFlatpak` (re-run `detectEmulators` on success).
   - New: `installFlatpak` in the hook - one-line twin of `installCore` for the new channel. Heading "Install an emulator (Flatpak)", button text "Install"; the core list keeps its heading.
@@ -53,3 +53,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes. New CLI subcommand: no. 
 - 2026-11-16 fplan: plan written
 - 2026-11-16 tplan: 1 automated test case + manual script
 Step 1: flatpak list not memoised at module scope (would go stale after install); new uncached flatpakApps() helper shared by both functions
+Step 3: CoreInstallList replaced by InstallList + InstallOptions; Flatpak block shown above cores

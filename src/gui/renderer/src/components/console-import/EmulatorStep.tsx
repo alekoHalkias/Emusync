@@ -15,40 +15,55 @@ const SUGGESTION_LINKS: Record<string, string> = {
   Eden: "https://eden-emu.dev/",
 };
 
-function CoreInstallList({ vm }: { vm: ConsoleImportVM }) {
-  const { retroarch, cores } = vm.install;
+type InstallItem = { key: string; label: string; run: () => Promise<string | null> };
+
+// Label + Install rows; one install at a time, error under its row (#744, #745).
+function InstallList({ title, items }: { title: string; items: InstallItem[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  if (!retroarch.length || !cores.length) return null;
-  const run = async (key: string, coresDir: string, lib: string) => {
-    setBusy(key);
-    setErrors(e => ({ ...e, [key]: "" }));
-    const err = await vm.installCore(coresDir, lib);
+  if (!items.length) return null;
+  const run = async (item: InstallItem) => {
+    setBusy(item.key);
+    setErrors(e => ({ ...e, [item.key]: "" }));
+    const err = await item.run();
     setBusy(null);
-    if (err) setErrors(e => ({ ...e, [key]: err }));
+    if (err) setErrors(e => ({ ...e, [item.key]: err }));
   };
   return (
     <div style={{ textAlign: "left", marginTop: 16 }}>
-      <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Install a RetroArch core</p>
-      {retroarch.flatMap(ra => cores.map(core => {
-        const key = `${ra.coresDir}/${core.lib}`;
-        return (
-          <div key={key} style={{ marginBottom: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <span style={{ fontSize: 13 }}>
-                {core.folder}{retroarch.length > 1 ? ` (${ra.label})` : ""}
-              </span>
-              <button className="btn btn-ghost" disabled={busy !== null} onClick={() => run(key, ra.coresDir, core.lib)}>
-                {busy === key ? <span className="spinner" /> : "Install"}
-              </button>
-            </div>
-            {errors[key] && (
-              <div style={{ fontSize: 12, color: "var(--color-danger, #e5484d)" }}>{errors[key]}</div>
-            )}
+      <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{title}</p>
+      {items.map(item => (
+        <div key={item.key} style={{ marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <span style={{ fontSize: 13 }}>{item.label}</span>
+            <button className="btn btn-ghost" disabled={busy !== null} onClick={() => run(item)}>
+              {busy === item.key ? <span className="spinner" /> : "Install"}
+            </button>
           </div>
-        );
-      }))}
+          {errors[item.key] && (
+            <div style={{ fontSize: 12, color: "var(--color-danger, #e5484d)" }}>{errors[item.key]}</div>
+          )}
+        </div>
+      ))}
     </div>
+  );
+}
+
+function InstallOptions({ vm }: { vm: ConsoleImportVM }) {
+  const { retroarch, cores, standalones = [] } = vm.install;
+  const coreItems: InstallItem[] = retroarch.flatMap(ra => cores.map(core => ({
+    key: `${ra.coresDir}/${core.lib}`,
+    label: `${core.folder}${retroarch.length > 1 ? ` (${ra.label})` : ""}`,
+    run: () => vm.installCore(ra.coresDir, core.lib),
+  })));
+  const flatpakItems: InstallItem[] = standalones.map(s => ({
+    key: s.flatpakId, label: s.label, run: () => vm.installFlatpak(s.flatpakId),
+  }));
+  return (
+    <>
+      <InstallList title="Install an emulator (Flatpak)" items={flatpakItems} />
+      <InstallList title="Install a RetroArch core" items={coreItems} />
+    </>
   );
 }
 
@@ -78,7 +93,7 @@ export function EmulatorStep({ vm }: { vm: ConsoleImportVM }) {
               })}
             </div>
           )}
-          <CoreInstallList vm={vm} />
+          <InstallOptions vm={vm} />
         </div>
       ) : (
         <>
