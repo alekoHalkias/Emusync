@@ -4,7 +4,7 @@
 - Issue: #739
 - Branch: feature/739-evaluate-manifest-format
 - PR: #752
-- Status: shipped
+- Status: implementing
 - Created: 2026-11-20
 - Fix attempts: 0
 

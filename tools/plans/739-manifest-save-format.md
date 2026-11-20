@@ -3,7 +3,7 @@
 Issue: #739
 Branch: feature/739-evaluate-manifest-format
 PR: #752
-Status: shipped
+Status: implementing
 Fix attempts: 0
 
 ## Goal
@@ -100,3 +100,9 @@ Step 5: mod uploads also record content size; mod staging's unused hasher remove
 Step 2-3: committed together (both rewrite sync_client.py). Generation `size` becomes content bytes (manifest_size, sum of file sizes) instead of blob file size: tar padding would otherwise trip the #213/#285 shrink guards on small saves. Added local_manifest/manifest_size; run.py uses them. A folder blob onto a single-file state path raises CardFormatMismatch (it used to write tar bytes into the file).
 Step 1: extract_tree verifies while writing members itself (validated paths, resolve check) instead of extractall + rehash; _safe_extract_tar stays for the bare rom-folder tar. Added blob_kind() so _write_memcard can raise CardFormatMismatch before extracting.
 - 2026-11-20 bplan: plan written
+
+## Fix attempt 1
+Failure: review correctness nits (ship blocks on correctness findings)
+Cause: _check_rel rejects names pack_tree produces (backslash, `.emusync-manifest.json`); restore of an unconverted generation raises ValueError -> 500.
+- [ ] F1.1 blob_tree._check_rel accepts any name the packer can produce; extract_tree's resolve check still confines writes. Test: such a folder round-trips.
+- [ ] F1.2 api/blobs._restore maps a ValueError from the store to 409 "version is unreadable". Test: restore of a non-format-3 generation -> 409.
