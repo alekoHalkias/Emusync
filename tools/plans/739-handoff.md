@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #739
 - Branch: feature/739-evaluate-manifest-format
-- PR: none
-- Status: implemented
+- PR: #752
+- Status: shipped
 - Created: 2026-11-20
 - Fix attempts: 0
 
@@ -76,6 +76,12 @@ Tests
 ### Blocked: no
 ### Blockers: none
 
+## 10. Ship
+### Status: shipped
+### PR: #752
+### Server Sync: pending
+### Doc Sync: pending
+
 ## 12. Log
 - 2026-11-20 issue: workflow initialized (resume from #739)
 - 2026-11-20 design: scope=none (evaluation), plan_target=none, difficulty=1/10, breaking=no; evaluation posted, recommendation close
@@ -90,3 +96,4 @@ Tests
 - 2026-11-20 implement: step 7 done (conftest tree/tree_dir helpers, 25 suites updated, test_blob_tree.py + test_tree_migration.py; 800 passed)
 - 2026-11-20 implement: step 8 done (CLAUDE.md, GOTCHAS, ARCHITECTURE updated); all steps done
 - 2026-11-20 review: 2 findings (nits), blocked=no
+- 2026-11-20 ship: tests passed (800), PR #752 opened

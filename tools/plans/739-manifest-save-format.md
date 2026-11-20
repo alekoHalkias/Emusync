@@ -2,8 +2,8 @@
 
 Issue: #739
 Branch: feature/739-evaluate-manifest-format
-PR: none
-Status: implemented
+PR: #752
+Status: shipped
 Fix attempts: 0
 
 ## Goal
