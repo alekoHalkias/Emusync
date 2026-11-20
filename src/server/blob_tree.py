@@ -183,10 +183,21 @@ def pack_tree(path, include: Optional[Callable[[str], bool]] = None) -> bytes:
     return _pack(*_local_items(Path(path), include))
 
 
+def local_manifest(path, include: Optional[Callable[[str], bool]] = None) -> dict:
+    """The manifest ``pack_tree(path, include)`` would carry, without packing."""
+    return _manifest_from(*_local_items(Path(path), include))
+
+
 def content_hash(path, include: Optional[Callable[[str], bool]] = None) -> str:
     """Content hash of a local save file or folder, equal to the hash the server
     records for ``pack_tree(path, include)``."""
-    return manifest_hash(_manifest_from(*_local_items(Path(path), include)))
+    return manifest_hash(local_manifest(path, include))
+
+
+def manifest_size(manifest: dict) -> int:
+    """Content bytes a manifest describes. Recorded as a generation's ``size`` and
+    used by the shrink guards (#213, #285): blob file size includes tar padding."""
+    return sum(e["size"] for e in manifest["files"])
 
 
 # ── reading ────────────────────────────────────────────────────────────────────

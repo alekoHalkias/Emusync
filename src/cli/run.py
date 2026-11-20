@@ -27,7 +27,7 @@ import httpx
 
 import server.config as cfg_module
 from server.store import LOCK_TTL_HOURS
-from server.sync_client import GameDeviceConfig, _memcard_payload_bytes
+from server.sync_client import GameDeviceConfig, local_manifest, manifest_hash, manifest_size
 
 from cli.common import _client, _get_device_name, _show_game_running_popup, split_launch_command
 from cli.netrom import find_rom_by_name_size, resolve_rom_path
@@ -625,8 +625,8 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
         # resolves to the cwd, which must never be treated as a save (mirrors
         # the identical guard in _reconcile_save).
         if save_path and Path(save_path).exists():
-            local_bytes = _memcard_payload_bytes(Path(save_path))
-            local_hash = hashlib.sha256(local_bytes).hexdigest()
+            local_m = local_manifest(Path(save_path))
+            local_hash = manifest_hash(local_m)
             if local_hash != server_hash:
                 # Guard against pushing a truncated/zero-byte save from a crashed
                 # emulator over the good server copy (issue #213). For a shared-
@@ -637,14 +637,14 @@ def run_game(game_slug: str, command: tuple[str, ...], detach: bool = False) -> 
                     server_size = sm.get("size") if sm else None
                 except Exception:
                     server_size = None
-                if _save_is_safe_to_push(len(local_bytes), server_size):
+                if _save_is_safe_to_push(manifest_size(local_m), server_size):
                     try:
                         save_client.push_save(save_key, save_path)
                         click.echo(f"Pushed save for {save_key}.")
                     except Exception as exc:
                         click.echo(f"Warning: failed to push save: {exc}", err=True)
                 else:
-                    _warn_unsafe_save(cfg, save_key, len(local_bytes), server_size)
+                    _warn_unsafe_save(cfg, save_key, manifest_size(local_m), server_size)
 
         # Push state if configured
         if state_path and not state_pull_failed and Path(state_path).exists():

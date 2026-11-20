@@ -27,11 +27,11 @@ Every save, state, memory card, mod and rom-folder blob travels and is stored in
   - Files: src/server/blob_tree.py (new), src/server/sync_client.py
   - Reuses: sync_client._safe_extract_tar, _extract_tar_to_tmp (moved here, re-exported from sync_client), _ENVELOPE_MAGIC/_pack_envelope, the deterministic sorted rglob walk of _memcard_payload_bytes
   - New: blob_tree.py - the codec is needed by client, store, API and migration; putting it in sync_client.py would push that file further past the size limit
-- [ ] 2. Client writes go through the manifest: `_write_memcard` dispatches on manifest kind (`file` -> `_write_memcard_raw_bytes`, keeps `CardFormatMismatch`; `dir` -> the existing backup-then-`os.replace` swap from `_write_memcard_tar_bytes`, now fed by `extract_tree`). `_extract_state_folder`, `_merge_extract_state_folder` and the single-file branch of `SyncClient.pull_state` use `extract_tree` and keep their current `.bak` rules. A `kind: "dir"` blob onto a single-file state path, or `file` onto the shared merge folder, keeps today's behavior (raise / ignore). `_require_envelope` requires format 3 and says to update the server.
+- [x] 2. Client writes go through the manifest: `_write_memcard` dispatches on manifest kind (`file` -> `_write_memcard_raw_bytes`, keeps `CardFormatMismatch`; `dir` -> the existing backup-then-`os.replace` swap from `_write_memcard_tar_bytes`, now fed by `extract_tree`). `_extract_state_folder`, `_merge_extract_state_folder` and the single-file branch of `SyncClient.pull_state` use `extract_tree` and keep their current `.bak` rules. A `kind: "dir"` blob onto a single-file state path, or `file` onto the shared merge folder, keeps today's behavior (raise / ignore). `_require_envelope` requires format 3 and says to update the server.
   - Files: src/server/sync_client.py
   - Reuses: _write_memcard_raw_bytes, the swap block of _write_memcard_tar_bytes, _backup_state_files, the merge loop of _merge_extract_state_folder
   - New: none
-- [ ] 3. Client pushes and hashes use the manifest: `memcard_bytes` -> `pack_tree`; `SyncClient.push_state` -> `pack_tree(p, include=prefix filter)`; `run_reconcile._reconcile_save` and `run.py` post-launch compare use `content_hash` instead of `sha256(_memcard_payload_bytes(...))`; delete `_memcard_payload_bytes`. The single-file state compare in run.py stays as is (same hash).
+- [x] 3. Client pushes and hashes use the manifest: `memcard_bytes` -> `pack_tree`; `SyncClient.push_state` -> `pack_tree(p, include=prefix filter)`; `run_reconcile._reconcile_save` and `run.py` post-launch compare use `content_hash` instead of `sha256(_memcard_payload_bytes(...))`; delete `_memcard_payload_bytes`. The single-file state compare in run.py stays as is (same hash).
   - Files: src/server/sync_client.py, src/cli/run_reconcile.py, src/cli/run.py
   - Reuses: blob_tree.pack_tree / content_hash
   - New: none
@@ -94,5 +94,6 @@ Breaking. Update the server first (the conversion runs on startup), then every c
 - Automatic deletion of `.pre-v38` originals.
 
 ## Log
+Step 2-3: committed together (both rewrite sync_client.py). Generation `size` becomes content bytes (manifest_size, sum of file sizes) instead of blob file size: tar padding would otherwise trip the #213/#285 shrink guards on small saves. Added local_manifest/manifest_size; run.py uses them. A folder blob onto a single-file state path raises CardFormatMismatch (it used to write tar bytes into the file).
 Step 1: extract_tree verifies while writing members itself (validated paths, resolve check) instead of extractall + rehash; _safe_extract_tar stays for the bare rom-folder tar. Added blob_kind() so _write_memcard can raise CardFormatMismatch before extracting.
 - 2026-11-20 bplan: plan written
