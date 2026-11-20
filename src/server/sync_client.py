@@ -19,32 +19,15 @@ import httpx
 _TRANSFER_TIMEOUT = httpx.Timeout(10, read=600, write=600)
 
 
-# ── transfer envelope (#478) ─────────────────────────────────────────────────
-# Every save/state/memcard/mod blob is prefixed with a small declared-format
-# header instead of the receiver guessing the shape by trying to parse it as a
-# tar and catching the failure — four independent places used to each sniff
-# this in a slightly different way (this file's old _write_memcard, pull_state,
-# pull_state_merge, and gui/electron/sync/save.ts's separate tar-CLI probe).
-# The server itself never inspects blob bytes (server/api/blobs.py just
-# streams/hashes/stores them), so the format only needs to travel inside the
-# bytes themselves — that also means it survives save-history/restore for
-# free, no schema change needed.
-_ENVELOPE_MAGIC = b"ES1\0"
-_ENVELOPE_HEADER_LEN = len(_ENVELOPE_MAGIC) + 1  # magic + 1 format byte
-_FMT_RAW = 0     # single file, payload is its raw bytes
-_FMT_TAR = 1     # folder, payload is an uncompressed tar
-_FMT_TARGZ = 2   # folder, payload is a gzip'd tar (states)
-
-
-def _pack_envelope(fmt: int, payload: bytes) -> bytes:
-    return _ENVELOPE_MAGIC + bytes([fmt]) + payload
-
-
-def _unpack_envelope(data: bytes) -> tuple[Optional[int], bytes]:
-    """(format, payload) if *data* has the envelope header, else (None, data)."""
-    if data[:4] == _ENVELOPE_MAGIC:
-        return data[4], data[5:]
-    return None, data
+# ── transfer envelope (#478) / manifest format (#739) ──────────────────────────
+# Every blob carries a declared-format header; since #739 the only format clients
+# read or write is 3 (manifest tar), implemented in server/blob_tree.py. Formats
+# 0-2 survive only for the server's one-time conversions (v36 sniffing, v38).
+from server.blob_tree import (  # noqa: E402,F401  (re-exported for callers/tests)
+    _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC, _FMT_RAW, _FMT_TAR, _FMT_TARGZ, _FMT_TREE,
+    _extract_tar_to_tmp, _pack_envelope, _safe_extract_tar, _unpack_envelope,
+    blob_kind, content_hash, extract_tree, pack_tree,
+)
 
 
 def _require_envelope(data: bytes) -> tuple[int, bytes]:
@@ -75,23 +58,6 @@ def _legacy_format(f, states: bool) -> int:
     finally:
         f.seek(0)
     return _FMT_TARGZ if gz else _FMT_TAR
-
-
-def _extract_tar_to_tmp(data: bytes, mode: str, parent: Path) -> Path:
-    """Extract tar *data* into a fresh temp dir under *parent* (same filesystem,
-    so callers can ``os.replace`` out of it) and return it. Any failure removes
-    the temp dir and re-raises, so a bad archive never touches the real target
-    (#692). The tarfile is always closed."""
-    parent.mkdir(parents=True, exist_ok=True)
-    tmp = Path(tempfile.mkdtemp(dir=str(parent), prefix=".emusync-"))
-    os.chmod(tmp, 0o755)  # mkdtemp is 0700; the dir may become the card itself
-    try:
-        with tarfile.open(fileobj=io.BytesIO(data), mode=mode) as tar:
-            _safe_extract_tar(tar, tmp)
-    except BaseException:
-        shutil.rmtree(tmp, ignore_errors=True)
-        raise
-    return tmp
 
 
 def _extract_state_folder(content: bytes, folder: Path) -> None:
@@ -155,32 +121,6 @@ def _merge_extract_state_folder(content: bytes, folder: Path) -> None:
             os.replace(str(src), str(dest))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-
-
-def _safe_extract_tar(tar: tarfile.TarFile, dest: Path) -> None:
-    """Extract a tar archive, refusing any member that resolves outside *dest*.
-
-    Guards against malicious archives using ``../`` paths, absolute paths, or
-    symlink/hardlink targets that would write outside the destination folder.
-    (``TarFile.extractall``'s ``filter="data"`` argument only exists on Python
-    3.12+, and this project supports 3.10+.)
-    """
-    dest_root = dest.resolve()
-    for member in tar.getmembers():
-        if member.islnk() or member.issym():
-            raise tarfile.TarError(f"refusing link member in archive: {member.name}")
-        target = (dest_root / member.name).resolve()
-        if target != dest_root and dest_root not in target.parents:
-            raise tarfile.TarError(f"refusing member outside destination: {member.name}")
-    if hasattr(tarfile, "data_filter"):  # 3.12+ and security backports
-        tar.extractall(path=str(dest), filter="data")
-        return
-    # Older Pythons: reject devices/FIFOs and drop setuid/setgid/sticky bits (#699).
-    for member in tar.getmembers():
-        if not (member.isreg() or member.isdir()):
-            raise tarfile.TarError(f"refusing special member in archive: {member.name}")
-        member.mode &= 0o777
-    tar.extractall(path=str(dest))
 
 
 @dataclass

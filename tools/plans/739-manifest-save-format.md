@@ -23,7 +23,7 @@ Every save, state, memory card, mod and rom-folder blob travels and is stored in
 - **Recommendations**: the new module keeps `sync_client.py` (852 lines) from growing; the tar extraction helpers move into it and are re-exported from `sync_client`.
 
 ## Steps
-- [ ] 1. Codec module `src/server/blob_tree.py`: `pack_tree(path, include=None) -> bytes` (enveloped format 3; `include(rel_path) -> bool` filter, `.bak` always skipped), `content_hash(path, include=None) -> str`, `manifest_hash(manifest) -> str`, `read_manifest(f)` (reads only the first member from a seekable file), `verify_blob(path) -> (manifest, hash)` (raises `ValueError` on missing envelope, format other than 3, bad manifest, a member missing from or not in the manifest, size/sha mismatch, link/special/absolute/`..` member), `extract_tree(data, parent) -> (kind, tmp_path)` (extract to a temp dir under *parent*, verify each file against the manifest, return the temp dir or temp file), `legacy_to_tree(fmt, payload) -> bytes` (format 0/1/2 to 3, for the migration only).
+- [x] 1. Codec module `src/server/blob_tree.py`: `pack_tree(path, include=None) -> bytes` (enveloped format 3; `include(rel_path) -> bool` filter, `.bak` always skipped), `content_hash(path, include=None) -> str`, `manifest_hash(manifest) -> str`, `read_manifest(f)` (reads only the first member from a seekable file), `verify_blob(path) -> (manifest, hash)` (raises `ValueError` on missing envelope, format other than 3, bad manifest, a member missing from or not in the manifest, size/sha mismatch, link/special/absolute/`..` member), `extract_tree(data, parent) -> (kind, tmp_path)` (extract to a temp dir under *parent*, verify each file against the manifest, return the temp dir or temp file), `legacy_to_tree(fmt, payload) -> bytes` (format 0/1/2 to 3, for the migration only).
   - Files: src/server/blob_tree.py (new), src/server/sync_client.py
   - Reuses: sync_client._safe_extract_tar, _extract_tar_to_tmp (moved here, re-exported from sync_client), _ENVELOPE_MAGIC/_pack_envelope, the deterministic sorted rglob walk of _memcard_payload_bytes
   - New: blob_tree.py - the codec is needed by client, store, API and migration; putting it in sync_client.py would push that file further past the size limit
@@ -94,4 +94,5 @@ Breaking. Update the server first (the conversion runs on startup), then every c
 - Automatic deletion of `.pre-v38` originals.
 
 ## Log
+Step 1: extract_tree verifies while writing members itself (validated paths, resolve check) instead of extractall + rehash; _safe_extract_tar stays for the bare rom-folder tar. Added blob_kind() so _write_memcard can raise CardFormatMismatch before extracting.
 - 2026-11-20 bplan: plan written

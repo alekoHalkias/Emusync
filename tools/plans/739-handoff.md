@@ -62,7 +62,7 @@ Tests
 
 ## 8. Implementation Steps
 ### Steps: see tools/plans/739-manifest-save-format.md
-- 1. codec module: src/server/blob_tree.py (new), sync_client.py. Reuses _safe_extract_tar, _extract_tar_to_tmp, _pack_envelope, sorted rglob walk. New module because four callers need it and sync_client.py is already 852 lines.
+- 1. [done] codec module: src/server/blob_tree.py (new), sync_client.py. Reuses _safe_extract_tar, _extract_tar_to_tmp, _pack_envelope, sorted rglob walk. New module because four callers need it and sync_client.py is already 852 lines.
 - 2. client writes: sync_client.py. Reuses _write_memcard_raw_bytes, swap block of _write_memcard_tar_bytes, _backup_state_files, merge loop. No new code paths.
 - 3. client pushes/hashes: sync_client.py, cli/run_reconcile.py, cli/run.py. Reuses pack_tree/content_hash; deletes _memcard_payload_bytes.
 - 4. rom-folder transfer: cli/transfer.py, sync_client.py. Reuses _extract_tar_to_tmp + swap; drops _FMT_TAR wrap.
@@ -77,3 +77,4 @@ Tests
 - 2026-11-20 design: user decision proceed with D only; scope=backend, plan_target=bplan, difficulty=9/10, breaking=yes
 - 2026-11-20 bplan: 8 steps written, backend_pattern=shared manifest codec + schema-gated conversion + strict server-first rollout
 - 2026-11-20 tplan: test_file=src/tests/test_blob_tree.py + test_tree_migration.py, 10 test cases defined
+- 2026-11-20 implement: step 1 done (blob_tree.py codec; tar helpers moved, re-exported from sync_client)
