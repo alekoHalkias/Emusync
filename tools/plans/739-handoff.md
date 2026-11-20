@@ -1,4 +1,4 @@
-# Handoff: #739 Evaluate a manifest save format and merged save tables
+# Handoff: #739 Replace save blob formats with a manifest payload
 
 ## Metadata
 - Issue: #739
@@ -19,17 +19,22 @@ Evaluation only; deliverable is a written evaluation and a proceed/close decisio
 src/server/sync_client.py, src/server/store/{blobs,conflicts,schema,devices}.py, src/server/api/{blobs,conflicts}.py, src/cli/run_reconcile.py
 ### Acceptance Criteria
 - [x] Written evaluation posted on the issue (issuecomment-7047489929)
-- [ ] Decision recorded: proceed (split into implementation issues) or close
+- [x] Decision recorded: proceed with Phase D only, Phase E dropped
+- [ ] Saves, states and memory cards push/pull/restore through one manifest format
+- [ ] CardFormatMismatch and envelope header-skipping hash helpers removed
+- [ ] One-time server conversion with backup (DB snapshot, originals kept until verified)
+- [ ] Docs updated
 
 ## 2. Design
-### Scope: evaluation only, no code
-### Backend Changes: none
-### UI Changes: none
-### Plan Target: none (awaiting user decision; recommendation is close)
-### Sub-issues: none; if proceeding: (1) manifest format + one-time blob conversion, (2) owner-keyed table merge
-### Difficulty: 1/10 (evaluation); D 9/10, E 6/10 if implemented
-### Backwards Compatibility: D breaking (server-first, every client must update); E server-internal, irreversible
+### Scope: backend only (Phase D). Phase E dropped by user decision 2026-11-20.
+### Backend Changes: new manifest envelope format in sync_client.py; one manifest-driven extract/merge/restore replacing raw/tar/tar.gz paths; manifest-derived content hash (replaces _payload_sha256/_memcard_payload_bytes header skipping); remove CardFormatMismatch and its run_reconcile handling; schema migration converting all stored blobs with DB snapshot + originals kept until verified; old-client upload wrapping in api/blobs.py.
+### UI Changes: none (GUI push/pull shell out to CLI, #479)
+### Plan Target: bplan
+### Sub-issues: none
+### Difficulty: 9/10 (includes +2 breaking)
+### Backwards Compatibility: breaking. Server updates first; clients require the manifest format. Accepted: one user, three self-managed devices.
 
 ## 12. Log
 - 2026-11-20 issue: workflow initialized (resume from #739)
 - 2026-11-20 design: scope=none (evaluation), plan_target=none, difficulty=1/10, breaking=no; evaluation posted, recommendation close
+- 2026-11-20 design: user decision proceed with D only; scope=backend, plan_target=bplan, difficulty=9/10, breaking=yes
