@@ -7,7 +7,6 @@ exposes a uniform method set per kind (`pull_<noun>_path`, `push_<noun>_file`,
 needs the noun to dispatch."""
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from typing import Optional
@@ -20,8 +19,7 @@ from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
 from ..store import SaveMeta
-from ..store.blobs import _envelope_file_in_place
-from ..sync_client import _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC
+from ..blob_tree import manifest_size, verify_blob
 from ._core import (
     _auth, _get_store, _print_activity, _device_label, _game_label,
     _run_integrity_sweep, get_integrity_status,
@@ -96,14 +94,12 @@ def _pull(kind: _BlobKind, slug: str, device_id: str) -> Response:
 async def _push(kind: _BlobKind, slug: str, request: Request, device_id: str) -> dict:
     if not kind.console and not _get_store().get_game(slug):
         raise HTTPException(status_code=404, detail="Game not found")  # before staging (#701)
-    tmp, h, size = await _stage_upload(request)
+    tmp = await _stage_upload(request)
     extra = (request.headers.get("X-Card-Format", ""),) if kind.console else ()
 
     def _store_it():
         store = _get_store()
-        nonlocal size
-        if _envelope_file_in_place(tmp, states=kind is _STATE):
-            size += _ENVELOPE_HEADER_LEN  # pre-#478 client upload, wrapped (#738); hash is payload-only
+        h, size = _verify_upload(tmp)
         m = getattr(store, f"push_{kind.noun}_file")(slug, device_id, tmp, h, size, *extra)
         if kind.synced_event:
             store.log_event(kind.synced_event, slug, device_id)
@@ -159,30 +155,14 @@ def _restore(kind: _BlobKind, slug: str, version_id: str, device_id: str) -> dic
 
 
 async def _stage_upload(request: Request):
-    """Stream the request body to a temp file under the blob root, hashing as we go.
-
-    Returns (path, sha256_hex, size) so a multi-MB save/state is never held whole in
-    memory (issue #239). The store moves the file into place on a same-filesystem
-    rename; on a dedupe hit it's discarded.
-
-    The hash excludes the transfer envelope's magic+format header (#478
-    follow-up) — every push now carries that header, but content identity
-    must stay independent of transport framing so an unchanged save/state
-    keeps hashing the same across #478 landing. Hashing the full enveloped
-    upload instead would have bumped every existing hash the instant this
-    shipped, and _reconcile_save's #460 divergence check would misread that
-    global format change as a real conflict on literally every game, every
-    device, the first time each reconciled post-upgrade. The full bytes
-    (envelope included) are still written to disk as-is — pull/extraction
-    needs the header to know the shape.
-    """
+    """Stream the request body to a temp file under the blob root and return its
+    path, so a multi-MB save/state is never held whole in memory (issue #239). The
+    store moves the file into place on a same-filesystem rename; on a dedupe hit
+    it's discarded. Hash and size come from the blob's manifest (_verify_upload)."""
     store = _get_store()
     loop = asyncio.get_running_loop()
     tmp = store.new_upload_path()
-    hasher = hashlib.sha256()
     size = 0
-    header_buf = b""
-    hashing_started = False
     try:
         with open(tmp, "wb") as f:
             async for chunk in request.stream():
@@ -190,27 +170,22 @@ async def _stage_upload(request: Request):
                 if size > _MAX_UPLOAD_BYTES:
                     raise HTTPException(status_code=413, detail="Upload too large")
                 await loop.run_in_executor(None, f.write, chunk)  # keep disk I/O off the event loop (#715)
-                if not hashing_started:
-                    header_buf += chunk
-                    if len(header_buf) < _ENVELOPE_HEADER_LEN:
-                        continue  # still buffering enough to check the magic
-                    payload_start = header_buf[_ENVELOPE_HEADER_LEN:] if header_buf[:4] == _ENVELOPE_MAGIC else header_buf
-                    hasher.update(payload_start)
-                    hashing_started = True
-                else:
-                    hasher.update(chunk)
-            if not hashing_started:
-                # Upload smaller than the header itself (shouldn't happen for
-                # real save/state data) — hash what's there, minus the header
-                # if it happens to be a (truncated) match.
-                payload_start = header_buf[_ENVELOPE_HEADER_LEN:] if header_buf[:4] == _ENVELOPE_MAGIC else header_buf
-                hasher.update(payload_start)
         if size == 0:
             raise HTTPException(status_code=400, detail="Empty upload")  # never store an empty generation (#715)
     except BaseException:
         tmp.unlink(missing_ok=True)  # don't leave a half-written .part behind
         raise
-    return tmp, hasher.hexdigest(), size
+    return tmp
+
+
+def _verify_upload(path) -> tuple[str, int]:
+    """(content hash, content size) of a staged upload. Anything but a valid
+    format-3 blob is a 400: old clients must update after the server (#739)."""
+    try:
+        m, h = verify_blob(path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Unsupported or corrupt save data ({exc}); update the EmuSync client")
+    return h, manifest_size(m)
 
 
 # ── saves ─────────────────────────────────────────────────────────────────────

@@ -291,11 +291,14 @@ class _HashingReader:
         return self._h.hexdigest()
 
 
-def verify_blob(path) -> tuple[dict, str]:
-    """(manifest, content hash) of a stored or staged blob file; ValueError if it
-    is not a valid format-3 blob."""
-    with open(path, "rb") as f:
-        m = _walk(f)
+def verify_blob(src) -> tuple[dict, str]:
+    """(manifest, content hash) of a stored or staged blob (a path, or the bytes);
+    ValueError if it is not a valid format-3 blob."""
+    if isinstance(src, (bytes, bytearray)):
+        m = _walk(io.BytesIO(src))
+    else:
+        with open(src, "rb") as f:
+            m = _walk(f)
     return m, manifest_hash(m)
 
 

@@ -7,13 +7,11 @@ way `switch_title_id` itself is shared on the `games` row (#443).
 from __future__ import annotations
 
 import asyncio
-import hashlib
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import FileResponse
 
-from ..store.blobs import _envelope_file_in_place
-from ..sync_client import _ENVELOPE_HEADER_LEN
+from .blobs import _verify_upload
 from ._core import _auth, _get_store, _print_activity, _device_label, _safe_segment
 
 router = APIRouter()
@@ -42,21 +40,17 @@ async def push_switch_mod(title_id: str, mod_name: str, request: Request, device
     _safe_segment(mod_name, "mod_name")
     store = _get_store()
     tmp = store.new_upload_path()
-    hasher = hashlib.sha256()
-    size = 0
     try:
         with open(tmp, "wb") as f:
             async for chunk in request.stream():
                 f.write(chunk)
-                hasher.update(chunk)
-                size += len(chunk)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
 
     def _store_it() -> bool:
-        wrapped = _envelope_file_in_place(tmp, states=False)  # pre-#478 client upload (#738)
-        return store.add_switch_mod(title_id, mod_name, device_id, tmp, size + (_ENVELOPE_HEADER_LEN if wrapped else 0))
+        _, content_size = _verify_upload(tmp)  # 400 unless a valid format-3 blob (#739)
+        return store.add_switch_mod(title_id, mod_name, device_id, tmp, content_size)
 
     try:
         added = await asyncio.to_thread(_store_it)

@@ -16,7 +16,6 @@ monotonic for inserts and so unambiguous even when two pushes share a timestamp)
 """
 from __future__ import annotations
 
-import hashlib
 import os
 import shutil
 import uuid
@@ -25,7 +24,8 @@ from pathlib import Path
 from typing import Optional
 
 from server.store.models import SaveMeta
-from server.sync_client import _ENVELOPE_HEADER_LEN, _ENVELOPE_MAGIC, _legacy_format
+from server.blob_tree import _ENVELOPE_MAGIC, manifest_size, verify_blob
+from server.sync_client import _legacy_format
 
 # How many generations to retain per game, per blob table. Older rows (and their
 # on-disk files) are pruned on every push.
@@ -38,16 +38,12 @@ HISTORY_LIMIT = 5
 _SHRINK_FLOOR = 0.5
 
 
-def _payload_sha256(data: bytes) -> str:
-    """Content hash of a stored blob, excluding the #478 transfer envelope header.
-
-    Must match api/blobs.py:_stage_upload, which records the envelope-free hash
-    on push; hashing the full bytes flags every enveloped blob as damaged and
-    gives restored generations hashes no client can match (#734).
-    """
-    if data[:len(_ENVELOPE_MAGIC)] == _ENVELOPE_MAGIC:
-        data = data[_ENVELOPE_HEADER_LEN:]
-    return hashlib.sha256(data).hexdigest()
+def _blob_hash_ok(path: Path, h: str) -> bool:
+    """True if the stored blob at *path* verifies and its manifest hash is *h* (#739)."""
+    try:
+        return verify_blob(path)[1] == h
+    except (ValueError, OSError):
+        return False
 
 
 def _envelope_file_in_place(path: Path, states: bool) -> bool:
@@ -55,7 +51,7 @@ def _envelope_file_in_place(path: Path, states: bool) -> bool:
 
     Returns True if the file was rewritten. Streams to ``.part`` + ``os.replace``
     (mods/saves reach GBs) so a crash never leaves a half-written blob (#734).
-    The payload, and so ``_payload_sha256``, is unchanged."""
+    Only the v36 migration uses it; the v38 step then converts to format 3."""
     path = Path(path)
     part = path.with_name(path.name + ".part")
     with open(path, "rb") as src:
@@ -118,8 +114,10 @@ class SaveStateMixin:
 
     def _push_blob(self, table: str, game_slug: str, device_id: str, data: bytes,
                    owner_col: str = "game_slug", card_format: Optional[str] = None) -> SaveMeta:
-        """Store *data* as a new generation, writing the bytes to disk."""
-        h = _payload_sha256(data)
+        """Store blob *data* as a new generation, writing the bytes to disk.
+        ValueError if *data* is not a valid format-3 blob (#739)."""
+        m, h = verify_blob(data)
+        size = manifest_size(m)
         now = datetime.now(timezone.utc).isoformat()
         current = self._newest_row(table, game_slug, owner_col)
         # Dedupe: identical to the current blob → don't create another generation.
@@ -128,13 +126,13 @@ class SaveStateMixin:
                 game_slug=game_slug, device_id=current["device_id"],
                 hash=current["hash"], pushed_at=current["pushed_at"], size=current["size"],
             )
-        blob_id = self._insert_blob_row(table, game_slug, device_id, h, len(data), now, owner_col, card_format)
+        blob_id = self._insert_blob_row(table, game_slug, device_id, h, size, now, owner_col, card_format)
         # Write the file before committing so a crash never leaves a row without bytes.
         self._blob_path(table, blob_id).write_bytes(data)
         stale = self._prune_history(table, game_slug, owner_col)
         self._conn.commit()
         self._unlink_blobs(table, stale)
-        return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now, size=len(data))
+        return SaveMeta(game_slug=game_slug, device_id=device_id, hash=h, pushed_at=now, size=size)
 
     def _push_blob_file(self, table: str, game_slug: str, device_id: str, src: Path, h: str, size: int,
                         owner_col: str = "game_slug", card_format: Optional[str] = None) -> SaveMeta:
@@ -302,13 +300,18 @@ class SaveStateMixin:
         if not path.exists():
             reasons.append("file_missing")
         else:
-            actual = path.stat().st_size
-            if actual == 0:
-                reasons.append("zero_byte")
-            if prior is not None and prior["size"] and actual < prior["size"] * _SHRINK_FLOOR:
-                reasons.append("shrank")
-            if _payload_sha256(path.read_bytes()) != row["hash"]:
-                reasons.append("hash_mismatch")
+            try:
+                m, h = verify_blob(path)
+            except (ValueError, OSError):
+                reasons.append("hash_mismatch")  # corrupt or not a format-3 blob (#739)
+            else:
+                actual = manifest_size(m)  # content bytes, like the recorded sizes
+                if actual == 0:
+                    reasons.append("zero_byte")
+                if prior is not None and prior["size"] and actual < prior["size"] * _SHRINK_FLOOR:
+                    reasons.append("shrank")
+                if h != row["hash"]:
+                    reasons.append("hash_mismatch")
 
         return {
             "status": "damaged" if reasons else "ok",
@@ -331,7 +334,7 @@ class SaveStateMixin:
             p = self._blob_path(table, r["id"])
             if not p.exists():
                 continue
-            if _payload_sha256(p.read_bytes()) == r["hash"]:
+            if _blob_hash_ok(p, r["hash"]):
                 return r["id"]
         return None
 

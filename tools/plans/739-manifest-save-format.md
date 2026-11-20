@@ -39,7 +39,7 @@ Every save, state, memory card, mod and rom-folder blob travels and is stored in
   - Files: src/cli/transfer.py, src/server/sync_client.py (expose the swap as `_swap_folder(card, tmp)`)
   - Reuses: _extract_tar_to_tmp, the swap from step 2
   - New: none
-- [ ] 5. Server upload, store and integrity: `_stage_upload` streams to disk and returns `(path, size)` with no hashing or header handling. `_push._store_it` and the mod push call `verify_blob(tmp)` and use its hash; `ValueError` -> 400 "Unsupported save format; update the EmuSync client" with the staged file removed. Drop `_envelope_file_in_place` from both upload routes (it stays for the v36 migration). `store/blobs.py` `_payload_sha256` is replaced by a `verify_blob`-based hash in `_push_blob`, `_classify_blob` (a verify failure counts as `hash_mismatch`) and `_last_good_version`.
+- [x] 5. Server upload, store and integrity: `_stage_upload` streams to disk and returns `(path, size)` with no hashing or header handling. `_push._store_it` and the mod push call `verify_blob(tmp)` and use its hash; `ValueError` -> 400 "Unsupported save format; update the EmuSync client" with the staged file removed. Drop `_envelope_file_in_place` from both upload routes (it stays for the v36 migration). `store/blobs.py` `_payload_sha256` is replaced by a `verify_blob`-based hash in `_push_blob`, `_classify_blob` (a verify failure counts as `hash_mismatch`) and `_last_good_version`.
   - Files: src/server/api/blobs.py, src/server/api/mods.py, src/server/store/blobs.py
   - Reuses: blob_tree.verify_blob, existing 400/staging-cleanup pattern (#701/#704/#715)
   - New: none
@@ -94,6 +94,7 @@ Breaking. Update the server first (the conversion runs on startup), then every c
 - Automatic deletion of `.pre-v38` originals.
 
 ## Log
+Step 5: mod uploads also record content size; mod staging's unused hasher removed. verify_blob accepts bytes too (store-level _push_blob/restore).
 Step 2-3: committed together (both rewrite sync_client.py). Generation `size` becomes content bytes (manifest_size, sum of file sizes) instead of blob file size: tar padding would otherwise trip the #213/#285 shrink guards on small saves. Added local_manifest/manifest_size; run.py uses them. A folder blob onto a single-file state path raises CardFormatMismatch (it used to write tar bytes into the file).
 Step 1: extract_tree verifies while writing members itself (validated paths, resolve check) instead of extractall + rehash; _safe_extract_tar stays for the bare rom-folder tar. Added blob_kind() so _write_memcard can raise CardFormatMismatch before extracting.
 - 2026-11-20 bplan: plan written

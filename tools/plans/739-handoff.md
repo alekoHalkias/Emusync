@@ -66,7 +66,7 @@ Tests
 - 2. [done] client writes: sync_client.py. Reuses _write_memcard_raw_bytes, swap block of _write_memcard_tar_bytes, _backup_state_files, merge loop. No new code paths.
 - 3. [done] client pushes/hashes: sync_client.py, cli/run_reconcile.py, cli/run.py. Reuses pack_tree/content_hash; deletes _memcard_payload_bytes.
 - 4. [done] rom-folder transfer: cli/transfer.py, sync_client.py. Reuses _extract_tar_to_tmp + swap; drops _FMT_TAR wrap.
-- 5. server upload/store/integrity: api/blobs.py, api/mods.py, store/blobs.py. Reuses verify_blob and existing staging cleanup; removes header-skip hashing.
+- 5. [done] server upload/store/integrity: api/blobs.py, api/mods.py, store/blobs.py. Reuses verify_blob and existing staging cleanup; removes header-skip hashing.
 - 6. schema v38 conversion: store/schema.py. Reuses v36/v37 loop shape, .part + os.replace, conn.backup.
 - 7. tests: new test_blob_tree.py, test_tree_migration.py; updates 10 existing files. New files because nothing covers the codec or v38.
 - 8. docs: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md, backend-design-guide.md.
@@ -80,3 +80,4 @@ Tests
 - 2026-11-20 implement: step 1 done (blob_tree.py codec; tar helpers moved, re-exported from sync_client)
 - 2026-11-20 implement: steps 2-3 done (client pulls/pushes/hashes on manifest format; size = content bytes)
 - 2026-11-20 implement: step 4 done (rom-folder receive: manifest via _write_memcard, bare GUI tar via _write_memcard_tar_bytes)
+- 2026-11-20 implement: step 5 done (server verifies uploads via verify_blob, 400 on old formats; store/integrity use manifest hash and content size)
