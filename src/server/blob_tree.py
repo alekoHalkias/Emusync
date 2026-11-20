@@ -235,6 +235,14 @@ def _parse_manifest(raw: bytes) -> dict:
     return m
 
 
+def _check_header(header: bytes) -> None:
+    if header[:4] != _ENVELOPE_MAGIC:
+        raise ValueError("blob has no format header; update the EmuSync server")
+    if header[4:5] != bytes([_FMT_TREE]):
+        raise ValueError(f"unsupported blob format {header[4] if len(header) > 4 else None}; "
+                         "update the EmuSync server and clients (#739)")
+
+
 def _walk(f: BinaryIO, sink: Optional[Callable[[str, BinaryIO], None]] = None) -> dict:
     """Read and verify a format-3 blob from binary file *f* (at offset 0).
 
@@ -242,11 +250,7 @@ def _walk(f: BinaryIO, sink: Optional[Callable[[str, BinaryIO], None]] = None) -
     once, and match its size and sha256; every entry must be present. *sink*
     (manifest path, stream) consumes member bytes while they are hashed. Raises
     ValueError on any mismatch or a missing/old format header."""
-    header = f.read(_ENVELOPE_HEADER_LEN)
-    if header[:4] != _ENVELOPE_MAGIC:
-        raise ValueError("blob has no format header")
-    if header[4:5] != bytes([_FMT_TREE]):
-        raise ValueError(f"unsupported blob format {header[4] if len(header) > 4 else None}")
+    _check_header(f.read(_ENVELOPE_HEADER_LEN))
     try:
         with tarfile.open(fileobj=f, mode="r:") as tar:
             first = tar.next()
@@ -305,8 +309,7 @@ def verify_blob(src) -> tuple[dict, str]:
 def blob_kind(data: bytes) -> str:
     """'file' or 'dir' from a blob's manifest, without reading the members."""
     f = io.BytesIO(data)
-    if f.read(_ENVELOPE_HEADER_LEN) != _ENVELOPE_MAGIC + bytes([_FMT_TREE]):
-        raise ValueError("blob is not in the manifest format; update the EmuSync server (#739)")
+    _check_header(f.read(_ENVELOPE_HEADER_LEN))
     try:
         with tarfile.open(fileobj=f, mode="r:") as tar:
             first = tar.next()
@@ -335,8 +338,6 @@ def extract_tree(data: bytes, parent: Path) -> tuple[str, Path]:
             shutil.copyfileobj(src, out, _CHUNK)
 
     try:
-        if not data.startswith(_ENVELOPE_MAGIC + bytes([_FMT_TREE])):
-            raise ValueError("blob is not in the manifest format; update the EmuSync server (#739)")
         m = _walk(io.BytesIO(data), sink)
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)

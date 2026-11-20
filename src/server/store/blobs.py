@@ -303,15 +303,15 @@ class SaveStateMixin:
             try:
                 m, h = verify_blob(path)
             except (ValueError, OSError):
-                reasons.append("hash_mismatch")  # corrupt or not a format-3 blob (#739)
-            else:
-                actual = manifest_size(m)  # content bytes, like the recorded sizes
-                if actual == 0:
-                    reasons.append("zero_byte")
-                if prior is not None and prior["size"] and actual < prior["size"] * _SHRINK_FLOOR:
-                    reasons.append("shrank")
-                if h != row["hash"]:
-                    reasons.append("hash_mismatch")
+                m = h = None  # corrupt or not a format-3 blob (#739)
+            # Content bytes, like the recorded sizes; a corrupt blob reports its file size.
+            actual = manifest_size(m) if m else path.stat().st_size
+            if actual == 0:
+                reasons.append("zero_byte")
+            if m and prior is not None and prior["size"] and actual < prior["size"] * _SHRINK_FLOOR:
+                reasons.append("shrank")
+            if h != row["hash"]:
+                reasons.append("hash_mismatch")
 
         return {
             "status": "damaged" if reasons else "ok",

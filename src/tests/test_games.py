@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import tree, AUTH, _device_auth
 
 
 # ── games ─────────────────────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ async def test_remove_game_device_unlinks_only_calling_device(client):
     await client.put("/games/pokemon-emerald/device", json={
         "rom_path": "/deck/emerald.gba", "save_path": "/deck/emerald.srm", "launch_command": "retroarch",
     }, headers=auth2)
-    await client.post("/games/pokemon-emerald/save", content=b"save-data", headers=auth1)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"save-data"), headers=auth1)
 
     r = await client.delete("/games/pokemon-emerald/device", headers=auth1)
     assert r.status_code == 200
@@ -249,7 +249,7 @@ async def test_update_nonexistent_game_returns_404(client):
 async def test_update_game_name_preserves_save_and_device_config(client):
     """Renaming a game must not cascade-delete its saves or device config."""
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
-    await client.post("/games/pokemon-emerald/save", content=b"save-data-v1", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"save-data-v1"), headers=AUTH)
     await client.put("/games/pokemon-emerald/device", json={
         "rom_path": "/roms/emerald.gba",
         "save_path": "/saves/emerald.sav",
@@ -281,7 +281,7 @@ async def test_update_game_name_does_not_wipe_other_games(client):
     """Renaming one game must not affect other games' data."""
     await client.post("/games", json={"name": "Game One"}, headers=AUTH)
     await client.post("/games", json={"name": "Game Two"}, headers=AUTH)
-    await client.post("/games/game-two/save", content=b"save-two", headers=AUTH)
+    await client.post("/games/game-two/save", content=tree(b"save-two"), headers=AUTH)
 
     # Rename Game One
     await client.put("/games/game-one", json={"name": "Game One Renamed"}, headers=AUTH)
@@ -303,7 +303,7 @@ async def test_update_game_name_does_not_wipe_other_games(client):
 async def test_cascade_delete_removes_saves_and_locks(client):
     """Deleting a game must remove its saves and locks from the DB."""
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
-    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"save data"), headers=AUTH)
     await client.post("/games/pokemon-emerald/lock", headers=AUTH)
 
     await client.delete("/games/pokemon-emerald", headers=AUTH)
@@ -323,7 +323,7 @@ async def test_cascade_delete_removes_saves_and_locks(client):
 @pytest.mark.asyncio
 async def test_delete_game_clears_lock_and_save(client):
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
-    await client.post("/games/pokemon-emerald/save", content=b"save", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"save"), headers=AUTH)
     await client.post("/games/pokemon-emerald/lock", headers=AUTH)
 
     r = await client.delete("/games/pokemon-emerald", headers=AUTH)

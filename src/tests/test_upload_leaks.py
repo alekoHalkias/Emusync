@@ -8,7 +8,7 @@ import pytest
 from server import api as api_module
 from server.api import _core
 from server.store import Store
-from tests.conftest import AUTH, MASTER_PIN
+from tests.conftest import tree, AUTH, MASTER_PIN
 
 
 def _uploads(store) -> list:
@@ -27,7 +27,7 @@ async def test_push_unknown_game_404_and_stages_nothing(client, noun):
 @pytest.mark.asyncio
 async def test_push_known_game_still_works(client):
     await client.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=AUTH)
-    r = await client.post("/games/metroid/save", content=b"DATA", headers=AUTH)
+    r = await client.post("/games/metroid/save", content=tree(b"DATA"), headers=AUTH)
     assert r.status_code == 200
     assert _uploads(_core._store) == []
 
@@ -41,14 +41,14 @@ async def test_store_failure_removes_staged_upload(client, monkeypatch):
 
     monkeypatch.setattr(Store, "push_save_file", boom)
     with pytest.raises(RuntimeError):
-        await client.post("/games/metroid/save", content=b"DATA", headers=AUTH)
+        await client.post("/games/metroid/save", content=tree(b"DATA"), headers=AUTH)
     assert _uploads(_core._store) == []
 
 
 @pytest.mark.asyncio
 async def test_identical_memcard_push_leaves_no_staged_file(client):
     for _ in range(2):
-        r = await client.post("/consoles/PS2/memcard", content=b"CARD", headers=AUTH)
+        r = await client.post("/consoles/PS2/memcard", content=tree(b"CARD"), headers=AUTH)
         assert r.status_code == 200
     assert _uploads(_core._store) == []
 

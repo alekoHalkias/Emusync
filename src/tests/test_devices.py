@@ -12,7 +12,7 @@ import pytest
 from server import api as api_module
 from server.api import _core
 from server.store import Store, GameDevice
-from tests.conftest import AUTH, DEVICE_ID, DEVICE_NAME, MASTER_PIN, _device_auth
+from tests.conftest import tree, AUTH, DEVICE_ID, DEVICE_NAME, MASTER_PIN, _device_auth
 
 
 # ── devices endpoint ──────────────────────────────────────────────────────────
@@ -261,7 +261,7 @@ def test_remove_device_with_games_and_saves():
             GameDevice(game_slug="metroid", device_id="dev1", rom_path="/x/m.gba",
                        save_path="", launch_command="", state_path="", rom_folder_path="")
         )
-        store.push_save("metroid", "dev1", b"savedata")
+        store.push_save("metroid", "dev1", tree(b"savedata"))
         store.acquire_lock("metroid", "dev1")
 
         store.remove_device("dev1")  # must not raise
@@ -564,7 +564,7 @@ def _seed(store, dev, slug="g"):
     store.ensure_device(dev, dev)
     store.add_game(slug, "Game")
     store.set_game_device(GameDevice(game_slug=slug, device_id=dev, rom_path=f"/{dev}/g.gba", save_path="", launch_command=""))
-    store.push_save(slug, dev, b"save-" + dev.encode())
+    store.push_save(slug, dev, tree(b"save-" + dev.encode()))
 
 
 def test_new_uuid_with_known_mac_merges_into_it(tmp_path, monkeypatch):

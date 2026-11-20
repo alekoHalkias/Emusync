@@ -6,19 +6,12 @@ import tarfile
 
 import pytest
 
-from tests.conftest import raw_env
+from tests.conftest import tree, tree_dir, raw_env
 
 
 def _make_state_archive(files: dict[str, bytes]) -> bytes:
-    """An enveloped tar.gz state blob, as every stored state is since v36 (#738)."""
-    from server.sync_client import _FMT_TARGZ, _pack_envelope
-    buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        for name, payload in files.items():
-            info = tarfile.TarInfo(name=name)
-            info.size = len(payload)
-            tar.addfile(info, io.BytesIO(payload))
-    return _pack_envelope(_FMT_TARGZ, buf.getvalue())
+    """A folder state blob in the wire format (#739)."""
+    return tree_dir(files)
 
 
 # ── state pull keeps backups (#204) ────────────────────────────────────────────
@@ -95,7 +88,7 @@ def test_unpack_envelope_none_for_legacy_blob():
 def test_extract_state_folder_reads_enveloped_targz(tmp_path):
     """A properly-enveloped tar.gz (the new format) extracts via the declared
     format, not the legacy try/except sniff."""
-    from server.sync_client import _FMT_TARGZ, _extract_state_folder, _pack_envelope
+    from server.sync_client import _extract_state_folder
 
     folder = tmp_path / "states" / "Metroid"
     folder.mkdir(parents=True)
@@ -109,11 +102,11 @@ def test_extract_state_folder_reads_enveloped_targz(tmp_path):
 def test_extract_state_folder_reads_enveloped_raw(tmp_path):
     """A properly-enveloped raw blob (single-file state) writes as <name>.state
     via the declared format, same as the legacy fallback's output shape."""
-    from server.sync_client import _FMT_RAW, _extract_state_folder, _pack_envelope
+    from server.sync_client import _extract_state_folder
 
     folder = tmp_path / "states" / "Zelda"
     folder.mkdir(parents=True)
-    enveloped = _pack_envelope(_FMT_RAW, b"single-file-state-bytes")
+    enveloped = tree(b"single-file-state-bytes")
 
     _extract_state_folder(enveloped, folder)
 
@@ -121,7 +114,7 @@ def test_extract_state_folder_reads_enveloped_raw(tmp_path):
 
 
 def test_merge_extract_reads_enveloped_targz(tmp_path):
-    from server.sync_client import _FMT_TARGZ, _merge_extract_state_folder, _pack_envelope
+    from server.sync_client import _merge_extract_state_folder
 
     sstates = tmp_path / "sstates"
     sstates.mkdir()
@@ -250,8 +243,8 @@ async def test_state_restore_round_trip_and_unknown_version_404(client):
     from tests.conftest import AUTH
 
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    await client.post("/games/zelda/state", content=b"good-state", headers=AUTH)
-    await client.post("/games/zelda/state", content=b"bad-state", headers=AUTH)
+    await client.post("/games/zelda/state", content=tree(b"good-state"), headers=AUTH)
+    await client.post("/games/zelda/state", content=tree(b"bad-state"), headers=AUTH)
 
     history = (await client.get("/games/zelda/state/history", headers=AUTH)).json()
     good = next(v for v in history if v["hash"] == hashlib.sha256(b"good-state").hexdigest())

@@ -6,6 +6,8 @@ Run:  .venv/bin/python -m pytest tests/ -v
 """
 from __future__ import annotations
 
+import io
+
 import os
 import socket
 import tempfile
@@ -43,10 +45,21 @@ AUTH = {
 }
 
 
-def raw_env(data: bytes) -> bytes:
-    """*data* as the server stores an un-enveloped (pre-#478) raw upload: wrapped
-    in the transfer envelope with the raw format byte (#738)."""
-    return b"ES1\0\x00" + data
+def tree(data: bytes) -> bytes:
+    """*data* as a single-file blob in the wire/storage format (#739). Its content
+    hash is ``sha256(data)``. Packing is deterministic, so equal input gives equal bytes."""
+    from server.blob_tree import _pack
+    return _pack("file", [("", lambda: io.BytesIO(data))])
+
+
+def tree_dir(files: dict[str, bytes]) -> bytes:
+    """*files* (relative path -> bytes) as a folder blob in the wire format (#739)."""
+    from server.blob_tree import _pack
+    return _pack("dir", [(rel, lambda d=d: io.BytesIO(d)) for rel, d in files.items()])
+
+
+# The bytes the server stores (and a pull returns) for an uploaded ``tree(data)``.
+raw_env = tree
 
 
 def _device_auth(device_id: str, device_name: str, pin: str = MASTER_PIN) -> dict:
