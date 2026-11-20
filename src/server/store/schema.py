@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 # Bump whenever a new migration block is added below.
-_SCHEMA_VERSION = 37
+_SCHEMA_VERSION = 38
 
 # Full current schema — used for fresh databases only.  Columns added via
 # ALTER TABLE migrations are included here so new installs never run migrations.
@@ -607,6 +607,12 @@ def _migrate(conn: sqlite3.Connection, from_version: int, blob_dir=None) -> None
         # Files no row references (leaked by pre-#750 device removal) move aside once.
         if blob_dir is not None:
             _quarantine_orphan_blobs(conn, blob_dir)
+    if from_version < 38:
+        # Every stored blob becomes the manifest format (#739); runs after v36
+        # (envelopes) and v37 (orphans moved aside, so only referenced files convert).
+        if blob_dir is not None:
+            from server.store.tree_migration import convert_blobs_to_tree
+            convert_blobs_to_tree(conn, blob_dir)
     conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
 

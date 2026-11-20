@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from server.store import Store, GameDevice
-from tests.conftest import raw_env
+from tests.conftest import tree, raw_env
 
 
 # ── thread safety (issue #200) ──────────────────────────────────────────────
@@ -33,7 +33,7 @@ def test_store_concurrent_access_no_misuse():
                     # interleave reads (execute + fetch) and writes (execute + commit)
                     store.get_game_device("zelda", "dev-1")
                     store.list_devices()
-                    store.push_save("zelda", "dev-1", f"save-{n}-{i}".encode())
+                    store.push_save("zelda", "dev-1", tree(f"save-{n}-{i}".encode()))
                     store.pull_save("zelda")
                     store.set_game_device(
                         GameDevice("zelda", "dev-1", "/roms/z.sfc", "/saves/z.srm", f"ra-{n}-{i}")
@@ -61,7 +61,7 @@ def test_foreign_keys_enforced_on_worker_thread():
 
         def worker() -> None:
             store.add_game("metroid", "Metroid")
-            store.push_save("metroid", "dev-1", b"data")
+            store.push_save("metroid", "dev-1", tree(b"data"))
             store.acquire_lock("metroid", "dev-1")
             store.remove_game("metroid")  # cascade should drop the save + lock
             data, _ = store.pull_save("metroid")
@@ -98,14 +98,14 @@ def test_save_bytes_live_on_disk_not_in_sqlite():
         store = Store(tmpdir)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        meta = store.push_save("zelda", "dev-1", b"hello-save")
+        meta = store.push_save("zelda", "dev-1", tree(b"hello-save"))
 
         # The blob file exists on disk and holds exactly the pushed bytes.
         row = store._conn.execute(
             "SELECT id, size FROM saves WHERE game_slug = ?", ("zelda",)
         ).fetchone()
         blob_file = Path(tmpdir) / "blobs" / "saves" / row["id"]
-        assert blob_file.read_bytes() == b"hello-save"
+        assert blob_file.read_bytes() == tree(b"hello-save")
         assert row["size"] == len(b"hello-save") == meta.size
 
         # The saves table no longer carries a data column at all.
@@ -113,7 +113,7 @@ def test_save_bytes_live_on_disk_not_in_sqlite():
         assert "data" not in cols
 
         # Round-trips through the byte API.
-        assert store.pull_save("zelda")[0] == b"hello-save"
+        assert store.pull_save("zelda")[0] == tree(b"hello-save")
 
 
 def test_remove_game_deletes_on_disk_blobs():
@@ -123,8 +123,8 @@ def test_remove_game_deletes_on_disk_blobs():
         store = Store(tmpdir)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", b"save-bytes")
-        store.push_state("zelda", "dev-1", b"state-bytes")
+        store.push_save("zelda", "dev-1", tree(b"save-bytes"))
+        store.push_state("zelda", "dev-1", tree(b"state-bytes"))
 
         saves_dir = Path(tmpdir) / "blobs" / "saves"
         states_dir = Path(tmpdir) / "blobs" / "states"
@@ -144,7 +144,7 @@ def test_prune_unlinks_old_generation_files():
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
         for i in range(HISTORY_LIMIT + 5):
-            store.push_save("zelda", "dev-1", f"save-{i}".encode())
+            store.push_save("zelda", "dev-1", tree(f"save-{i}".encode()))
 
         saves_dir = Path(tmpdir) / "blobs" / "saves"
         rows = store._conn.execute("SELECT COUNT(*) AS n FROM saves").fetchone()["n"]

@@ -6,7 +6,7 @@ import tempfile
 import pytest
 
 from server.store import Store
-from tests.conftest import AUTH, DEVICE_ID, DEVICE_NAME
+from tests.conftest import tree, AUTH, DEVICE_ID, DEVICE_NAME
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_events_empty_on_fresh_store(client):
 @pytest.mark.asyncio
 async def test_save_synced_event_logged(client):
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
-    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"save data"), headers=AUTH)
 
     r = await client.get("/events", headers=AUTH)
     events = r.json()
@@ -41,7 +41,7 @@ async def test_game_started_and_stopped_events_logged(client):
 @pytest.mark.asyncio
 async def test_events_include_device_name(client):
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
-    await client.post("/games/pokemon-emerald/save", content=b"save data", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"save data"), headers=AUTH)
 
     r = await client.get("/events", headers=AUTH)
     save_event = next(e for e in r.json() if e["type"] == "save_synced")
@@ -52,7 +52,7 @@ async def test_events_include_device_name(client):
 async def test_events_ordered_newest_first(client):
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
     await client.post("/games/pokemon-emerald/lock", headers=AUTH)
-    await client.post("/games/pokemon-emerald/save", content=b"save", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"save"), headers=AUTH)
 
     r = await client.get("/events", headers=AUTH)
     events = r.json()

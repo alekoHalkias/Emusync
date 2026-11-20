@@ -1210,7 +1210,7 @@ def test_reconcile_folder_card_vs_raw_server_copy_local_wins(tmp_path, live_serv
     """#718: a single-file server copy pulled onto a folder save used to write
     nothing yet report success. Now local wins: the folder is pushed, kept
     untouched, and the mismatch is logged as a conflict."""
-    from server.sync_client import SyncClient, _memcard_payload_bytes
+    from server.sync_client import SyncClient, content_hash
 
     client_a = SyncClient(live_server["host"], live_server["port"], "", "dev-a", "DeviceA")
     client_b = SyncClient(live_server["host"], live_server["port"], "", "dev-b", "DeviceB")
@@ -1228,7 +1228,7 @@ def test_reconcile_folder_card_vs_raw_server_copy_local_wins(tmp_path, live_serv
     cfg = SimpleNamespace(data_dir=str(tmp_path), device_id="dev-b")
     returned = _reconcile_save(client_b, cfg, slug, str(save_b))
 
-    folder_hash = hashlib.sha256(_memcard_payload_bytes(save_b)).hexdigest()
+    folder_hash = content_hash(save_b)
     assert returned == folder_hash
     assert client_b.get_save_meta(slug)["hash"] == folder_hash
     assert (save_b / "GAME" / "data.bin").read_bytes() == b"FOLDER-PROGRESS"

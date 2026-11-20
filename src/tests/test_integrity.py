@@ -13,7 +13,7 @@ import pytest
 
 from server.store import Store
 from server.api import _core
-from tests.conftest import AUTH, MASTER_PIN
+from tests.conftest import tree, AUTH, MASTER_PIN
 from server import api as api_module
 
 
@@ -33,7 +33,7 @@ def test_integrity_ok_for_healthy_save():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", b"a healthy save")
+        store.push_save("zelda", "dev-1", tree(b"a healthy save"))
         verdict = store.integrity_for_game("zelda")["save"]
         assert verdict["status"] == "ok"
         assert verdict["reasons"] == []
@@ -54,7 +54,7 @@ def test_integrity_zero_byte():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", b"real content here")
+        store.push_save("zelda", "dev-1", tree(b"real content here"))
         _corrupt_current(store, "saves", "zelda", b"")
         verdict = store.integrity_for_game("zelda")["save"]
         assert verdict["status"] == "damaged"
@@ -66,9 +66,9 @@ def test_integrity_shrank():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", b"x" * 1000)       # prior generation
-        store.push_save("zelda", "dev-1", b"y" * 800)        # current (distinct)
-        _corrupt_current(store, "saves", "zelda", b"z" * 100)  # < 50% of 1000
+        store.push_save("zelda", "dev-1", tree(b"x" * 1000))  # prior generation
+        store.push_save("zelda", "dev-1", tree(b"y" * 800))  # current (distinct)
+        _corrupt_current(store, "saves", "zelda", tree(b"z" * 100))  # < 50% of 1000
         verdict = store.integrity_for_game("zelda")["save"]
         assert verdict["status"] == "damaged"
         assert "shrank" in verdict["reasons"]
@@ -79,7 +79,7 @@ def test_integrity_hash_mismatch():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", b"original-bytes")
+        store.push_save("zelda", "dev-1", tree(b"original-bytes"))
         # Same length, different content → only the hash changes.
         _corrupt_current(store, "saves", "zelda", b"swapped--bytes")
         verdict = store.integrity_for_game("zelda")["save"]
@@ -92,9 +92,9 @@ def test_integrity_last_good_version_points_at_prior_healthy():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", b"good-generation-one")
+        store.push_save("zelda", "dev-1", tree(b"good-generation-one"))
         good_id = store._newest_row("saves", "zelda")["id"]
-        store.push_save("zelda", "dev-1", b"good-generation-two")
+        store.push_save("zelda", "dev-1", tree(b"good-generation-two"))
         _corrupt_current(store, "saves", "zelda", b"corrupted-gen-two!!")  # same length
         verdict = store.integrity_for_game("zelda")["save"]
         assert verdict["status"] == "damaged"
@@ -107,7 +107,7 @@ def test_sweep_skips_games_without_blobs():
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
         store.add_game("metroid", "Metroid")  # no blobs
-        store.push_save("zelda", "dev-1", b"some save")
+        store.push_save("zelda", "dev-1", tree(b"some save"))
         swept = store.sweep_integrity()
         assert "zelda" in swept
         assert "metroid" not in swept
@@ -118,7 +118,7 @@ def test_integrity_state_zero_byte():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_state("zelda", "dev-1", b"a state archive blob")
+        store.push_state("zelda", "dev-1", tree(b"a state archive blob"))
         _corrupt_current(store, "states", "zelda", b"")
         verdict = store.integrity_for_game("zelda")["state"]
         assert verdict["status"] == "damaged"
@@ -129,7 +129,7 @@ def test_integrity_for_console_card_ok_damaged_and_last_good():
     """Console memory cards use the same classifier as saves (#737)."""
     def push(store, payload):
         up = store.new_upload_path()
-        up.write_bytes(payload)
+        up.write_bytes(tree(payload))
         store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -151,7 +151,7 @@ def test_integrity_for_console_card_ok_damaged_and_last_good():
 @pytest.mark.asyncio
 async def test_get_integrity_endpoint_healthy(client):
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    await client.post("/games/zelda/save", content=b"a healthy save", headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"a healthy save"), headers=AUTH)
     r = await client.get("/games/zelda/integrity", headers=AUTH)
     assert r.status_code == 200
     assert r.json()["save"]["status"] == "ok"
@@ -167,8 +167,8 @@ async def test_get_integrity_endpoint_404(client):
 @pytest.mark.asyncio
 async def test_get_integrity_endpoint_damaged(client):
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    await client.post("/games/zelda/save", content=b"good-bytes-one", headers=AUTH)
-    await client.post("/games/zelda/save", content=b"good-bytes-two", headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"good-bytes-one"), headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"good-bytes-two"), headers=AUTH)
     _corrupt_current(_core._get_store(), "saves", "zelda", b"")
 
     r = await client.get("/games/zelda/integrity", headers=AUTH)
@@ -189,7 +189,7 @@ async def test_integrity_requires_auth(client):
 @pytest.mark.asyncio
 async def test_rescan_endpoint_reports_damaged(client):
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    await client.post("/games/zelda/save", content=b"healthy-content", headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"healthy-content"), headers=AUTH)
     _corrupt_current(_core._get_store(), "saves", "zelda", b"")
 
     r = await client.post("/integrity/rescan", headers=AUTH)
@@ -203,8 +203,8 @@ async def test_rescan_endpoint_reports_damaged(client):
 @pytest.mark.asyncio
 async def test_restore_last_good_clears_damage(client):
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    await client.post("/games/zelda/save", content=b"good-save-bytes", headers=AUTH)
-    await client.post("/games/zelda/save", content=b"newer-save-byte", headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"good-save-bytes"), headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"newer-save-byte"), headers=AUTH)
     _corrupt_current(_core._get_store(), "saves", "zelda", b"")
 
     before = (await client.get("/games/zelda/integrity", headers=AUTH)).json()["save"]
@@ -227,7 +227,7 @@ def test_init_runs_sweep():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", b"content-to-corrupt")
+        store.push_save("zelda", "dev-1", tree(b"content-to-corrupt"))
         _corrupt_current(store, "saves", "zelda", b"")
 
         api_module.init(store, MASTER_PIN)
@@ -236,19 +236,14 @@ def test_init_runs_sweep():
         assert status["zelda"]["save"]["status"] == "damaged"
 
 
-# ── envelope-free hashing (#734) ─────────────────────────────────────────────────
-
-def _env(payload: bytes) -> bytes:
-    from server.sync_client import _FMT_RAW, _pack_envelope
-    return _pack_envelope(_FMT_RAW, payload)
-
+# ── content hashing: envelope/framing never hashed (#734, #739) ─────────────────────────────────────────────────
 
 def test_integrity_ok_for_enveloped_save():
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        meta = store.push_save("zelda", "dev-1", _env(b"enveloped save"))
+        meta = store.push_save("zelda", "dev-1", tree(b"enveloped save"))
         assert meta.hash == hashlib.sha256(b"enveloped save").hexdigest()
         verdict = store.integrity_for_game("zelda")["save"]
         assert verdict["status"] == "ok", verdict["reasons"]
@@ -260,9 +255,9 @@ def test_restore_records_envelope_free_hash():
         store = Store(tmp)
         store.ensure_device("dev-1", "PC")
         store.add_game("zelda", "Zelda")
-        store.push_save("zelda", "dev-1", _env(b"version-one"))
+        store.push_save("zelda", "dev-1", tree(b"version-one"))
         v1 = store._newest_row("saves", "zelda")["id"]
-        store.push_save("zelda", "dev-1", _env(b"version-two"))
+        store.push_save("zelda", "dev-1", tree(b"version-two"))
         meta = store.restore_save("zelda", v1)
         assert meta.hash == hashlib.sha256(b"version-one").hexdigest()
         assert store.integrity_for_game("zelda")["save"]["status"] == "ok"
@@ -271,7 +266,20 @@ def test_restore_records_envelope_free_hash():
 @pytest.mark.asyncio
 async def test_api_enveloped_push_reports_ok(client):
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    r = await client.post("/games/zelda/save", content=_env(b"api save"), headers=AUTH)
+    r = await client.post("/games/zelda/save", content=tree(b"api save"), headers=AUTH)
     assert r.json()["hash"] == hashlib.sha256(b"api save").hexdigest()
     r = await client.get("/games/zelda/integrity", headers=AUTH)
     assert r.json()["save"]["status"] == "ok"
+
+
+def test_empty_folder_state_is_ok_not_zero_byte(tmp_path):
+    """An empty state folder pushed as a blob with no files is not damage (#739):
+    the server PC had five such states, converted from empty tar.gz archives."""
+    from tests.conftest import tree_dir
+    store = Store(str(tmp_path))
+    store.ensure_device("dev-1", "PC")
+    store.add_game("zelda", "Zelda")
+    store.push_state("zelda", "dev-1", tree_dir({}))
+    assert store.integrity_for_game("zelda")["state"]["status"] == "ok"
+    store.push_save("zelda", "dev-1", tree(b""))  # an empty single file still is
+    assert "zero_byte" in store.integrity_for_game("zelda")["save"]["reasons"]

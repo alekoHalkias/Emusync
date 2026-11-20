@@ -7,25 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import AUTH
+from tests.conftest import AUTH, tree, tree_dir
 from server.sync_client import (
-    _FMT_RAW,
-    _FMT_TARGZ,
     _extract_state_folder,
     _merge_extract_state_folder,
-    _pack_envelope,
     _write_memcard_tar_bytes,
 )
-
-
-def _targz(files: dict[str, bytes]) -> bytes:
-    buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        for name, data in files.items():
-            info = tarfile.TarInfo(name)
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
-    return buf.getvalue()
 
 
 def _no_temp(parent: Path) -> bool:
@@ -83,8 +70,8 @@ def test_state_extract_failure_leaves_files(tmp_path):
     folder = tmp_path / "states"
     folder.mkdir()
     (folder / "a.state").write_text("old")
-    with pytest.raises(tarfile.TarError):
-        _extract_state_folder(_pack_envelope(_FMT_TARGZ, b"garbage"), folder)
+    with pytest.raises(ValueError):
+        _extract_state_folder(b"ES1\0\x03garbage", folder)
     assert (folder / "a.state").read_text() == "old"
     assert not (folder / "a.state.bak").exists()
     assert _no_temp(tmp_path)
@@ -94,7 +81,7 @@ def test_state_extract_success_backs_up(tmp_path):
     folder = tmp_path / "states"
     folder.mkdir()
     (folder / "a.state").write_text("old")
-    _extract_state_folder(_pack_envelope(_FMT_TARGZ, _targz({"a.state": b"new"})), folder)
+    _extract_state_folder(tree_dir({"a.state": b"new"}), folder)
     assert (folder / "a.state").read_text() == "new"
     assert (folder / "a.state.bak").read_text() == "old"
     assert _no_temp(tmp_path)
@@ -102,7 +89,7 @@ def test_state_extract_success_backs_up(tmp_path):
 
 def test_state_extract_enveloped_raw_blob(tmp_path):
     folder = tmp_path / "Game"
-    _extract_state_folder(_pack_envelope(_FMT_RAW, b"RAWSTATE"), folder)
+    _extract_state_folder(tree(b"RAWSTATE"), folder)
     assert (folder / "Game.state").read_bytes() == b"RAWSTATE"
 
 
@@ -111,7 +98,7 @@ def test_merge_backs_up_subfolder_member(tmp_path):
     (folder / "sub").mkdir(parents=True)
     (folder / "sub" / "a.state").write_text("old")
     (folder / "other.state").write_text("other")
-    _merge_extract_state_folder(_pack_envelope(_FMT_TARGZ, _targz({"sub/a.state": b"new"})), folder)
+    _merge_extract_state_folder(tree_dir({"sub/a.state": b"new"}), folder)
     assert (folder / "sub" / "a.state").read_text() == "new"
     assert (folder / "sub" / "a.state.bak").read_text() == "old"
     assert (folder / "other.state").read_text() == "other"
@@ -122,8 +109,8 @@ def test_merge_traversal_rejected_without_backup(tmp_path):
     folder = tmp_path / "sstates"
     folder.mkdir()
     (folder / "x").write_text("keep")
-    with pytest.raises(tarfile.TarError):
-        _merge_extract_state_folder(_pack_envelope(_FMT_TARGZ, _targz({"../x": b"evil"})), folder)
+    with pytest.raises(ValueError):
+        _merge_extract_state_folder(tree_dir({"../x": b"evil"}), folder)
     assert (folder / "x").read_text() == "keep"
     assert not (folder / "x.bak").exists()
     assert not (tmp_path / "x").exists()

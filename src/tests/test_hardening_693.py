@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from server.api import _core, transfers
-from tests.conftest import AUTH, _device_auth, raw_env
+from tests.conftest import tree, AUTH, _device_auth, raw_env
 
 
 @pytest.mark.asyncio
@@ -40,7 +40,7 @@ async def test_mod_names_rejected(client, bad):
 
 @pytest.mark.asyncio
 async def test_valid_mod_roundtrip(client):
-    r = await client.post("/switch/0100000000010000/mods/My Mod", content=b"tar", headers=AUTH)
+    r = await client.post("/switch/0100000000010000/mods/My Mod", content=tree(b"tar"), headers=AUTH)
     assert r.status_code == 200 and r.json()["added"] is True
     r = await client.get("/switch/0100000000010000/mods", headers=AUTH)
     assert [m["mod_name"] for m in r.json()] == ["My Mod"]

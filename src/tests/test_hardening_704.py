@@ -9,7 +9,7 @@ import pytest
 from server import api as api_module
 from server.api import _core, blobs
 from server.store import Store
-from tests.conftest import AUTH
+from tests.conftest import tree, AUTH
 
 
 def _push(store, slug, data, tmp_path, name):
@@ -68,7 +68,7 @@ async def test_upload_over_cap_413_and_cleaned(make_client, monkeypatch):
     c = await make_client()
     await c.post("/games", json={"name": "Metroid", "console": "GBA"}, headers=AUTH)
     monkeypatch.setattr(blobs, "_MAX_UPLOAD_BYTES", 10)
-    r = await c.post("/games/metroid/save", content=b"x" * 100, headers=AUTH)
+    r = await c.post("/games/metroid/save", content=tree(b"x" * 100), headers=AUTH)
     assert r.status_code == 413
     up = _core._get_store()._blob_dir / ".uploads"
     assert not up.exists() or list(up.iterdir()) == []
@@ -77,7 +77,7 @@ async def test_upload_over_cap_413_and_cleaned(make_client, monkeypatch):
 @pytest.mark.asyncio
 async def test_failed_push_cleans_upload(make_client):
     c = await make_client()
-    r = await c.post("/games/nope/save", content=b"x" * 20, headers=AUTH)
+    r = await c.post("/games/nope/save", content=tree(b"x" * 20), headers=AUTH)
     assert r.status_code == 404  # unknown slug is rejected before staging (#701)
     up = _core._get_store()._blob_dir / ".uploads"
     assert not up.exists() or list(up.iterdir()) == []

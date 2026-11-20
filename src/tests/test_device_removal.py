@@ -12,7 +12,7 @@ import pytest
 
 from server.store import Store, schema
 from server.store.devices import REMOVED_DEVICE_ID
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import tree, AUTH, _device_auth
 
 
 def _store(tmp_path) -> Store:
@@ -43,10 +43,10 @@ def _card(store, tmp_path, device, data: bytes) -> None:
 def test_remove_keeps_newest_generation_per_game(tmp_path):
     s = _store(tmp_path)
     for v in (b"a1", b"a2", b"a3"):
-        s.push_save("zelda", "A", v)
+        s.push_save("zelda", "A", tree(v))
     for v in (b"s1", b"s2"):
-        s.push_state("zelda", "A", v)
-    s.push_save("zelda", "B", b"b1")  # current save is B's
+        s.push_state("zelda", "A", tree(v))
+    s.push_save("zelda", "B", tree(b"b1"))  # current save is B's
 
     s.remove_device("A")
 
@@ -63,11 +63,11 @@ def test_remove_keeps_newest_generation_per_game(tmp_path):
 
 def test_removed_devices_current_save_survives(tmp_path):
     s = _store(tmp_path)
-    s.push_save("zelda", "A", b"old")
-    s.push_save("zelda", "A", b"only-copy")
+    s.push_save("zelda", "A", tree(b"old"))
+    s.push_save("zelda", "A", tree(b"only-copy"))
     s.remove_device("A")
     path, meta = s.pull_save_path("zelda")
-    assert path.read_bytes() == b"only-copy"
+    assert path.read_bytes() == tree(b"only-copy")
     assert meta.hash == hashlib.sha256(b"only-copy").hexdigest()
 
 
@@ -91,8 +91,8 @@ def test_remove_card_and_mod_pusher_no_fk_error(tmp_path):
 
 def test_second_removed_device_keeps_only_newest_placeholder_generation(tmp_path):
     s = _store(tmp_path)
-    s.push_save("zelda", "A", b"a")
-    s.push_save("zelda", "B", b"b")
+    s.push_save("zelda", "A", tree(b"a"))
+    s.push_save("zelda", "B", tree(b"b"))
     s.remove_device("A")
     s.remove_device("B")
     saves = _rows(s, "saves")
@@ -102,7 +102,7 @@ def test_second_removed_device_keeps_only_newest_placeholder_generation(tmp_path
 
 def test_remove_edge_cases_are_noops(tmp_path):
     s = _store(tmp_path)
-    s.push_save("zelda", "A", b"x")
+    s.push_save("zelda", "A", tree(b"x"))
     s.remove_device("nope")
     s.remove_device("A")
     s.remove_device("A")  # twice
@@ -112,9 +112,9 @@ def test_remove_edge_cases_are_noops(tmp_path):
 
 def test_clear_devices_keeps_saves_and_hides_placeholder(tmp_path):
     s = _store(tmp_path)
-    s.push_save("zelda", "A", b"a1")
-    s.push_save("zelda", "A", b"a2")
-    s.push_save("zelda", "B", b"b1")
+    s.push_save("zelda", "A", tree(b"a1"))
+    s.push_save("zelda", "A", tree(b"a2"))
+    s.push_save("zelda", "B", tree(b"b1"))
     s.clear_devices()
     assert s.list_devices() == []
     saves = _rows(s, "saves")
@@ -126,13 +126,13 @@ def test_clear_devices_keeps_saves_and_hides_placeholder(tmp_path):
 async def test_placeholder_hidden_from_api_and_rejected_by_auth(client):
     other = _device_auth("dev-x", "PC")
     await client.post("/games", json={"name": "Zelda"}, headers=other)
-    await client.post("/games/zelda/save", content=b"ES1\0\x00save", headers=other)
+    await client.post("/games/zelda/save", content=tree(b"save"), headers=other)
     assert (await client.delete("/devices/dev-x", headers=AUTH)).status_code == 200
 
     ids = {d["id"] for d in (await client.get("/devices", headers=AUTH)).json()}
     assert REMOVED_DEVICE_ID not in ids and "dev-x" not in ids
     r = await client.get("/games/zelda/save", headers=AUTH)
-    assert r.status_code == 200 and r.content == b"ES1\0\x00save"
+    assert r.status_code == 200 and r.content == tree(b"save")
     r = await client.get("/games", headers=_device_auth(REMOVED_DEVICE_ID, "x"))
     assert r.status_code == 400
 

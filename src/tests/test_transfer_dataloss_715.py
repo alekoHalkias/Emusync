@@ -9,7 +9,7 @@ import pytest
 
 from server.api import _core, blobs
 from server.sync_client import SyncClient
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import tree, AUTH, _device_auth
 
 GOOD = b"NEWROM" * 1000
 
@@ -80,7 +80,7 @@ def test_extensionless_ok_directory_rejected(rom_client, tmp_path):
 @pytest.mark.asyncio
 async def test_save_baseline_only_after_delivery(client):
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    await client.post("/games/zelda/save", content=b"SAVE", headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"SAVE"), headers=AUTH)
     store = _core._get_store()
     resp = blobs._pull(blobs._SAVE, "zelda", "dev-b")
     assert store.get_save_sync_baseline("zelda", "dev-b") is None
@@ -90,7 +90,7 @@ async def test_save_baseline_only_after_delivery(client):
 
 @pytest.mark.asyncio
 async def test_memcard_baseline_only_after_delivery(client):
-    await client.post("/consoles/PS2/memcard", content=b"CARD", headers=AUTH)
+    await client.post("/consoles/PS2/memcard", content=tree(b"CARD"), headers=AUTH)
     store = _core._get_store()
     resp = blobs.pull_console_memcard("PS2", "dev-b")
     assert store.get_console_save_sync_baseline("PS2", "dev-b") is None
@@ -114,7 +114,7 @@ async def test_empty_upload_rejected(client, path):
     assert r.status_code == 400
     assert (await client.get(path, headers=AUTH)).status_code == 204
     # a real upload afterwards still works
-    assert (await client.post(path, content=b"DATA", headers=AUTH)).status_code == 200
+    assert (await client.post(path, content=tree(b"DATA"), headers=AUTH)).status_code == 200
 
 
 def test_is_stale_handles_naive_and_garbage():

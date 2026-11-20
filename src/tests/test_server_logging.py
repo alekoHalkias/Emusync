@@ -13,7 +13,7 @@ import pytest
 
 import server.config as cfg_module
 from cli.server import _auto_initialize_server, _RotatingLogWriter, _TimestampedStream
-from tests.conftest import MASTER_PIN
+from tests.conftest import tree, MASTER_PIN
 
 AUTH = {
     "Authorization": f"Bearer {MASTER_PIN}",
@@ -150,7 +150,7 @@ async def test_lock_acquire_release_log_run_and_stop(client, capsys):
 async def test_save_push_and_pull_are_logged(client, capsys):
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
-    await client.post("/games/pokemon-emerald/save", content=b"DATA", headers=AUTH)
+    await client.post("/games/pokemon-emerald/save", content=tree(b"DATA"), headers=AUTH)
     assert "save pushed: Pokemon Emerald from steamdeck" in capsys.readouterr().out
 
     await client.get("/games/pokemon-emerald/save", headers=AUTH)
@@ -161,7 +161,7 @@ async def test_save_push_and_pull_are_logged(client, capsys):
 async def test_state_push_and_pull_are_logged(client, capsys):
     await client.post("/games", json={"name": "Pokemon Emerald"}, headers=AUTH)
 
-    await client.post("/games/pokemon-emerald/state", content=b"STATE", headers=AUTH)
+    await client.post("/games/pokemon-emerald/state", content=tree(b"STATE"), headers=AUTH)
     assert "state pushed: Pokemon Emerald from steamdeck" in capsys.readouterr().out
 
     await client.get("/games/pokemon-emerald/state", headers=AUTH)

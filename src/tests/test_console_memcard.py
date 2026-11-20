@@ -11,7 +11,7 @@ import tempfile
 import pytest
 
 from server.store import Store
-from tests.conftest import AUTH, _device_auth, raw_env
+from tests.conftest import tree, AUTH, _device_auth, raw_env
 
 
 # ── store level ──────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ def test_console_save_card_format_round_trips(tmp_path):
 @pytest.mark.asyncio
 async def test_memcard_push_and_pull(client):
     card = b"\x01\x02\x03\x04" * 512
-    r = await client.post("/consoles/PS2/memcard", content=card, headers=AUTH)
+    r = await client.post("/consoles/PS2/memcard", content=tree(card), headers=AUTH)
     assert r.status_code == 200
     assert r.json()["hash"] == hashlib.sha256(card).hexdigest()
 
@@ -98,12 +98,12 @@ async def test_memcard_pull_204_when_absent(client):
 @pytest.mark.asyncio
 async def test_memcard_meta_after_push(client):
     card = b"some memory card bytes"
-    await client.post("/consoles/PS2/memcard", content=card, headers=AUTH)
+    await client.post("/consoles/PS2/memcard", content=tree(card), headers=AUTH)
     r = await client.get("/consoles/PS2/memcard/meta", headers=AUTH)
     assert r.status_code == 200
     meta = r.json()
     assert meta["hash"] == hashlib.sha256(card).hexdigest()
-    assert meta["size"] == len(raw_env(card))
+    assert meta["size"] == len(card)  # content bytes (#739)
 
 
 @pytest.mark.asyncio
@@ -113,7 +113,7 @@ async def test_memcard_is_shared_across_devices(client):
     auth_a = _device_auth("dev-a", "PC")
     auth_b = _device_auth("dev-b", "Steam Deck")
     card = b"shared across the whole PS2 console"
-    await client.post("/consoles/PS2/memcard", content=card, headers=auth_a)
+    await client.post("/consoles/PS2/memcard", content=tree(card), headers=auth_a)
 
     r = await client.get("/consoles/PS2/memcard", headers=auth_b)
     assert r.status_code == 200
@@ -132,7 +132,7 @@ async def test_memcard_card_format_header_round_trips(client):
     pulling device can compare its own Dolphin setting against it."""
     card = b"gc card bytes"
     headers = dict(AUTH, **{"X-Card-Format": "GCIFolder"})
-    r = await client.post("/consoles/GC/memcard", content=card, headers=headers)
+    r = await client.post("/consoles/GC/memcard", content=tree(card), headers=headers)
     assert r.status_code == 200
 
     r = await client.get("/consoles/GC/memcard", headers=AUTH)
@@ -145,7 +145,7 @@ async def test_memcard_card_format_header_round_trips(client):
 @pytest.mark.asyncio
 async def test_memcard_card_format_defaults_empty_when_not_sent(client):
     card = b"ps2 card bytes"
-    await client.post("/consoles/PS2/memcard", content=card, headers=AUTH)
+    await client.post("/consoles/PS2/memcard", content=tree(card), headers=AUTH)
     r = await client.get("/consoles/PS2/memcard/meta", headers=AUTH)
     assert r.json()["card_format"] == ""
 
@@ -157,7 +157,7 @@ def test_console_save_history_accumulates_generations():
         store = Store(tmp)
         for payload in (b"gen-one", b"gen-two-bigger", b"gen-three"):
             up = store.new_upload_path()
-            up.write_bytes(payload)
+            up.write_bytes(tree(payload))
             store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
 
         history = store.list_console_save_history("PS2")
@@ -171,7 +171,7 @@ def test_console_save_history_dedupes_identical_pushes():
         store = Store(tmp)
         for _ in range(2):
             up = store.new_upload_path()
-            up.write_bytes(b"same")
+            up.write_bytes(tree(b"same"))
             store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(b"same").hexdigest(), 4)
         assert len(store.list_console_save_history("PS2")) == 1
 
@@ -183,7 +183,7 @@ def test_console_save_history_pruned_to_limit():
         for i in range(HISTORY_LIMIT + 5):
             payload = f"gen-{i}".encode()
             up = store.new_upload_path()
-            up.write_bytes(payload)
+            up.write_bytes(tree(payload))
             store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
         history = store.list_console_save_history("PS2")
         assert len(history) == HISTORY_LIMIT
@@ -195,7 +195,7 @@ def test_restore_console_save_makes_old_version_current():
         store = Store(tmp)
         for payload in (b"good-card", b"bad-card"):
             up = store.new_upload_path()
-            up.write_bytes(payload)
+            up.write_bytes(tree(payload))
             store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(payload))
 
         history = store.list_console_save_history("PS2")
@@ -205,7 +205,7 @@ def test_restore_console_save_makes_old_version_current():
         assert meta["hash"] == hashlib.sha256(b"good-card").hexdigest()
 
         path, _ = store.pull_console_save_path("PS2")
-        assert path.read_bytes() == b"good-card"
+        assert path.read_bytes() == tree(b"good-card")
         # Restore added a forward generation rather than dropping anything.
         assert len(store.list_console_save_history("PS2")) == 3
 
@@ -214,11 +214,11 @@ def test_restore_console_save_carries_card_format_forward():
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(tmp)
         up = store.new_upload_path()
-        up.write_bytes(b"gc card v1")
+        up.write_bytes(tree(b"gc card v1"))
         store.push_console_save_file("GC", "dev-1", up, hashlib.sha256(b"gc card v1").hexdigest(), 10,
                                       card_format="GCIFolder")
         up2 = store.new_upload_path()
-        up2.write_bytes(b"gc card v2")
+        up2.write_bytes(tree(b"gc card v2"))
         store.push_console_save_file("GC", "dev-1", up2, hashlib.sha256(b"gc card v2").hexdigest(), 10,
                                       card_format="GCIFolder")
 
@@ -236,8 +236,8 @@ def test_restore_console_save_unknown_version_returns_none():
 
 @pytest.mark.asyncio
 async def test_memcard_history_route_accumulates_and_restores(client):
-    await client.post("/consoles/PS2/memcard", content=b"good-card", headers=AUTH)
-    await client.post("/consoles/PS2/memcard", content=b"bad-card", headers=AUTH)
+    await client.post("/consoles/PS2/memcard", content=tree(b"good-card"), headers=AUTH)
+    await client.post("/consoles/PS2/memcard", content=tree(b"bad-card"), headers=AUTH)
 
     r = await client.get("/consoles/PS2/memcard/history", headers=AUTH)
     assert r.status_code == 200
@@ -255,7 +255,7 @@ async def test_memcard_history_route_accumulates_and_restores(client):
 
 @pytest.mark.asyncio
 async def test_memcard_restore_unknown_version_returns_404(client):
-    await client.post("/consoles/PS2/memcard", content=b"x", headers=AUTH)
+    await client.post("/consoles/PS2/memcard", content=tree(b"x"), headers=AUTH)
     r = await client.post("/consoles/PS2/memcard/restore", json={"version_id": "no-such-id"}, headers=AUTH)
     assert r.status_code == 404
 
@@ -290,7 +290,7 @@ async def test_memcard_sync_baseline_missing_returns_204(client):
 @pytest.mark.asyncio
 async def test_memcard_push_records_pushing_devices_own_baseline(client):
     data = b"pushed card bytes"
-    r = await client.post("/consoles/PS2/memcard", content=data, headers=AUTH)
+    r = await client.post("/consoles/PS2/memcard", content=tree(data), headers=AUTH)
     pushed_hash = r.json()["hash"]
 
     baseline = (await client.get("/consoles/PS2/memcard/sync-baseline", headers=AUTH)).json()
@@ -302,7 +302,7 @@ async def test_memcard_pull_records_pulling_devices_own_baseline(client):
     auth_a = _device_auth("device-a", "Gaming PC")
     auth_b = _device_auth("device-b", "Steam Deck")
     data = b"pushed by A"
-    r = await client.post("/consoles/PS2/memcard", content=data, headers=auth_a)
+    r = await client.post("/consoles/PS2/memcard", content=tree(data), headers=auth_a)
     pushed_hash = r.json()["hash"]
 
     # B hasn't pulled yet — no baseline of its own, even though A has one.
@@ -356,18 +356,20 @@ def test_memcard_client_report_conflict_delegates_to_console_scoped_endpoint():
 
 # ── #734: envelope-free restore hash, immutable pull copy, prune after commit ────
 
+from server.blob_tree import verify_blob  # noqa: E402
+
+
 def _push_card(store, payload: bytes, dev: str = "dev-1"):
     up = store.new_upload_path()
-    up.write_bytes(payload)
+    up.write_bytes(tree(payload))
     return store.push_console_save_file("PS2", dev, up, hashlib.sha256(payload).hexdigest(), len(payload))
 
 
 def test_console_restore_hash_is_envelope_free():
-    from server.sync_client import _FMT_RAW, _pack_envelope
     with tempfile.TemporaryDirectory() as tmp:
         store = Store(tmp)
         for payload in (b"card-one", b"card-two"):
-            data = _pack_envelope(_FMT_RAW, payload)
+            data = tree(payload)
             up = store.new_upload_path()
             up.write_bytes(data)
             store.push_console_save_file("PS2", "dev-1", up, hashlib.sha256(payload).hexdigest(), len(data))
@@ -383,7 +385,7 @@ def test_console_pull_serves_history_generation_and_no_live_slot_is_written():
         path, meta = store.pull_console_save_path("PS2")
         newest = store.list_console_save_history("PS2")[0]["id"]
         assert path == store._blob_path("console_save_history", newest)
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == meta["hash"]
+        assert verify_blob(path)[1] == meta["hash"]
         # #737: console_saves is retired; nothing writes the live row or file.
         assert store._conn.execute("SELECT COUNT(*) FROM console_saves").fetchone()[0] == 0
         assert not store._blob_path("console_saves", "PS2").exists()
@@ -447,8 +449,8 @@ def test_v35_backfills_pre_480_card_into_history(tmp_path):
     rows = conn.execute("SELECT * FROM console_save_history").fetchall()
     assert len(rows) == 1
     assert (rows[0]["hash"], rows[0]["size"], rows[0]["card_format"], rows[0]["device_id"]) == (h, len(data), "MemoryCard", "dev-1")
-    # v36 then gives the backfilled card the #478 envelope (#738); payload unchanged
-    assert (blobs / "console_save_history" / rows[0]["id"]).read_bytes() == b"ES1\0\x00" + data
+    # v36 enveloped it (#738), v38 made it a manifest blob (#739); content unchanged
+    assert (blobs / "console_save_history" / rows[0]["id"]).read_bytes() == tree(data)
     # retired table and file are left in place
     assert conn.execute("SELECT COUNT(*) FROM console_saves").fetchone()[0] == 1
     assert (blobs / "console_saves" / "PS2").exists()
@@ -483,5 +485,5 @@ def test_store_serves_backfilled_card_with_same_bytes_and_hash(tmp_path):
     conn.close()
     store = Store(str(tmp_path / "x"))
     path, meta = store.pull_console_save_path("PS2")
-    assert path is not None and path.read_bytes() == b"ES1\0\x00" + data
+    assert path is not None and path.read_bytes() == tree(data)
     assert meta["hash"] == h and meta["card_format"] == "MemoryCard"

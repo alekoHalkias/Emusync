@@ -8,15 +8,13 @@ top-level-only pack/write logic didn't handle.
 """
 from __future__ import annotations
 
-import io
-import tarfile
 from pathlib import Path
 
 import pytest
 
-from server.sync_client import (
-    _FMT_RAW, CardFormatMismatch, _pack_envelope, _unpack_envelope, _write_memcard, memcard_bytes,
-)
+from server.blob_tree import verify_blob
+from server.sync_client import CardFormatMismatch, _write_memcard, memcard_bytes
+from tests.conftest import tree
 
 
 def _make_folder_card(root: Path) -> None:
@@ -36,8 +34,7 @@ def test_memcard_bytes_includes_nested_game_subfolders(tmp_path):
 
     data = memcard_bytes(card)
 
-    _, payload = _unpack_envelope(data)
-    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(payload)).getmembers()}
+    names = {e["path"] for e in verify_blob(data)[0]["files"]}
     assert names == {"_pcsx2_superblock", "GAME1/GAME1", "GAME1/icon.sys"}
 
 
@@ -94,8 +91,7 @@ def test_memcard_bytes_includes_nested_gci_folder_saves(tmp_path):
 
     data = memcard_bytes(card)
 
-    _, payload = _unpack_envelope(data)
-    names = {m.name for m in tarfile.open(fileobj=io.BytesIO(payload)).getmembers()}
+    names = {e["path"] for e in verify_blob(data)[0]["files"]}
     assert names == {
         "USA/Card A/GALE01/01-GALE-ZeldaWW.gci",
         "USA/Card A/GALE01/01-GALE-ZeldaWW.gci.bnr",
@@ -136,7 +132,7 @@ def test_write_memcard_rejects_unenveloped_blob(tmp_path):
     assert not (tmp_path / "Mcd001.ps2.bak").exists()
 
 
-@pytest.mark.parametrize("blob", [_pack_envelope(_FMT_RAW, b"RAW")])
+@pytest.mark.parametrize("blob", [tree(b"RAW")])
 def test_write_memcard_raw_onto_directory_raises_mismatch(tmp_path, blob):
     """A raw blob onto a folder card raises instead of
     silently writing nothing and reporting success (#718); the folder is untouched."""

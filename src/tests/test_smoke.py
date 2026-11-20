@@ -5,7 +5,7 @@ import hashlib
 
 import pytest
 
-from tests.conftest import AUTH, DEVICE_ID, raw_env
+from tests.conftest import tree, AUTH, DEVICE_ID, raw_env
 
 
 # ── schema smoke test ─────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ async def test_full_flow(client):
     }, headers=AUTH)
 
     save = b"\xDE\xAD\xBE\xEF" * 512
-    r = await client.post("/games/metroid-fusion/save", content=save, headers=AUTH)
+    r = await client.post("/games/metroid-fusion/save", content=tree(save), headers=AUTH)
     assert r.json()["hash"] == hashlib.sha256(save).hexdigest()
 
     r = await client.get("/games/metroid-fusion/save", headers=AUTH)
@@ -50,7 +50,7 @@ async def test_games_overview_batches_lock_save_and_config(client):
         headers=AUTH,
     )
     await client.post("/games/metroid/lock", headers=AUTH)
-    await client.post("/games/metroid/save", content=b"savedata", headers=AUTH)
+    await client.post("/games/metroid/save", content=tree(b"savedata"), headers=AUTH)
 
     r = await client.get("/games/overview", headers=AUTH)
     assert r.status_code == 200
@@ -80,9 +80,9 @@ async def test_games_overview_no_duplicate_rows_after_multiple_saves(client):
         headers=AUTH,
     )
     # Three distinct save pushes → three retained generations.
-    await client.post("/games/metroid/save", content=b"gen-1", headers=AUTH)
-    await client.post("/games/metroid/save", content=b"gen-2", headers=AUTH)
-    last = await client.post("/games/metroid/save", content=b"gen-3", headers=AUTH)
+    await client.post("/games/metroid/save", content=tree(b"gen-1"), headers=AUTH)
+    await client.post("/games/metroid/save", content=tree(b"gen-2"), headers=AUTH)
+    last = await client.post("/games/metroid/save", content=tree(b"gen-3"), headers=AUTH)
     newest_pushed_at = last.json()["pushed_at"]
 
     rows = (await client.get("/games/overview", headers=AUTH)).json()

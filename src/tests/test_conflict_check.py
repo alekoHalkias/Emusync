@@ -11,7 +11,7 @@ import hashlib
 
 import pytest
 
-from tests.conftest import AUTH, _device_auth
+from tests.conftest import tree, AUTH, _device_auth
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ async def test_local_only_changed_not_diverged(client):
     await client.post("/games", json={"name": "Test Game", "slug": "test-game"}, headers=AUTH)
     # Device-1 pushes save v1
     save_v1 = b"save version 1"
-    await client.post("/games/test-game/save", content=save_v1, headers=AUTH)
+    await client.post("/games/test-game/save", content=tree(save_v1), headers=AUTH)
     baseline_hash = _sha256(save_v1)
     # Client sends a different local hash (local changed, server = baseline)
     local_hash = _sha256(b"local modified")
@@ -68,10 +68,10 @@ async def test_server_only_changed_not_diverged(client):
     await client.post("/games", json={"name": "Test Game", "slug": "test-game"}, headers=AUTH)
     # Device-1 (test-pc) pushes save v1
     save_v1 = b"save version 1"
-    await client.post("/games/test-game/save", content=save_v1, headers=AUTH)
+    await client.post("/games/test-game/save", content=tree(save_v1), headers=AUTH)
     # Device-2 pushes save v2 (changes server hash, baseline for device-1 stays v1)
     save_v2 = b"save version 2"
-    await client.post("/games/test-game/save", content=save_v2, headers=_device_auth("device-2", "other-pc"))
+    await client.post("/games/test-game/save", content=tree(save_v2), headers=_device_auth("device-2", "other-pc"))
     # Device-1's local still holds v1 (the baseline) — check with device-1's headers
     local_hash = _sha256(save_v1)
     resp = await client.get(
@@ -88,10 +88,10 @@ async def test_both_changed_different_hashes_diverged(client):
     await client.post("/games", json={"name": "Test Game", "slug": "test-game"}, headers=AUTH)
     # Device-1 pushes save v1 (baseline = v1)
     save_v1 = b"save version 1"
-    await client.post("/games/test-game/save", content=save_v1, headers=AUTH)
+    await client.post("/games/test-game/save", content=tree(save_v1), headers=AUTH)
     # Device-2 pushes save v2 (server hash = v2, baseline for device-1 still v1)
     save_v2 = b"save version 2"
-    await client.post("/games/test-game/save", content=save_v2, headers=_device_auth("device-2", "other-pc"))
+    await client.post("/games/test-game/save", content=tree(save_v2), headers=_device_auth("device-2", "other-pc"))
     # Device-1 now has a modified local save (v3, different from both v1 and v2)
     save_v3 = b"save version 3 - local edited"
     local_hash = _sha256(save_v3)
@@ -112,9 +112,9 @@ async def test_both_changed_same_hash_not_diverged(client):
     """Both changed but end up with the same hash → not diverged."""
     await client.post("/games", json={"name": "Test Game", "slug": "test-game"}, headers=AUTH)
     save_v1 = b"save version 1"
-    await client.post("/games/test-game/save", content=save_v1, headers=AUTH)
+    await client.post("/games/test-game/save", content=tree(save_v1), headers=AUTH)
     save_v2 = b"save version 2"
-    await client.post("/games/test-game/save", content=save_v2, headers=_device_auth("device-2", "other-pc"))
+    await client.post("/games/test-game/save", content=tree(save_v2), headers=_device_auth("device-2", "other-pc"))
     # Device-1's local somehow matches server (v2) — identical content, no conflict
     local_hash = _sha256(save_v2)
     resp = await client.get(
@@ -146,7 +146,7 @@ async def test_state_both_changed_different_hashes_diverged(client):
     await client.post("/games", json={"name": "Test Game", "slug": "test-game"}, headers=AUTH)
     # Push a state via the state push endpoint
     state_v1 = b"state version 1"
-    await client.post("/games/test-game/state", content=state_v1, headers=AUTH)
+    await client.post("/games/test-game/state", content=tree(state_v1), headers=AUTH)
     server_hash = _sha256(state_v1)
     # Client sends a different local state hash
     local_hash = _sha256(b"state version 2 - local edited")
@@ -165,7 +165,7 @@ async def test_state_same_hash_not_diverged(client):
     """State endpoint: same hash → not diverged."""
     await client.post("/games", json={"name": "Test Game", "slug": "test-game"}, headers=AUTH)
     state_v1 = b"state version 1"
-    await client.post("/games/test-game/state", content=state_v1, headers=AUTH)
+    await client.post("/games/test-game/state", content=tree(state_v1), headers=AUTH)
     server_hash = _sha256(state_v1)
     # Client sends the same hash
     resp = await client.get(

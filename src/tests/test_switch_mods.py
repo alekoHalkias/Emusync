@@ -11,7 +11,7 @@ import pytest
 from cli.run_switch import _local_switch_mods, _switch_load_root_for, _sync_switch_mods
 from server.store import Store
 from server.sync_client import SyncClient
-from tests.conftest import AUTH, raw_env
+from tests.conftest import tree, AUTH, raw_env
 
 
 # ── store ────────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ async def test_switch_mods_pull_missing_returns_204(client):
 async def test_switch_mods_push_list_pull_roundtrip(client):
     r = await client.post(
         "/switch/0100000011D90000/mods/Cool%20Mod",
-        content=b"mod tar bytes",
+        content=tree(b"mod tar bytes"),
         headers={**AUTH, "Content-Type": "application/octet-stream"},
     )
     assert r.status_code == 200
@@ -143,7 +143,7 @@ async def test_switch_mods_push_list_pull_roundtrip(client):
     mods = r.json()
     assert len(mods) == 1
     assert mods[0]["mod_name"] == "Cool Mod"
-    assert mods[0]["size"] == len(raw_env(b"mod tar bytes"))
+    assert mods[0]["size"] == len(b"mod tar bytes")  # content bytes (#739)
 
     r = await client.get("/switch/0100000011D90000/mods/Cool%20Mod", headers=AUTH)
     assert r.status_code == 200
@@ -154,12 +154,12 @@ async def test_switch_mods_push_list_pull_roundtrip(client):
 async def test_switch_mods_second_push_is_a_noop(client):
     await client.post(
         "/switch/0100000011D90000/mods/Cool%20Mod",
-        content=b"original",
+        content=tree(b"original"),
         headers={**AUTH, "Content-Type": "application/octet-stream"},
     )
     r = await client.post(
         "/switch/0100000011D90000/mods/Cool%20Mod",
-        content=b"a totally different upload",
+        content=tree(b"a totally different upload"),
         headers={**AUTH, "Content-Type": "application/octet-stream"},
     )
     assert r.status_code == 200

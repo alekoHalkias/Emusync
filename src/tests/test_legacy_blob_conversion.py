@@ -16,12 +16,13 @@ from httpx import ASGITransport, AsyncClient
 
 import server.api as api_module
 from server.store import Store, schema
-from server.store.blobs import _envelope_file_in_place, _payload_sha256
+from server.blob_tree import verify_blob
+from server.store.blobs import _envelope_file_in_place
 from server.sync_client import (
     _ENVELOPE_MAGIC, _FMT_RAW, _FMT_TAR, _FMT_TARGZ,
     _extract_state_folder, _pack_envelope, _write_memcard,
 )
-from tests.conftest import AUTH, MASTER_PIN
+from tests.conftest import AUTH, MASTER_PIN, tree, tree_dir
 
 
 def _tar(files: dict[str, bytes], mode: str = "w") -> bytes:
@@ -56,7 +57,6 @@ def test_converter_wraps_each_legacy_shape(tmp_path, name):
     p.write_bytes(data)
     assert _envelope_file_in_place(p, states) is True
     assert p.read_bytes() == _ENVELOPE_MAGIC + bytes([fmt]) + data
-    assert _payload_sha256(p.read_bytes()) == hashlib.sha256(data).hexdigest()
     assert not list(tmp_path.glob("*.part"))
 
 
@@ -109,29 +109,35 @@ def test_v36_skips_missing_dirs(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_legacy_blobs_pull_with_same_hash_after_upgrade(tmp_path):
-    """End to end: legacy save + state stored by an old server, DB at v35; the
-    upgraded Store converts them, pulls carry the same hash, and the client
-    writes the original content."""
+async def test_legacy_blobs_survive_the_full_upgrade_chain(tmp_path):
+    """End to end: un-enveloped save + state stored by an old server, DB at v35;
+    the upgraded Store runs v36 (envelope) and v38 (manifest, #739). The save keeps
+    its hash, the state gets its manifest hash, and the client writes the original
+    content."""
     data_dir = tmp_path / "data"
     store = Store(str(data_dir))
     store.add_game("zelda", "Zelda")
     store.ensure_device("dev-old", "Old PC")
     save = b"\xde\xad legacy sram"
-    store.push_save("zelda", "dev-old", save)   # store writes bytes as given: un-enveloped
-    store.push_state("zelda", "dev-old", _TGZ)
+    store.push_save("zelda", "dev-old", tree(b"placeholder"))
+    store.push_state("zelda", "dev-old", tree(b"placeholder"))
+    for table, data in (("saves", save), ("states", _TGZ)):  # what a pre-#478 server stored
+        row = store._newest_row(table, "zelda")
+        store._blob_path(table, row["id"]).write_bytes(data)
+        store._conn.execute(f"UPDATE {table} SET hash = ?, size = ? WHERE id = ?",
+                            (hashlib.sha256(data).hexdigest(), len(data), row["id"]))
     store._conn.execute("PRAGMA user_version = 35")
     store._conn.commit()
     store._conn.close()
 
-    api_module.init(Store(str(data_dir)), MASTER_PIN)  # reopen runs v36
+    api_module.init(Store(str(data_dir)), MASTER_PIN)  # reopen runs v36..v38
     async with AsyncClient(transport=ASGITransport(app=api_module.app), base_url="http://t") as c:
         r = await c.get("/games/zelda/save", headers=AUTH)
-        assert r.content == _pack_envelope(_FMT_RAW, save)
+        assert r.content == tree(save)
         assert r.headers["x-save-hash"] == hashlib.sha256(save).hexdigest()
         rs = await c.get("/games/zelda/state", headers=AUTH)
-        assert rs.content == _pack_envelope(_FMT_TARGZ, _TGZ)
-        assert rs.headers["x-state-hash"] == hashlib.sha256(_TGZ).hexdigest()
+        assert rs.content == tree_dir({"slot0.state": b"state"})
+        assert rs.headers["x-state-hash"] == verify_blob(rs.content)[1]
 
     card = tmp_path / "out" / "zelda.srm"
     _write_memcard(card, r.content)
@@ -142,20 +148,15 @@ async def test_legacy_blobs_pull_with_same_hash_after_upgrade(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_unenveloped_uploads_are_wrapped_with_the_same_hash(client):
-    """Pre-#478 clients still push; the server stores the enveloped form and the
-    hash matches an enveloped push of the same content."""
+async def test_pre_739_state_and_mod_uploads_are_rejected(client):
+    """Old clients' state and mod uploads (bare or format 0-2) get a 400 and
+    nothing is stored; they must update after the server (#739)."""
     await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
-    content = b"old client save"
-    r_old = await client.post("/games/zelda/save", content=content, headers=AUTH)
-    r_new = await client.post("/games/zelda/save", content=_pack_envelope(_FMT_RAW, content), headers=AUTH)
-    assert r_old.json()["hash"] == r_new.json()["hash"] == hashlib.sha256(content).hexdigest()
-    assert (await client.get("/games/zelda/save", headers=AUTH)).content == _pack_envelope(_FMT_RAW, content)
-
-    # A bare gzip tar state upload is classified as tar.gz.
-    await client.post("/games/zelda/state", content=_TGZ, headers=AUTH)
-    assert (await client.get("/games/zelda/state", headers=AUTH)).content == _pack_envelope(_FMT_TARGZ, _TGZ)
-
-    await client.post("/switch/0100ABF008968000/mods/Cool", content=_TAR, headers=AUTH)
-    pulled = await client.get("/switch/0100ABF008968000/mods/Cool", headers=AUTH)
-    assert pulled.content == _pack_envelope(_FMT_TAR, _TAR)
+    for body in (_TGZ, _pack_envelope(_FMT_TARGZ, _TGZ)):
+        r = await client.post("/games/zelda/state", content=body, headers=AUTH)
+        assert r.status_code == 400
+    assert (await client.get("/games/zelda/state", headers=AUTH)).status_code == 204
+    for body in (_TAR, _pack_envelope(_FMT_TAR, _TAR)):
+        r = await client.post("/switch/0100ABF008968000/mods/Cool", content=body, headers=AUTH)
+        assert r.status_code == 400
+    assert (await client.get("/switch/0100ABF008968000/mods", headers=AUTH)).json() == []

@@ -2,7 +2,6 @@
 `emusync run` (split out of cli/run.py, issue #368)."""
 from __future__ import annotations
 
-import hashlib
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,7 +11,7 @@ import click
 
 from cli.common import _mtime, _newest_matching, _parse_iso_utc, _find_touched_path
 from cli.run_conflicts import _warn_save_conflict
-from server.sync_client import CardFormatMismatch, _memcard_payload_bytes
+from server.sync_client import CardFormatMismatch, content_hash
 
 
 def _decide_save_action(
@@ -74,7 +73,7 @@ def _reconcile_save(client, cfg, game_slug: str, save_path: str) -> Optional[str
     local_hash: Optional[str] = None
     local_mtime: Optional[datetime] = None
     if p.exists():
-        local_hash = hashlib.sha256(_memcard_payload_bytes(p)).hexdigest()
+        local_hash = content_hash(p)
         # rglob, not iterdir: folder cards nest content (PCSX2 GAME1/GAME1,
         # PPSSPP SAVEDATA/<GAME>/, Dolphin GC/) whose changes must count (#402).
         mtime_src = max((f.stat().st_mtime for f in p.rglob("*") if f.is_file()), default=p.stat().st_mtime) if p.is_dir() else p.stat().st_mtime
