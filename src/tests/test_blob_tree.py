@@ -118,6 +118,28 @@ def test_unsafe_manifest_paths_are_rejected(tmp_path, name):
     assert not (tmp_path / "evil").exists()
 
 
+def test_unusual_but_legal_names_round_trip(tmp_path):
+    d = tmp_path / "save"
+    d.mkdir()
+    (d / "a\\b.sav").write_bytes(b"backslash")
+    (d / ".emusync-manifest.json").write_bytes(b"user file")
+    kind, tmp = extract_tree(pack_tree(d), tmp_path / "out")
+    assert _files(tmp) == _files(d)
+
+
+@pytest.mark.asyncio
+async def test_restore_of_unreadable_generation_is_409(client):
+    await client.post("/games", json={"name": "Zelda"}, headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"one"), headers=AUTH)
+    await client.post("/games/zelda/save", content=tree(b"two"), headers=AUTH)
+    from server.api import _core
+    store = _core._get_store()
+    old = store.list_save_history("zelda")[-1]["id"]
+    store._blob_path("saves", old).write_bytes(b"ES1\0\x00one")  # left unconverted
+    r = await client.post("/games/zelda/save/restore", json={"version_id": old}, headers=AUTH)
+    assert r.status_code == 409
+
+
 def test_symlink_member_is_rejected(tmp_path):
     def add_link(ms):
         link = tarfile.TarInfo("GAME1/GAME1")

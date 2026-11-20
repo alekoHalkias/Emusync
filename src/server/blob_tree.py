@@ -203,10 +203,12 @@ def manifest_size(manifest: dict) -> int:
 # ── reading ────────────────────────────────────────────────────────────────────
 
 def _check_rel(rel: str) -> None:
+    """Reject absolute, empty-segment, ``.``/``..`` paths. Any other name the packer
+    can produce is accepted (a backslash is a legal Linux filename char); writes
+    are additionally confined by extract_tree's resolve check (Windows separators)."""
     p = PurePosixPath(rel)
-    if (not rel or "\\" in rel or "\0" in rel or p.is_absolute() or p.as_posix() != rel
-            or any(part in ("", ".", "..") for part in rel.split("/"))
-            or rel == _MANIFEST):
+    if (not rel or "\0" in rel or p.is_absolute() or p.as_posix() != rel
+            or any(part in ("", ".", "..") for part in rel.split("/"))):
         raise ValueError(f"unsafe path in blob manifest: {rel!r}")
 
 

@@ -147,7 +147,10 @@ def _history(kind: _BlobKind, slug: str) -> list[dict]:
 
 
 def _restore(kind: _BlobKind, slug: str, version_id: str, device_id: str) -> dict:
-    meta = getattr(_get_store(), f"restore_{kind.noun}")(slug, version_id)
+    try:
+        meta = getattr(_get_store(), f"restore_{kind.noun}")(slug, version_id)
+    except ValueError:  # a generation the v38 conversion could not convert (#739)
+        raise HTTPException(status_code=409, detail="That version is unreadable and cannot be restored")
     if not meta:
         raise HTTPException(status_code=404, detail=kind.not_found or f"{kind.noun.capitalize()} version not found")
     _print_activity(f"{kind.label or kind.noun} restored: {_owner_label(kind, slug)} by {_device_label(device_id)}")

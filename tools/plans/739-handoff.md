@@ -4,7 +4,7 @@
 - Issue: #739
 - Branch: feature/739-evaluate-manifest-format
 - PR: #752
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-20
 - Fix attempts: 0
 
@@ -97,3 +97,4 @@ Tests
 - 2026-11-20 implement: step 8 done (CLAUDE.md, GOTCHAS, ARCHITECTURE updated); all steps done
 - 2026-11-20 review: 2 findings (nits), blocked=no
 - 2026-11-20 ship: tests passed (800), PR #752 opened
+- 2026-11-20 ship: review nits fixed on PR #752, 802 tests pass

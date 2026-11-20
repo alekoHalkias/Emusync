@@ -3,7 +3,7 @@
 Issue: #739
 Branch: feature/739-evaluate-manifest-format
 PR: #752
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal
@@ -104,5 +104,5 @@ Step 1: extract_tree verifies while writing members itself (validated paths, res
 ## Fix attempt 1
 Failure: review correctness nits (ship blocks on correctness findings)
 Cause: _check_rel rejects names pack_tree produces (backslash, `.emusync-manifest.json`); restore of an unconverted generation raises ValueError -> 500.
-- [ ] F1.1 blob_tree._check_rel accepts any name the packer can produce; extract_tree's resolve check still confines writes. Test: such a folder round-trips.
-- [ ] F1.2 api/blobs._restore maps a ValueError from the store to 409 "version is unreadable". Test: restore of a non-format-3 generation -> 409.
+- [x] F1.1 blob_tree._check_rel accepts any name the packer can produce; extract_tree's resolve check still confines writes. Test: such a folder round-trips.
+- [x] F1.2 api/blobs._restore maps a ValueError from the store to 409 "version is unreadable". Test: restore of a non-format-3 generation -> 409.
