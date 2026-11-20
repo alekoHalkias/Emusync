@@ -11,7 +11,7 @@ import click
 
 import server.config as cfg_module
 from server.sync_client import (
-    _ENVELOPE_MAGIC, _FMT_TAR, GameDeviceConfig, SyncClient, _pack_envelope, _write_memcard, memcard_bytes,
+    _ENVELOPE_MAGIC, GameDeviceConfig, SyncClient, _write_memcard, _write_memcard_tar_bytes, memcard_bytes,
 )
 
 from cli import netrom
@@ -438,11 +438,12 @@ def _receive_transfer(
                 client.download_transfer(transfer_id, tmp.name, expected_hash=sha256)
                 log(f"  Extracting into {folder}...")
                 data = Path(tmp.name).read_bytes()
-                if not data.startswith(_ENVELOPE_MAGIC):
+                if data.startswith(_ENVELOPE_MAGIC):
+                    _write_memcard(Path(folder), data)  # CLI send: manifest blob (#739)
+                else:
                     # GUI rom:push sends a bare `tar -cf`; rom-folder is a tar by
-                    # contract, so declare it rather than sniff (#738).
-                    data = _pack_envelope(_FMT_TAR, data)
-                _write_memcard(Path(folder), data)
+                    # contract, so it is extracted as one, never sniffed (#738).
+                    _write_memcard_tar_bytes(Path(folder), data)
             finally:
                 os.unlink(tmp.name)
         else:

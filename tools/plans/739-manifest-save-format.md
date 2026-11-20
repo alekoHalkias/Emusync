@@ -35,7 +35,7 @@ Every save, state, memory card, mod and rom-folder blob travels and is stored in
   - Files: src/server/sync_client.py, src/cli/run_reconcile.py, src/cli/run.py
   - Reuses: blob_tree.pack_tree / content_hash
   - New: none
-- [ ] 4. rom-folder transfers: send path already calls `memcard_bytes` (now format 3, no change). Receive path: an enveloped blob goes to `_write_memcard`; the bare `tar -cf` from GUI `rom:push` is extracted through `_extract_tar_to_tmp` plus the same swap, declared by kind and never sniffed (#738). Drop the `_pack_envelope(_FMT_TAR, ...)` wrap.
+- [x] 4. rom-folder transfers: send path already calls `memcard_bytes` (now format 3, no change). Receive path: an enveloped blob goes to `_write_memcard`; the bare `tar -cf` from GUI `rom:push` is extracted through `_extract_tar_to_tmp` plus the same swap, declared by kind and never sniffed (#738). Drop the `_pack_envelope(_FMT_TAR, ...)` wrap.
   - Files: src/cli/transfer.py, src/server/sync_client.py (expose the swap as `_swap_folder(card, tmp)`)
   - Reuses: _extract_tar_to_tmp, the swap from step 2
   - New: none
