@@ -71,6 +71,11 @@ Tests
 - 7. [done] tests: new test_blob_tree.py, test_tree_migration.py; updates 10 existing files. New files because nothing covers the codec or v38.
 - 8. [done] docs: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md, backend-design-guide.md.
 
+## 9. Review
+### Findings: 2 nits. (1) blob_tree.py: filenames with a backslash or named .emusync-manifest.json pack but fail server verification (400 on every push). (2) store/blobs.py restore of a generation that failed v38 conversion raises ValueError -> 500.
+### Blocked: no
+### Blockers: none
+
 ## 12. Log
 - 2026-11-20 issue: workflow initialized (resume from #739)
 - 2026-11-20 design: scope=none (evaluation), plan_target=none, difficulty=1/10, breaking=no; evaluation posted, recommendation close
@@ -84,3 +89,4 @@ Tests
 - 2026-11-20 implement: step 6 done (v38 conversion with DB backup, originals in blobs/.pre-v38, hash remap)
 - 2026-11-20 implement: step 7 done (conftest tree/tree_dir helpers, 25 suites updated, test_blob_tree.py + test_tree_migration.py; 800 passed)
 - 2026-11-20 implement: step 8 done (CLAUDE.md, GOTCHAS, ARCHITECTURE updated); all steps done
+- 2026-11-20 review: 2 findings (nits), blocked=no
