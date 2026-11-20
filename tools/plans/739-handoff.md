@@ -79,8 +79,8 @@ Tests
 ## 10. Ship
 ### Status: shipped
 ### PR: #752
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: held (breaking v38 conversion; awaiting user go-ahead)
+### Doc Sync: done (step 8)
 
 ## 12. Log
 - 2026-11-20 issue: workflow initialized (resume from #739)
@@ -98,3 +98,4 @@ Tests
 - 2026-11-20 review: 2 findings (nits), blocked=no
 - 2026-11-20 ship: tests passed (800), PR #752 opened
 - 2026-11-20 ship: review nits fixed on PR #752, 802 tests pass
+- 2026-11-20 ship: server sync held for user confirmation; doc sync done in step 8
