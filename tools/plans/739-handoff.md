@@ -39,6 +39,27 @@ src/server/sync_client.py, src/server/store/{blobs,conflicts,schema,devices}.py,
 ### Backend Pattern: envelope format 3 = uncompressed tar with leading .emusync-manifest.json; file hash = file sha256 (unchanged, GUI getFileHash stays valid), dir hash = sha256 of sorted [path,size,sha256] JSON.
 ### Recommendations: CardFormatMismatch cannot be removed; issue criterion corrected.
 
+## 6. Testing Plan
+### Test File: src/tests/test_blob_tree.py, src/tests/test_tree_migration.py, conftest.py helper, existing suites updated
+### Test Cases: 10 (file/dir round trip, filename-independent file hash, deterministic pack, filters, API push/pull, old-format 400, CardFormatMismatch, migration, migration idempotence)
+### Edge Cases: tampered blob, hostile tar members, empty folder, integrity damaged, migration skips, restore of pre-conversion generation
+### Integration Points: SyncClient vs live_server folder card A->B; rom-folder transfer both paths; GUI getFileHash relies on unchanged single-file hash
+### Outline:
+Backend
+- 1. New codec module src/server/blob_tree.py (pack, hash, verify, extract, legacy convert); tar helpers move in from sync_client
+- 2. Client pulls/writes for saves, cards, states, mods go through extract_tree; CardFormatMismatch kept
+- 3. Client pushes and local hashes use pack_tree/content_hash; _memcard_payload_bytes deleted
+- 4. rom-folder transfer receive path: enveloped via _write_memcard, bare GUI tar via the shared swap
+- 5. Server: plain staging, verify_blob hash on push, old formats rejected with 400, integrity uses verify_blob
+- 6. Schema v38: DB backup, convert every stored blob with originals kept in blobs/.pre-v38, remap dir hashes in rows, baselines, conflicts
+- 8. Docs: CLAUDE.md, GOTCHAS, ARCHITECTURE, design guide
+Tests
+- 7a. conftest tree()/raw_env helper; mechanical wrap of raw-byte posts and store pushes in existing suites
+- 7b. test_blob_tree.py: codec, API and edge cases
+- 7c. test_tree_migration.py: v38 conversion, remap, backup, idempotence
+- 7d. extend test_memcard_folder_sync and test_rom_transfer for cross-device and transfer paths
+### Summary: Replaces the raw/tar/tar.gz save blob formats with a single manifest tar format, converts all stored blobs once (with a DB backup and originals kept), and requires the new format from clients.
+
 ## 8. Implementation Steps
 ### Steps: see tools/plans/739-manifest-save-format.md
 - 1. codec module: src/server/blob_tree.py (new), sync_client.py. Reuses _safe_extract_tar, _extract_tar_to_tmp, _pack_envelope, sorted rglob walk. New module because four callers need it and sync_client.py is already 852 lines.
@@ -55,3 +76,4 @@ src/server/sync_client.py, src/server/store/{blobs,conflicts,schema,devices}.py,
 - 2026-11-20 design: scope=none (evaluation), plan_target=none, difficulty=1/10, breaking=no; evaluation posted, recommendation close
 - 2026-11-20 design: user decision proceed with D only; scope=backend, plan_target=bplan, difficulty=9/10, breaking=yes
 - 2026-11-20 bplan: 8 steps written, backend_pattern=shared manifest codec + schema-gated conversion + strict server-first rollout
+- 2026-11-20 tplan: test_file=src/tests/test_blob_tree.py + test_tree_migration.py, 10 test cases defined

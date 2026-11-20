@@ -66,3 +66,6 @@ When a store core is generalized (owner column), the existing per-feature suites
 
 ### Shell launcher (#741)
 `src/emusync` is tested by copying it into a `tmp_path` checkout layout and running it with `bash` under a PATH whose `python3` (and the venv's `bin/python`) are small sh stubs that exec `sys.executable` or fail on cue. Assert exit code, stdout marker from a stub `emusync.py`, and stderr text. Skip on Windows.
+
+### Blob format changes (#739)
+Tests build wire blobs through the real codec, never hand-written bytes: `conftest.tree(data)` gives a single-file blob and `raw_env` returns the same, so a format change touches one helper. Packing must be deterministic (mtime/uid 0) so pulled bytes compare equal. Conversion migrations follow the #737 backfill pattern plus: originals kept aside, DB backup present, hashes remapped in rows, baselines and conflicts together.
