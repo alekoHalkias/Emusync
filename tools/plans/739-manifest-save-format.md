@@ -3,7 +3,7 @@
 Issue: #739
 Branch: feature/739-evaluate-manifest-format
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -51,7 +51,7 @@ Every save, state, memory card, mod and rom-folder blob travels and is stored in
   - Files: src/tests/*
   - Reuses: test_integration.py `client` fixture and AUTH headers, test_legacy_blob_conversion.py DB setup
   - New: two test files - no existing file covers the codec or the v38 migration
-- [ ] 8. Docs: CLAUDE.md Saves/sync envelope bullet (format 3 only; hash rule; server-first rollout; `.pre-v38` and `emusync.db.pre-v38` can be deleted by hand once synced), GOTCHAS.md manifest section with the hash-stability reasoning, ARCHITECTURE.md envelope section; backend design guide hash line.
+- [x] 8. Docs: CLAUDE.md Saves/sync envelope bullet (format 3 only; hash rule; server-first rollout; `.pre-v38` and `emusync.db.pre-v38` can be deleted by hand once synced), GOTCHAS.md manifest section with the hash-stability reasoning, ARCHITECTURE.md envelope section; backend design guide hash line.
   - Files: CLAUDE.md, src/docs/GOTCHAS.md, src/docs/ARCHITECTURE.md, .claude/backend-design-guide.md
   - Reuses: existing sections (#478, #738, #734 entries)
   - New: none

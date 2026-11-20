@@ -4,7 +4,7 @@
 - Issue: #739
 - Branch: feature/739-evaluate-manifest-format
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-20
 - Fix attempts: 0
 
@@ -69,7 +69,7 @@ Tests
 - 5. [done] server upload/store/integrity: api/blobs.py, api/mods.py, store/blobs.py. Reuses verify_blob and existing staging cleanup; removes header-skip hashing.
 - 6. [done] schema v38 conversion (in store/tree_migration.py): store/schema.py. Reuses v36/v37 loop shape, .part + os.replace, conn.backup.
 - 7. [done] tests: new test_blob_tree.py, test_tree_migration.py; updates 10 existing files. New files because nothing covers the codec or v38.
-- 8. docs: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md, backend-design-guide.md.
+- 8. [done] docs: CLAUDE.md, GOTCHAS.md, ARCHITECTURE.md, backend-design-guide.md.
 
 ## 12. Log
 - 2026-11-20 issue: workflow initialized (resume from #739)
@@ -83,3 +83,4 @@ Tests
 - 2026-11-20 implement: step 5 done (server verifies uploads via verify_blob, 400 on old formats; store/integrity use manifest hash and content size)
 - 2026-11-20 implement: step 6 done (v38 conversion with DB backup, originals in blobs/.pre-v38, hash remap)
 - 2026-11-20 implement: step 7 done (conftest tree/tree_dir helpers, 25 suites updated, test_blob_tree.py + test_tree_migration.py; 800 passed)
+- 2026-11-20 implement: step 8 done (CLAUDE.md, GOTCHAS, ARCHITECTURE updated); all steps done
