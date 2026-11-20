@@ -79,7 +79,7 @@ Tests
 ## 10. Ship
 ### Status: shipped
 ### PR: #752
-### Server Sync: held (breaking v38 conversion; awaiting user go-ahead)
+### Server Sync: done (v38 converted 145 blobs, 0 failed)
 ### Doc Sync: done (step 8)
 
 ## 12. Log
@@ -99,3 +99,4 @@ Tests
 - 2026-11-20 ship: tests passed (800), PR #752 opened
 - 2026-11-20 ship: review nits fixed on PR #752, 802 tests pass
 - 2026-11-20 ship: server sync held for user confirmation; doc sync done in step 8
+- 2026-11-20 ship: server sync done; v38 converted 145 blobs, 0 failed; fixed empty-folder zero_byte false positive

@@ -270,3 +270,16 @@ async def test_api_enveloped_push_reports_ok(client):
     assert r.json()["hash"] == hashlib.sha256(b"api save").hexdigest()
     r = await client.get("/games/zelda/integrity", headers=AUTH)
     assert r.json()["save"]["status"] == "ok"
+
+
+def test_empty_folder_state_is_ok_not_zero_byte(tmp_path):
+    """An empty state folder pushed as a blob with no files is not damage (#739):
+    the server PC had five such states, converted from empty tar.gz archives."""
+    from tests.conftest import tree_dir
+    store = Store(str(tmp_path))
+    store.ensure_device("dev-1", "PC")
+    store.add_game("zelda", "Zelda")
+    store.push_state("zelda", "dev-1", tree_dir({}))
+    assert store.integrity_for_game("zelda")["state"]["status"] == "ok"
+    store.push_save("zelda", "dev-1", tree(b""))  # an empty single file still is
+    assert "zero_byte" in store.integrity_for_game("zelda")["save"]["reasons"]

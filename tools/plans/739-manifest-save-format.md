@@ -3,7 +3,7 @@
 Issue: #739
 Branch: feature/739-evaluate-manifest-format
 PR: #752
-Status: implementing
+Status: shipped
 Fix attempts: 0
 
 ## Goal
@@ -110,4 +110,4 @@ Cause: _check_rel rejects names pack_tree produces (backslash, `.emusync-manifes
 ## Fix attempt 2
 Failure: server PC after v38 flags 5 states `zero_byte`; their originals were empty tar.gz state folders (no members), previously hidden by the 50-byte file size.
 Cause: _classify_blob treats content size 0 as damage for folder blobs too.
-- [ ] F2.1 store/blobs._classify_blob: zero_byte only for a single-file blob with 0 bytes or a 0-byte file on disk, never an empty folder. Test in test_integrity.
+- [x] F2.1 store/blobs._classify_blob: zero_byte only for a single-file blob with 0 bytes or a 0-byte file on disk, never an empty folder. Test in test_integrity.
