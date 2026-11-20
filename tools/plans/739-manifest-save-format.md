@@ -3,7 +3,7 @@
 Issue: #739
 Branch: feature/739-evaluate-manifest-format
 PR: #752
-Status: shipped
+Status: implementing
 Fix attempts: 0
 
 ## Goal
@@ -106,3 +106,8 @@ Failure: review correctness nits (ship blocks on correctness findings)
 Cause: _check_rel rejects names pack_tree produces (backslash, `.emusync-manifest.json`); restore of an unconverted generation raises ValueError -> 500.
 - [x] F1.1 blob_tree._check_rel accepts any name the packer can produce; extract_tree's resolve check still confines writes. Test: such a folder round-trips.
 - [x] F1.2 api/blobs._restore maps a ValueError from the store to 409 "version is unreadable". Test: restore of a non-format-3 generation -> 409.
+
+## Fix attempt 2
+Failure: server PC after v38 flags 5 states `zero_byte`; their originals were empty tar.gz state folders (no members), previously hidden by the 50-byte file size.
+Cause: _classify_blob treats content size 0 as damage for folder blobs too.
+- [ ] F2.1 store/blobs._classify_blob: zero_byte only for a single-file blob with 0 bytes or a 0-byte file on disk, never an empty folder. Test in test_integrity.
