@@ -3,8 +3,8 @@
 ## Metadata
 - Issue: #753
 - Branch: feature/753-emulator-picker
-- PR: none
-- Status: implemented
+- PR: #754
+- Status: shipped
 - Created: 2026-11-20
 - Fix attempts: 0
 
@@ -102,8 +102,8 @@ Docs
 ### Blockers: TBD
 
 ## 10. Ship
-### Status: pending
-### PR: none
+### Status: shipped
+### PR: #754
 ### Server Sync: pending
 ### Doc Sync: pending
 
@@ -130,3 +130,4 @@ Docs
 - 2026-11-20 implement: step 10 done (add moveSaves tests run through node)
 - 2026-11-20 implement: step 11 done (document emulator picker and new IPC)
 - 2026-11-20 implement: all steps done
+- 2026-11-20 ship: tests passed (808 passed, 3 skipped), PR #754 opened
