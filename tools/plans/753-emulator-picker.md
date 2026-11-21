@@ -29,7 +29,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/electron/emulator/ipc.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: step 1, `loadConsoleDefinitionsIfNeeded`
   - New: channel - scan only resolves whole folders, settings need one ROM
-- [ ] 3. IPC `emulator:moveSaves({ fromSave, toSave, fromState, toState })` in new `emulator/moveSaves.ts`: save (file or folder) renamed, EXDEV falls back to `cpSync` into `<dest>.part`, verify, `renameSync`, then remove source; state folder moved file by file. Skips missing/same sources, never overwrites an existing destination. Returns `{ ok, moved: string[], skipped: string[], error? }`.
+- [x] 3. IPC `emulator:moveSaves({ fromSave, toSave, fromState, toState })` in new `emulator/moveSaves.ts`: save (file or folder) renamed, EXDEV falls back to `cpSync` into `<dest>.part`, verify, `renameSync`, then remove source; state folder moved file by file. Skips missing/same sources, never overwrites an existing destination. Returns `{ ok, moved: string[], skipped: string[], error? }`.
   - Files: src/gui/electron/emulator/moveSaves.ts, src/gui/electron/emulator/ipc.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: rename + EXDEV copy/verify pattern from `sync/rom.ts` `rom:moveToConsoleFolder`
   - New: file - `files:rename-game-files` renames by base name within one root and `rom:moveToConsoleFolder` is ROM/server-bound; files.ts is near the 300-line limit
