@@ -25,7 +25,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/electron/emulator/scan.ts
   - Reuses: the existing `.map(romPath => {...})` body verbatim (matchSaveFile, resolveSharedCard, state lookup, launch command)
   - New: none (function boundary only)
-- [ ] 2. IPC `emulator:resolveGame({ consoleKey, option, romPath, scanRoot })` returns `{ savePath, saveExists, statePath, stateExists, launchCommand }` from `resolveRomEntry` (scanRoot falls back to `dirname(romPath)`).
+- [x] 2. IPC `emulator:resolveGame({ consoleKey, option, romPath, scanRoot })` returns `{ savePath, saveExists, statePath, stateExists, launchCommand }` from `resolveRomEntry` (scanRoot falls back to `dirname(romPath)`).
   - Files: src/gui/electron/emulator/ipc.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: step 1, `loadConsoleDefinitionsIfNeeded`
   - New: channel - scan only resolves whole folders, settings need one ROM
