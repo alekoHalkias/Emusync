@@ -3,7 +3,7 @@
 Issue: #753
 Branch: feature/753-emulator-picker
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal

@@ -4,7 +4,7 @@
 - Issue: #753
 - Branch: feature/753-emulator-picker
 - PR: none
-- Status: implementing
+- Status: implemented
 - Created: 2026-11-20
 - Fix attempts: 0
 
@@ -129,3 +129,4 @@ Docs
 - 2026-11-20 implement: step 9 done (console-level emulator picker applies switch to all games on the console)
 - 2026-11-20 implement: step 10 done (add moveSaves tests run through node)
 - 2026-11-20 implement: step 11 done (document emulator picker and new IPC)
+- 2026-11-20 implement: all steps done
