@@ -101,12 +101,22 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
     const option = emu.options.find((o) => o.id === pending?.id);
     if (!pending || !option || !row) return;
     setSwitching(true);
-    const res = await applyConsoleSwitch(pending.items, move);
+    let res: Awaited<ReturnType<typeof applyConsoleSwitch>>;
+    try {
+      res = await applyConsoleSwitch(pending.items, move);
+    } catch {
+      setMsg("Switch failed part-way — is the server reachable? Reopen to check each game.");
+      return;
+    } finally {
+      setPending(null);
+      setSwitching(false);
+    }
+    // Console folders are the emulator roots without RetroArch's core folder,
+    // matching scan.ts:resolveRomEntry and netplay.ts (GameName/... is appended).
+    const root = (dir = ""): string => (option.coreFolderName && dir ? dir.replace(/[\\/][^\\/]*[\\/]?$/, "") : dir);
     const card = usesSharedSaveLayout(abbr) ? pending.items[0]?.plan.savePath : "";
-    const next = { ...row, device_emulator: option.label, device_save_folder: card || option.saveDir, device_state_folder: option.stateDir ?? "" };
+    const next = { ...row, device_emulator: option.label, device_save_folder: card || root(option.saveDir), device_state_folder: root(option.stateDir) };
     setRow(next);
-    setPending(null);
-    setSwitching(false);
     const parts = [`Switched ${res.updated} game${res.updated === 1 ? "" : "s"} to ${option.label}`];
     if (res.moved) parts.push(`${res.moved} save file${res.moved === 1 ? "" : "s"} moved`);
     if (res.skipped.length) parts.push(`${res.skipped.length} kept because a file already exists at the new location`);

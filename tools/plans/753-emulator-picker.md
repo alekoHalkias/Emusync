@@ -3,7 +3,7 @@
 Issue: #753
 Branch: feature/753-emulator-picker
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -64,9 +64,9 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
 - [x] 11. Docs: ARCHITECTURE.md (IPC `emulator:resolveGame`, `emulator:moveSaves`; components EmulatorPicker, EmulatorSwitchModal, emulatorSwitch.ts), CLAUDE.md GUI rule for #753.
 
 ## Review fixes
-- [ ] R1. ConsoleFoldersModal confirmSwitch: device_save_folder/device_state_folder use the emulator root without the RetroArch core folder (`coreFolderName ? dirname(dir) : dir`, same as `scan.ts:resolveRomEntry`); shared layouts keep the card path.
+- [x] R1. ConsoleFoldersModal confirmSwitch: device_save_folder/device_state_folder use the emulator root without the RetroArch core folder (`coreFolderName ? dirname(dir) : dir`, same as `scan.ts:resolveRomEntry`); shared layouts keep the card path.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
-- [ ] R2. ConsoleFoldersModal confirmSwitch: try/catch/finally so a failed apply clears the busy state, closes the modal and reports the error in the msg line.
+- [x] R2. ConsoleFoldersModal confirmSwitch: try/catch/finally so a failed apply clears the busy state, closes the modal and reports the error in the msg line.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
 
 ## Testing

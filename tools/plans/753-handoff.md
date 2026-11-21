@@ -4,7 +4,7 @@
 - Issue: #753
 - Branch: feature/753-emulator-picker
 - PR: #754
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-20
 - Fix attempts: 0
 
@@ -100,8 +100,8 @@ Docs
 ### Findings:
 - R1 correctness ConsoleFoldersModal.tsx:106 - console save/state folder stored with RetroArch core layer (saveDir/stateDir); netplay.ts and resolveRomEntry use the root without it. Fix: strip core folder (dirname when coreFolderName), card path for shared layouts unchanged.
 - R2 correctness ConsoleFoldersModal.tsx:104 - no try/finally around applyConsoleSwitch; failure leaves modal busy and picker disabled.
-### Blocked: yes
-### Blockers: R1, R2 (fix via implement on same branch/PR)
+### Blocked: no (R1, R2 fixed)
+### Blockers: none
 
 ## 10. Ship
 ### Status: shipped
@@ -134,3 +134,4 @@ Docs
 - 2026-11-20 implement: all steps done
 - 2026-11-20 ship: tests passed (808 passed, 3 skipped), PR #754 opened
 - 2026-11-20 review: 2 findings, blocked=yes
+- 2026-11-20 implement: R1, R2 done (console folders use emulator root; failed apply clears busy state)
