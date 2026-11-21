@@ -5,6 +5,9 @@ import { sanitizeFilename, usesSharedSaveLayout, usesSharedStateLayout } from ".
 import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
 import { MoveLocalRomPanel } from "./game-config/MoveLocalRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
+import { CUSTOM, EmulatorPicker } from "./game-config/EmulatorPicker";
+import EmulatorSwitchModal from "./game-config/EmulatorSwitchModal";
+import { useGameEmulator } from "./game-config/useGameEmulator";
 import { useGameSync } from "./game-config/useGameSync";
 import SteamRestartModal from "./SteamRestartModal";
 import SyncConflictModal from "./SyncConflictModal";
@@ -100,6 +103,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   const sharedStateLayout = usesSharedStateLayout(gameConsole);
 
   const sync = useGameSync(slug, savePath, statePath, gameConsole, sharedLayout);
+  // Emulator picker (#753): builds the launch command and save/state paths.
+  const emulator = useGameEmulator({
+    gameConsole, launchCommand,
+    romPath: romSource === "network" && localRomPath ? localRomPath : romPath,
+    scanRoot: netExtraRef.current.rom_folder_path, savePath, statePath, sharedLayout, sharedStateLayout,
+    apply: (plan) => { setLaunchCommand(plan.launchCommand); setSavePath(plan.savePath); setStatePath(plan.statePath); },
+  });
   const { conflictModal, handleConflictChoice } = sync;
 
   useEffect(() => {
@@ -245,6 +255,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     try {
       let finalSlug = slug;
 
+      // Saves queued by an emulator switch move before the new paths are stored (#753).
+      const move = emulator.takeMove();
+      if (move) {
+        const res = await window.emusync.emulator.moveSaves(move);
+        if (!res.ok) { emulator.restoreMove(move); throw new Error(`Moving saves failed: ${res.error ?? "unknown error"}`); }
+      }
+
       // Paths that may be rewritten by an on-disk rename below.
       let finalRom = romPath.trim();
       let finalSave = savePath.trim();
@@ -385,14 +402,21 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
 
         <div className="input-group">
-          <label htmlFor="gc-launch">Launch command</label>
-          <input id="gc-launch"
-            type="text"
-            value={launchCommand}
-            onChange={(e) => setLaunchCommand(e.target.value)}
-            placeholder="retroarch -L snes.so %ROM%"
-            className={errors.launchCommand ? "error" : ""}
-          />
+          <label htmlFor={emulator.consoleKey ? "gc-emulator" : "gc-launch"}>{emulator.consoleKey ? "Emulator" : "Launch command"}</label>
+          {emulator.consoleKey && (
+            <EmulatorPicker id="gc-emulator" emu={emulator.emu} value={emulator.value} onChange={emulator.pick} />
+          )}
+          {(!emulator.consoleKey || emulator.value === CUSTOM) && (
+            <input id="gc-launch"
+              type="text"
+              value={launchCommand}
+              onChange={(e) => setLaunchCommand(e.target.value)}
+              placeholder="retroarch -L snes.so %ROM%"
+              className={errors.launchCommand ? "error" : ""}
+              style={emulator.consoleKey ? { marginTop: 6 } : undefined}
+            />
+          )}
+          {emulator.error && <span role="alert" className="error-msg">{emulator.error}</span>}
           {errors.launchCommand && <span role="alert" className="error-msg">{errors.launchCommand}</span>}
         </div>
 
@@ -674,6 +698,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           onNo={() => setShowSteamRestart(false)}
         />
       )}
+
+      {emulator.modal && <EmulatorSwitchModal {...emulator.modal} />}
 
       {conflictModal && (
         <SyncConflictModal

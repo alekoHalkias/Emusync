@@ -49,7 +49,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/renderer/src/components/game-config/EmulatorSwitchModal.tsx
   - Reuses: `Modal`, guide modal pattern
   - New: component - SyncConflictModal is conflict-specific
-- [ ] 8. GameConfig: replace the "Launch command" input with "Emulator" (`EmulatorPicker`, consoleKey from `emulator.consoles()` by abbr). On load select `matchOption(launchCommand)`; Custom shows the existing text input unchanged. On pick: `planSwitch` with the ROM in use and `rom_folder_path`, open `EmulatorSwitchModal`; on confirm set launch/save/state fields and keep the move in a ref; `handleSave` runs `moveSaves` before `setGameDevice` and aborts with the error on failure. Validation keeps "Launch command is required" for Custom only; a picked option always yields a command.
+- [x] 8. GameConfig: replace the "Launch command" input with "Emulator" (`EmulatorPicker`, consoleKey from `emulator.consoles()` by abbr). On load select `matchOption(launchCommand)`; Custom shows the existing text input unchanged. On pick: `planSwitch` with the ROM in use and `rom_folder_path`, open `EmulatorSwitchModal`; on confirm set launch/save/state fields and keep the move in a ref; `handleSave` runs `moveSaves` before `setGameDevice` and aborts with the error on failure. Validation keeps "Launch command is required" for Custom only; a picked option always yields a command.
   - Files: src/gui/renderer/src/components/GameConfig.tsx
   - Reuses: steps 5-7, existing `handleSave`, `withRomToken`
   - New: none
@@ -98,3 +98,5 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (emulator:resolveGame, em
 ## Log
 - 2026-11-20 fplan: plan written
 - 2026-11-20 tplan: testing section added
+Step 6: no per-source dedupe in applyConsoleSwitch; once a shared card moves its source is gone, so later moves are no-ops.
+Step 8: per-game picker state lives in new game-config/useGameEmulator.ts to keep GameConfig (692 lines) from growing; GameConfig falls back to the plain launch input when the game has no known console.
