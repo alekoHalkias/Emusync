@@ -93,7 +93,7 @@ Docs
 - [done] 6: game-config/emulatorSwitch.ts - planSwitch, previewConsoleSwitch, applyConsoleSwitch; reuses listMyGameDevices/getGameDevice/setGameDevice and layout helpers; new to keep GameConfig from growing and share with console modal.
 - [done] 7: game-config/EmulatorSwitchModal.tsx - warning + new paths + move choice; reuses Modal; new because SyncConflictModal is conflict-specific.
 - [done] 8: GameConfig.tsx - Emulator field replaces launch input, queued move on Save; reuses steps 5-7.
-- 9: ConsoleFoldersModal.tsx - picker replaces label select, console-wide apply; reuses steps 5-7 and save().
+- [done] 9: ConsoleFoldersModal.tsx - picker replaces label select, console-wide apply; reuses steps 5-7 and save().
 - 10: tests (tplan). 11: docs (ARCHITECTURE.md, CLAUDE.md).
 
 ## 9. Review
@@ -126,3 +126,4 @@ Docs
 - 2026-11-20 implement: step 6 done (add emulatorSwitch planning and console-wide apply)
 - 2026-11-20 implement: step 7 done (add EmulatorSwitchModal)
 - 2026-11-20 implement: step 8 done (replace GameConfig launch field with emulator picker, move saves on Save)
+- 2026-11-20 implement: step 9 done (console-level emulator picker applies switch to all games on the console)

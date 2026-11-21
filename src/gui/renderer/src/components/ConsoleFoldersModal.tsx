@@ -5,6 +5,9 @@ import React, { useEffect, useState } from "react";
 import { getDeviceConsoles, updateDeviceConsole, type DeviceConsole } from "../api";
 import { useDevices } from "../DeviceContext";
 import { usesSharedSaveLayout } from "./console-import/helpers";
+import { EmulatorPicker, useEmulatorOptions } from "./game-config/EmulatorPicker";
+import EmulatorSwitchModal from "./game-config/EmulatorSwitchModal";
+import { applyConsoleSwitch, pathsChanged, previewConsoleSwitch, type ConsoleSwitchItem } from "./game-config/emulatorSwitch";
 import IgnoredGamesPanel from "./IgnoredGamesPanel";
 import Modal from "./Modal";
 
@@ -23,7 +26,9 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
   const [row, setRow] = useState<DeviceConsole | null | undefined>(undefined);
   const [origRom, setOrigRom] = useState("");
   const [legacy, setLegacy] = useState<string[]>([]);
-  const [emulators, setEmulators] = useState<string[]>([]);
+  const emu = useEmulatorOptions(consoleKey);
+  const [pending, setPending] = useState<{ id: string; items: ConsoleSwitchItem[]; customCount: number } | null>(null);
+  const [switching, setSwitching] = useState(false);
   const [abbr, setAbbr] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -42,8 +47,6 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
       setRow(primary);
       setOrigRom(primary?.device_game_folder ?? "");
       setLegacy(all.filter((c) => c !== primary && c.device_game_folder).map((c) => c.device_game_folder));
-      const det = await window.emusync.emulator.detect(consoleKey).catch(() => null);
-      setEmulators([...new Set((det?.options ?? []).map((o: { label: string }) => o.label))]);
     })();
   }, [currentDeviceId, consoleKey]);
 
@@ -59,19 +62,19 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
     if (dir !== row?.device_game_folder && !extras.includes(dir)) edit({ device_extra_folders: [...extras, dir] });
   };
 
-  async function save(): Promise<void> {
-    if (!currentDeviceId || !row?.id) return;
+  async function save(next: DeviceConsole | null | undefined = row, done = "Saved"): Promise<void> {
+    if (!currentDeviceId || !next?.id) return;
     setSaving(true);
     setMsg("");
     try {
-      const { id: _id, console_name: _name, ...folders } = row;
+      const { id: _id, console_name: _name, ...folders } = next;
       const body: Folders = { ...folders };
       // The copy destination defaults to the ROM folder; store that so Move/Network panels see it,
       // and keep it following the ROM folder while it still equals the folder it was defaulted from.
       if (body.device_network_folder && (!body.device_local_folder || body.device_local_folder === origRom)) body.device_local_folder = body.device_game_folder;
-      await updateDeviceConsole(currentDeviceId, row.id, body);
+      await updateDeviceConsole(currentDeviceId, next.id, body);
       setOrigRom(body.device_game_folder);
-      setMsg("Saved");
+      setMsg(done);
     } catch {
       setMsg("Couldn't save — is the server reachable?");
     } finally {
@@ -79,7 +82,38 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
     }
   }
 
-  const emuChoices = row?.device_emulator && !emulators.includes(row.device_emulator) ? [row.device_emulator, ...emulators] : emulators;
+  // Console-wide emulator switch (#753): rebuild every game on this console here
+  // (Custom-command games are left alone), then store the console's emulator + folders.
+  const emuValue = emu.options.find((o) => o.label === row?.device_emulator)?.id ?? "";
+  async function pickEmulator(id: string): Promise<void> {
+    const option = emu.options.find((o) => o.id === id);
+    if (!option) return;
+    setSwitching(true);
+    try {
+      setPending({ id, ...(await previewConsoleSwitch(abbr, consoleKey, option, emu.options)) });
+    } catch {
+      setMsg("Couldn't load this console's games — is the server reachable?");
+    } finally {
+      setSwitching(false);
+    }
+  }
+  async function confirmSwitch(move: boolean): Promise<void> {
+    const option = emu.options.find((o) => o.id === pending?.id);
+    if (!pending || !option || !row) return;
+    setSwitching(true);
+    const res = await applyConsoleSwitch(pending.items, move);
+    const card = usesSharedSaveLayout(abbr) ? pending.items[0]?.plan.savePath : "";
+    const next = { ...row, device_emulator: option.label, device_save_folder: card || option.saveDir, device_state_folder: option.stateDir ?? "" };
+    setRow(next);
+    setPending(null);
+    setSwitching(false);
+    const parts = [`Switched ${res.updated} game${res.updated === 1 ? "" : "s"} to ${option.label}`];
+    if (res.moved) parts.push(`${res.moved} save file${res.moved === 1 ? "" : "s"} moved`);
+    if (res.skipped.length) parts.push(`${res.skipped.length} kept because a file already exists at the new location`);
+    if (res.errors.length) parts.push(`failed: ${res.errors.join("; ")}`);
+    await save(next, parts.join(", ") + ".");
+  }
+  const sample = pending?.items.find((i) => pathsChanged(i.plan));
 
   return (
     <Modal size="md" onClose={onClose}>
@@ -107,10 +141,10 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
             ))}
             <div className="input-group">
               <label htmlFor="cf-emulator">Emulator</label>
-              <select id="cf-emulator" value={row.device_emulator} onChange={(e) => edit({ device_emulator: e.target.value })}>
-                <option value="">Not set</option>
-                {emuChoices.map((l) => <option key={l} value={l}>{l}</option>)}
-              </select>
+              <EmulatorPicker id="cf-emulator" emu={emu} value={emuValue} onChange={pickEmulator} allowCustom={false} disabled={switching} />
+              {row.device_emulator && !emuValue && emu.loaded && (
+                <p style={{ color: "var(--text-muted)", fontSize: 12 }}>Saved: {row.device_emulator} (not detected on this device)</p>
+              )}
             </div>
             <div className="input-group">
               <label htmlFor="cf-device_network_folder">Network (NAS) folder</label>
@@ -148,11 +182,23 @@ export default function ConsoleFoldersModal({ consoleKey, onClose }: Props): Rea
               </p>
             </div>
             <div className="modal-actions">
-              <button className="btn btn-primary" disabled={saving} onClick={save}>
+              <button className="btn btn-primary" disabled={saving} onClick={() => save()}>
                 {saving ? <><span className="spinner" /> Saving…</> : "Save"}
               </button>
             </div>
           </div>
+        )}
+        {pending && (
+          <EmulatorSwitchModal
+            fromLabel={row?.device_emulator ?? ""}
+            toLabel={emu.options.find((o) => o.id === pending.id)?.label ?? ""}
+            savePath={sample && sample.plan.savePath !== sample.plan.fromSave ? sample.plan.savePath : undefined}
+            statePath={sample && sample.plan.statePath !== sample.plan.fromState ? sample.plan.statePath : undefined}
+            note={`Applies to ${pending.items.length} game${pending.items.length === 1 ? "" : "s"} on this device${pending.customCount ? ` (${pending.customCount} with a custom command left as is)` : ""}.${sample && pending.items.length > 1 ? ` Paths shown for ${sample.name}.` : ""}`}
+            busy={switching}
+            onCancel={() => setPending(null)}
+            onConfirm={confirmSwitch}
+          />
         )}
         <IgnoredGamesPanel consoleKey={consoleKey} />
         {msg && <p style={{ color: "var(--text-muted)", fontSize: 12 }}>{msg}</p>}

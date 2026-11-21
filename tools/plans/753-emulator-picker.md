@@ -53,7 +53,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/renderer/src/components/GameConfig.tsx
   - Reuses: steps 5-7, existing `handleSave`, `withRomToken`
   - New: none
-- [ ] 9. ConsoleFoldersModal: replace the label select with `EmulatorPicker` (`allowCustom={false}`, value matched by `device_emulator` label). On pick: `previewConsoleSwitch`, `EmulatorSwitchModal` (shows the console's new save/state root, or the card path for shared layouts, plus game count); on confirm `applyConsoleSwitch`, set `device_emulator`, `device_save_folder` (card path for shared layouts, else `option.saveDir`), `device_state_folder` (`option.stateDir ?? ""`) and call the existing `save()`. Result in the existing `msg` line ("Switched N games, M saves moved, K skipped").
+- [x] 9. ConsoleFoldersModal: replace the label select with `EmulatorPicker` (`allowCustom={false}`, value matched by `device_emulator` label). On pick: `previewConsoleSwitch`, `EmulatorSwitchModal` (shows the console's new save/state root, or the card path for shared layouts, plus game count); on confirm `applyConsoleSwitch`, set `device_emulator`, `device_save_folder` (card path for shared layouts, else `option.saveDir`), `device_state_folder` (`option.stateDir ?? ""`) and call the existing `save()`. Result in the existing `msg` line ("Switched N games, M saves moved, K skipped").
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: steps 5-7, existing `save()` / `updateDeviceConsole`
   - New: none
