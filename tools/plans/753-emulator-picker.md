@@ -57,7 +57,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: steps 5-7, existing `save()` / `updateDeviceConsole`
   - New: none
-- [ ] 10. Tests: new src/tests/test_move_saves.py drives `emulator/moveSaves.ts` through Node (type stripping) on real `tmp_path` files; existing test_emulator_suggestions.py must pass unchanged; both `tsc` projects + `make lint`; manual script below. No mocks.
+- [x] 10. Tests: new src/tests/test_move_saves.py drives `emulator/moveSaves.ts` through Node (type stripping) on real `tmp_path` files; existing test_emulator_suggestions.py must pass unchanged; both `tsc` projects + `make lint`; manual script below. No mocks.
   - Files: src/tests/test_move_saves.py, src/gui/electron/emulator/moveSaves.ts (keep it importing only `node:fs`/`node:path`, export `moveSaves`)
   - Reuses: `tmp_path`, #741 subprocess pattern (run a real program, assert result), test_emulator_suggestions.py as the EmulatorStep regression
   - New: test file - no harness exercises Electron main code; moveSaves is the only data-loss path in this change
