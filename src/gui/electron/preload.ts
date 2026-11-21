@@ -75,6 +75,12 @@ contextBridge.exposeInMainWorld("emusync", {
       ipcRenderer.invoke("emulator:installCore", consoleKey, coresDir, lib),
     installFlatpak: (consoleKey: string, flatpakId: string): Promise<{ ok: boolean; error?: string }> =>
       ipcRenderer.invoke("emulator:installFlatpak", consoleKey, flatpakId),
+    resolveGame: (params: {
+      consoleKey: string; option: import("./emulator/types").DetectedEmulatorOption; romPath: string; scanRoot?: string;
+    }): Promise<{ savePath: string; saveExists: boolean; statePath: string; stateExists: boolean; launchCommand: string }> =>
+      ipcRenderer.invoke("emulator:resolveGame", params),
+    moveSaves: (params: import("./emulator/moveSaves").MoveSavesParams): Promise<import("./emulator/moveSaves").MoveSavesResult> =>
+      ipcRenderer.invoke("emulator:moveSaves", params),
     scan: (
       consoleKey: string,
       emulatorOption: import("./emulator/types").DetectedEmulatorOption,

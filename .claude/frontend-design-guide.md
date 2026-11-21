@@ -67,3 +67,7 @@
 
 ## Banners
 Actionable background events (updates, cross-device upload requests) render as a strip under the topbar: `var(--surface2)` background, 12px text, one row per item, a `btn` primary action plus `btn btn-ghost` secondary, inline muted/danger text for errors. Mount beside `<UpdateBanner />` in App.tsx.
+
+## Emulator picker (#753)
+- Plain `<select>` of detected emulators (label), then "Custom command" (reveals the text input), then "More..." last (opens an inline install panel under the select, never navigates). Install panel = wizard `InstallOptions` rows; re-detect after install.
+- A choice that changes files (switching emulator) confirms in a `Modal`: warning first, then the new paths in a muted monospace line each, actions Cancel / Keep files / Move saves.

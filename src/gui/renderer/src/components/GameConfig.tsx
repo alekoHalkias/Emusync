@@ -5,6 +5,9 @@ import { sanitizeFilename, usesSharedSaveLayout, usesSharedStateLayout } from ".
 import { NetworkRomPanel } from "./game-config/NetworkRomPanel";
 import { MoveLocalRomPanel } from "./game-config/MoveLocalRomPanel";
 import { SyncLine } from "./game-config/SyncLine";
+import { CUSTOM, EmulatorPicker } from "./game-config/EmulatorPicker";
+import EmulatorSwitchModal from "./game-config/EmulatorSwitchModal";
+import { useGameEmulator } from "./game-config/useGameEmulator";
 import { useGameSync } from "./game-config/useGameSync";
 import SteamRestartModal from "./SteamRestartModal";
 import SyncConflictModal from "./SyncConflictModal";
@@ -94,18 +97,29 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
   // states are shared across all games, so they must not be renamed per-game and
   // have no meaningful per-game manual push/pull (#294/#295).
   const [gameConsole, setGameConsole] = useState("");
+  // True once getGame (or the offline cache) has answered, so a blank console is real (#753).
+  const [consoleReady, setConsoleReady] = useState(isNew);
   const sharedLayout = usesSharedSaveLayout(gameConsole);
   // PS2 only: states are shared too, so their per-game controls hide as well;
   // dc/gamecube/psp keep normal per-game state rename/push/pull (#402).
   const sharedStateLayout = usesSharedStateLayout(gameConsole);
 
   const sync = useGameSync(slug, savePath, statePath, gameConsole, sharedLayout);
+  // Emulator picker (#753): builds the launch command and save/state paths.
+  const emulator = useGameEmulator({
+    gameConsole, ready: consoleReady, launchCommand,
+    romPath: romSource === "network" && localRomPath ? localRomPath : romPath,
+    scanRoot: netExtraRef.current.rom_folder_path, savePath, statePath, sharedLayout, sharedStateLayout,
+    apply: (plan) => { setLaunchCommand(plan.launchCommand); setSavePath(plan.savePath); setStatePath(plan.statePath); },
+  });
+  // Raw launch input only once we know the game has no console; picker (loading) until then.
+  const showPicker = emulator.resolving || !!emulator.consoleKey;
   const { conflictModal, handleConflictChoice } = sync;
 
   useEffect(() => {
     if (!slug) return;
     window.emusync.steam.isAdded(slug).then(setSteamAdded).catch(() => {});
-    getGame(slug).then(g => setGameConsole(g.console ?? "")).catch(() => {});
+    getGame(slug).then(g => setGameConsole(g.console ?? "")).catch(() => {}).finally(() => setConsoleReady(true));
     getGameDevice(slug)
       .then((cfg) => {
         setRomPath(cfg.rom_path);
@@ -244,6 +258,13 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
     setSaving(true);
     try {
       let finalSlug = slug;
+
+      // Saves queued by an emulator switch move before the new paths are stored (#753).
+      const move = emulator.takeMove();
+      if (move) {
+        const res = await window.emusync.emulator.moveSaves(move);
+        if (!res.ok) { emulator.restoreMove(move); throw new Error(`Moving saves failed: ${res.error ?? "unknown error"}`); }
+      }
 
       // Paths that may be rewritten by an on-disk rename below.
       let finalRom = romPath.trim();
@@ -385,14 +406,21 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
         </div>
 
         <div className="input-group">
-          <label htmlFor="gc-launch">Launch command</label>
-          <input id="gc-launch"
-            type="text"
-            value={launchCommand}
-            onChange={(e) => setLaunchCommand(e.target.value)}
-            placeholder="retroarch -L snes.so %ROM%"
-            className={errors.launchCommand ? "error" : ""}
-          />
+          <label htmlFor={showPicker ? "gc-emulator" : "gc-launch"}>{showPicker ? "Emulator" : "Launch command"}</label>
+          {showPicker && (
+            <EmulatorPicker id="gc-emulator" emu={emulator.emu} value={emulator.value} onChange={emulator.pick} disabled={emulator.resolving} />
+          )}
+          {(!showPicker || emulator.value === CUSTOM) && (
+            <input id="gc-launch"
+              type="text"
+              value={launchCommand}
+              onChange={(e) => setLaunchCommand(e.target.value)}
+              placeholder="retroarch -L snes.so %ROM%"
+              className={errors.launchCommand ? "error" : ""}
+              style={showPicker ? { marginTop: 6 } : undefined}
+            />
+          )}
+          {emulator.error && <span role="alert" className="error-msg">{emulator.error}</span>}
           {errors.launchCommand && <span role="alert" className="error-msg">{errors.launchCommand}</span>}
         </div>
 
@@ -674,6 +702,8 @@ export default function GameConfig({ slug, name: initialName, onBack, onSaved, o
           onNo={() => setShowSteamRestart(false)}
         />
       )}
+
+      {emulator.modal && <EmulatorSwitchModal {...emulator.modal} />}
 
       {conflictModal && (
         <SyncConflictModal

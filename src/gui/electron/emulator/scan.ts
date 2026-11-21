@@ -220,6 +220,102 @@ function matchSaveFile(saveDir: string, baseName: string, exts: string[]): { pat
   return { path: join(saveDir, `${baseName}.${exts[0]}`), exists: false };
 }
 
+/** Save/state paths and launch command for one ROM under one detected emulator.
+ *  `dir` is the scan root the ROM was found under (content-subfolder detection). */
+export function resolveRomEntry(consoleKey: string, emulatorOption: DetectedEmulatorOption, romPath: string, dir: string): RomEntry {
+  const consoleDef = rt.cachedConsoleDefs?.[consoleKey];
+  const firstSys = consoleDef ? rt.cachedSystemDefs?.[consoleDef.systemKeys[0]] : undefined;
+  const defaultSaveExts = firstSys?.saveExts ?? DEFAULT_SAVE_EXTS;
+  const romExt = extname(romPath).slice(1).toLowerCase();
+  const base   = basename(romPath, extname(romPath));
+  const system = rt.cachedSystemDefs?.[romExt];
+  const saveExts = system?.save_exts ?? defaultSaveExts;
+
+  // When a ROM lives in a per-game subfolder (e.g. roms/GBA/GameName/game.gba)
+  // RetroArch's "Sort saves/states by content directory" option mirrors that
+  // subfolder name into saves/ and states/ WITHOUT the core name subfolder:
+  //   saves/GameName/game.srm  or  states/GameName/game.state
+  // We must check those paths in addition to the core-subfolder patterns.
+  const romParentDir    = dirname(romPath);
+  const contentSubfolder = romParentDir !== dir ? basename(romParentDir) : null;
+  const saveRoot  = emulatorOption.coreFolderName ? dirname(emulatorOption.saveDir)  : emulatorOption.saveDir;
+
+  // ── Save file lookup (single file) ────────────────────────────────────
+  // Priority: content-dir path first, then legacy core-subfolder / flat root.
+  // Target path: savesRoot/GameName/GameName.ext  (no core-name layer)
+  const gameFolderName = contentSubfolder ?? base;
+  const isSharedMemcard = !!rt.cachedConsoleDefs?.[consoleKey]?.sharedMemcard;
+  let m: { path: string; exists: boolean };
+  if (isSharedMemcard) {
+    // Shared-save console: every game's savePath is the same card (#295/#402).
+    const cardPath = resolveSharedCard(consoleKey, emulatorOption.saveDir, saveRoot, emulatorOption.systemDir);
+    m = { path: cardPath, exists: existsSync(cardPath) };
+  } else if (consoleKey === "ps3") {
+    // RPCS3 save folder is <TITLE_ID>-named; learned after first play (cli/run_ps3.py, #422).
+    m = { path: "", exists: false };
+  } else if (consoleKey === "switch") {
+    // Eden's real save folder is a NAND path keyed by profile-ID +
+    // title-ID, nothing like the ROM's own name or location — a
+    // filename-based guess here is actively wrong, not just imprecise.
+    // Left blank and learned after first play (cli/run_switch.py, #441).
+    m = { path: "", exists: false };
+  } else {
+    m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
+    if (!m.exists) {
+      // saves/mGBA/GameName/base.ext  (core + content-dir)
+      const mCC = matchSaveFile(join(emulatorOption.saveDir, gameFolderName), base, saveExts);
+      if (mCC.exists) m = mCC;
+    }
+    if (!m.exists) {
+      // saves/mGBA/base.ext  (core only, legacy flat)
+      const mFlat = matchSaveFile(emulatorOption.saveDir, base, saveExts);
+      if (mFlat.exists) m = mFlat;
+    }
+    if (!m.exists && emulatorOption.coreFolderName) {
+      // saves/base.ext  (legacy flat root)
+      const mRoot = matchSaveFile(saveRoot, base, saveExts);
+      if (mRoot.exists) m = mRoot;
+    }
+    // Always register the canonical target path (savesRoot/GameName/base.ext)
+    // so the path is correct even before RetroArch creates the file.
+    if (!m.exists) {
+      m = { path: join(saveRoot, gameFolderName, `${base}.${saveExts[0]}`), exists: false };
+    }
+  }
+
+  // ── State folder lookup ────────────────────────────────────────────────
+  // state_path stores the FOLDER (statesRoot/GameName/) because multiple
+  // state slots coexist there. We check whether it already has any files.
+  let sm: { path: string; exists: boolean } | undefined;
+  if (emulatorOption.stateDir) {
+    const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
+    if (rt.cachedConsoleDefs?.[consoleKey]?.sharedState) {
+      // Shared sstates folder (PS2): every game's states live flat in one
+      // folder, named per serial — point at the folder itself; `emusync run`
+      // syncs only this game's serial files (issue #294). dc/gamecube/psp
+      // cores write normal per-content states, so they take the else branch.
+      sm = { path: stateRoot, exists: !!findLatestFileInDir(stateRoot) };
+    } else {
+      const stateFolder = join(stateRoot, gameFolderName);
+      sm = { path: stateFolder, exists: !!findLatestFileInDir(stateFolder) };
+    }
+  }
+
+  const standaloneArgs = (emulatorOption.launchArgs ?? []).join(" ");
+  const launchCommand = emulatorOption.corePath
+    ? `"${emulatorOption.execPath}" -L "${emulatorOption.corePath}" "%ROM%"`
+    : `"${emulatorOption.execPath}"${standaloneArgs ? ` ${standaloneArgs}` : ""} "%ROM%"`;
+  return {
+    name: consoleKey === "switch" ? switchDisplayName(base) : base, romPath,
+    savePath: m.path, saveExists: m.exists,
+    statePath: sm?.path, stateExists: sm?.exists,
+    launchCommand,
+    consoleName: system?.name ?? consoleDef?.label ?? consoleKey,
+    coreName: emulatorOption.coreFolderName,
+    switchSiblingCount: consoleKey === "switch" ? countSwitchSiblingFiles(romPath) : undefined,
+  };
+}
+
 export function runEmulatorScan(params: {
   consoleKey: string;
   emulatorOption: DetectedEmulatorOption;
@@ -242,9 +338,6 @@ export function runEmulatorScan(params: {
   const romDirs = [...new Set([...emulatorOption.romDirs, ...(extraPaths ?? [])].filter(Boolean))];
   console.error(`[scan] romExtSet=${JSON.stringify([...romExtSet])} romDirs=${JSON.stringify(romDirs)}`);
 
-  const firstSys = rt.cachedSystemDefs?.[consoleDef.systemKeys[0]];
-  const defaultSaveExts = firstSys?.saveExts ?? DEFAULT_SAVE_EXTS;
-
   const roms: RomEntry[] = romDirs.flatMap(dir => {
     const allInDir = scanRomDir(dir, 0, consoleKey);
     console.error(`[scan] dir='${dir}' → scanRomDir found ${allInDir.length} files total`);
@@ -253,97 +346,7 @@ export function runEmulatorScan(params: {
       (consoleKey !== "switch" || isSwitchBaseGameFile(basename(p)))
     );
     console.error(`[scan] dir='${dir}' → after ext filter (${[...romExtSet].join(",")}) kept ${filtered.length}`);
-    return filtered
-      .map(romPath => {
-        const romExt = extname(romPath).slice(1).toLowerCase();
-        const base   = basename(romPath, extname(romPath));
-        const system = rt.cachedSystemDefs?.[romExt];
-        const saveExts = system?.save_exts ?? defaultSaveExts;
-
-        // When a ROM lives in a per-game subfolder (e.g. roms/GBA/GameName/game.gba)
-        // RetroArch's "Sort saves/states by content directory" option mirrors that
-        // subfolder name into saves/ and states/ WITHOUT the core name subfolder:
-        //   saves/GameName/game.srm  or  states/GameName/game.state
-        // We must check those paths in addition to the core-subfolder patterns.
-        const romParentDir    = dirname(romPath);
-        const contentSubfolder = romParentDir !== dir ? basename(romParentDir) : null;
-        const saveRoot  = emulatorOption.coreFolderName ? dirname(emulatorOption.saveDir)  : emulatorOption.saveDir;
-
-        // ── Save file lookup (single file) ────────────────────────────────────
-        // Priority: content-dir path first, then legacy core-subfolder / flat root.
-        // Target path: savesRoot/GameName/GameName.ext  (no core-name layer)
-        const gameFolderName = contentSubfolder ?? base;
-        const isSharedMemcard = !!rt.cachedConsoleDefs?.[consoleKey]?.sharedMemcard;
-        let m: { path: string; exists: boolean };
-        if (isSharedMemcard) {
-          // Shared-save console: every game's savePath is the same card (#295/#402).
-          const cardPath = resolveSharedCard(consoleKey, emulatorOption.saveDir, saveRoot, emulatorOption.systemDir);
-          m = { path: cardPath, exists: existsSync(cardPath) };
-        } else if (consoleKey === "ps3") {
-          // RPCS3 save folder is <TITLE_ID>-named; learned after first play (cli/run_ps3.py, #422).
-          m = { path: "", exists: false };
-        } else if (consoleKey === "switch") {
-          // Eden's real save folder is a NAND path keyed by profile-ID +
-          // title-ID, nothing like the ROM's own name or location — a
-          // filename-based guess here is actively wrong, not just imprecise.
-          // Left blank and learned after first play (cli/run_switch.py, #441).
-          m = { path: "", exists: false };
-        } else {
-          m = matchSaveFile(join(saveRoot, gameFolderName), base, saveExts);
-          if (!m.exists) {
-            // saves/mGBA/GameName/base.ext  (core + content-dir)
-            const mCC = matchSaveFile(join(emulatorOption.saveDir, gameFolderName), base, saveExts);
-            if (mCC.exists) m = mCC;
-          }
-          if (!m.exists) {
-            // saves/mGBA/base.ext  (core only, legacy flat)
-            const mFlat = matchSaveFile(emulatorOption.saveDir, base, saveExts);
-            if (mFlat.exists) m = mFlat;
-          }
-          if (!m.exists && emulatorOption.coreFolderName) {
-            // saves/base.ext  (legacy flat root)
-            const mRoot = matchSaveFile(saveRoot, base, saveExts);
-            if (mRoot.exists) m = mRoot;
-          }
-          // Always register the canonical target path (savesRoot/GameName/base.ext)
-          // so the path is correct even before RetroArch creates the file.
-          if (!m.exists) {
-            m = { path: join(saveRoot, gameFolderName, `${base}.${saveExts[0]}`), exists: false };
-          }
-        }
-
-        // ── State folder lookup ────────────────────────────────────────────────
-        // state_path stores the FOLDER (statesRoot/GameName/) because multiple
-        // state slots coexist there. We check whether it already has any files.
-        let sm: { path: string; exists: boolean } | undefined;
-        if (emulatorOption.stateDir) {
-          const stateRoot = emulatorOption.coreFolderName ? dirname(emulatorOption.stateDir) : emulatorOption.stateDir;
-          if (rt.cachedConsoleDefs?.[consoleKey]?.sharedState) {
-            // Shared sstates folder (PS2): every game's states live flat in one
-            // folder, named per serial — point at the folder itself; `emusync run`
-            // syncs only this game's serial files (issue #294). dc/gamecube/psp
-            // cores write normal per-content states, so they take the else branch.
-            sm = { path: stateRoot, exists: !!findLatestFileInDir(stateRoot) };
-          } else {
-            const stateFolder = join(stateRoot, gameFolderName);
-            sm = { path: stateFolder, exists: !!findLatestFileInDir(stateFolder) };
-          }
-        }
-
-        const standaloneArgs = (emulatorOption.launchArgs ?? []).join(" ");
-        const launchCommand = emulatorOption.corePath
-          ? `"${emulatorOption.execPath}" -L "${emulatorOption.corePath}" "%ROM%"`
-          : `"${emulatorOption.execPath}"${standaloneArgs ? ` ${standaloneArgs}` : ""} "%ROM%"`;
-        return {
-          name: consoleKey === "switch" ? switchDisplayName(base) : base, romPath,
-          savePath: m.path, saveExists: m.exists,
-          statePath: sm?.path, stateExists: sm?.exists,
-          launchCommand,
-          consoleName: system?.name ?? consoleDef.label,
-          coreName: emulatorOption.coreFolderName,
-          switchSiblingCount: consoleKey === "switch" ? countSwitchSiblingFiles(romPath) : undefined,
-        };
-      });
+    return filtered.map(romPath => resolveRomEntry(consoleKey, emulatorOption, romPath, dir));
   });
 
   console.error(`[scan] total ROMs returning to renderer: ${roms.length}`);

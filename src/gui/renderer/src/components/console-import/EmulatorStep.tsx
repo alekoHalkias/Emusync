@@ -49,15 +49,23 @@ function InstallList({ title, items }: { title: string; items: InstallItem[] }) 
   );
 }
 
-function InstallOptions({ vm }: { vm: ConsoleImportVM }) {
-  const { retroarch, cores, standalones = [] } = vm.install;
+type InstallTargets = ConsoleImportVM["install"];
+type InstallProps = {
+  install: InstallTargets;
+  installCore: (coresDir: string, lib: string) => Promise<string | null>;
+  installFlatpak: (flatpakId: string) => Promise<string | null>;
+};
+
+// Shared with the game/console emulator picker's "More..." panel (#753).
+export function InstallOptions({ install, installCore, installFlatpak }: InstallProps) {
+  const { retroarch, cores, standalones = [] } = install;
   const coreItems: InstallItem[] = retroarch.flatMap(ra => cores.map(core => ({
     key: `${ra.coresDir}/${core.lib}`,
     label: `${core.folder}${retroarch.length > 1 ? ` (${ra.label})` : ""}`,
-    run: () => vm.installCore(ra.coresDir, core.lib),
+    run: () => installCore(ra.coresDir, core.lib),
   })));
   const flatpakItems: InstallItem[] = standalones.map(s => ({
-    key: s.flatpakId, label: s.label, run: () => vm.installFlatpak(s.flatpakId),
+    key: s.flatpakId, label: s.label, run: () => installFlatpak(s.flatpakId),
   }));
   return (
     <>
@@ -67,12 +75,27 @@ function InstallOptions({ vm }: { vm: ConsoleImportVM }) {
   );
 }
 
+// Download links for a console's suggested emulators (#744).
+export function SuggestionLinks({ suggestions }: { suggestions: unknown }) {
+  // Guard against a malformed value from the API (suggestions is occasionally a
+  // string, not a list) so callers never crash on .map / .length.
+  const list = Array.isArray(suggestions) ? (suggestions as string[]) : [];
+  if (!list.length) return null;
+  return (
+    <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "left", display: "inline-block", marginTop: 4 }}>
+      {list.map(s => {
+        const url = SUGGESTION_LINKS[s.split(" ")[0]];
+        return <div key={s}>• {url ? <a href={url} target="_blank" rel="noreferrer">{s}</a> : s}</div>;
+      })}
+    </div>
+  );
+}
+
 export function EmulatorStep({ vm }: { vm: ConsoleImportVM }) {
   const { emulators, consoleLabel, emuSel } = vm;
   // Guard against a malformed value from the API (suggestions is occasionally a
   // string, not a list) so the wizard never crashes on .map / .length.
   const suggestions = Array.isArray(vm.suggestions) ? vm.suggestions : [];
-  const linkFor = (s: string): string | undefined => SUGGESTION_LINKS[s.split(" ")[0]];
   return (
     <>
       {emulators.length === 0 ? (
@@ -84,16 +107,8 @@ export function EmulatorStep({ vm }: { vm: ConsoleImportVM }) {
           <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: suggestions.length ? 12 : 0 }}>
             Please install a compatible emulator for <strong>{consoleLabel}</strong>.
           </p>
-          {suggestions.length > 0 && (
-            <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "left",
-              display: "inline-block", marginTop: 4 }}>
-              {suggestions.map(s => {
-                const url = linkFor(s);
-                return <div key={s}>• {url ? <a href={url} target="_blank" rel="noreferrer">{s}</a> : s}</div>;
-              })}
-            </div>
-          )}
-          <InstallOptions vm={vm} />
+          <SuggestionLinks suggestions={suggestions} />
+          <InstallOptions install={vm.install} installCore={vm.installCore} installFlatpak={vm.installFlatpak} />
         </div>
       ) : (
         <>
