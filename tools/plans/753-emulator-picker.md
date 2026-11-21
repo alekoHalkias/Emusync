@@ -61,7 +61,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/tests/test_move_saves.py, src/gui/electron/emulator/moveSaves.ts (keep it importing only `node:fs`/`node:path`, export `moveSaves`)
   - Reuses: `tmp_path`, #741 subprocess pattern (run a real program, assert result), test_emulator_suggestions.py as the EmulatorStep regression
   - New: test file - no harness exercises Electron main code; moveSaves is the only data-loss path in this change
-- [ ] 11. Docs: ARCHITECTURE.md (IPC `emulator:resolveGame`, `emulator:moveSaves`; components EmulatorPicker, EmulatorSwitchModal, emulatorSwitch.ts), CLAUDE.md GUI rule for #753.
+- [x] 11. Docs: ARCHITECTURE.md (IPC `emulator:resolveGame`, `emulator:moveSaves`; components EmulatorPicker, EmulatorSwitchModal, emulatorSwitch.ts), CLAUDE.md GUI rule for #753.
 
 ## Testing
 - **Test File**: src/tests/test_move_saves.py (skipped when `node` is missing or older than 22.18, which lacks default type stripping)
