@@ -90,7 +90,7 @@ Docs
 - [done] 3: emulator/moveSaves.ts (+ipc, preload, d.ts) - emulator:moveSaves; reuses rom:moveToConsoleFolder rename/EXDEV pattern; new file because rename-game-files is base-name bound and files.ts near 300 lines.
 - [done] 4: console-import/EmulatorStep.tsx - export InstallOptions (props not vm) + SuggestionLinks; SUGGESTION_LINKS stays for test_emulator_suggestions.py.
 - [done] 5: game-config/EmulatorPicker.tsx - useEmulatorOptions, matchOption, EmulatorPicker; reuses detect/install IPC and step 4; new because no dropdown over detected options exists.
-- 6: game-config/emulatorSwitch.ts - planSwitch, previewConsoleSwitch, applyConsoleSwitch; reuses listMyGameDevices/getGameDevice/setGameDevice and layout helpers; new to keep GameConfig from growing and share with console modal.
+- [done] 6: game-config/emulatorSwitch.ts - planSwitch, previewConsoleSwitch, applyConsoleSwitch; reuses listMyGameDevices/getGameDevice/setGameDevice and layout helpers; new to keep GameConfig from growing and share with console modal.
 - 7: game-config/EmulatorSwitchModal.tsx - warning + new paths + move choice; reuses Modal; new because SyncConflictModal is conflict-specific.
 - 8: GameConfig.tsx - Emulator field replaces launch input, queued move on Save; reuses steps 5-7.
 - 9: ConsoleFoldersModal.tsx - picker replaces label select, console-wide apply; reuses steps 5-7 and save().
@@ -123,3 +123,4 @@ Docs
 - 2026-11-20 implement: step 3 done (add emulator:moveSaves IPC with safe file moves)
 - 2026-11-20 implement: step 4 done (export InstallOptions and SuggestionLinks from EmulatorStep)
 - 2026-11-20 implement: step 5 done (add EmulatorPicker with detected options, Custom, and More install panel)
+- 2026-11-20 implement: step 6 done (add emulatorSwitch planning and console-wide apply)
