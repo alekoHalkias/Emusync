@@ -37,7 +37,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/renderer/src/components/console-import/EmulatorStep.tsx
   - Reuses: `InstallList`, `InstallOptions`, `SUGGESTION_LINKS`
   - New: none
-- [ ] 5. New `game-config/EmulatorPicker.tsx`: `useEmulatorOptions(consoleKey)` (detect, `installCore`/`installFlatpak` then re-detect, same shape as useConsoleImport's), `matchOption(cmd, options)` (option whose `execPath` and, when set, `corePath` both appear in the command; else null = Custom), and `EmulatorPicker` (`<select>`: options by label, "Custom command" when `allowCustom`, "More..." toggling an inline panel with `InstallOptions` + `SuggestionLinks`).
+- [x] 5. New `game-config/EmulatorPicker.tsx`: `useEmulatorOptions(consoleKey)` (detect, `installCore`/`installFlatpak` then re-detect, same shape as useConsoleImport's), `matchOption(cmd, options)` (option whose `execPath` and, when set, `corePath` both appear in the command; else null = Custom), and `EmulatorPicker` (`<select>`: options by label, "Custom command" when `allowCustom`, "More..." toggling an inline panel with `InstallOptions` + `SuggestionLinks`).
   - Files: src/gui/renderer/src/components/game-config/EmulatorPicker.tsx
   - Reuses: `emulator.detect/installCore/installFlatpak` IPC, step 4 exports
   - New: component - no existing dropdown over detected options (ConsoleFoldersModal's is label-only, no install)
