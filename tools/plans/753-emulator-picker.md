@@ -33,7 +33,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/electron/emulator/moveSaves.ts, src/gui/electron/emulator/ipc.ts, src/gui/electron/preload.ts, src/gui/renderer/src/emusync.d.ts
   - Reuses: rename + EXDEV copy/verify pattern from `sync/rom.ts` `rom:moveToConsoleFolder`
   - New: file - `files:rename-game-files` renames by base name within one root and `rom:moveToConsoleFolder` is ROM/server-bound; files.ts is near the 300-line limit
-- [ ] 4. Export the wizard install panel: `InstallOptions` takes `{ install, installCore, installFlatpak }` props instead of `vm`; add exported `SuggestionLinks({ suggestions })` (the existing linked list). `EmulatorStep` passes its vm fields. `SUGGESTION_LINKS` stays in EmulatorStep.tsx (test_emulator_suggestions.py reads it there).
+- [x] 4. Export the wizard install panel: `InstallOptions` takes `{ install, installCore, installFlatpak }` props instead of `vm`; add exported `SuggestionLinks({ suggestions })` (the existing linked list). `EmulatorStep` passes its vm fields. `SUGGESTION_LINKS` stays in EmulatorStep.tsx (test_emulator_suggestions.py reads it there).
   - Files: src/gui/renderer/src/components/console-import/EmulatorStep.tsx
   - Reuses: `InstallList`, `InstallOptions`, `SUGGESTION_LINKS`
   - New: none

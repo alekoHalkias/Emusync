@@ -88,7 +88,7 @@ Docs
 - [done] 1: scan.ts - extract resolveRomEntry from runEmulatorScan loop; reuses existing body; no new logic.
 - [done] 2: emulator/ipc.ts, preload.ts, emusync.d.ts - emulator:resolveGame; reuses step 1; new channel because scan only resolves folders.
 - [done] 3: emulator/moveSaves.ts (+ipc, preload, d.ts) - emulator:moveSaves; reuses rom:moveToConsoleFolder rename/EXDEV pattern; new file because rename-game-files is base-name bound and files.ts near 300 lines.
-- 4: console-import/EmulatorStep.tsx - export InstallOptions (props not vm) + SuggestionLinks; SUGGESTION_LINKS stays for test_emulator_suggestions.py.
+- [done] 4: console-import/EmulatorStep.tsx - export InstallOptions (props not vm) + SuggestionLinks; SUGGESTION_LINKS stays for test_emulator_suggestions.py.
 - 5: game-config/EmulatorPicker.tsx - useEmulatorOptions, matchOption, EmulatorPicker; reuses detect/install IPC and step 4; new because no dropdown over detected options exists.
 - 6: game-config/emulatorSwitch.ts - planSwitch, previewConsoleSwitch, applyConsoleSwitch; reuses listMyGameDevices/getGameDevice/setGameDevice and layout helpers; new to keep GameConfig from growing and share with console modal.
 - 7: game-config/EmulatorSwitchModal.tsx - warning + new paths + move choice; reuses Modal; new because SyncConflictModal is conflict-specific.
@@ -121,3 +121,4 @@ Docs
 - 2026-11-20 implement: step 2 done (add emulator:resolveGame IPC)
 - 2026-11-20 implement: step 2 done (add emulator:resolveGame IPC)
 - 2026-11-20 implement: step 3 done (add emulator:moveSaves IPC with safe file moves)
+- 2026-11-20 implement: step 4 done (export InstallOptions and SuggestionLinks from EmulatorStep)
