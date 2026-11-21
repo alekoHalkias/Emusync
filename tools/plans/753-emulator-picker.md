@@ -21,7 +21,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
 - New IPC channels go in `preload.ts` and `emusync.d.ts`.
 
 ## Steps
-- [ ] 1. Extract per-ROM resolution in `scan.ts` into exported `resolveRomEntry(consoleKey, option, romPath, scanDir): RomEntry`; `runEmulatorScan` maps through it. No behavior change.
+- [x] 1. Extract per-ROM resolution in `scan.ts` into exported `resolveRomEntry(consoleKey, option, romPath, scanDir): RomEntry`; `runEmulatorScan` maps through it. No behavior change.
   - Files: src/gui/electron/emulator/scan.ts
   - Reuses: the existing `.map(romPath => {...})` body verbatim (matchSaveFile, resolveSharedCard, state lookup, launch command)
   - New: none (function boundary only)
