@@ -106,8 +106,8 @@ Docs
 ## 10. Ship
 ### Status: shipped
 ### PR: #754
-### Server Sync: pending
-### Doc Sync: pending
+### Server Sync: done
+### Doc Sync: done
 
 ## 11. Fix Attempts
 ### Attempt 1: none
@@ -135,3 +135,5 @@ Docs
 - 2026-11-20 ship: tests passed (808 passed, 3 skipped), PR #754 opened
 - 2026-11-20 review: 2 findings, blocked=yes
 - 2026-11-20 implement: R1, R2 done (console folders use emulator root; failed apply clears busy state)
+- 2026-11-20 ship: server sync done
+- 2026-11-20 ship: doc sync updated ARCHITECTURE.md (CLAUDE.md updated in step 2; GOTCHAS.md not needed)
