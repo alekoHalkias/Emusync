@@ -57,8 +57,36 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
   - Reuses: steps 5-7, existing `save()` / `updateDeviceConsole`
   - New: none
-- [ ] 10. Tests: see section 6/7 of the handoff (tplan).
+- [ ] 10. Tests: new src/tests/test_move_saves.py drives `emulator/moveSaves.ts` through Node (type stripping) on real `tmp_path` files; existing test_emulator_suggestions.py must pass unchanged; both `tsc` projects + `make lint`; manual script below. No mocks.
+  - Files: src/tests/test_move_saves.py, src/gui/electron/emulator/moveSaves.ts (keep it importing only `node:fs`/`node:path`, export `moveSaves`)
+  - Reuses: `tmp_path`, #741 subprocess pattern (run a real program, assert result), test_emulator_suggestions.py as the EmulatorStep regression
+  - New: test file - no harness exercises Electron main code; moveSaves is the only data-loss path in this change
 - [ ] 11. Docs: ARCHITECTURE.md (IPC `emulator:resolveGame`, `emulator:moveSaves`; components EmulatorPicker, EmulatorSwitchModal, emulatorSwitch.ts), CLAUDE.md GUI rule for #753.
+
+## Testing
+- **Test File**: src/tests/test_move_saves.py (skipped when `node` is missing or older than 22.18, which lacks default type stripping)
+- **Test Cases**:
+  - file move: save file moved to a new folder (parents created), source gone, bytes equal, reported in `moved`
+  - folder move: folder save (GC card folder / Switch-style) moved whole, contents equal
+  - state folder: each state file moved individually into the new folder; files already in the destination kept
+  - same path: from == to is a no-op, nothing reported as moved
+  - missing source: no error, nothing moved (fresh emulator, no save yet)
+- **Edge Cases**:
+  - destination exists: never overwritten; source untouched; path listed in `skipped`
+  - state name collision: colliding file stays in the source folder, listed in `skipped`, others still move
+  - blank paths: empty `fromSave`/`fromState` skip that half (shared-layout per-game switch)
+- **Integration Points**:
+  - test_emulator_suggestions.py: SUGGESTION_LINKS still parsed from EmulatorStep.tsx after the InstallOptions export
+  - `PUT /games/{slug}/device` already accepts launch_command/save_path/state_path (covered by existing test_games.py/test_devices.py); no new server code
+  - `tsc --noEmit` for main and renderer: no new errors beyond the known pre-existing ones
+- **Manual script** (dev server + `make dev-gui`, real files in a temp ROM/save folder):
+  1. GBA game with RetroArch mGBA core: Emulator shows the core; switch to standalone mGBA: modal shows warning + new save/state paths; Move saves; Save; save file is at the new path, config PUT matches, `emusync run` launches mGBA.
+  2. Same, choose Keep files: paths updated, old files untouched.
+  3. Cancel in the modal or leave the form unsaved: no files moved.
+  4. Game with a hand-written command: opens as Custom with the text unchanged; saving keeps it.
+  5. More...: install a missing core; the dropdown lists it without reopening.
+  6. Console settings: switch a console with 2+ games and one Custom game; Custom game untouched, others updated, message counts correct; device_emulator/save/state folders updated.
+  7. PS2 per-game switch: card and sstates paths unchanged; console-level switch moves the card once.
 
 ## Checklist
 Schema bump: no. New IPC channel (+ emusync.d.ts): yes (emulator:resolveGame, emulator:moveSaves). New CLI subcommand: no. Config/data file change: no.
@@ -69,3 +97,4 @@ Schema bump: no. New IPC channel (+ emusync.d.ts): yes (emulator:resolveGame, em
 
 ## Log
 - 2026-11-20 fplan: plan written
+- 2026-11-20 tplan: testing section added

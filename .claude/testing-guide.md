@@ -69,3 +69,6 @@ When a store core is generalized (owner column), the existing per-feature suites
 
 ### Blob format changes (#739)
 Tests build wire blobs through the real codec, never hand-written bytes: `conftest.tree(data)` gives a single-file blob and `raw_env` returns the same, so a format change touches one helper. Packing must be deterministic (mtime/uid 0) so pulled bytes compare equal. Conversion migrations follow the #737 backfill pattern plus: originals kept aside, DB backup present, hashes remapped in rows, baselines and conflicts together.
+
+### Electron main data-loss helpers (#753)
+A main-process helper that moves user files lives in its own module importing only `node:*` builtins, so pytest can run it with `node` (type stripping, skip below Node 22.18) on real `tmp_path` files via a short inline ESM driver; assert bytes, source removal and never-overwrite. Everything else main/renderer stays tsc + lint + manual script.

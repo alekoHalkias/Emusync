@@ -55,12 +55,26 @@ See issue #753.
 ### Unresolved Conflicts: none
 
 ## 6. Testing Plan
-### Test File: TBD
-### Test Cases: TBD
-### Edge Cases: TBD
-### Integration Points: TBD
-### Outline: TBD
-### Summary: TBD
+### Test File: src/tests/test_move_saves.py (Node-driven, skips below Node 22.18)
+### Test Cases: file move; folder move; state files moved individually; same-path no-op; missing source no-op.
+### Edge Cases: destination exists never overwritten (skipped); state name collision keeps colliding file in source; blank from-paths skip that half.
+### Integration Points: test_emulator_suggestions.py unchanged (SUGGESTION_LINKS stays in EmulatorStep.tsx); existing device PUT tests cover persisted fields; tsc both projects + make lint; 7-step manual script in plan.
+### Outline:
+Frontend
+- 1 scan.ts: extract resolveRomEntry (no behavior change)
+- 2 IPC emulator:resolveGame (one ROM + one emulator -> launch cmd, save/state paths)
+- 3 IPC emulator:moveSaves in emulator/moveSaves.ts (safe move, never overwrite)
+- 4 EmulatorStep.tsx: export InstallOptions + SuggestionLinks
+- 5 EmulatorPicker.tsx: detected options, Custom command, More... install panel; matchOption
+- 6 emulatorSwitch.ts: planSwitch / previewConsoleSwitch / applyConsoleSwitch (shared-layout and blank-save rules)
+- 7 EmulatorSwitchModal.tsx: compatibility warning, new paths, Cancel / Keep files / Move saves
+- 8 GameConfig.tsx: Emulator field replaces launch input; move runs on Save
+- 9 ConsoleFoldersModal.tsx: picker replaces label select; console-wide apply skipping Custom games
+Tests
+- 10 test_move_saves.py (5 cases + 3 edge cases), suggestion test regression, tsc/lint, manual script
+Docs
+- 11 ARCHITECTURE.md + CLAUDE.md
+### Summary: Game and console settings choose an installed emulator from a dropdown (Custom and More... included), build the launch command and save/state paths from it, warn about save compatibility and offer to move existing saves to the new emulator's location.
 
 ## 7. Test Design
 ### Test Scope: TBD
@@ -102,3 +116,4 @@ See issue #753.
 - 2026-11-20 issue: workflow initialized; user decisions recorded in section 1
 - 2026-11-20 design: scope=ui, plan_target=fplan, difficulty=6/10, breaking=no
 - 2026-11-20 fplan: 11 steps written, visual_pattern=settings select + inline install panel + switch confirm modal
+- 2026-11-20 tplan: test_file=src/tests/test_move_saves.py, 8 test cases defined
