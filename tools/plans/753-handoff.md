@@ -4,7 +4,7 @@
 - Issue: #753
 - Branch: feature/753-emulator-picker
 - PR: #754
-- Status: implementing
+- Status: shipped
 - Created: 2026-11-20
 - Fix attempts: 0
 
@@ -138,3 +138,4 @@ Docs
 - 2026-11-20 ship: server sync done
 - 2026-11-20 ship: doc sync updated ARCHITECTURE.md (CLAUDE.md updated in step 2; GOTCHAS.md not needed)
 - 2026-11-20 user report: launch text field shows before the dropdown on open; fix step R3 added
+- 2026-11-20 implement: R3 done (picker loading state instead of raw launch input while console resolves)

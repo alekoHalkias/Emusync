@@ -3,7 +3,7 @@
 Issue: #753
 Branch: feature/753-emulator-picker
 PR: none
-Status: implementing
+Status: implemented
 Fix attempts: 0
 
 ## Goal
@@ -68,7 +68,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
 - [x] R2. ConsoleFoldersModal confirmSwitch: try/catch/finally so a failed apply clears the busy state, closes the modal and reports the error in the msg line.
   - Files: src/gui/renderer/src/components/ConsoleFoldersModal.tsx
-- [ ] R3. GameConfig flashes the raw launch input before the dropdown: `consoleKey` is "" while `getGame` and the console lookup are in flight, which the form treats as "no console". Track a resolving state (GameConfig passes `ready` once the game's console is loaded; the hook resolves after the lookup) and show the disabled picker ("Detecting emulators...") meanwhile; fall back to the raw input only when resolved with no console.
+- [x] R3. GameConfig flashes the raw launch input before the dropdown: `consoleKey` is "" while `getGame` and the console lookup are in flight, which the form treats as "no console". Track a resolving state (GameConfig passes `ready` once the game's console is loaded; the hook resolves after the lookup) and show the disabled picker ("Detecting emulators...") meanwhile; fall back to the raw input only when resolved with no console.
   - Files: src/gui/renderer/src/components/GameConfig.tsx, src/gui/renderer/src/components/game-config/useGameEmulator.ts
 
 ## Testing

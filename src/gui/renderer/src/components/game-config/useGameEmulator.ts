@@ -8,6 +8,7 @@ type Move = { fromSave: string; toSave: string; fromState: string; toState: stri
 
 type Args = {
   gameConsole: string;          // stored abbr, e.g. "GBA"
+  ready: boolean;               // gameConsole has been loaded (blank then means no console)
   launchCommand: string;
   romPath: string;              // ROM in use (local copy for network games)
   scanRoot?: string;
@@ -20,13 +21,17 @@ type Args = {
 
 export function useGameEmulator(a: Args) {
   const [consoleKey, setConsoleKey] = useState("");
+  // Until resolved, a blank consoleKey means "still loading", not "no console",
+  // so the form shows the picker's loading state instead of the raw input.
+  const [resolved, setResolved] = useState(false);
   useEffect(() => {
-    if (!a.gameConsole) return;
+    if (!a.ready) return;
+    if (!a.gameConsole) { setConsoleKey(""); setResolved(true); return; }
     window.emusync.emulator.consoles().then(defs => {
       const def = defs.find(d => (d.abbr ?? "").toLowerCase() === a.gameConsole.toLowerCase());
       setConsoleKey(def?.key ?? "");
-    }).catch(() => {});
-  }, [a.gameConsole]);
+    }).catch(() => {}).finally(() => setResolved(true));
+  }, [a.ready, a.gameConsole]);
 
   const emu = useEmulatorOptions(consoleKey);
   const [value, setValue] = useState("");
@@ -88,5 +93,5 @@ export function useGameEmulator(a: Args) {
     onConfirm: confirm,
   };
 
-  return { consoleKey, emu, value, pick, error, modal, takeMove, restoreMove: (m: Move) => { move.current = m; } };
+  return { consoleKey, resolving: !resolved, emu, value, pick, error, modal, takeMove, restoreMove: (m: Move) => { move.current = m; } };
 }
