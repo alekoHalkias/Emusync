@@ -91,7 +91,7 @@ Docs
 - [done] 4: console-import/EmulatorStep.tsx - export InstallOptions (props not vm) + SuggestionLinks; SUGGESTION_LINKS stays for test_emulator_suggestions.py.
 - [done] 5: game-config/EmulatorPicker.tsx - useEmulatorOptions, matchOption, EmulatorPicker; reuses detect/install IPC and step 4; new because no dropdown over detected options exists.
 - [done] 6: game-config/emulatorSwitch.ts - planSwitch, previewConsoleSwitch, applyConsoleSwitch; reuses listMyGameDevices/getGameDevice/setGameDevice and layout helpers; new to keep GameConfig from growing and share with console modal.
-- 7: game-config/EmulatorSwitchModal.tsx - warning + new paths + move choice; reuses Modal; new because SyncConflictModal is conflict-specific.
+- [done] 7: game-config/EmulatorSwitchModal.tsx - warning + new paths + move choice; reuses Modal; new because SyncConflictModal is conflict-specific.
 - 8: GameConfig.tsx - Emulator field replaces launch input, queued move on Save; reuses steps 5-7.
 - 9: ConsoleFoldersModal.tsx - picker replaces label select, console-wide apply; reuses steps 5-7 and save().
 - 10: tests (tplan). 11: docs (ARCHITECTURE.md, CLAUDE.md).
@@ -124,3 +124,4 @@ Docs
 - 2026-11-20 implement: step 4 done (export InstallOptions and SuggestionLinks from EmulatorStep)
 - 2026-11-20 implement: step 5 done (add EmulatorPicker with detected options, Custom, and More install panel)
 - 2026-11-20 implement: step 6 done (add emulatorSwitch planning and console-wide apply)
+- 2026-11-20 implement: step 7 done (add EmulatorSwitchModal)

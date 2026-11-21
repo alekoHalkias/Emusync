@@ -45,7 +45,7 @@ Game and console settings pick an installed emulator from a dropdown (plus Custo
   - Files: src/gui/renderer/src/components/game-config/emulatorSwitch.ts
   - Reuses: `listMyGameDevices`, `getGameDevice`, `setGameDevice`, `usesSharedSaveLayout`/`usesSharedStateLayout`
   - New: module - shared by GameConfig and ConsoleFoldersModal, keeps GameConfig (692 lines) from growing
-- [ ] 7. New `game-config/EmulatorSwitchModal.tsx`: warning "A save made with <old> may not load in <new>." and, when save/state paths change, "<new> uses save path <path> and state path <path>. Move existing save files there?" Actions: Cancel, Keep files, Move saves.
+- [x] 7. New `game-config/EmulatorSwitchModal.tsx`: warning "A save made with <old> may not load in <new>." and, when save/state paths change, "<new> uses save path <path> and state path <path>. Move existing save files there?" Actions: Cancel, Keep files, Move saves.
   - Files: src/gui/renderer/src/components/game-config/EmulatorSwitchModal.tsx
   - Reuses: `Modal`, guide modal pattern
   - New: component - SyncConflictModal is conflict-specific
